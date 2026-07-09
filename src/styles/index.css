@@ -752,6 +752,127 @@ body {
   min-width: 26px;
 }
 
+/* ---------- accessibility (Phase 7) ---------- */
+/* visible keyboard focus everywhere, without fighting mouse users */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-radius: 4px;
+}
+.field:focus-visible {
+  outline: none; /* fields already show focus via border-color */
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ---------- toasts ---------- */
+.toast-in {
+  animation: toast-in 0.18s ease-out;
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ---------- presence (Phase 7) ---------- */
+.peer-cursor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 60;
+  pointer-events: none;
+  transition: transform 0.08s linear;
+}
+.peer-cursor-name {
+  position: absolute;
+  top: 16px;
+  left: 12px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.peer-selection {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 4;
+  pointer-events: none;
+  border: 1.5px solid;
+  border-radius: 11px;
+  transition: transform 0.08s linear;
+}
+.peer-selection-name {
+  position: absolute;
+  top: -16px;
+  left: 0;
+  padding: 0 5px;
+  border-radius: 4px;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* comment pins on the canvas */
+.comment-pin {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 55;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--panel);
+  border-radius: 50% 50% 50% 4px;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+}
+.comment-pin.is-resolved {
+  opacity: 0.55;
+}
+.comment-pin.is-focused {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.comment-pin:hover {
+  transform: scale(1.15);
+}
+
+/* comment count badge on card headers */
+.card-comments {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0 5px;
+  height: 16px;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 9.5px;
+  font-weight: 700;
+}
+
 /* ---------- code workspace ---------- */
 .code-tab {
   display: flex;

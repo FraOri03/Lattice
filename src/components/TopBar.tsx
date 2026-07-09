@@ -3,16 +3,21 @@ import { useStore } from '@/store/useStore'
 import { useUiStore } from '@/store/useUiStore'
 import { useSyncStore } from '@/lib/sync/syncStore'
 import { syncEngine } from '@/lib/sync/SyncEngine'
+import { useCollabStore } from '@/lib/collab/collabStore'
+import { useCan, useReadOnly } from '@/lib/collab/useCollab'
 import type { ViewMode } from '@/types/model'
 import { ProfileMenu } from '@/components/account/ProfileMenu'
+import { PresenceAvatars } from '@/components/collab/PresenceAvatars'
 import {
   IcBoard,
-  IcChevronDown,
+  IcChevronRight,
   IcCloud,
   IcCloudOff,
   IcCode,
   IcCommand,
   IcDoc,
+  IcHistory,
+  IcMessage,
   IcMoon,
   IcNote,
   IcPlus,
@@ -21,7 +26,9 @@ import {
   IcSplit,
   IcSun,
   IcTable,
+  IcUserPlus,
   IcWifiOff,
+  IcChevronDown,
 } from '@/components/Icons'
 
 const MODES: { mode: ViewMode; label: string; icon: React.ReactNode }[] = [
@@ -93,6 +100,7 @@ function SyncIndicator() {
     <button
       className={`flex cursor-pointer items-center gap-1.5 rounded-full border border-bord bg-panel2 px-2 py-1 text-[10px] font-medium ${color}`}
       title={sync.error ?? 'Google Drive sync — click to sync now'}
+      aria-label="Sync now"
       onClick={() => void syncEngine.syncNow()}
     >
       {sync.status === 'syncing' ? (
@@ -130,7 +138,13 @@ function QuickCreate() {
 
   return (
     <div className="relative" ref={ref}>
-      <button className="btn" onClick={() => setOpen((v) => !v)} title="Quick create">
+      <button
+        className="btn"
+        onClick={() => setOpen((v) => !v)}
+        title="Quick create"
+        aria-label="Create new item"
+        aria-expanded={open}
+      >
         <IcPlus size={13} /> New <IcChevronDown size={11} />
       </button>
       {open && (
@@ -153,43 +167,129 @@ function QuickCreate() {
   )
 }
 
-export function TopBar() {
+/**
+ * Breadcrumb: project → current context. Present in EVERY mode, so the
+ * user always knows where they are (the old bar went blank outside Board).
+ */
+function ContextBreadcrumb() {
+  const project = useStore((s) => s.projects[s.activeProjectId])
+  const viewMode = useStore((s) => s.viewMode)
   const board = useStore((s) => s.boards[s.activeBoardId])
   const renameBoard = useStore((s) => s.renameBoard)
+  const docs = useStore((s) => s.docs)
+  const codeDocs = useStore((s) => s.codeDocs)
+  const sheetDocs = useStore((s) => s.sheetDocs)
+  const notes = useStore((s) => s.notes)
+  const assets = useStore((s) => s.assets)
+  const activeDocId = useStore((s) => s.activeDocId)
+  const activeCodeId = useStore((s) => s.activeCodeId)
+  const activeSheetId = useStore((s) => s.activeSheetId)
+  const activeNoteId = useStore((s) => s.activeNoteId)
+  const activeAssetId = useStore((s) => s.activeAssetId)
+  const readOnly = useReadOnly()
+
+  const boardVisible = viewMode === 'board' || viewMode === 'split'
+
+  let entity: string | null = null
+  if (activeAssetId && assets[activeAssetId]) entity = assets[activeAssetId].name
+  else if (activeCodeId && codeDocs[activeCodeId])
+    entity = `${codeDocs[activeCodeId].title}.${codeDocs[activeCodeId].extension}`
+  else if (activeSheetId && sheetDocs[activeSheetId]) entity = sheetDocs[activeSheetId].title
+  else if (activeDocId && docs[activeDocId]) entity = docs[activeDocId].title
+  else if (activeNoteId && notes[activeNoteId]) entity = notes[activeNoteId].title
+
+  return (
+    <div className="flex min-w-0 items-center gap-1 text-[12px]">
+      {project && (
+        <span className="flex min-w-0 items-center gap-1.5 font-medium text-muted" title={project.name}>
+          <span aria-hidden>{project.icon}</span>
+          <span className="max-w-28 truncate">{project.name}</span>
+        </span>
+      )}
+      {boardVisible && board ? (
+        <>
+          <IcChevronRight size={11} className="flex-none text-muted" />
+          <input
+            className="w-36 rounded-md border border-transparent bg-transparent px-1.5 py-0.5 text-[12.5px] font-semibold outline-none hover:border-bord focus:border-accent disabled:hover:border-transparent"
+            value={board.name}
+            disabled={readOnly}
+            onChange={(e) => renameBoard(board.id, e.target.value)}
+            aria-label="Board name"
+            title={readOnly ? 'Read-only — your role cannot rename boards' : 'Rename board'}
+          />
+        </>
+      ) : entity ? (
+        <>
+          <IcChevronRight size={11} className="flex-none text-muted" />
+          <span className="max-w-44 truncate font-semibold" title={entity}>
+            {entity}
+          </span>
+        </>
+      ) : null}
+    </div>
+  )
+}
+
+/** Comments / Versions toggles with unresolved badge. */
+function PanelButtons() {
+  const panel = useCollabStore((s) => s.panel)
+  const setPanel = useCollabStore((s) => s.setPanel)
+  const projectId = useStore((s) => s.activeProjectId)
+  const comments = useCollabStore((s) => s.comments[projectId])
+  const openCount = comments?.filter((t) => !t.resolved).length ?? 0
+
+  return (
+    <>
+      <button
+        className={`icon-btn relative ${panel === 'comments' ? 'bg-panel2 !text-accent' : ''}`}
+        title="Comments"
+        aria-label={`Comments${openCount ? ` (${openCount} open)` : ''}`}
+        onClick={() => setPanel(panel === 'comments' ? null : 'comments')}
+      >
+        <IcMessage size={15} />
+        {openCount > 0 && (
+          <span className="absolute -top-0.5 -right-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-accent px-0.5 text-[8.5px] font-bold text-white">
+            {openCount > 9 ? '9+' : openCount}
+          </span>
+        )}
+      </button>
+      <button
+        className={`icon-btn ${panel === 'versions' || panel === 'activity' ? 'bg-panel2 !text-accent' : ''}`}
+        title="Version history & activity"
+        aria-label="Version history and activity"
+        onClick={() => setPanel(panel === 'versions' ? null : 'versions')}
+      >
+        <IcHistory size={15} />
+      </button>
+    </>
+  )
+}
+
+export function TopBar() {
   const viewMode = useStore((s) => s.viewMode)
   const setViewMode = useStore((s) => s.setViewMode)
   const theme = useStore((s) => s.theme)
   const setTheme = useStore((s) => s.setTheme)
   const setPaletteOpen = useUiStore((s) => s.setPaletteOpen)
-
-  const boardVisible = viewMode === 'board' || viewMode === 'split'
+  const setShareDialogOpen = useUiStore((s) => s.setShareDialogOpen)
+  const mayCreate = useCan('content.create')
 
   return (
     <header className="flex h-11 flex-none items-center gap-2 border-b border-bord bg-panel px-3">
-      <QuickCreate />
-      {boardVisible && board ? (
-        <>
-          <input
-            className="w-44 rounded-md border border-transparent bg-transparent px-2 py-1 text-[13px] font-semibold outline-none hover:border-bord focus:border-accent"
-            value={board.name}
-            onChange={(e) => renameBoard(board.id, e.target.value)}
-            title="Board name"
-          />
-          <span className="hidden text-[11px] text-muted lg:inline">
-            {board.nodes.length} cards · {board.edges.length} links
-          </span>
-        </>
-      ) : (
-        <span className="w-44" />
-      )}
+      {mayCreate && <QuickCreate />}
+      <ContextBreadcrumb />
 
       <div className="flex-1" />
 
-      <div className="flex rounded-lg border border-bord bg-panel2 p-0.5">
+      <div className="flex rounded-lg border border-bord bg-panel2 p-0.5" role="tablist" aria-label="View mode">
         {MODES.map(({ mode, label, icon }) => (
           <button
             key={mode}
             onClick={() => setViewMode(mode)}
+            role="tab"
+            aria-selected={viewMode === mode}
+            aria-label={`${label} view`}
+            title={`${label} view`}
             className={`flex cursor-pointer items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium ${
               viewMode === mode
                 ? 'bg-panel text-ink shadow-sm'
@@ -204,10 +304,22 @@ export function TopBar() {
 
       <div className="flex-1" />
 
+      <PresenceAvatars />
+      <button
+        className="btn"
+        onClick={() => setShareDialogOpen(true)}
+        title="Share — members, roles & invites"
+        aria-label="Share project"
+      >
+        <IcUserPlus size={13} />
+        <span className="hidden lg:inline">Share</span>
+      </button>
+      <PanelButtons />
       <button
         className="btn hidden md:inline-flex"
         onClick={() => setPaletteOpen(true)}
         title="Command palette"
+        aria-label="Open command palette"
       >
         <IcCommand size={12} />
         <kbd className="text-[10px] text-muted">Ctrl K</kbd>
@@ -217,6 +329,7 @@ export function TopBar() {
         className="icon-btn"
         onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
         title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+        aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
       >
         {theme === 'dark' ? <IcSun size={15} /> : <IcMoon size={15} />}
       </button>

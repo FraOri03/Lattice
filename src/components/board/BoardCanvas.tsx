@@ -11,6 +11,7 @@ import {
   ReactFlowProvider,
   useReactFlow,
   type OnNodeDrag,
+  type OnSelectionChangeFunc,
 } from '@xyflow/react'
 import { useStore, CARD_DEFAULTS } from '@/store/useStore'
 import {
@@ -27,6 +28,15 @@ import { toVideoEmbed } from '@/lib/media'
 import { looksLikeUrl } from '@/lib/web/WebEmbedService'
 import { centerOf, sectionAtPoint } from '@/lib/board/sections'
 import { CARD_COLORS, type BoardNode } from '@/types/model'
+import { presenceService } from '@/lib/collab/PresenceService'
+import { commentService } from '@/lib/collab/CommentService'
+import { useCollabStore } from '@/lib/collab/collabStore'
+import { useReadOnly } from '@/lib/collab/useCollab'
+import { BoardPresenceLayer } from '@/components/collab/BoardPresenceLayer'
+import { CommentPins } from '@/components/collab/CommentPins'
+import { toast } from '@/components/ui/Toaster'
+import { promptDialog } from '@/components/ui/ConfirmDialog'
+import { IcBoard, IcNote, IcSection, IcUpload } from '@/components/Icons'
 import {
   FileCardNode,
   ImageCardNode,
@@ -74,6 +84,50 @@ function isEditableTarget(t: EventTarget | null): boolean {
   )
 }
 
+/** First-run guidance when a board is empty (previously: a blank dot grid). */
+function EmptyBoardState({ readOnly }: { readOnly: boolean }) {
+  const addSection = useStore((s) => s.addSection)
+  const addCard = useStore((s) => s.addCard)
+  return (
+    <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+      <div className="flex max-w-sm flex-col items-center gap-3 text-center">
+        <span className="flex h-14 w-14 items-center justify-center rounded-2xl border border-bord bg-panel text-muted">
+          <IcBoard size={26} />
+        </span>
+        <p className="text-[14px] font-semibold">This board is empty</p>
+        {readOnly ? (
+          <p className="text-[12px] leading-relaxed text-muted">
+            Nothing here yet. Your role is read-only — an editor can add the first cards.
+          </p>
+        ) : (
+          <>
+            <p className="text-[12px] leading-relaxed text-muted">
+              Add cards with the toolbar below, drag files from your desktop, drag
+              notes/docs from the sidebar, or paste a URL to embed a website.
+            </p>
+            <div className="pointer-events-auto flex gap-2">
+              <button className="btn" onClick={() => addCard('note', { x: 0, y: 0 })}>
+                <IcNote size={13} /> First note
+              </button>
+              <button className="btn" onClick={() => addSection({ x: -320, y: -210 })}>
+                <IcSection size={13} /> Add section
+              </button>
+              <button
+                className="btn"
+                onClick={() =>
+                  (document.querySelector('[data-import-input]') as HTMLInputElement)?.click()
+                }
+              >
+                <IcUpload size={13} /> Import files
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function Canvas() {
   const board = useStore((s) => s.boards[s.activeBoardId])
   const theme = useStore((s) => s.theme)
@@ -84,6 +138,11 @@ function Canvas() {
   const addWebEmbedCard = useStore((s) => s.addWebEmbedCard)
   const attachCardToSection = useStore((s) => s.attachCardToSection)
   const detachCardFromSection = useStore((s) => s.detachCardFromSection)
+  const commentMode = useCollabStore((s) => s.commentMode)
+  const setCommentMode = useCollabStore((s) => s.setCommentMode)
+  const setPanel = useCollabStore((s) => s.setPanel)
+  const setFocusedThread = useCollabStore((s) => s.setFocusedThread)
+  const readOnly = useReadOnly()
   const { screenToFlowPosition } = useReactFlow()
 
   /** Cards dropped on a section join it; dragged out, they leave it. */
@@ -102,6 +161,11 @@ function Canvas() {
     [attachCardToSection, detachCardFromSection],
   )
 
+  /** Live selection outlines for peers. */
+  const onSelectionChange = useCallback<OnSelectionChangeFunc>(({ nodes }) => {
+    presenceService.setSelection(nodes.map((n) => n.id))
+  }, [])
+
   // paste a URL anywhere on the board → web embed card
   useEffect(() => {
     const onPaste = (e: ClipboardEvent) => {
@@ -109,6 +173,10 @@ function Canvas() {
       const text = e.clipboardData?.getData('text') ?? ''
       if (!looksLikeUrl(text)) return
       e.preventDefault()
+      if (readOnly) {
+        toast.warning('Read-only project', 'Your role cannot add cards to this board.')
+        return
+      }
       const base = screenToFlowPosition({
         x: window.innerWidth / 2,
         y: window.innerHeight / 2,
@@ -117,15 +185,46 @@ function Canvas() {
         x: base.x - CARD_DEFAULTS.webembed.w / 2,
         y: base.y - CARD_DEFAULTS.webembed.h / 2,
       })
-      if (!res.cardId) alert(res.reason)
+      if (!res.cardId) toast.error('Could not embed that URL', res.reason)
     }
     window.addEventListener('paste', onPaste)
     return () => window.removeEventListener('paste', onPaste)
-  }, [addWebEmbedCard, screenToFlowPosition])
+  }, [addWebEmbedCard, screenToFlowPosition, readOnly])
+
+  /** Comment mode: click the canvas to pin a comment at that spot. */
+  const onPaneClick = useCallback(
+    async (e: React.MouseEvent) => {
+      if (!commentMode) return
+      const pos = screenToFlowPosition({ x: e.clientX, y: e.clientY })
+      const body = await promptDialog({
+        title: 'Comment on this spot',
+        label: 'Comment',
+        placeholder: 'What about this area? (@name mentions)',
+        confirmLabel: 'Add comment',
+      })
+      setCommentMode(false)
+      if (!body?.trim()) return
+      const projectId = useStore.getState().activeProjectId
+      const thread = commentService.add(projectId, 'board', board.id, body, {
+        boardId: board.id,
+        x: pos.x,
+        y: pos.y,
+      })
+      if (thread) {
+        setPanel('comments')
+        setFocusedThread(thread.id)
+      }
+    },
+    [commentMode, screenToFlowPosition, board.id, setCommentMode, setPanel, setFocusedThread],
+  )
 
   const onDrop = useCallback(
     async (e: React.DragEvent) => {
       e.preventDefault()
+      if (readOnly) {
+        toast.warning('Read-only project', 'Your role cannot add cards to this board.')
+        return
+      }
       const base = screenToFlowPosition({ x: e.clientX, y: e.clientY })
 
       const noteId = e.dataTransfer.getData(NOTE_DRAG_MIME)
@@ -215,21 +314,26 @@ function Canvas() {
           addCard('image', base, { src: url })
         else {
           const res = addWebEmbedCard(url, base)
-          if (!res.cardId) alert(res.reason)
+          if (!res.cardId) toast.error('Could not embed that URL', res.reason)
         }
       }
     },
-    [addCard, addWebEmbedCard, screenToFlowPosition],
+    [addCard, addWebEmbedCard, screenToFlowPosition, readOnly],
   )
 
   return (
     <div
-      className="relative h-full min-w-0 flex-1"
+      className={`relative h-full min-w-0 flex-1 ${commentMode ? 'cursor-crosshair' : ''}`}
       onDrop={(e) => void onDrop(e)}
       onDragOver={(e) => {
         e.preventDefault()
-        e.dataTransfer.dropEffect = 'copy'
+        e.dataTransfer.dropEffect = readOnly ? 'none' : 'copy'
       }}
+      onPointerMove={(e) => {
+        const p = screenToFlowPosition({ x: e.clientX, y: e.clientY })
+        presenceService.setCursor(board.id, p.x, p.y)
+      }}
+      onPointerLeave={() => presenceService.clearCursor()}
     >
       <ReactFlow
         nodes={board.nodes}
@@ -239,6 +343,8 @@ function Canvas() {
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onNodeDragStop={onNodeDragStop}
+        onSelectionChange={onSelectionChange}
+        onPaneClick={(e) => void onPaneClick(e)}
         colorMode={theme}
         fitView
         fitViewOptions={{ padding: 0.15, maxZoom: 1 }}
@@ -246,7 +352,10 @@ function Canvas() {
         maxZoom={4}
         connectionMode={ConnectionMode.Loose}
         defaultEdgeOptions={defaultEdgeOptions}
-        deleteKeyCode={['Delete', 'Backspace']}
+        nodesDraggable={!readOnly}
+        nodesConnectable={!readOnly}
+        edgesReconnectable={!readOnly}
+        deleteKeyCode={readOnly ? null : ['Delete', 'Backspace']}
         selectionKeyCode="Shift"
       >
         <Background variant={BackgroundVariant.Dots} gap={22} size={1.2} />
@@ -260,15 +369,33 @@ function Canvas() {
           }
         />
         <Controls />
-        <Panel position="bottom-center">
-          <CanvasToolbar />
-        </Panel>
+        {!readOnly && (
+          <Panel position="bottom-center">
+            <CanvasToolbar />
+          </Panel>
+        )}
+        <BoardPresenceLayer boardId={board.id} />
+        <CommentPins boardId={board.id} />
       </ReactFlow>
+      {board.nodes.length === 0 && <EmptyBoardState readOnly={readOnly} />}
+      {commentMode && (
+        <div className="pointer-events-none absolute top-3 left-1/2 z-20 -translate-x-1/2 rounded-full border border-accent/40 bg-accent/15 px-3 py-1 text-[11px] font-medium text-accent">
+          Click anywhere on the canvas to pin a comment — Esc to cancel
+        </div>
+      )}
     </div>
   )
 }
 
 export function BoardCanvas() {
+  const setCommentMode = useCollabStore((s) => s.setCommentMode)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setCommentMode(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [setCommentMode])
   return (
     <ReactFlowProvider>
       <Canvas />

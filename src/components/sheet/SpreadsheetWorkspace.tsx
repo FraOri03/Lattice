@@ -1,5 +1,6 @@
 import type { SpreadsheetDocMeta } from '@/types/model'
 import { useStore } from '@/store/useStore'
+import { useReadOnly } from '@/lib/collab/useCollab'
 import { IcTable, IcX } from '@/components/Icons'
 import { SheetSessionProvider } from './SheetSession'
 import { SpreadsheetEditor } from './SpreadsheetEditor'
@@ -19,16 +20,18 @@ export default function SpreadsheetWorkspace({ meta }: { meta: SpreadsheetDocMet
   const updateSheetMeta = useStore((s) => s.updateSheetMeta)
   const closeSheet = useStore((s) => s.closeSheet)
   const viewMode = useStore((s) => s.viewMode)
+  const readOnly = useReadOnly()
 
   return (
     <section className="flex h-full min-w-0 flex-1 border-r border-bord bg-panel">
-      <SheetSessionProvider sheetId={meta.id}>
+      <SheetSessionProvider sheetId={meta.id} readOnly={readOnly}>
         <div className="flex h-full min-w-0 flex-1 flex-col">
           <div className="flex flex-none items-center gap-2 border-b border-bord px-4 py-2">
             <IcTable size={15} className="flex-none text-muted" />
             <input
               className="min-w-0 flex-1 bg-transparent text-[15px] font-bold outline-none"
               value={meta.title}
+              disabled={readOnly}
               onChange={(e) => updateSheetMeta(meta.id, { title: e.target.value })}
               placeholder="Untitled spreadsheet"
             />

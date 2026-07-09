@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { cellKey, displayValueOf } from '@/lib/sheet/sheetModel'
+import { confirmDialog } from '@/components/ui/ConfirmDialog'
 import { IcPlus, IcX } from '@/components/Icons'
 import { rectOf, useSheetSession } from './SheetSession'
 
@@ -86,10 +87,18 @@ export function SheetTabs() {
             <button
               className="icon-btn h-4 w-4"
               title="Delete sheet"
-              onClick={(e) => {
+              onClick={async (e) => {
                 e.stopPropagation()
                 const hasData = Object.keys(s.cells).length > 0
-                if (!hasData || confirm(`Delete sheet "${s.name}" and its data?`))
+                if (
+                  !hasData ||
+                  (await confirmDialog({
+                    title: `Delete sheet “${s.name}”?`,
+                    body: 'The tab and all its cell data are removed from this workbook.',
+                    confirmLabel: 'Delete sheet',
+                    danger: true,
+                  }))
+                )
                   deleteSheetTab(i)
               }}
             >

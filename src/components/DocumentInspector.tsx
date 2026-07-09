@@ -7,6 +7,8 @@ import {
 } from '@/lib/export/ExportService'
 import { KIND_ICONS } from '@/components/assetKinds'
 import { DocumentOutline } from '@/components/richdoc/DocumentOutline'
+import { toast } from '@/components/ui/Toaster'
+import { confirmDialog } from '@/components/ui/ConfirmDialog'
 import { IcDownload, IcTrash } from '@/components/Icons'
 
 /**
@@ -35,7 +37,7 @@ export function DocumentInspector() {
     try {
       await exportDocument(doc, format)
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Export failed')
+      toast.error('Export failed', err instanceof Error ? err.message : undefined)
     }
   }
 
@@ -164,8 +166,15 @@ export function DocumentInspector() {
       <div className="insp-h">Danger</div>
       <button
         className="btn w-full text-[#f24822]"
-        onClick={() => {
-          if (confirm(`Delete document "${doc.title}" and its cards on all boards?`))
+        onClick={async () => {
+          if (
+            await confirmDialog({
+              title: `Delete “${doc.title}”?`,
+              body: 'The document and its cards on all boards are removed.',
+              confirmLabel: 'Delete document',
+              danger: true,
+            })
+          )
             deleteDoc(doc.id)
         }}
       >

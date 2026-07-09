@@ -150,6 +150,17 @@ export async function importFiles(files: File[]): Promise<ImportOutcome[]> {
   } finally {
     setProgress(null)
   }
+  const imported = out.filter((o) => o.kind !== 'error').length
+  if (imported) {
+    const { activityLog } = await import('@/lib/collab/ActivityLogService')
+    activityLog.log(
+      useStore.getState().activeProjectId,
+      'file.imported',
+      imported === 1 && files[0]
+        ? `Imported “${files[0].name}”`
+        : `Imported ${imported} files`,
+    )
+  }
   return out
 }
 
@@ -199,10 +210,12 @@ export function cardSpecFor(outcome: ImportOutcome): {
 export function reportErrors(outcomes: ImportOutcome[]): void {
   const errors = outcomes.filter((o) => o.kind === 'error')
   if (errors.length) {
-    alert(
-      `Some files could not be imported:\n${errors
-        .map((e) => `· ${e.fileName}: ${e.message}`)
-        .join('\n')}`,
-    )
+    // lazy import avoids a static cycle (Toaster → … → ImportService)
+    void import('@/components/ui/Toaster').then(({ toast }) => {
+      toast.error(
+        `${errors.length} file${errors.length > 1 ? 's' : ''} could not be imported`,
+        errors.map((e) => `${e.fileName}: ${e.message}`).join(' · '),
+      )
+    })
   }
 }

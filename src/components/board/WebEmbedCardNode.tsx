@@ -4,6 +4,8 @@ import type { BoardNode } from '@/types/model'
 import { useStore } from '@/store/useStore'
 import { sanitizeEmbedUrl, faviconUrlFor } from '@/lib/web/WebEmbedService'
 import { hostnameOf } from '@/lib/media'
+import { toast } from '@/components/ui/Toaster'
+import { promptDialog } from '@/components/ui/ConfirmDialog'
 import { CardChrome } from './CardChrome'
 import {
   IcAlert,
@@ -26,12 +28,17 @@ export function WebEmbedCardNode({ id, data, selected }: NodeProps<BoardNode>) {
   const resizeCard = useStore((s) => s.resizeCard)
   const [faviconBroken, setFaviconBroken] = useState(false)
 
-  const changeUrl = () => {
-    const raw = prompt('Webpage URL', embed?.url ?? 'https://')
+  const changeUrl = async () => {
+    const raw = await promptDialog({
+      title: 'Change webpage URL',
+      label: 'URL',
+      initialValue: embed?.url ?? 'https://',
+      confirmLabel: 'Update',
+    })
     if (!raw) return
     const res = sanitizeEmbedUrl(raw)
     if (!res.ok) {
-      alert(res.reason ?? 'Invalid URL')
+      toast.error('Invalid URL', res.reason)
       return
     }
     updateWebEmbed(id, {

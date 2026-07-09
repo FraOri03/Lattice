@@ -4,6 +4,7 @@ import { useUiStore } from '@/store/useUiStore'
 import { useActiveProject, useRecentProjects } from '@/lib/projects/ProjectStore'
 import { groupProjects, PROJECT_ICONS } from '@/lib/projects/ProjectRegistry'
 import { CARD_COLORS, type CardColor, type Project } from '@/types/model'
+import { confirmDialog } from '@/components/ui/ConfirmDialog'
 import {
   IcArchive,
   IcCheck,
@@ -253,11 +254,14 @@ function ProjectDialog({
                 ? 'The last project cannot be deleted'
                 : 'Delete the project and everything in it'
             }
-            onClick={() => {
+            onClick={async () => {
               if (
-                confirm(
-                  `Delete project "${project.name}" with ALL its boards, notes, documents and assets? This cannot be undone locally. (Files already synced to Drive are kept there.)`,
-                )
+                await confirmDialog({
+                  title: `Delete project “${project.name}”?`,
+                  body: 'ALL its boards, notes, documents and assets are deleted. This cannot be undone locally — files already synced to Drive are kept there.',
+                  confirmLabel: 'Delete project',
+                  danger: true,
+                })
               ) {
                 setOpen(false)
                 deleteProject(project.id)

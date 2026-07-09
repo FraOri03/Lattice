@@ -2,6 +2,12 @@ import { useEffect } from 'react'
 import { useStore } from '@/store/useStore'
 import { useUiStore } from '@/store/useUiStore'
 import { AccountProvider, useAccount } from '@/lib/auth/AccountProvider'
+import { collabHub } from '@/lib/collab/hub'
+import { presenceService } from '@/lib/collab/PresenceService'
+import { realtimeBoardSync } from '@/lib/collab/RealtimeBoardSync'
+import { realtimeDocumentSync } from '@/lib/collab/RealtimeDocumentSync'
+import { membersService } from '@/lib/collab/MembersService'
+import { inviteService } from '@/lib/collab/InviteService'
 import { Sidebar } from '@/components/Sidebar'
 import { TopBar } from '@/components/TopBar'
 import { Inspector } from '@/components/Inspector'
@@ -12,6 +18,12 @@ import { BoardCanvas } from '@/components/board/BoardCanvas'
 import { LoginScreen } from '@/components/account/LoginScreen'
 import { GithubDialog } from '@/components/github/GithubDialog'
 import { CommandPalette } from '@/components/CommandPalette'
+import { Toaster, toast } from '@/components/ui/Toaster'
+import { DialogHost, confirmDialog } from '@/components/ui/ConfirmDialog'
+import { ShortcutsDialog } from '@/components/ui/ShortcutsDialog'
+import { ShareDialog } from '@/components/collab/ShareDialog'
+import { CollabPanel } from '@/components/collab/CollabPanel'
+import { ReadOnlyBanner } from '@/components/collab/ReadOnlyBanner'
 import {
   CodeModeWorkspace,
   PresentationModeWorkspace,
@@ -42,12 +54,79 @@ function ImportProgressToast() {
   )
 }
 
+/** Boot the collaboration layer once the workspace is visible. */
+function useCollaboration() {
+  const activeProjectId = useStore((s) => s.activeProjectId)
+
+  useEffect(() => {
+    collabHub.start()
+    presenceService.start()
+    realtimeBoardSync.start()
+    realtimeDocumentSync.start()
+    return () => {
+      realtimeDocumentSync.stop()
+      realtimeBoardSync.stop()
+      presenceService.stop()
+      collabHub.stop()
+    }
+  }, [])
+
+  // every project the user opens has an owner (bootstraps pre-Phase-7 projects)
+  useEffect(() => {
+    membersService.ensureOwner(activeProjectId)
+  }, [activeProjectId])
+
+  // invite links: …/#invite=<token>
+  useEffect(() => {
+    const token = new URLSearchParams(location.hash.slice(1)).get('invite')
+    if (!token) return
+    history.replaceState(null, '', location.pathname + location.search)
+    const invite = inviteService.findByToken(token)
+    if (!invite) {
+      toast.warning(
+        'Invite not found',
+        'This invite was revoked, already used, or its project data has not reached this browser yet.',
+      )
+      return
+    }
+    void confirmDialog({
+      title: 'Join this project?',
+      body: `You were invited as ${invite.role} by ${invite.invitedByName}.`,
+      confirmLabel: 'Accept invite',
+    }).then((ok) => {
+      if (!ok) return
+      if (inviteService.accept(invite)) {
+        useStore.getState().setActiveProject(invite.projectId)
+        toast.success('Invite accepted', `You joined as ${invite.role}.`)
+      }
+    })
+  }, [])
+}
+
+/** Global shortcuts that aren't tied to a specific pane. */
+function useGlobalShortcuts() {
+  const setShortcutsOpen = useUiStore((s) => s.setShortcutsOpen)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === '/' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault()
+        setShortcutsOpen(true)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [setShortcutsOpen])
+}
+
 function Workspace() {
   const theme = useStore((s) => s.theme)
   const viewMode = useStore((s) => s.viewMode)
   const activeDocId = useStore((s) => s.activeDocId)
   const activeCodeId = useStore((s) => s.activeCodeId)
   const activeAssetId = useStore((s) => s.activeAssetId)
+
+  useCollaboration()
+  useGlobalShortcuts()
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
@@ -63,6 +142,7 @@ function Workspace() {
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar />
+        <ReadOnlyBanner />
         <div className="flex min-h-0 flex-1">
           {(viewMode === 'doc' || viewMode === 'split') && <DocumentView />}
           {codeWorkspace && <CodeInspector />}
@@ -76,10 +156,13 @@ function Workspace() {
               <Inspector />
             </>
           )}
+          <CollabPanel />
         </div>
       </div>
       <GithubDialog />
       <CommandPalette />
+      <ShareDialog />
+      <ShortcutsDialog />
       <ImportProgressToast />
     </div>
   )
@@ -95,6 +178,8 @@ export default function App() {
   return (
     <AccountProvider>
       <Gate />
+      <DialogHost />
+      <Toaster />
     </AccountProvider>
   )
 }

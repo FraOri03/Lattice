@@ -14,6 +14,9 @@ import { importFiles, reportErrors } from '@/lib/import/ImportService'
 import { labelForLang } from '@/lib/code/languages'
 import { FileKindIcon, fileKindForAsset, type FileKind } from '@/lib/registry/fileKinds'
 import { ProjectSwitcher } from '@/components/projects/ProjectSwitcher'
+import { useCan } from '@/lib/collab/useCollab'
+import { toast } from '@/components/ui/Toaster'
+import { confirmDialog } from '@/components/ui/ConfirmDialog'
 import {
   IcBoard,
   IcClock,
@@ -87,6 +90,8 @@ export function Sidebar() {
   const vaultInput = useRef<HTMLInputElement>(null)
   const filesInput = useRef<HTMLInputElement>(null)
   const [exporting, setExporting] = useState(false)
+  const mayCreate = useCan('content.create')
+  const mayDelete = useCan('content.delete')
 
   const q = search.trim().toLowerCase()
   const show = (f: SidebarFilter) => sidebarFilter === 'all' || sidebarFilter === f
@@ -226,15 +231,20 @@ export function Sidebar() {
     if (!file) return
     try {
       const data = JSON.parse(await file.text()) as VaultExport
-      if (
-        !confirm(
-          'Importing a project replaces all current boards, notes and assets. Continue?',
-        )
-      )
-        return
+      const ok = await confirmDialog({
+        title: 'Replace the whole vault?',
+        body: 'Importing a project file replaces ALL current boards, notes, documents and assets in this browser.',
+        confirmLabel: 'Replace everything',
+        danger: true,
+      })
+      if (!ok) return
       await importVault(data)
+      toast.success('Vault imported')
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Could not read that file.')
+      toast.error(
+        'Import failed',
+        err instanceof Error ? err.message : 'Could not read that file.',
+      )
     }
   }
 
@@ -243,6 +253,8 @@ export function Sidebar() {
     try {
       const vault = await exportVaultFull()
       downloadText('vault.lattice.json', JSON.stringify(vault), 'application/json')
+      const { activityLog } = await import('@/lib/collab/ActivityLogService')
+      activityLog.log(activeProjectId, 'export', 'Exported the vault as a project file')
     } finally {
       setExporting(false)
     }
@@ -317,9 +329,16 @@ export function Sidebar() {
         {/* boards */}
         <div className="insp-h flex items-center justify-between">
           <span>Boards</span>
-          <button className="icon-btn h-5 w-5" onClick={addBoard} title="New board">
-            <IcPlus size={12} />
-          </button>
+          {mayCreate && (
+            <button
+              className="icon-btn h-5 w-5"
+              onClick={addBoard}
+              title="New board"
+              aria-label="New board"
+            >
+              <IcPlus size={12} />
+            </button>
+          )}
         </div>
         {projectBoards.map((id) => {
           const b = boards[id]
@@ -338,13 +357,21 @@ export function Sidebar() {
                 {b.name}
               </span>
               <span className="text-[10px] text-muted">{b.nodes.length}</span>
-              {projectBoards.length > 1 && (
+              {projectBoards.length > 1 && mayDelete && (
                 <button
                   className="icon-btn hidden h-5 w-5 group-hover:flex"
                   title="Delete board"
-                  onClick={(e) => {
+                  aria-label={`Delete board ${b.name}`}
+                  onClick={async (e) => {
                     e.stopPropagation()
-                    if (confirm(`Delete board "${b.name}"? Notes are kept.`))
+                    if (
+                      await confirmDialog({
+                        title: `Delete board “${b.name}”?`,
+                        body: 'Cards on this board are removed; notes, documents and assets are kept.',
+                        confirmLabel: 'Delete board',
+                        danger: true,
+                      })
+                    )
                       deleteBoard(id)
                   }}
                 >
@@ -360,13 +387,16 @@ export function Sidebar() {
           <>
             <div className="insp-h flex items-center justify-between">
               <span>Documents</span>
-              <button
-                className="icon-btn h-5 w-5"
-                title="New document"
-                onClick={() => openDoc(createDoc())}
-              >
-                <IcPlus size={12} />
-              </button>
+              {mayCreate && (
+                <button
+                  className="icon-btn h-5 w-5"
+                  title="New document"
+                  aria-label="New document"
+                  onClick={() => openDoc(createDoc())}
+                >
+                  <IcPlus size={12} />
+                </button>
+              )}
             </div>
             {docList.length === 0 && (
               <div className="px-2 py-1 text-[11px] text-muted italic">
@@ -390,19 +420,27 @@ export function Sidebar() {
                 <FileKindIcon kind="richdoc" size={13} />
                 <span className="min-w-0 flex-1 truncate text-xs">{d.title}</span>
                 <span className="text-[10px] text-muted">{d.wordCount}w</span>
-                <button
-                  className="icon-btn hidden h-5 w-5 group-hover:flex"
-                  title="Delete document"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    if (
-                      confirm(`Delete document "${d.title}" and its cards on all boards?`)
-                    )
-                      deleteDoc(d.id)
-                  }}
-                >
-                  <IcTrash size={11} />
-                </button>
+                {mayDelete && (
+                  <button
+                    className="icon-btn hidden h-5 w-5 group-hover:flex"
+                    title="Delete document"
+                    aria-label={`Delete document ${d.title}`}
+                    onClick={async (e) => {
+                      e.stopPropagation()
+                      if (
+                        await confirmDialog({
+                          title: `Delete “${d.title}”?`,
+                          body: 'The document and its cards on all boards are removed.',
+                          confirmLabel: 'Delete document',
+                          danger: true,
+                        })
+                      )
+                        deleteDoc(d.id)
+                    }}
+                  >
+                    <IcTrash size={11} />
+                  </button>
+                )}
               </div>
             ))}
           </>
@@ -413,13 +451,16 @@ export function Sidebar() {
           <>
             <div className="insp-h flex items-center justify-between">
               <span>Spreadsheets</span>
-              <button
-                className="icon-btn h-5 w-5"
-                title="New spreadsheet"
-                onClick={() => openSheet(createSheetDoc())}
-              >
-                <IcPlus size={12} />
-              </button>
+              {mayCreate && (
+                <button
+                  className="icon-btn h-5 w-5"
+                  title="New spreadsheet"
+                  aria-label="New spreadsheet"
+                  onClick={() => openSheet(createSheetDoc())}
+                >
+                  <IcPlus size={12} />
+                </button>
+              )}
             </div>
             {sheetList.length === 0 && (
               <div className="px-2 py-1 text-[11px] text-muted italic">
@@ -443,21 +484,27 @@ export function Sidebar() {
                 <FileKindIcon kind="sheet" size={13} />
                 <span className="min-w-0 flex-1 truncate text-xs">{sh.title}</span>
                 <span className="text-[10px] text-muted">{sh.cellCount}c</span>
-                <button
-                  className="icon-btn hidden h-5 w-5 group-hover:flex"
-                  title="Delete spreadsheet"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    if (
-                      confirm(
-                        `Delete spreadsheet "${sh.title}" and its cards on all boards?`,
+                {mayDelete && (
+                  <button
+                    className="icon-btn hidden h-5 w-5 group-hover:flex"
+                    title="Delete spreadsheet"
+                    aria-label={`Delete spreadsheet ${sh.title}`}
+                    onClick={async (e) => {
+                      e.stopPropagation()
+                      if (
+                        await confirmDialog({
+                          title: `Delete “${sh.title}”?`,
+                          body: 'The spreadsheet and its cards on all boards are removed.',
+                          confirmLabel: 'Delete spreadsheet',
+                          danger: true,
+                        })
                       )
-                    )
-                      deleteSheetDoc(sh.id)
-                  }}
-                >
-                  <IcTrash size={11} />
-                </button>
+                        deleteSheetDoc(sh.id)
+                    }}
+                  >
+                    <IcTrash size={11} />
+                  </button>
+                )}
               </div>
             ))}
           </>
@@ -468,13 +515,16 @@ export function Sidebar() {
           <>
             <div className="insp-h flex items-center justify-between">
               <span>Code</span>
-              <button
-                className="icon-btn h-5 w-5"
-                title="New code file"
-                onClick={() => openCode(createCode())}
-              >
-                <IcPlus size={12} />
-              </button>
+              {mayCreate && (
+                <button
+                  className="icon-btn h-5 w-5"
+                  title="New code file"
+                  aria-label="New code file"
+                  onClick={() => openCode(createCode())}
+                >
+                  <IcPlus size={12} />
+                </button>
+              )}
             </div>
             {codeList.length === 0 && (
               <div className="px-2 py-1 text-[11px] text-muted italic">
@@ -500,21 +550,27 @@ export function Sidebar() {
                   {c.title}.{c.extension}
                 </span>
                 <span className="text-[10px] text-muted">{c.lineCount}L</span>
-                <button
-                  className="icon-btn hidden h-5 w-5 group-hover:flex"
-                  title="Delete code file"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    if (
-                      confirm(
-                        `Delete "${c.title}.${c.extension}" and its cards on all boards?`,
+                {mayDelete && (
+                  <button
+                    className="icon-btn hidden h-5 w-5 group-hover:flex"
+                    title="Delete code file"
+                    aria-label={`Delete code file ${c.title}.${c.extension}`}
+                    onClick={async (e) => {
+                      e.stopPropagation()
+                      if (
+                        await confirmDialog({
+                          title: `Delete “${c.title}.${c.extension}”?`,
+                          body: 'The file and its cards on all boards are removed.',
+                          confirmLabel: 'Delete file',
+                          danger: true,
+                        })
                       )
-                    )
-                      deleteCode(c.id)
-                  }}
-                >
-                  <IcTrash size={11} />
-                </button>
+                        deleteCode(c.id)
+                    }}
+                  >
+                    <IcTrash size={11} />
+                  </button>
+                )}
               </div>
             ))}
           </>
@@ -525,13 +581,16 @@ export function Sidebar() {
           <>
             <div className="insp-h flex items-center justify-between">
               <span>Notes</span>
-              <button
-                className="icon-btn h-5 w-5"
-                title="New note"
-                onClick={() => openNote(createNote())}
-              >
-                <IcPlus size={12} />
-              </button>
+              {mayCreate && (
+                <button
+                  className="icon-btn h-5 w-5"
+                  title="New note"
+                  aria-label="New note"
+                  onClick={() => openNote(createNote())}
+                >
+                  <IcPlus size={12} />
+                </button>
+              )}
             </div>
             {noteList.length === 0 && (
               <div className="px-2 py-1 text-[11px] text-muted italic">No notes match</div>
@@ -552,17 +611,27 @@ export function Sidebar() {
               >
                 <FileKindIcon kind="note" size={13} />
                 <span className="min-w-0 flex-1 truncate text-xs">{n.title}</span>
-                <button
-                  className="icon-btn hidden h-5 w-5 group-hover:flex"
-                  title="Delete note"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    if (confirm(`Delete note "${n.title}" and its cards on all boards?`))
-                      deleteNote(n.id)
-                  }}
-                >
-                  <IcTrash size={11} />
-                </button>
+                {mayDelete && (
+                  <button
+                    className="icon-btn hidden h-5 w-5 group-hover:flex"
+                    title="Delete note"
+                    aria-label={`Delete note ${n.title}`}
+                    onClick={async (e) => {
+                      e.stopPropagation()
+                      if (
+                        await confirmDialog({
+                          title: `Delete note “${n.title}”?`,
+                          body: 'The note and its cards on all boards are removed.',
+                          confirmLabel: 'Delete note',
+                          danger: true,
+                        })
+                      )
+                        deleteNote(n.id)
+                    }}
+                  >
+                    <IcTrash size={11} />
+                  </button>
+                )}
               </div>
             ))}
           </>
@@ -573,13 +642,16 @@ export function Sidebar() {
           <>
             <div className="insp-h flex items-center justify-between">
               <span>Assets</span>
-              <button
-                className="icon-btn h-5 w-5"
-                title="Import files"
-                onClick={() => filesInput.current?.click()}
-              >
-                <IcPlus size={12} />
-              </button>
+              {mayCreate && (
+                <button
+                  className="icon-btn h-5 w-5"
+                  title="Import files"
+                  aria-label="Import files"
+                  onClick={() => filesInput.current?.click()}
+                >
+                  <IcPlus size={12} />
+                </button>
+              )}
             </div>
             {assetList.length === 0 && (
               <div className="px-2 py-1 text-[11px] text-muted italic">
@@ -605,28 +677,38 @@ export function Sidebar() {
                 <FileKindIcon kind={fileKindForAsset(a.kind)} size={13} />
                 <span className="min-w-0 flex-1 truncate text-xs">{a.name}</span>
                 <span className="text-[10px] text-muted">{formatBytes(a.size)}</span>
-                <button
-                  className="icon-btn hidden h-5 w-5 group-hover:flex"
-                  title="Delete asset from the vault"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    if (
-                      confirm(`Delete asset "${a.name}" and its cards on all boards?`)
-                    )
-                      deleteAsset(a.id)
-                  }}
-                >
-                  <IcTrash size={11} />
-                </button>
+                {mayDelete && (
+                  <button
+                    className="icon-btn hidden h-5 w-5 group-hover:flex"
+                    title="Delete asset from the vault"
+                    aria-label={`Delete asset ${a.name}`}
+                    onClick={async (e) => {
+                      e.stopPropagation()
+                      if (
+                        await confirmDialog({
+                          title: `Delete asset “${a.name}”?`,
+                          body: 'The file and its cards on all boards are removed from the vault.',
+                          confirmLabel: 'Delete asset',
+                          danger: true,
+                        })
+                      )
+                        deleteAsset(a.id)
+                    }}
+                  >
+                    <IcTrash size={11} />
+                  </button>
+                )}
               </div>
             ))}
-            <button
-              className="btn mt-1.5 w-full"
-              onClick={() => filesInput.current?.click()}
-              title="Import PDF, DOCX, XLSX, PPTX, images, video, audio, GLB/OBJ and more"
-            >
-              <IcUpload size={13} /> Import files…
-            </button>
+            {mayCreate && (
+              <button
+                className="btn mt-1.5 w-full"
+                onClick={() => filesInput.current?.click()}
+                title="Import PDF, DOCX, XLSX, PPTX, images, video, audio, GLB/OBJ and more"
+              >
+                <IcUpload size={13} /> Import files…
+              </button>
+            )}
           </>
         )}
         <input

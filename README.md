@@ -1,6 +1,6 @@
 # Lattice
 
-A **local-first unified creative workspace**: Obsidian-style linked notes, a Figma-style infinite board with sections, a Word/Notion-style rich document editor, a VS Code-style code workspace with GitHub sync, an Excel-style spreadsheet engine, projects, a personal account area, and Google Drive cloud sync — with universal file import and 3D asset embedding.
+A **local-first unified creative workspace**: Obsidian-style linked notes, a Figma-style infinite board with sections, a Word/Notion-style rich document editor, a VS Code-style code workspace with GitHub sync, an Excel-style spreadsheet engine, projects, a personal account area, Google Drive cloud sync — and, since Phase 7, a **collaboration engine**: members & roles, invitations, presence with live board cursors, threaded comments, an activity log, version history and role-based read-only modes.
 
 ```
 npm install
@@ -46,7 +46,24 @@ Feel targets: Figma (board), Obsidian (linked notes), Notion (organization), Off
 | Top navigation: Board · Split · Document · Sheet · Presentation · Code | ✅ implemented |
 | Command palette (Ctrl/Cmd+K), quick create, recents, file-type filters, sync/offline indicators, import progress | ✅ implemented |
 | Presentation editor | ⬜ **not built** — Presentation mode is an honest placeholder; imported PPTX/ODP stay preserved assets |
-| Realtime collaboration | ⬜ Phase 7 — architecture prepared (see §13), not implemented |
+
+**Phase 7 (this release):**
+
+| Area | Status |
+|---|---|
+| Project members & roles (owner/admin/editor/commenter/viewer) with a permission matrix | ✅ implemented (`PermissionsService`) |
+| Invitations (invite by email, role, pending state, copy link, revoke, resend, accept flow, offline "simulate acceptance") | ✅ implemented (link-based — no email backend, and it says so) |
+| Presence: active avatars in the top bar, per-user location ("viewing X", "editing Y"), last-active times | ✅ real across tabs of one browser (BroadcastChannel); cross-device needs the realtime backend |
+| Live board collaboration: cursors, selection outlines, live card/section movement, safe op merging | ✅ real across tabs; provider-ready for cross-device |
+| Comments: pins on the canvas, threads on cards/sections/docs/code/sheets/assets/embeds, replies, resolve/reopen, @mentions, filters, badges | ✅ implemented |
+| Activity log (invites, joins, edits, moves, comments, versions, Drive/GitHub sync, imports, exports) | ✅ implemented |
+| Version history: snapshots of boards/docs/code/project meta, restore (with auto-backup), duplicate, line diff | ✅ implemented |
+| Role-based read-only: boards, docs, sheets, code, sidebar and inspectors all honor the role; "Preview as role" for testing | ✅ implemented |
+| Code collaboration: soft file locks ("X is editing"), read-only for others, request edit control, owner/admin force-unlock | ✅ implemented |
+| Document collaboration: editing indicators, conflict-safe refresh on remote saves (never clobbers a focused editor) | ✅ implemented (LWW at save granularity — **not** keystroke CRDT; see §14) |
+| Drive-polling collaboration provider (members/invites/comments/activity/versions sync via the project's Drive folder) | ✅ implemented, ~20s latency, honestly labeled |
+| True realtime backend (websocket) | ⬜ Phase 8 — provider seam ready (`VITE_REALTIME_WS_URL`), nothing faked |
+| UX/UI fix pass: toast system, styled confirm/prompt dialogs, focus-visible states, aria-labels, reduced-motion, context breadcrumb, empty-board state, shortcuts overlay (Ctrl+/) | ✅ implemented (see §14 audit summary) |
 
 ## 3 · Architecture: the document engine + cloud layer
 
@@ -228,19 +245,95 @@ Checklist after the first deploy:
 - set env vars for *Production* and *Preview* environments
 - no secrets in the client: only `VITE_*` values reach the bundle; `GITHUB_CLIENT_SECRET` must **not** be prefixed
 
-## 13 · Phase 7 roadmap — realtime collaboration
+## 13 · Phase 7 — collaboration architecture
 
-Prepared seams (not implemented):
+```
+                 UI: ShareDialog · PresenceAvatars · BoardPresenceLayer ·
+                     CommentPins · CollabPanel (Comments/Activity/Versions) ·
+                     ReadOnlyBanner · lock banners
+                                   │  (hooks: useMyRole/useCan/usePeers…)
+      ┌────────────────────────────┴─────────────────────────────┐
+      │                collab services (src/lib/collab)          │
+      │  PermissionsService · MembersService · InviteService     │
+      │  PresenceService · CommentService · ActivityLogService   │
+      │  VersionHistoryService · RealtimeBoardSync               │
+      │  RealtimeDocumentSync (incl. code locks)                 │
+      └──────────────┬──────────────────────────┬────────────────┘
+                     │ collabStore (Zustand)    │ ConflictResolverV2
+      ┌──────────────┴──────────────────────────┴────────────────┐
+      │                     CollabHub (router)                   │
+      │   send() ─▶ every active provider · recv ─▶ handlers     │
+      └──────┬─────────────────────┬──────────────────┬──────────┘
+             │                     │                  │
+   LocalCollaborationProvider   DrivePolling-      Realtime-
+   (BroadcastChannel: REAL      Collaboration-     CollaborationProvider
+    live sync between tabs)     Provider (~20s,    (placeholder — needs a
+                                durable state      websocket backend,
+                                via collab.json)   Phase 8)
+```
 
-- **ConflictResolver** is the designated merge point — swapping newest-wins for CRDT/operation-log merging doesn't touch the sync plumbing.
-- **SyncEngine** already separates snapshot metadata from bodies and tracks per-entity versions; an op-log can replace the timestamp diff.
-- **Projects** are the natural sharing unit (`/Lattice/projects/<id>` maps to per-project ACLs).
-- **AccountProvider** supports multiple providers per account (`Account.providers`).
-- Presence, shared cursors, and a websocket transport (or Drive Realtime alternative) are net-new Phase 7 work, deliberately not faked today.
+### Permission matrix
 
-Also on the roadmap: presentation engine, File System Access API vault, DOCX/PDF export, plugin API, PR-based GitHub flow, remote-deletion management UI.
+| Capability | Owner | Admin | Editor | Commenter | Viewer |
+|---|---|---|---|---|---|
+| View content | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Add comments / resolve own | ✅ | ✅ | ✅ | ✅ | — |
+| Resolve any comment | ✅ | ✅ | ✅ | — | — |
+| Create / edit / delete content | ✅ | ✅ | ✅ | — | — |
+| Create & restore versions | ✅ | ✅ | ✅ | — | — |
+| Manage members (below own rank), invites | ✅ | ✅ | — | — | — |
+| Force-unlock locked code files | ✅ | ✅ | — | — | — |
+| Manage integrations (Drive/GitHub) | ✅ | — | — | — | — |
+| Delete project / transfer ownership | ✅ | — | — | — | — |
 
-## 14 · Folder structure (source)
+The matrix lives in one place (`src/lib/collab/permissions.ts`); UI and services both consult it, and the owner can **preview the app as any role** from Share → Settings.
+
+### Provider strategy (no vendor lock-in)
+
+`CollaborationProvider` is a transport interface with honest, self-reported capabilities (`presence`, `liveCursors`, `latency`, `scope`). The hub runs every available provider simultaneously:
+
+- **LocalCollaborationProvider** — BroadcastChannel. Real, instant collaboration between tabs/windows of the same browser: presence, cursors, selections, live board ops, document/lock messages. This is what makes every collaboration feature testable without any backend.
+- **DrivePollingCollaborationProvider** — durable collab state (members, invites, comments, activity, version index) synced through `/Lattice/projects/<id>/collab.json` on a ~20s poll. **Drive polling limitation:** latency is the polling interval, there is no live presence (only last-active timestamps), and every participant needs access to the same Drive folder. The UI labels it exactly that way.
+- **RealtimeCollaborationProvider** — a documented placeholder. It activates only when `VITE_REALTIME_WS_URL` is set and currently just logs that the client isn't implemented; candidates are Supabase Realtime, Liveblocks, PartyKit or y-websocket. Nothing simulates a websocket.
+
+Merging is structure-aware (`ConflictResolverV2`): collab records union by id with per-record newest-wins, comment replies always union, activity/version sets union, and boards merge **node-by-node** so two people moving different cards both keep their change.
+
+### Honest limitations (collaboration)
+
+- True low-latency multiplayer across devices **requires a realtime backend** — Phase 8. Today "live" means tabs of one browser; cross-device sync is Drive polling (seconds-to-minutes, durable data only).
+- Document co-editing is conflict-safe last-writer-wins at save granularity, not keystroke-level CRDT. Yjs was deliberately **not** wired in: without a shared backend it could only ever merge between tabs that already share IndexedDB, which the simpler scheme covers. The Tiptap/Monaco + provider seams are where y-prosemirror/y-monaco land in Phase 8.
+- Code files use soft locking instead of merging (first editor wins the lock; heartbeat + TTL; request-edit + owner/admin force-unlock).
+- Invites are links, not emails — Lattice has no mail server and says so in the dialog. Cross-browser invite acceptance needs the invite state to have reached that browser (same Drive), so the Share dialog also offers an explicit "simulate acceptance" for offline role testing.
+- Version snapshot payloads live in this device's IndexedDB (the index syncs; bodies don't yet).
+- Membership is cooperative, not cryptographic: with Drive as the only backend there is no server enforcing ACLs — roles gate the UI and services, which is honest for trusted-team use and will be enforced server-side in Phase 8.
+
+## 14 · Phase 7 — UX/UI audit summary & fixes
+
+A structural audit ran before the collaboration work; what it found and what was fixed:
+
+| Finding (audit) | Fix (this release) |
+|---|---|
+| Native `alert()`/`confirm()`/`prompt()` for deletes, imports and URL entry — jarring, blocking, unstyled | Global **toast system** + promise-based **styled confirm/prompt dialogs** with a danger variant; every native dialog call replaced |
+| No visible keyboard focus anywhere; icon-only buttons without accessible names; no reduced-motion support | Global `:focus-visible` ring, `aria-label`s across the chrome (mode switcher, icon buttons, dialogs), `prefers-reduced-motion` handling |
+| Top bar went blank outside Board mode (literal spacer); project context invisible | **Context breadcrumb** (project icon + name → board/document/code/sheet) in every mode; duplicate card-count stat removed |
+| Empty board = bare dot grid with zero guidance | **Empty-board state** with first-note / add-section / import actions (read-only aware) |
+| No keyboard shortcut reference | **Shortcuts overlay** (Ctrl+/ and command palette entry) |
+| Destructive actions confirmed with plain-text `confirm()` | Danger-styled dialogs with explicit consequences ("Notes are kept", "cannot be undone locally…") |
+| Collaboration UX (net-new) | Avatars in the top bar; cursors/selections on the canvas; comments as pins + one right-side drawer (Comments·Activity·Versions — one drawer, not three); role state as a persistent banner + disabled-with-explanation controls; locks as in-context banners |
+
+Product coherence: the app keeps one design token set (`--panel/--bord/--ink/--accent`), one icon system, one card chrome, one dialog/toast language — Figma-like on the board, Obsidian-like in notes, VS Code-like in code, Notion-like in documents.
+
+## 15 · Phase 8 roadmap
+
+Prepared, deliberately not implemented:
+
+- **True realtime backend** — implement `RealtimeCollaborationProvider` against Supabase Realtime / Liveblocks / PartyKit / y-websocket; add y-prosemirror + y-monaco for keystroke-level co-editing; server-enforced ACLs from the §13 matrix.
+- **Team workspaces** — organizations above projects; shared member directories.
+- **Public share links / published boards** — read-only URLs backed by the share model.
+- **Billing/subscriptions**, **web clipper**, **AI assistant inside projects**, **mobile/tablet UI**.
+- Plus the standing items: presentation engine, File System Access API vault, DOCX/PDF export, plugin API, PR-based GitHub flow, remote-deletion management UI.
+
+## 16 · Folder structure (source)
 
 ```
 api/
@@ -248,10 +341,14 @@ api/
 src/
   App.tsx                      # providers + login gate + mode router
   types/model.ts               # entities incl. Project/Account/SyncState/BoardSection/WebEmbed
+  types/collab.ts              # Phase 7: roles, members, invites, presence, comments, activity, versions
   store/useStore.ts, seed.ts   # vault store (persisted, versioned migration), useUiStore.ts
   lib/
     env.ts                     # VITE_* configuration
     auth/                      # AuthService (Google GIS / mock) + AccountProvider
+    collab/                    # Phase 7: hub + providers (local/drive-polling/realtime),
+                               #   permissions, members, invites, presence, comments,
+                               #   activity, versions, board/document sync, ConflictResolverV2
     sync/                      # SyncEngine + ConflictResolver + syncStore
     storage/                   # StorageProvider (IndexedDB) + GoogleDriveStorageProvider
     github/GithubCodeProvider.ts
@@ -263,6 +360,9 @@ src/
     import/ export/ convert/ assets/ code/ richdoc/ sheet/  # engines (Phases 1–4)
   components/
     Sidebar.tsx TopBar.tsx CommandPalette.tsx Inspector.tsx DocumentView.tsx
+    ui/                        # Phase 7: Toaster, ConfirmDialog (confirm/prompt), ShortcutsDialog
+    collab/                    # Phase 7: ShareDialog, PresenceAvatars, BoardPresenceLayer,
+                               #   CommentPins, CollabPanel (comments/activity/versions), ReadOnlyBanner
     account/                   # LoginScreen + ProfileMenu
     projects/ProjectSwitcher.tsx
     github/GithubDialog.tsx
@@ -271,7 +371,7 @@ src/
     richdoc/ code/ sheet/ preview/  # editors & previews
 ```
 
-## 15 · Vault structure (virtual, mirrors cloud + future disk layout)
+## 17 · Vault structure (virtual, mirrors cloud + future disk layout)
 
 ```
 /projects/<id>    project spaces (config in project.json when synced)
