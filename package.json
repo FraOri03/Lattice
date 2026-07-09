@@ -1,0 +1,50 @@
+{
+  "name": "lattice",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@monaco-editor/react": "^4.7.0",
+    "@tiptap/core": "^2.14.0",
+    "@tiptap/extension-image": "^2.14.0",
+    "@tiptap/extension-link": "^2.14.0",
+    "@tiptap/extension-placeholder": "^2.14.0",
+    "@tiptap/extension-table": "^2.14.0",
+    "@tiptap/extension-table-cell": "^2.14.0",
+    "@tiptap/extension-table-header": "^2.14.0",
+    "@tiptap/extension-table-row": "^2.14.0",
+    "@tiptap/extension-task-item": "^2.14.0",
+    "@tiptap/extension-task-list": "^2.14.0",
+    "@tiptap/extension-underline": "^2.14.0",
+    "@tiptap/pm": "^2.14.0",
+    "@tiptap/react": "^2.14.0",
+    "@tiptap/starter-kit": "^2.14.0",
+    "@tiptap/suggestion": "^2.14.0",
+    "@xyflow/react": "^12.6.0",
+    "jszip": "^3.10.1",
+    "mammoth": "^1.9.0",
+    "monaco-editor": "^0.52.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "three": "^0.176.0",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
+    "zustand": "^5.0.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.4",
+    "@types/node": "^26.1.1",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@types/three": "^0.176.0",
+    "@vitejs/plugin-react": "^4.4.0",
+    "tailwindcss": "^4.1.4",
+    "typescript": "~5.8.3",
+    "vite": "^6.3.0"
+  }
+}
