@@ -225,6 +225,13 @@ function ConnectedPanel() {
       )
       setSelectedExports(new Set())
       setMessage('')
+      void import('@/lib/collab/ActivityLogService').then(({ activityLog }) =>
+        activityLog.log(
+          useStore.getState().activeProjectId,
+          'github.sync',
+          `Pushed ${files.length} code file${files.length === 1 ? '' : 's'} to ${link.repo} (${link.branch})`,
+        ),
+      )
       return `Committed ${files.length} file(s) to ${link.branch}${res.branchCreated ? ' (branch created)' : ''} — ${res.url}`
     })
 
@@ -243,6 +250,13 @@ function ConnectedPanel() {
         }
       }
       if (!count) throw new Error('No code documents are linked to GitHub files yet')
+      void import('@/lib/collab/ActivityLogService').then(({ activityLog }) =>
+        activityLog.log(
+          useStore.getState().activeProjectId,
+          'github.sync',
+          `Pulled ${count} linked code file${count === 1 ? '' : 's'} from GitHub`,
+        ),
+      )
       return `Pulled ${count} linked file${count === 1 ? '' : 's'} from GitHub`
     })
 

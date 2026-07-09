@@ -323,3 +323,108 @@ export const IcMaximize = (p: P) => (
     <path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M3 16v3a2 2 0 0 0 2 2h3" />
   </S>
 )
+
+/* ---------------- Phase 7 (collaboration) ---------------- */
+
+export const IcInfo = (p: P) => (
+  <S {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 11v5M12 8h.01" />
+  </S>
+)
+export const IcUsers = (p: P) => (
+  <S {...p}>
+    <circle cx="9" cy="8" r="3.5" />
+    <path d="M2.5 20c0-3.4 2.9-5.5 6.5-5.5s6.5 2.1 6.5 5.5" />
+    <path d="M16 5a3.5 3.5 0 0 1 0 6.8M18.5 15.2c1.9.8 3 2.3 3 4.3" />
+  </S>
+)
+export const IcUserPlus = (p: P) => (
+  <S {...p}>
+    <circle cx="10" cy="8" r="3.5" />
+    <path d="M3.5 20c0-3.4 2.9-5.5 6.5-5.5 1.4 0 2.7.3 3.8.9" />
+    <path d="M19 13v6M16 16h6" />
+  </S>
+)
+export const IcMessage = (p: P) => (
+  <S {...p}>
+    <path d="M21 12.5a8 8 0 0 1-8 8c-1.4 0-2.8-.3-4-.9L3 21l1.4-5.5a8 8 0 1 1 16.6-3z" />
+  </S>
+)
+export const IcMessageDot = (p: P) => (
+  <S {...p}>
+    <path d="M21 12.5a8 8 0 0 1-8 8c-1.4 0-2.8-.3-4-.9L3 21l1.4-5.5a8 8 0 1 1 16.6-3z" />
+    <path d="M9 11.5h.01M13 11.5h.01M17 11.5h.01" />
+  </S>
+)
+export const IcHistory = (p: P) => (
+  <S {...p}>
+    <path d="M3.5 12a8.5 8.5 0 1 1 2.5 6M3.5 12H2m1.5 0 2-2" />
+    <path d="M12 7.5V12l3 2" />
+  </S>
+)
+export const IcActivity = (p: P) => (
+  <S {...p}>
+    <path d="M3 12h4l2.5-7 5 14 2.5-7h4" />
+  </S>
+)
+export const IcLock = (p: P) => (
+  <S {...p}>
+    <rect x="5" y="11" width="14" height="10" rx="2" />
+    <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+  </S>
+)
+export const IcUnlock = (p: P) => (
+  <S {...p}>
+    <rect x="5" y="11" width="14" height="10" rx="2" />
+    <path d="M8 11V7a4 4 0 0 1 7.7-1.5" />
+  </S>
+)
+export const IcCopy = (p: P) => (
+  <S {...p}>
+    <rect x="9" y="9" width="12" height="12" rx="2" />
+    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+  </S>
+)
+export const IcMail = (p: P) => (
+  <S {...p}>
+    <rect x="2" y="4" width="20" height="16" rx="2" />
+    <path d="m2 7 10 6 10-6" />
+  </S>
+)
+export const IcSend = (p: P) => (
+  <S {...p}>
+    <path d="m22 2-7 20-4-9-9-4z" />
+    <path d="M22 2 11 13" />
+  </S>
+)
+export const IcReply = (p: P) => (
+  <S {...p}>
+    <path d="M9 14 4 9l5-5" />
+    <path d="M4 9h10a6 6 0 0 1 6 6v4" />
+  </S>
+)
+export const IcKeyboard = (p: P) => (
+  <S {...p}>
+    <rect x="2" y="6" width="20" height="12" rx="2" />
+    <path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h.01M18 14h.01M9 14h6" />
+  </S>
+)
+export const IcPin = (p: P) => (
+  <S {...p}>
+    <path d="M12 21s-6.5-5.3-6.5-10.5a6.5 6.5 0 0 1 13 0C18.5 15.7 12 21 12 21z" />
+    <circle cx="12" cy="10.5" r="2.2" />
+  </S>
+)
+export const IcRestore = (p: P) => (
+  <S {...p}>
+    <path d="M3 12a9 9 0 1 0 2.6-6.3L3 8.3" />
+    <path d="M3 3v5.3h5.3" />
+    <path d="m9 12.7 2.2 2.3L15.5 10" />
+  </S>
+)
+export const IcDot = (p: P) => (
+  <S {...p}>
+    <circle cx="12" cy="12" r="5" fill="currentColor" stroke="none" />
+  </S>
+)

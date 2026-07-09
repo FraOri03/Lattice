@@ -254,6 +254,26 @@ function stripCards(
   )
 }
 
+/**
+ * Tell the collaboration layer that a body was saved: other sessions
+ * refresh their open editors, and the activity log records the edit
+ * (deduped). Dynamic imports keep the store free of static dependencies
+ * on the collab layer (which itself imports this store).
+ */
+function announceEdit(kind: 'doc' | 'code' | 'sheet', id: string, message: string) {
+  void import('@/lib/collab/RealtimeDocumentSync').then(({ realtimeDocumentSync }) =>
+    realtimeDocumentSync.announceSave(id, kind),
+  )
+  void import('@/lib/collab/ActivityLogService').then(({ activityLog }) =>
+    activityLog.log(
+      useStore.getState().activeProjectId,
+      `${kind}.edited`,
+      message,
+      id,
+    ),
+  )
+}
+
 /** Stamp every entity of a legacy (pre-projects) vault with a project id. */
 function stampProject<T extends { projectId?: string }>(
   record: Record<string, T>,
@@ -333,6 +353,9 @@ export const useStore = create<AppState>()(
           boards: { ...s.boards, [boardId]: board },
           boardOrder: [...s.boardOrder, boardId],
         }))
+        void import('@/lib/collab/ActivityLogService').then(({ activityLog }) =>
+          activityLog.log(id, 'project.created', `Project “${project.name}” created`),
+        )
         return id
       },
 
@@ -950,6 +973,7 @@ export const useStore = create<AppState>()(
             [id]: { ...meta, ...digestDocJson(body), updatedAt: Date.now() },
           },
         }))
+        announceEdit('doc', id, `Edited document “${meta.title}”`)
       },
 
       deleteDoc: (id) => {
@@ -1022,6 +1046,7 @@ export const useStore = create<AppState>()(
             [id]: { ...meta, ...digestSpreadsheet(body), updatedAt: Date.now() },
           },
         }))
+        announceEdit('sheet', id, `Edited spreadsheet “${meta.title}”`)
       },
 
       deleteSheetDoc: (id) => {
@@ -1099,6 +1124,7 @@ export const useStore = create<AppState>()(
             [id]: { ...meta, ...digestCode(content), updatedAt: Date.now() },
           },
         }))
+        announceEdit('code', id, `Edited ${meta.title}.${meta.extension}`)
       },
 
       deleteCode: (id) => {

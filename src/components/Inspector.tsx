@@ -12,7 +12,11 @@ import { conversionNoteForAsset } from '@/lib/convert/ConversionService'
 import { formatBytes } from '@/lib/media'
 import { labelForLang } from '@/lib/code/languages'
 import { KIND_LABEL } from '@/components/assetKinds'
-import { IcDownload, IcEdit, IcEye, IcTrash } from '@/components/Icons'
+import { useCollabStore } from '@/lib/collab/collabStore'
+import { useMyRole, useOpenCommentCount, useReadOnly } from '@/lib/collab/useCollab'
+import { ROLE_LABEL } from '@/types/collab'
+import { confirmDialog } from '@/components/ui/ConfirmDialog'
+import { IcDownload, IcEdit, IcEye, IcMessage, IcTrash } from '@/components/Icons'
 
 const TYPE_LABEL: Record<CardData['type'], string> = {
   note: 'Note card',
@@ -398,14 +402,34 @@ function NodeInspector({ node }: { node: BoardNode }) {
       )}
 
       <div className="insp-h">Danger</div>
-      <button className="btn w-full text-[#f24822]" onClick={() => deleteCard(node.id)}>
+      <button
+        className="btn w-full text-[#f24822]"
+        onClick={async () => {
+          if (
+            await confirmDialog({
+              title: 'Delete this card?',
+              body: 'Only the card is removed — linked notes, documents and assets stay in the vault.',
+              confirmLabel: 'Delete card',
+              danger: true,
+            })
+          )
+            deleteCard(node.id)
+        }}
+      >
         <IcTrash size={12} /> Delete card
       </button>
       {d.type === 'asset' && asset && (
         <button
           className="btn mt-2 w-full text-[#f24822]"
-          onClick={() => {
-            if (confirm(`Delete asset "${asset.name}" and its cards on all boards?`))
+          onClick={async () => {
+            if (
+              await confirmDialog({
+                title: `Delete asset “${asset.name}”?`,
+                body: 'The file and its cards on all boards are removed from the vault.',
+                confirmLabel: 'Delete asset',
+                danger: true,
+              })
+            )
               deleteAsset(asset.id)
           }}
         >
@@ -415,9 +439,14 @@ function NodeInspector({ node }: { node: BoardNode }) {
       {d.type === 'richdoc' && richdoc && (
         <button
           className="btn mt-2 w-full text-[#f24822]"
-          onClick={() => {
+          onClick={async () => {
             if (
-              confirm(`Delete document "${richdoc.title}" and its cards on all boards?`)
+              await confirmDialog({
+                title: `Delete “${richdoc.title}”?`,
+                body: 'The document and its cards on all boards are removed.',
+                confirmLabel: 'Delete document',
+                danger: true,
+              })
             )
               deleteDoc(richdoc.id)
           }}
@@ -428,11 +457,14 @@ function NodeInspector({ node }: { node: BoardNode }) {
       {d.type === 'code' && codeDoc && (
         <button
           className="btn mt-2 w-full text-[#f24822]"
-          onClick={() => {
+          onClick={async () => {
             if (
-              confirm(
-                `Delete "${codeDoc.title}.${codeDoc.extension}" and its cards on all boards?`,
-              )
+              await confirmDialog({
+                title: `Delete “${codeDoc.title}.${codeDoc.extension}”?`,
+                body: 'The file and its cards on all boards are removed.',
+                confirmLabel: 'Delete file',
+                danger: true,
+              })
             )
               deleteCode(codeDoc.id)
           }}
@@ -443,9 +475,14 @@ function NodeInspector({ node }: { node: BoardNode }) {
       {d.type === 'sheet' && sheetDoc && (
         <button
           className="btn mt-2 w-full text-[#f24822]"
-          onClick={() => {
+          onClick={async () => {
             if (
-              confirm(`Delete spreadsheet "${sheetDoc.title}" and its cards on all boards?`)
+              await confirmDialog({
+                title: `Delete “${sheetDoc.title}”?`,
+                body: 'The spreadsheet and its cards on all boards are removed.',
+                confirmLabel: 'Delete spreadsheet',
+                danger: true,
+              })
             )
               deleteSheetDoc(sheetDoc.id)
           }}
@@ -453,6 +490,32 @@ function NodeInspector({ node }: { node: BoardNode }) {
           <IcTrash size={12} /> Delete spreadsheet from vault
         </button>
       )}
+    </>
+  )
+}
+
+/** Comments summary + entry point for the selected card. */
+function CardCommentsRow({ nodeId }: { nodeId: string }) {
+  const count = useOpenCommentCount(nodeId)
+  const setPanel = useCollabStore((s) => s.setPanel)
+  const setFocusedThread = useCollabStore((s) => s.setFocusedThread)
+  return (
+    <>
+      <div className="insp-h">Comments</div>
+      <button
+        className="btn w-full"
+        onClick={() => {
+          const projectId = useStore.getState().activeProjectId
+          const thread = (useCollabStore.getState().comments[projectId] ?? []).find(
+            (t) => t.targetId === nodeId && !t.resolved,
+          )
+          setPanel('comments')
+          setFocusedThread(thread?.id ?? null)
+        }}
+      >
+        <IcMessage size={12} />
+        {count ? `${count} open comment${count > 1 ? 's' : ''}` : 'Comment on this card'}
+      </button>
     </>
   )
 }
@@ -479,11 +542,27 @@ function EdgeInspector({ edge }: { edge: Edge }) {
 
 export function Inspector() {
   const board = useStore((s) => s.boards[s.activeBoardId])
+  const readOnly = useReadOnly()
+  const role = useMyRole()
   const selectedNodes = board.nodes.filter((n) => n.selected)
   const selectedEdge = board.edges.find((e) => e.selected)
 
   return (
     <aside className="w-70 flex-none overflow-y-auto border-l border-bord bg-panel px-4 pb-6">
+      {readOnly && (
+        <div className="mt-3 flex items-center gap-1.5 rounded-md bg-panel2 px-2 py-1.5 text-[10.5px] text-muted">
+          <IcEye size={11} className="flex-none" />
+          {ROLE_LABEL[role]} access — fields are read-only
+        </div>
+      )}
+      {/* comments stay usable for commenter roles, so they live outside the
+          disabled fieldset that neutralizes every editing control below */}
+      {selectedNodes.length === 1 && <CardCommentsRow nodeId={selectedNodes[0].id} />}
+      <fieldset
+        disabled={readOnly}
+        className="m-0 min-w-0 border-0 p-0"
+        style={{ minInlineSize: 'auto' }}
+      >
       {selectedNodes.length === 1 ? (
         <NodeInspector node={selectedNodes[0]} />
       ) : selectedNodes.length > 1 ? (
@@ -515,6 +594,7 @@ export function Inspector() {
           </ul>
         </>
       )}
+      </fieldset>
     </aside>
   )
 }

@@ -3,6 +3,10 @@ import { useReactFlow } from '@xyflow/react'
 import type { CardType } from '@/types/model'
 import { useStore } from '@/store/useStore'
 import { cardSpecFor, importFiles, reportErrors } from '@/lib/import/ImportService'
+import { useCollabStore } from '@/lib/collab/collabStore'
+import { useCan } from '@/lib/collab/useCollab'
+import { toast } from '@/components/ui/Toaster'
+import { promptDialog } from '@/components/ui/ConfirmDialog'
 import {
   IcCode,
   IcCube,
@@ -10,6 +14,7 @@ import {
   IcGlobe,
   IcImage,
   IcLink,
+  IcMessage,
   IcNote,
   IcSection,
   IcTable,
@@ -23,6 +28,9 @@ export function CanvasToolbar() {
   const addCard = useStore((s) => s.addCard)
   const addSection = useStore((s) => s.addSection)
   const addWebEmbedCard = useStore((s) => s.addWebEmbedCard)
+  const commentMode = useCollabStore((s) => s.commentMode)
+  const setCommentMode = useCollabStore((s) => s.setCommentMode)
+  const mayComment = useCan('comments.add')
   const imageInput = useRef<HTMLInputElement>(null)
   const importInput = useRef<HTMLInputElement>(null)
 
@@ -52,6 +60,7 @@ export function CanvasToolbar() {
     label: string
     icon: React.ReactNode
     onClick: () => void
+    active?: boolean
   }[] = [
     {
       key: 'section',
@@ -99,14 +108,32 @@ export function CanvasToolbar() {
       label: 'Web',
       icon: <IcGlobe size={16} />,
       onClick: () => {
-        const url = prompt('Webpage URL to embed', 'https://')
-        if (!url) return
-        const res = addWebEmbedCard(url, centerPos())
-        if (!res.cardId) alert(res.reason)
+        void promptDialog({
+          title: 'Embed a webpage',
+          body: 'Only http(s) URLs are allowed. Sites that refuse framing fall back to a link preview.',
+          label: 'URL',
+          placeholder: 'https://…',
+          confirmLabel: 'Embed',
+        }).then((url) => {
+          if (!url) return
+          const res = addWebEmbedCard(url, centerPos())
+          if (!res.cardId) toast.error('Could not embed that URL', res.reason)
+        })
       },
     },
     { key: 'link', label: 'Link', icon: <IcLink size={16} />, onClick: () => insert('link') },
     { key: 'embed3d', label: '3D', icon: <IcCube size={16} />, onClick: () => insert('embed3d') },
+    ...(mayComment
+      ? [
+          {
+            key: 'comment',
+            label: 'Comment',
+            icon: <IcMessage size={16} />,
+            onClick: () => setCommentMode(!commentMode),
+            active: commentMode,
+          },
+        ]
+      : []),
     {
       key: 'import',
       label: 'Import',
@@ -120,12 +147,20 @@ export function CanvasToolbar() {
       {items.map((item) => (
         <button
           key={item.key}
-          className="flex cursor-pointer flex-col items-center gap-0.5 rounded-lg px-3 py-1.5 text-muted hover:bg-panel2 hover:text-ink"
+          className={`flex cursor-pointer flex-col items-center gap-0.5 rounded-lg px-3 py-1.5 ${
+            item.active
+              ? 'bg-accent/15 text-accent'
+              : 'text-muted hover:bg-panel2 hover:text-ink'
+          }`}
           onClick={item.onClick}
+          aria-label={item.key === 'comment' ? 'Pin a comment on the canvas' : `Add ${item.label.toLowerCase()} card`}
+          aria-pressed={item.key === 'comment' ? !!item.active : undefined}
           title={
             item.key === 'import'
               ? 'Import any file — PDF, Office, media, 3D…'
-              : `Add ${item.label.toLowerCase()} card`
+              : item.key === 'comment'
+                ? 'Pin a comment anywhere on the canvas'
+                : `Add ${item.label.toLowerCase()} card`
           }
         >
           {item.icon}
@@ -145,6 +180,7 @@ export function CanvasToolbar() {
       />
       <input
         ref={importInput}
+        data-import-input
         type="file"
         multiple
         hidden

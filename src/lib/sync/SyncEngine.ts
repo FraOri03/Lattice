@@ -210,6 +210,14 @@ class SyncEngine {
       this.meta.lastSyncAt = Date.now()
       this.saveMeta()
       useSyncStore.getState().markSynced(this.meta.lastSyncAt)
+      // activity trail (deduped there); dynamic import avoids a static cycle
+      void import('@/lib/collab/ActivityLogService').then(({ activityLog }) =>
+        activityLog.log(
+          useStore.getState().activeProjectId,
+          'drive.sync',
+          'Synced with Google Drive',
+        ),
+      )
     } catch (err) {
       this.reportError(err)
     } finally {
