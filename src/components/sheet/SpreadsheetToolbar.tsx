@@ -1,6 +1,7 @@
 import { useRef } from 'react'
 import { cellKey, type NumFmt } from '@/lib/sheet/sheetModel'
 import { IcAlignCenter, IcAlignLeft, IcAlignRight } from '@/components/Icons'
+import { SheetPeerChips } from '@/components/collab/EntityPresence'
 import { rectOf, useSheetSession } from './SheetSession'
 
 const NUM_FMTS: { id: NumFmt; label: string }[] = [
@@ -60,6 +61,7 @@ function ColorWell({
  */
 export function SpreadsheetToolbar() {
   const {
+    sheetId,
     sheet,
     selection,
     active,
@@ -188,6 +190,8 @@ export function SpreadsheetToolbar() {
       >
         − Col
       </button>
+
+      <SheetPeerChips sheetId={sheetId} />
     </div>
   )
 }

@@ -5,6 +5,7 @@ import { formatBytes } from '@/lib/media'
 import { KIND_ICONS, KIND_LABEL } from '@/components/assetKinds'
 import { IcDownload, IcX } from '@/components/Icons'
 import { AssetPreview } from './previews'
+import { ViewingPeers } from '@/components/collab/EntityPresence'
 
 /** Full asset preview pane — takes the document editor's slot when an asset is open. */
 export function AssetPreviewPane({ asset }: { asset: AssetDoc }) {
@@ -22,6 +23,7 @@ export function AssetPreviewPane({ asset }: { asset: AssetDoc }) {
           onChange={(e) => renameAsset(asset.id, e.target.value)}
           placeholder="Untitled asset"
         />
+        <ViewingPeers entityId={asset.id} />
         <span className="flex-none text-[11px] text-muted">
           {KIND_LABEL[asset.kind]} · {formatBytes(asset.size)}
         </span>

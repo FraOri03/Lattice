@@ -8,6 +8,7 @@ import { useCan, useReadOnly } from '@/lib/collab/useCollab'
 import type { ViewMode } from '@/types/model'
 import { ProfileMenu } from '@/components/account/ProfileMenu'
 import { PresenceAvatars } from '@/components/collab/PresenceAvatars'
+import { RealtimeStatusChip } from '@/components/collab/RealtimeStatusChip'
 import {
   IcBoard,
   IcChevronRight,
@@ -328,6 +329,7 @@ export function TopBar() {
       <div className="flex-1" />
 
       <PresenceAvatars />
+      <RealtimeStatusChip />
       <button
         className="btn"
         onClick={() => setShareDialogOpen(true)}

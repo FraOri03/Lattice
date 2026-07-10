@@ -242,18 +242,29 @@ function SettingsTab() {
           <div className="mt-1 text-[11px] text-muted">
             scope: {p.capabilities.scope} · latency: {p.capabilities.latency} ·{' '}
             {p.capabilities.liveCursors ? 'live cursors' : 'no live cursors'} ·{' '}
-            {p.capabilities.liveBoardOps ? 'live board sync' : 'durable state only'}
+            {p.capabilities.documentCRDT && p.capabilities.codeCRDT
+              ? 'CRDT docs & code'
+              : 'no CRDT merge'}{' '}
+            · {p.capabilities.boardRealtime ? 'live board ops' : 'durable state only'} ·{' '}
+            {p.capabilities.serverPermissions
+              ? 'server-enforced permissions'
+              : 'UI-level permissions'}
           </div>
         </div>
       ))}
-      <div className="rounded-lg border border-dashed border-bord p-2.5">
-        <div className="text-[12px] font-semibold text-muted">Realtime backend</div>
-        <div className="mt-1 text-[11px] leading-relaxed text-muted">
-          Cross-device live cursors and co-editing need a websocket backend (Supabase
-          Realtime, Liveblocks, PartyKit or y-websocket). The provider seam is ready —
-          set VITE_REALTIME_WS_URL once a backend exists. Planned for Phase 8.
+      {!providers.some((p) => p.id === 'realtime') && (
+        <div className="rounded-lg border border-dashed border-bord p-2.5">
+          <div className="text-[12px] font-semibold text-muted">
+            Cross-device realtime: not configured
+          </div>
+          <div className="mt-1 text-[11px] leading-relaxed text-muted">
+            Tabs of this browser already co-edit via CRDT; other devices sync
+            through Google Drive. For live cross-device collaboration set
+            VITE_REALTIME_BACKEND=liveblocks + LIVEBLOCKS_SECRET_KEY and sign in
+            with Google — the status chip in the top bar has the full checklist.
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="insp-h">Roles</div>
       {(Object.keys(ROLE_LABEL) as CollabRole[]).map((r) => (
