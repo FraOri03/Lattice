@@ -17,6 +17,7 @@ import { DocumentView } from '@/components/DocumentView'
 import { BoardCanvas } from '@/components/board/BoardCanvas'
 import { LoginScreen } from '@/components/account/LoginScreen'
 import { GithubDialog } from '@/components/github/GithubDialog'
+import { DriveDialog } from '@/components/account/DriveDialog'
 import { CommandPalette } from '@/components/CommandPalette'
 import { Toaster, toast } from '@/components/ui/Toaster'
 import { DialogHost, confirmDialog } from '@/components/ui/ConfirmDialog'
@@ -160,6 +161,7 @@ function Workspace() {
         </div>
       </div>
       <GithubDialog />
+      <DriveDialog />
       <CommandPalette />
       <ShareDialog />
       <ShortcutsDialog />

@@ -4,6 +4,7 @@ import { create } from 'zustand'
 interface UiState {
   paletteOpen: boolean
   githubDialogOpen: boolean
+  driveDialogOpen: boolean
   projectDialogOpen: boolean
   shareDialogOpen: boolean
   shortcutsOpen: boolean
@@ -12,6 +13,7 @@ interface UiState {
 
   setPaletteOpen: (open: boolean) => void
   setGithubDialogOpen: (open: boolean) => void
+  setDriveDialogOpen: (open: boolean) => void
   setProjectDialogOpen: (open: boolean) => void
   setShareDialogOpen: (open: boolean) => void
   setShortcutsOpen: (open: boolean) => void
@@ -21,6 +23,7 @@ interface UiState {
 export const useUiStore = create<UiState>()((set) => ({
   paletteOpen: false,
   githubDialogOpen: false,
+  driveDialogOpen: false,
   projectDialogOpen: false,
   shareDialogOpen: false,
   shortcutsOpen: false,
@@ -28,6 +31,7 @@ export const useUiStore = create<UiState>()((set) => ({
 
   setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
   setGithubDialogOpen: (githubDialogOpen) => set({ githubDialogOpen }),
+  setDriveDialogOpen: (driveDialogOpen) => set({ driveDialogOpen }),
   setProjectDialogOpen: (projectDialogOpen) => set({ projectDialogOpen }),
   setShareDialogOpen: (shareDialogOpen) => set({ shareDialogOpen }),
   setShortcutsOpen: (shortcutsOpen) => set({ shortcutsOpen }),

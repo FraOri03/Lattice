@@ -27,6 +27,7 @@ function timeAgo(ts: number | null): string {
 
 const SYNC_LABEL: Record<string, string> = {
   idle: 'Waiting for changes',
+  connecting: 'Connecting to Drive…',
   syncing: 'Syncing…',
   synced: 'Up to date',
   offline: 'Offline — will resume',
@@ -39,6 +40,7 @@ export function ProfileMenu() {
   const { account, authKind, signIn, signOut } = useAccount()
   const sync = useSyncStore()
   const setGithubDialogOpen = useUiStore((s) => s.setGithubDialogOpen)
+  const setDriveDialogOpen = useUiStore((s) => s.setDriveDialogOpen)
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const githubUser = githubProvider.getCachedUser()
@@ -110,8 +112,21 @@ export function ProfileMenu() {
               driveConnected
                 ? `folder “${env.driveAppFolder}”`
                 : authKind === 'mock'
-                  ? 'needs Google sign-in'
-                  : 'not connected'
+                  ? 'needs OAuth setup'
+                  : sync.status === 'connecting'
+                    ? 'connecting…'
+                    : 'not connected'
+            }
+            action={
+              <button
+                className="cursor-pointer text-[11px] text-accent hover:underline"
+                onClick={() => {
+                  setOpen(false)
+                  setDriveDialogOpen(true)
+                }}
+              >
+                {driveConnected ? 'Manage' : 'Connect'}
+              </button>
             }
           />
           <ServiceRow
@@ -160,6 +175,17 @@ export function ProfileMenu() {
                 onClick={() => void syncEngine.syncNow()}
               >
                 <IcRefresh size={12} />
+              </button>
+            )}
+            {!driveConnected && sync.status === 'error' && (
+              <button
+                className="cursor-pointer text-[11px] text-accent hover:underline"
+                onClick={() => {
+                  setOpen(false)
+                  setDriveDialogOpen(true)
+                }}
+              >
+                Fix
               </button>
             )}
           </div>

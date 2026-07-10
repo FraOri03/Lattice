@@ -46,10 +46,11 @@ export function AccountProvider({ children }: { children: ReactNode }) {
     () => localStorage.getItem(SKIP_KEY) === '1',
   )
 
-  // a restored Google session resumes Drive sync on startup
+  // a restored Google session resumes Drive sync on startup; start()
+  // verifies the connection first and reports errors via the sync store
   useEffect(() => {
     if (account && authService.kind === 'google') {
-      syncEngine.start()
+      void syncEngine.start()
     }
     // run once for the restored session; sign-in path calls start() itself
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -64,7 +65,7 @@ export function AccountProvider({ children }: { children: ReactNode }) {
       setStatus('signed-in')
       localStorage.removeItem(SKIP_KEY)
       setLoginSkipped(false)
-      if (authService.kind === 'google') syncEngine.start()
+      if (authService.kind === 'google') void syncEngine.start()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sign-in failed')
       setStatus(account ? 'signed-in' : 'signed-out')

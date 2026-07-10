@@ -3,6 +3,7 @@ import { storage } from '@/lib/storage/StorageProvider'
 import {
   GoogleDriveStorageProvider,
   DriveApiError,
+  describeDriveError,
 } from '@/lib/storage/GoogleDriveStorageProvider'
 import { authService } from '@/lib/auth/AuthService'
 import { useSyncStore } from './syncStore'
@@ -92,17 +93,52 @@ class SyncEngine {
     localStorage.setItem(META_KEY, JSON.stringify(this.meta))
   }
 
-  /** Begin syncing (called after Google sign-in / session restore). */
-  start(): void {
-    if (this.running) return
+  private connecting = false
+
+  /**
+   * Begin syncing (called after Google sign-in / session restore, or from
+   * "Reconnect Drive"). The engine only flips to "connected" after a real
+   * verification round-trip (valid token → Drive API reachable → app
+   * folder exists). If any step fails, sync stays off with a precise
+   * error and the local IndexedDB vault keeps working untouched.
+   */
+  async start(): Promise<void> {
+    if (this.running || this.connecting) return
     if (authService.kind !== 'google') {
       // mock accounts are local-only — never pretend to sync
       useSyncStore.getState().setProvider('none')
       useSyncStore.getState().setStatus('disabled')
       return
     }
+
+    // offline: don't fail verification on a dead network — wait and retry
+    if (!navigator.onLine) {
+      useSyncStore.getState().setStatus('offline')
+      window.addEventListener('online', this.retryStart, { once: true })
+      return
+    }
+
+    this.connecting = true
+    useSyncStore.getState().setStatus('connecting')
+    const drive = new GoogleDriveStorageProvider(() => authService.getAccessToken())
+    try {
+      const token = await authService.getAccessToken()
+      if (!token) {
+        throw new DriveApiError(401, 'No valid Google Drive token')
+      }
+      await drive.about() // token valid + scope granted + Drive API enabled
+      await drive.ensureAppFolder() // /Lattice exists (find-or-create)
+    } catch (err) {
+      this.connecting = false
+      useSyncStore.getState().setProvider('none')
+      useSyncStore.getState().setStatus('error', describeDriveError(err))
+      console.error('[sync] Drive connection failed', err)
+      return
+    }
+    this.connecting = false
+
     this.running = true
-    this.drive = new GoogleDriveStorageProvider(() => authService.getAccessToken())
+    this.drive = drive
     useSyncStore.getState().setProvider('google-drive')
     useSyncStore.getState().setStatus(navigator.onLine ? 'idle' : 'offline')
 
@@ -125,11 +161,14 @@ class SyncEngine {
     void this.syncNow()
   }
 
+  private retryStart = () => void this.start()
+
   stop(): void {
     this.running = false
     this.unsubscribe?.()
     this.unsubscribe = null
     if (this.pushTimer) clearTimeout(this.pushTimer)
+    window.removeEventListener('online', this.retryStart)
     window.removeEventListener('online', this.onOnline)
     window.removeEventListener('offline', this.onOffline)
     this.drive = null
@@ -246,14 +285,19 @@ class SyncEngine {
   }
 
   private reportError(err: unknown) {
-    const message =
-      err instanceof DriveApiError && err.status === 401
-        ? 'Google Drive session expired — sign in again to resume sync'
-        : err instanceof Error
-          ? err.message
-          : 'Sync failed'
     console.error('[sync]', err)
-    useSyncStore.getState().setStatus('error', message)
+    useSyncStore.getState().setStatus('error', describeDriveError(err))
+  }
+
+  /** True once start() verified the Drive connection and sync is live. */
+  get isRunning(): boolean {
+    return this.running
+  }
+
+  /** Tear down and re-verify — used by "Reconnect Drive". */
+  async restart(): Promise<void> {
+    this.stop()
+    await this.start()
   }
 
   /* ---------------- push ---------------- */

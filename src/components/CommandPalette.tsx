@@ -156,6 +156,7 @@ function usePaletteItems(query: string, close: () => void): PaletteItem[] {
   const s = useStore()
   const syncProvider = useSyncStore((st) => st.provider)
   const setGithubDialogOpen = useUiStore((st) => st.setGithubDialogOpen)
+  const setDriveDialogOpen = useUiStore((st) => st.setDriveDialogOpen)
   const setShareDialogOpen = useUiStore((st) => st.setShareDialogOpen)
   const setShortcutsOpen = useUiStore((st) => st.setShortcutsOpen)
   const setPanel = useCollabStore((st) => st.setPanel)
@@ -183,6 +184,7 @@ function usePaletteItems(query: string, close: () => void): PaletteItem[] {
         () => s.setTheme(s.theme === 'dark' ? 'light' : 'dark'),
       ],
       ['GitHub — sync code', <IcGithub size={14} />, () => setGithubDialogOpen(true)],
+      ['Google Drive — connect & diagnostics', <IcCloud size={14} />, () => setDriveDialogOpen(true)],
       ['Share — members & invites', <IcUserPlus size={14} />, () => setShareDialogOpen(true)],
       ['Comments', <IcMessage size={14} />, () => setPanel('comments')],
       ['Activity log', <IcActivity size={14} />, () => setPanel('activity')],
@@ -310,5 +312,5 @@ function usePaletteItems(query: string, close: () => void): PaletteItem[] {
     }
 
     return items.slice(0, 30)
-  }, [query, s, syncProvider, setGithubDialogOpen, setShareDialogOpen, setShortcutsOpen, setPanel, close])
+  }, [query, s, syncProvider, setGithubDialogOpen, setDriveDialogOpen, setShareDialogOpen, setShortcutsOpen, setPanel, close])
 }

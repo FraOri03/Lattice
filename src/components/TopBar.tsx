@@ -59,6 +59,7 @@ function useOnline(): boolean {
 function SyncIndicator() {
   const sync = useSyncStore()
   const online = useOnline()
+  const setDriveDialogOpen = useUiStore((s) => s.setDriveDialogOpen)
 
   if (!online) {
     return (
@@ -71,13 +72,33 @@ function SyncIndicator() {
     )
   }
   if (sync.provider !== 'google-drive') {
+    // Drive not (yet) verified: show connecting / a clickable error / local
+    if (sync.status === 'connecting') {
+      return (
+        <span className="flex items-center gap-1.5 rounded-full border border-bord bg-panel2 px-2 py-1 text-[10px] font-medium text-muted">
+          <IcRefresh size={12} className="animate-spin" /> Connecting…
+        </span>
+      )
+    }
+    if (sync.status === 'error') {
+      return (
+        <button
+          className="flex cursor-pointer items-center gap-1.5 rounded-full border border-[#f24822]/40 bg-panel2 px-2 py-1 text-[10px] font-medium text-[#f24822]"
+          title={`${sync.error ?? 'Google Drive is not connected'} — click for diagnostics`}
+          onClick={() => setDriveDialogOpen(true)}
+        >
+          <IcCloudOff size={12} /> Drive error
+        </button>
+      )
+    }
     return (
-      <span
-        className="flex items-center gap-1.5 rounded-full border border-bord bg-panel2 px-2 py-1 text-[10px] font-medium text-muted"
-        title="Cloud sync is off — sign in with Google to enable Drive sync"
+      <button
+        className="flex cursor-pointer items-center gap-1.5 rounded-full border border-bord bg-panel2 px-2 py-1 text-[10px] font-medium text-muted"
+        title="Cloud sync is off — click to connect Google Drive"
+        onClick={() => setDriveDialogOpen(true)}
       >
         <IcCloudOff size={12} /> Local
-      </span>
+      </button>
     )
   }
   const color =
@@ -101,7 +122,9 @@ function SyncIndicator() {
       className={`flex cursor-pointer items-center gap-1.5 rounded-full border border-bord bg-panel2 px-2 py-1 text-[10px] font-medium ${color}`}
       title={sync.error ?? 'Google Drive sync — click to sync now'}
       aria-label="Sync now"
-      onClick={() => void syncEngine.syncNow()}
+      onClick={() =>
+        sync.status === 'error' ? setDriveDialogOpen(true) : void syncEngine.syncNow()
+      }
     >
       {sync.status === 'syncing' ? (
         <IcRefresh size={12} className="animate-spin" />
