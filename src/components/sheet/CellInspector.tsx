@@ -13,6 +13,8 @@ import {
   exportSpreadsheet,
   SHEET_EXPORT_FORMATS,
 } from '@/lib/sheet/SpreadsheetExportService'
+import { toast } from '@/components/ui/Toaster'
+import { confirmDialog } from '@/components/ui/ConfirmDialog'
 import { IcDownload, IcTrash } from '@/components/Icons'
 import { useSheetSession } from './SheetSession'
 
@@ -48,7 +50,7 @@ export function CellInspector() {
     try {
       await exportSpreadsheet(meta, format, sheetIndex)
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Export failed')
+      toast.error('Export failed', err instanceof Error ? err.message : undefined)
     } finally {
       setExporting(null)
     }
@@ -163,8 +165,15 @@ export function CellInspector() {
       <div className="insp-h">Danger</div>
       <button
         className="btn w-full text-[#f24822]"
-        onClick={() => {
-          if (confirm(`Delete "${meta.title}" and its cards on all boards?`))
+        onClick={async () => {
+          if (
+            await confirmDialog({
+              title: `Delete “${meta.title}”?`,
+              body: 'The spreadsheet and its cards on all boards are removed.',
+              confirmLabel: 'Delete spreadsheet',
+              danger: true,
+            })
+          )
             deleteSheetDoc(meta.id)
         }}
       >

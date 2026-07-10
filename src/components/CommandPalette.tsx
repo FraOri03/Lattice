@@ -5,16 +5,22 @@ import { useSyncStore } from '@/lib/sync/syncStore'
 import { syncEngine } from '@/lib/sync/SyncEngine'
 import { FileKindIcon, type FileKind } from '@/lib/registry/fileKinds'
 import type { RecentEntry, ViewMode } from '@/types/model'
+import { useCollabStore } from '@/lib/collab/collabStore'
 import {
+  IcActivity,
   IcBoard,
   IcClock,
   IcCloud,
   IcFolder,
   IcGithub,
+  IcHistory,
+  IcKeyboard,
+  IcMessage,
   IcMoon,
   IcPlus,
   IcSearch,
   IcSun,
+  IcUserPlus,
 } from '@/components/Icons'
 
 interface PaletteItem {
@@ -151,6 +157,9 @@ function usePaletteItems(query: string, close: () => void): PaletteItem[] {
   const syncProvider = useSyncStore((st) => st.provider)
   const setGithubDialogOpen = useUiStore((st) => st.setGithubDialogOpen)
   const setDriveDialogOpen = useUiStore((st) => st.setDriveDialogOpen)
+  const setShareDialogOpen = useUiStore((st) => st.setShareDialogOpen)
+  const setShortcutsOpen = useUiStore((st) => st.setShortcutsOpen)
+  const setPanel = useCollabStore((st) => st.setPanel)
 
   return useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -176,6 +185,11 @@ function usePaletteItems(query: string, close: () => void): PaletteItem[] {
       ],
       ['GitHub — sync code', <IcGithub size={14} />, () => setGithubDialogOpen(true)],
       ['Google Drive — connect & diagnostics', <IcCloud size={14} />, () => setDriveDialogOpen(true)],
+      ['Share — members & invites', <IcUserPlus size={14} />, () => setShareDialogOpen(true)],
+      ['Comments', <IcMessage size={14} />, () => setPanel('comments')],
+      ['Activity log', <IcActivity size={14} />, () => setPanel('activity')],
+      ['Version history', <IcHistory size={14} />, () => setPanel('versions')],
+      ['Keyboard shortcuts', <IcKeyboard size={14} />, () => setShortcutsOpen(true), 'Ctrl /'],
     ]
     if (syncProvider === 'google-drive') {
       actions.push(['Sync now (Google Drive)', <IcCloud size={14} />, () => void syncEngine.syncNow()])
@@ -298,5 +312,5 @@ function usePaletteItems(query: string, close: () => void): PaletteItem[] {
     }
 
     return items.slice(0, 30)
-  }, [query, s, syncProvider, setGithubDialogOpen, setDriveDialogOpen, close])
+  }, [query, s, syncProvider, setGithubDialogOpen, setDriveDialogOpen, setShareDialogOpen, setShortcutsOpen, setPanel, close])
 }

@@ -8,6 +8,10 @@ import { storage } from '@/lib/storage/StorageProvider'
 import { EMPTY_DOC } from '@/lib/richdoc/docjson'
 import { ASSET_DRAG_MIME, DOC_DRAG_MIME, NOTE_DRAG_MIME } from '@/lib/dnd'
 import { importFile } from '@/lib/import/ImportService'
+import { useReadOnly } from '@/lib/collab/useCollab'
+import { presenceService } from '@/lib/collab/PresenceService'
+import { realtimeDocumentSync } from '@/lib/collab/RealtimeDocumentSync'
+import { toast } from '@/components/ui/Toaster'
 import { baseExtensions } from './extensions'
 import { SlashCommands } from './SlashCommandMenu'
 import { AssetPickerDialog } from './AssetPickerDialog'
@@ -59,12 +63,14 @@ function EditorInner({
   variant: 'full' | 'mini'
 }) {
   const persistDocContent = useStore((s) => s.persistDocContent)
+  const readOnly = useReadOnly()
   const saveTimer = useRef<number | undefined>(undefined)
   const insertAtRef = useRef<number | null>(null)
   const [assetPickerOpen, setAssetPickerOpen] = useState(false)
   const imageInput = useRef<HTMLInputElement>(null)
 
   const editor = useEditor({
+    editable: !readOnly,
     extensions: [
       ...baseExtensions,
       Placeholder.configure({
@@ -136,10 +142,45 @@ function EditorInner({
         700,
       )
     },
+    onFocus: () => {
+      const meta = useStore.getState().docs[docId]
+      presenceService.setEditing({ kind: 'doc', id: docId, title: meta?.title ?? 'document' })
+    },
+    onBlur: () => presenceService.setEditing(undefined),
   })
   const editorRef = useRef(editor)
   editorRef.current = editor
   useEditorTick(variant === 'mini' ? null : editor)
+
+  // role changes (or "view as" preview) flip editability live
+  useEffect(() => {
+    editor?.setEditable(!readOnly)
+  }, [editor, readOnly])
+
+  // another session saved this document: refresh if we're not mid-edit
+  useEffect(() => {
+    return realtimeDocumentSync.onRemoteUpdate(docId, () => {
+      const ed = editorRef.current
+      if (!ed || ed.isDestroyed) return
+      const refresh = async () => {
+        const body = (await storage.getDocument(docId)) as JSONContent | undefined
+        const cur = editorRef.current
+        if (cur && !cur.isDestroyed && body)
+          cur.commands.setContent(body, false)
+      }
+      if (ed.isFocused) {
+        toast.info('Document changed elsewhere', 'Someone saved a newer version of this document.', {
+          label: 'Load newest',
+          run: () => void refresh(),
+        })
+      } else {
+        void refresh()
+      }
+    })
+  }, [docId])
+
+  // never leave a stale "editing…" indicator behind
+  useEffect(() => () => presenceService.setEditing(undefined), [docId])
 
   // Flush pending changes when the editor unmounts (tab switch, card close…)
   useEffect(() => {
@@ -169,7 +210,8 @@ function EditorInner({
     if (!file) return
     const outcome = await importFile(file)
     if (outcome.kind === 'asset') insertEmbed(outcome.asset.id)
-    else if (outcome.kind === 'error') alert(`${outcome.fileName}: ${outcome.message}`)
+    else if (outcome.kind === 'error')
+      toast.error('Image import failed', `${outcome.fileName}: ${outcome.message}`)
   }
 
   return (

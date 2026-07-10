@@ -4,6 +4,7 @@ import { downloadAsset } from '@/lib/assets/AssetRegistry'
 import { downloadText } from '@/lib/download'
 import { formatBytes } from '@/lib/media'
 import { labelForLang } from '@/lib/code/languages'
+import { confirmDialog } from '@/components/ui/ConfirmDialog'
 import { IcDownload, IcTrash } from '@/components/Icons'
 
 /** Right panel of the code workspace: metadata, source file, backlinks, export. */
@@ -119,11 +120,14 @@ export function CodeInspector() {
       <div className="insp-h">Danger</div>
       <button
         className="btn w-full text-[#f24822]"
-        onClick={() => {
+        onClick={async () => {
           if (
-            confirm(
-              `Delete "${meta.title}.${meta.extension}" and its cards on all boards?`,
-            )
+            await confirmDialog({
+              title: `Delete “${meta.title}.${meta.extension}”?`,
+              body: 'The file and its cards on all boards are removed.',
+              confirmLabel: 'Delete file',
+              danger: true,
+            })
           )
             deleteCode(meta.id)
         }}
