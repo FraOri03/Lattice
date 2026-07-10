@@ -1,9 +1,13 @@
 import { backlinksToTitle, useStore } from '@/store/useStore'
+import type { CodeEditingPolicy } from '@/types/model'
 import { storage } from '@/lib/storage/StorageProvider'
 import { downloadAsset } from '@/lib/assets/AssetRegistry'
 import { downloadText } from '@/lib/download'
 import { formatBytes } from '@/lib/media'
 import { labelForLang } from '@/lib/code/languages'
+import { useCan } from '@/lib/collab/useCollab'
+import { yjsManager } from '@/lib/crdt/YjsManager'
+import { reconciledCode } from '@/lib/crdt/CodeCRDT'
 import { confirmDialog } from '@/components/ui/ConfirmDialog'
 import { IcDownload, IcTrash } from '@/components/Icons'
 
@@ -18,14 +22,29 @@ export function CodeInspector() {
   const openDoc = useStore((s) => s.openDoc)
   const openCode = useStore((s) => s.openCode)
   const deleteCode = useStore((s) => s.deleteCode)
+  const project = useStore((s) => s.projects[s.activeProjectId])
+  const updateProject = useStore((s) => s.updateProject)
+  const canSettings = useCan('project.settings')
 
   if (!meta) return null
 
   const backlinks = backlinksToTitle(notes, docs, codeDocs, meta.title, meta.id)
   const sourceAsset = meta.sourceAssetId ? assets[meta.sourceAssetId] : undefined
+  const policy: CodeEditingPolicy =
+    project?.settings.codeEditingPolicy ?? 'collaborative'
+
+  const setPolicy = (next: CodeEditingPolicy) => {
+    if (!project) return
+    updateProject(project.id, {
+      settings: { ...project.settings, codeEditingPolicy: next },
+    })
+  }
 
   const download = async () => {
-    const content = await storage.getDocument(meta.id)
+    // prefer the reconciled CRDT state (may hold unmerged remote edits)
+    const projectId = meta.projectId ?? useStore.getState().activeProjectId
+    const merged = reconciledCode(yjsManager.room(projectId), meta.id)
+    const content = merged ?? (await storage.getDocument(meta.id))
     downloadText(
       `${meta.title}.${meta.extension}`,
       typeof content === 'string' ? content : '',
@@ -111,6 +130,49 @@ export function CodeInspector() {
           ))}
         </>
       )}
+
+      <div className="insp-h">Collaboration</div>
+      <div
+        role="radiogroup"
+        aria-label="Code editing policy"
+        className="flex flex-col gap-1 text-xs"
+      >
+        {(
+          [
+            {
+              value: 'collaborative',
+              label: 'Collaborative',
+              hint: 'Everyone edits together — changes merge automatically (CRDT).',
+            },
+            {
+              value: 'checkout',
+              label: 'Checkout required',
+              hint: 'One editor at a time — others request control; admins can force-unlock.',
+            },
+          ] as const
+        ).map((opt) => (
+          <label
+            key={opt.value}
+            className={`flex cursor-pointer items-start gap-2 rounded-lg border px-2 py-1.5 ${
+              policy === opt.value ? 'border-accent bg-accent-soft' : 'border-bord'
+            } ${canSettings ? '' : 'cursor-not-allowed opacity-60'}`}
+            title={opt.hint}
+          >
+            <input
+              type="radio"
+              name="code-editing-policy"
+              className="mt-0.5"
+              checked={policy === opt.value}
+              disabled={!canSettings}
+              onChange={() => setPolicy(opt.value)}
+            />
+            <span>
+              <span className="block font-semibold">{opt.label}</span>
+              <span className="block text-[10.5px] text-muted">{opt.hint}</span>
+            </span>
+          </label>
+        ))}
+      </div>
 
       <div className="insp-h">Export</div>
       <button className="btn w-full" onClick={() => void download()}>

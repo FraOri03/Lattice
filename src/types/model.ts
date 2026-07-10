@@ -36,6 +36,15 @@ export interface Project {
   settings: ProjectSettings
 }
 
+/**
+ * How code files are edited together (Phase 8):
+ *  - collaborative: CRDT multiplayer — several people type at once,
+ *    merges are deterministic (Yjs)
+ *  - checkout: soft file lock — one active editor at a time, others
+ *    request control; owner/admin may force-unlock
+ */
+export type CodeEditingPolicy = 'collaborative' | 'checkout'
+
 export interface ProjectSettings {
   /** GitHub code-sync link: only code documents ever sync to GitHub */
   github?: {
@@ -46,6 +55,8 @@ export interface ProjectSettings {
     /** repo default branch (protected; Lattice never commits to it) */
     defaultBranch: string
   }
+  /** code collaboration mode; default 'collaborative' */
+  codeEditingPolicy?: CodeEditingPolicy
   [key: string]: unknown
 }
 

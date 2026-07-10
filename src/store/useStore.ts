@@ -195,8 +195,12 @@ interface AppState {
 
   createDoc: (partial?: Partial<RichDocMeta>) => string
   updateDocMeta: (id: string, patch: Partial<Omit<RichDocMeta, 'id' | 'type'>>) => void
-  /** Write a document body to storage and refresh its digested metadata. */
-  persistDocContent: (id: string, body: JSONContent) => void
+  /**
+   * Write a document body to storage and refresh its digested metadata.
+   * `silent` skips the activity/announce hooks — used when persisting
+   * remote CRDT changes that another user already authored.
+   */
+  persistDocContent: (id: string, body: JSONContent, opts?: { silent?: boolean }) => void
   deleteDoc: (id: string) => void
   openDoc: (id: string) => void
   closeDoc: () => void
@@ -215,7 +219,7 @@ interface AppState {
   createCode: (partial?: Partial<CodeDocMeta>) => string
   updateCodeMeta: (id: string, patch: Partial<Omit<CodeDocMeta, 'id' | 'type'>>) => void
   /** Write code source to storage and refresh its digested metadata. */
-  persistCodeContent: (id: string, content: string) => void
+  persistCodeContent: (id: string, content: string, opts?: { silent?: boolean }) => void
   deleteCode: (id: string) => void
   openCode: (id: string) => void
   closeCode: () => void
@@ -967,7 +971,7 @@ export const useStore = create<AppState>()(
           }
         }),
 
-      persistDocContent: (id, body) => {
+      persistDocContent: (id, body, opts) => {
         void storage.putDocument(id, body).catch(console.error)
         const meta = get().docs[id]
         if (!meta) return
@@ -977,7 +981,7 @@ export const useStore = create<AppState>()(
             [id]: { ...meta, ...digestDocJson(body), updatedAt: Date.now() },
           },
         }))
-        announceEdit('doc', id, `Edited document “${meta.title}”`)
+        if (!opts?.silent) announceEdit('doc', id, `Edited document “${meta.title}”`)
       },
 
       deleteDoc: (id) => {
@@ -1125,7 +1129,7 @@ export const useStore = create<AppState>()(
           }
         }),
 
-      persistCodeContent: (id, content) => {
+      persistCodeContent: (id, content, opts) => {
         void storage.putDocument(id, content).catch(console.error)
         const meta = get().codeDocs[id]
         if (!meta) return
@@ -1135,7 +1139,7 @@ export const useStore = create<AppState>()(
             [id]: { ...meta, ...digestCode(content), updatedAt: Date.now() },
           },
         }))
-        announceEdit('code', id, `Edited ${meta.title}.${meta.extension}`)
+        if (!opts?.silent) announceEdit('code', id, `Edited ${meta.title}.${meta.extension}`)
       },
 
       deleteCode: (id) => {

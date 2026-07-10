@@ -54,3 +54,15 @@ export function deleteCodeCRDT(room: ProjectRoom, codeId: string): void {
     room.projectMetadata().delete(marker(codeId))
   })
 }
+
+/**
+ * The reconciled source of a code file: once a file is migrated, the
+ * CRDT text is the truth (it may contain remote edits nobody persisted
+ * locally yet); before migration the stored body is. GitHub export goes
+ * through this so commits always ship the merged shared state.
+ */
+export function reconciledCode(room: ProjectRoom, codeId: string): string | null {
+  if (!room.projectMetadata().get(marker(codeId))) return null
+  const text = room.codeDocuments().get(codeId)
+  return text ? text.toString() : null
+}

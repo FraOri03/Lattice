@@ -3,7 +3,7 @@ import type { JSONContent } from '@tiptap/core'
 import { NodeSelection } from '@tiptap/pm/state'
 import { BubbleMenu, EditorContent, FloatingMenu, useEditor } from '@tiptap/react'
 import Placeholder from '@tiptap/extension-placeholder'
-import Collaboration from '@tiptap/extension-collaboration'
+import Collaboration, { isChangeOrigin } from '@tiptap/extension-collaboration'
 import CollaborationCursor from '@tiptap/extension-collaboration-cursor'
 import { prosemirrorJSONToYXmlFragment } from 'y-prosemirror'
 import { useStore } from '@/store/useStore'
@@ -100,6 +100,8 @@ function EditorInner({
   const persistDocContent = useStore((s) => s.persistDocContent)
   const readOnly = useReadOnly()
   const saveTimer = useRef<number | undefined>(undefined)
+  /** true when at least one local (non-CRDT-remote) edit awaits saving */
+  const locallyDirty = useRef(false)
   const insertAtRef = useRef<number | null>(null)
   const [assetPickerOpen, setAssetPickerOpen] = useState(false)
   const imageInput = useRef<HTMLInputElement>(null)
@@ -187,13 +189,16 @@ function EditorInner({
         return true
       },
     },
-    onUpdate: ({ editor }) => {
-      // export the durable JSON body from the current CRDT state
+    onUpdate: ({ editor, transaction }) => {
+      // export the durable JSON body from the current CRDT state; remote
+      // CRDT changes persist silently (the author logs their own edit)
+      if (!isChangeOrigin(transaction)) locallyDirty.current = true
       window.clearTimeout(saveTimer.current)
-      saveTimer.current = window.setTimeout(
-        () => persistDocContent(docId, editor.getJSON()),
-        700,
-      )
+      saveTimer.current = window.setTimeout(() => {
+        const silent = !locallyDirty.current
+        locallyDirty.current = false
+        persistDocContent(docId, editor.getJSON(), { silent })
+      }, 700)
     },
     onFocus: () => {
       const meta = useStore.getState().docs[docId]

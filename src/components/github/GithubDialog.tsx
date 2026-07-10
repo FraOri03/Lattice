@@ -204,12 +204,21 @@ function ConnectedPanel() {
       if (!link) throw new Error('Link a repository first')
       const docs = projectCode.filter((c) => selectedExports.has(c.id))
       if (!docs.length) throw new Error('Select at least one code document')
+      const { yjsManager } = await import('@/lib/crdt/YjsManager')
+      const { reconciledCode } = await import('@/lib/crdt/CodeCRDT')
       const files = []
       for (const doc of docs) {
         const source = await storage.getDocument(doc.id)
+        // commit the reconciled CRDT state: it may hold merged remote
+        // edits that no local save has exported yet
+        const room = yjsManager.room(doc.projectId ?? useStore.getState().activeProjectId)
+        const merged = reconciledCode(room, doc.id)
         const existing = codeGithubLink(doc.metadata)
         const path = existing?.path ?? `lattice/${slugify(doc.title)}.${doc.extension || 'txt'}`
-        files.push({ path, content: typeof source === 'string' ? source : '' })
+        files.push({
+          path,
+          content: merged ?? (typeof source === 'string' ? source : ''),
+        })
         if (!existing) {
           updateCodeMeta(doc.id, {
             metadata: { ...doc.metadata, github: { repo: link.repo, branch: link.branch, path } },
