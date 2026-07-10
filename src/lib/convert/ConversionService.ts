@@ -40,16 +40,23 @@ export const DocxAdapter: FormatAdapter = {
   extensions: ['docx'],
   mimes: ['application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
   canImport: true,
-  canExport: false,
+  canExport: true,
   importStrategy: 'mammoth.js → HTML → Tiptap JSON',
-  exportStrategy: 'planned — docx serializer (Phase 5)',
-  limitations: ['Complex layout, comments and tracked changes are dropped on import'],
+  exportStrategy: 'Tiptap JSON → WordprocessingML package (in-browser, Phase 8)',
+  limitations: [
+    'Complex layout, comments and tracked changes are dropped on import',
+    'Export: asset embeds become a reference line; image sizes default when unknown',
+  ],
   requiresBackend: false,
   importDocument: async (file) => {
     const { value: html } = await mammoth.convertToHtml({
       arrayBuffer: await file.arrayBuffer(),
     })
     return generateJSON(html, baseExtensions)
+  },
+  exportDocument: async (body) => {
+    const { docJsonToDocxBlob } = await import('./docx')
+    return docJsonToDocxBlob(body)
   },
 }
 

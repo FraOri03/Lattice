@@ -21,6 +21,12 @@ import {
 export function ProjectSwitcher() {
   const project = useActiveProject()
   const projects = useStore((s) => s.projects)
+  const workspaces = useStore((s) => s.workspaces)
+  const activeWorkspaceId = useStore((s) => s.activeWorkspaceId)
+  const setActiveWorkspace = useStore((s) => s.setActiveWorkspace)
+  const createWorkspace = useStore((s) => s.createWorkspace)
+  const updateWorkspace = useStore((s) => s.updateWorkspace)
+  const deleteWorkspace = useStore((s) => s.deleteWorkspace)
   const setActiveProject = useStore((s) => s.setActiveProject)
   const createProject = useStore((s) => s.createProject)
   const updateProject = useStore((s) => s.updateProject)
@@ -39,7 +45,15 @@ export function ProjectSwitcher() {
   }, [open])
 
   if (!project) return null
-  const groups = groupProjects(Object.values(projects))
+  const activeWorkspace = workspaces[activeWorkspaceId]
+  // only this workspace's projects appear in the switcher
+  const wsProjects = activeWorkspace
+    ? Object.values(projects).filter((p) => activeWorkspace.projectIds.includes(p.id))
+    : Object.values(projects)
+  const groups = groupProjects(wsProjects)
+  const wsList = Object.values(workspaces).sort((a, b) =>
+    a.personal === b.personal ? a.name.localeCompare(b.name) : a.personal ? -1 : 1,
+  )
   const color = CARD_COLORS[project.color] ?? CARD_COLORS.blue
 
   const row = (p: Project, hint?: React.ReactNode) => (
@@ -82,6 +96,82 @@ export function ProjectSwitcher() {
 
       {open && (
         <div className="absolute top-full right-3 left-3 z-50 mt-1 max-h-[60vh] overflow-y-auto rounded-xl border border-bord bg-panel p-1.5 shadow-xl">
+          <div className="px-2 pt-1 pb-0.5 text-[9.5px] font-semibold tracking-widest text-muted uppercase">
+            Workspaces
+          </div>
+          {wsList
+            .filter((ws) => !ws.archived || ws.id === activeWorkspaceId)
+            .map((ws) => (
+              <div key={ws.id} className="group/ws flex items-center">
+                <button
+                  className={`flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[12px] ${
+                    ws.id === activeWorkspaceId
+                      ? 'bg-panel2 text-ink'
+                      : 'text-muted hover:bg-panel2/60'
+                  }`}
+                  onClick={() => {
+                    setActiveWorkspace(ws.id)
+                    setOpen(false)
+                  }}
+                  aria-current={ws.id === activeWorkspaceId}
+                >
+                  <span className="text-[13px]">{ws.icon}</span>
+                  <span className="min-w-0 flex-1 truncate">
+                    {ws.name}
+                    {ws.archived ? ' (archived)' : ''}
+                  </span>
+                  <span className="text-[10px] text-muted">
+                    {ws.projectIds.length} prj
+                  </span>
+                  {ws.id === activeWorkspaceId && (
+                    <IcCheck size={12} className="flex-none text-accent" />
+                  )}
+                </button>
+                {!ws.personal && (
+                  <span className="hidden flex-none gap-0.5 group-hover/ws:flex">
+                    <button
+                      className="icon-btn h-5 w-5"
+                      title={ws.archived ? 'Unarchive workspace' : 'Archive workspace'}
+                      aria-label={`${ws.archived ? 'Unarchive' : 'Archive'} workspace ${ws.name}`}
+                      onClick={() => updateWorkspace(ws.id, { archived: !ws.archived })}
+                    >
+                      <IcArchive size={10} />
+                    </button>
+                    <button
+                      className="icon-btn h-5 w-5 text-[#f24822]"
+                      title="Delete workspace (its projects move to Personal)"
+                      aria-label={`Delete workspace ${ws.name}`}
+                      onClick={async () => {
+                        if (
+                          await confirmDialog({
+                            title: `Delete workspace “${ws.name}”?`,
+                            body: `Nothing is lost: its ${ws.projectIds.length} project${ws.projectIds.length === 1 ? '' : 's'} move to the Personal workspace.`,
+                            confirmLabel: 'Delete workspace',
+                            danger: true,
+                          })
+                        )
+                          deleteWorkspace(ws.id)
+                      }}
+                    >
+                      <IcTrash size={10} />
+                    </button>
+                  </span>
+                )}
+              </div>
+            ))}
+          <button
+            className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-[12px] text-muted hover:bg-panel2 hover:text-ink"
+            onClick={() => {
+              const name = window.prompt('Workspace name', 'Team workspace')
+              if (!name?.trim()) return
+              const id = createWorkspace({ name: name.trim() })
+              setActiveWorkspace(id)
+              setOpen(false)
+            }}
+          >
+            <IcPlus size={12} /> New workspace
+          </button>
+          <div className="mx-1 my-1 h-px bg-bord" role="separator" />
           {groups.starred.length > 0 && (
             <>
               <div className="px-2 pt-1 pb-0.5 text-[9.5px] font-semibold tracking-widest text-muted uppercase">
@@ -164,6 +254,11 @@ function ProjectDialog({
   const setOpen = useUiStore((s) => s.setProjectDialogOpen)
   const deleteProject = useStore((s) => s.deleteProject)
   const projectCount = useStore((s) => Object.keys(s.projects).length)
+  const workspaces = useStore((s) => s.workspaces)
+  const moveProjectToWorkspace = useStore((s) => s.moveProjectToWorkspace)
+  const containingWs = Object.values(workspaces).find((ws) =>
+    ws.projectIds.includes(project.id),
+  )
 
   if (!open) return null
 
@@ -213,6 +308,22 @@ function ProjectDialog({
             </button>
           ))}
         </div>
+
+        <label className="mb-1 block text-[11px] font-medium text-muted">Workspace</label>
+        <select
+          className="field mb-3 cursor-pointer"
+          value={containingWs?.id ?? ''}
+          aria-label="Move project to workspace"
+          onChange={(e) => moveProjectToWorkspace(project.id, e.target.value)}
+        >
+          {Object.values(workspaces)
+            .filter((ws) => !ws.archived || ws.id === containingWs?.id)
+            .map((ws) => (
+              <option key={ws.id} value={ws.id}>
+                {ws.icon} {ws.name}
+              </option>
+            ))}
+        </select>
 
         <label className="mb-1 block text-[11px] font-medium text-muted">Color</label>
         <div className="mb-4 flex gap-1.5">

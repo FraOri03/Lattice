@@ -1,6 +1,8 @@
 import { useRef } from 'react'
 import { cellKey, type NumFmt } from '@/lib/sheet/sheetModel'
 import { IcAlignCenter, IcAlignLeft, IcAlignRight } from '@/components/Icons'
+import { SheetPeerChips } from '@/components/collab/EntityPresence'
+import { ToolbarDivider } from '@/components/ui/ToolbarDivider'
 import { rectOf, useSheetSession } from './SheetSession'
 
 const NUM_FMTS: { id: NumFmt; label: string }[] = [
@@ -60,6 +62,7 @@ function ColorWell({
  */
 export function SpreadsheetToolbar() {
   const {
+    sheetId,
     sheet,
     selection,
     active,
@@ -94,7 +97,7 @@ export function SpreadsheetToolbar() {
         I
       </button>
 
-      <span className="mx-1 h-4 w-px bg-bord" />
+      <ToolbarDivider />
 
       <ColorWell
         label="Text color"
@@ -111,7 +114,7 @@ export function SpreadsheetToolbar() {
         onClear={() => applyStyle({ bg: undefined })}
       />
 
-      <span className="mx-1 h-4 w-px bg-bord" />
+      <ToolbarDivider />
 
       {(
         [
@@ -132,7 +135,7 @@ export function SpreadsheetToolbar() {
         </button>
       ))}
 
-      <span className="mx-1 h-4 w-px bg-bord" />
+      <ToolbarDivider />
 
       <select
         className="field h-6 w-36 flex-none cursor-pointer px-1 py-0 text-[11.5px]"
@@ -150,7 +153,7 @@ export function SpreadsheetToolbar() {
         ))}
       </select>
 
-      <span className="mx-1 h-4 w-px bg-bord" />
+      <ToolbarDivider />
 
       <button
         className="tbtn px-1.5"
@@ -188,6 +191,8 @@ export function SpreadsheetToolbar() {
       >
         − Col
       </button>
+
+      <SheetPeerChips sheetId={sheetId} />
     </div>
   )
 }

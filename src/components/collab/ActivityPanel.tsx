@@ -11,9 +11,9 @@ import {
   IcGithub,
   IcHistory,
   IcMessage,
-  IcUpload,
   IcUsers,
 } from '@/components/Icons'
+import { ActionIcon } from '@/components/ActionIcons'
 
 /** ActivityPanel — chronological project history with light filtering. */
 
@@ -24,7 +24,7 @@ const TYPE_ICON = (type: ActivityType): React.ReactNode => {
   if (type.startsWith('board.')) return <IcBoard size={12} />
   if (type === 'github.sync') return <IcGithub size={12} />
   if (type === 'drive.sync') return <IcCloud size={12} />
-  if (type === 'file.imported') return <IcUpload size={12} />
+  if (type === 'file.imported') return <ActionIcon.Import size={12} />
   return <IcDoc size={12} />
 }
 

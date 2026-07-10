@@ -16,7 +16,8 @@ import { useCollabStore } from '@/lib/collab/collabStore'
 import { useMyRole, useOpenCommentCount, useReadOnly } from '@/lib/collab/useCollab'
 import { ROLE_LABEL } from '@/types/collab'
 import { confirmDialog } from '@/components/ui/ConfirmDialog'
-import { IcDownload, IcEdit, IcEye, IcMessage, IcTrash } from '@/components/Icons'
+import { IcEdit, IcEye, IcMessage, IcTrash } from '@/components/Icons'
+import { ActionIcon } from '@/components/ActionIcons'
 
 const TYPE_LABEL: Record<CardData['type'], string> = {
   note: 'Note card',
@@ -203,8 +204,12 @@ function NodeInspector({ node }: { node: BoardNode }) {
             <button className="btn flex-1" onClick={() => openAsset(asset.id)}>
               <IcEye size={12} /> Preview
             </button>
-            <button className="btn flex-1" onClick={() => void downloadAsset(asset)}>
-              <IcDownload size={12} /> Download
+            <button
+              className="btn flex-1"
+              title="Download the original file to this device"
+              onClick={() => void downloadAsset(asset)}
+            >
+              <ActionIcon.DownloadLocal size={12} /> Download
             </button>
           </div>
         </>

@@ -14,20 +14,25 @@ import {
   IcFolder,
   IcHistory,
   IcPlus,
+  IcPresentation,
   IcRestore,
   IcSplit,
+  IcTable,
 } from '@/components/Icons'
 
 /**
- * VersionHistoryPanel — snapshots of boards, documents, code files and
- * project metadata: create, restore, duplicate, and a line diff against
- * the current state.
+ * VersionHistoryPanel — snapshots of boards, documents, code files,
+ * sheets, presentations and project metadata: create, restore,
+ * duplicate, and a line diff against the current state (sheets diff as
+ * a changed-cell inventory, decks as a slide inventory).
  */
 
 const TARGET_ICON: Record<VersionTargetType, React.ReactNode> = {
   board: <IcBoard size={12} />,
   doc: <IcDoc size={12} />,
   code: <IcCode size={12} />,
+  sheet: <IcTable size={12} />,
+  present: <IcPresentation size={12} />,
   project: <IcFolder size={12} />,
 }
 
@@ -223,6 +228,10 @@ export function VersionHistoryPanel() {
   const docs = useStore((s) => s.docs)
   const activeCodeId = useStore((s) => s.activeCodeId)
   const codeDocs = useStore((s) => s.codeDocs)
+  const activeSheetId = useStore((s) => s.activeSheetId)
+  const sheetDocs = useStore((s) => s.sheetDocs)
+  const activePresentId = useStore((s) => s.activePresentId)
+  const presentDocs = useStore((s) => s.presentDocs)
   const versions = useCollabStore((s) => s.versions[projectId]) ?? []
   const mayCreate = useCan('versions.create')
 
@@ -240,10 +249,33 @@ export function VersionHistoryPanel() {
         id: activeCodeId,
         label: `${codeDocs[activeCodeId].title}.${codeDocs[activeCodeId].extension}`,
       }
+    if (activeSheetId && sheetDocs[activeSheetId])
+      return {
+        type: 'sheet',
+        id: activeSheetId,
+        label: `sheet “${sheetDocs[activeSheetId].title}”`,
+      }
+    if (activePresentId && presentDocs[activePresentId])
+      return {
+        type: 'present',
+        id: activePresentId,
+        label: `deck “${presentDocs[activePresentId].title}”`,
+      }
     const board = boards[activeBoardId]
     if (board) return { type: 'board', id: activeBoardId, label: `board “${board.name}”` }
     return null
-  }, [activeDocId, docs, activeCodeId, codeDocs, boards, activeBoardId])
+  }, [
+    activeDocId,
+    docs,
+    activeCodeId,
+    codeDocs,
+    activeSheetId,
+    sheetDocs,
+    activePresentId,
+    presentDocs,
+    boards,
+    activeBoardId,
+  ])
 
   const saveVersion = async (target: { type: VersionTargetType; id: string; label: string }) => {
     const label = await promptDialog({

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '@/store/useStore'
 import { useCollabStore } from '@/lib/collab/collabStore'
 import { commentService } from '@/lib/collab/CommentService'
+import { focusAreaOnBoard } from './CommentAreas'
 import { membersService } from '@/lib/collab/MembersService'
 import { useCan, useMyRole } from '@/lib/collab/useCollab'
 import { currentIdentity, colorForUser } from '@/lib/collab/CollaborationProvider'
@@ -45,6 +46,8 @@ function useTargetLabel() {
     switch (t.targetType) {
       case 'board':
         return `board “${boards[t.targetId]?.name ?? '?'}”`
+      case 'area':
+        return `area on “${boards[t.targetId]?.name ?? '?'}”`
       case 'doc':
         return `doc “${docs[t.targetId]?.title ?? '?'}”`
       case 'code': {
@@ -167,12 +170,135 @@ function ThreadCard({
         )}
       </div>
       <div className="mb-1 flex items-center gap-1 text-[10px] text-muted">
-        <IcPin size={9} /> {label}
+        {thread.area ? (
+          <button
+            className="flex cursor-pointer items-center gap-1 hover:text-accent"
+            title="Zoom to this area on the board"
+            aria-label={`Zoom to area: ${label}`}
+            onClick={() => focusAreaOnBoard(thread)}
+          >
+            <IcPin size={9} /> {label} · zoom
+          </button>
+        ) : (
+          <>
+            <IcPin size={9} /> {label}
+          </>
+        )}
         {thread.resolved && thread.resolvedByName && (
           <span>· resolved by {thread.resolvedByName}</span>
         )}
       </div>
       <p className="text-[12px] leading-relaxed break-words whitespace-pre-wrap">{thread.body}</p>
+
+      {/* Comments 2.0: reactions + assignment + due date */}
+      <div className="mt-1.5 flex flex-wrap items-center gap-1">
+        {['👍', '✅', '❤️', '👀'].map((emoji) => {
+          const users = thread.reactions?.[emoji] ?? []
+          const mine = users.includes(identity.userId)
+          if (!users.length && !mayReply) return null
+          return (
+            <button
+              key={emoji}
+              className={`flex h-5 items-center gap-0.5 rounded-full border px-1.5 text-[10.5px] ${
+                mine ? 'border-accent bg-accent/10' : 'border-bord hover:border-accent'
+              } ${mayReply ? 'cursor-pointer' : 'cursor-default'}`}
+              title={mine ? 'Remove your reaction' : 'React'}
+              aria-pressed={mine}
+              aria-label={`${emoji} reaction (${users.length})`}
+              disabled={!mayReply}
+              onClick={() => commentService.toggleReaction(projectId, thread.id, emoji)}
+            >
+              {emoji}
+              {users.length > 0 && <span>{users.length}</span>}
+            </button>
+          )
+        })}
+        {(thread.dueAt || thread.assigneeName) && (
+          <span className="ml-auto flex items-center gap-1 text-[10px] text-muted">
+            {thread.assigneeName && <span>→ {thread.assigneeName}</span>}
+            {thread.dueAt && (
+              <span className={thread.dueAt < Date.now() && !thread.resolved ? 'font-semibold text-[#f24822]' : ''}>
+                due {new Date(thread.dueAt).toLocaleDateString()}
+              </span>
+            )}
+          </span>
+        )}
+      </div>
+
+      {focused && mayReply && (
+        <div className="mt-1.5 flex items-center gap-1.5">
+          <select
+            className="field !w-auto flex-1 cursor-pointer !px-1.5 !py-0.5 text-[11px]"
+            value={thread.assigneeId ?? ''}
+            aria-label="Assign comment to member"
+            onChange={(e) => {
+              const member = membersService
+                .membersOf(projectId)
+                .find((m) => m.userId === e.target.value)
+              commentService.setAssignee(
+                projectId,
+                thread.id,
+                member ? { userId: member.userId, name: member.name || member.email } : null,
+              )
+            }}
+          >
+            <option value="">Unassigned</option>
+            {membersService.membersOf(projectId).map((m) => (
+              <option key={m.userId} value={m.userId}>
+                {m.name || m.email}
+              </option>
+            ))}
+          </select>
+          <input
+            type="date"
+            className="field !w-32 !px-1.5 !py-0.5 text-[11px]"
+            aria-label="Due date"
+            value={thread.dueAt ? new Date(thread.dueAt).toISOString().slice(0, 10) : ''}
+            onChange={(e) =>
+              commentService.setDueDate(
+                projectId,
+                thread.id,
+                e.target.value ? new Date(e.target.value).getTime() : null,
+              )
+            }
+          />
+        </div>
+      )}
+
+      {thread.area && focused && commentService.canEditArea(projectId, thread) && (
+        <fieldset className="mt-2 rounded-md border border-bord p-1.5">
+          <legend className="px-1 text-[9.5px] font-semibold text-muted uppercase">
+            Area geometry
+          </legend>
+          <div className="grid grid-cols-4 gap-1">
+            {(
+              [
+                ['x', thread.area.x],
+                ['y', thread.area.y],
+                ['width', thread.area.width],
+                ['height', thread.area.height],
+              ] as const
+            ).map(([field, value]) => (
+              <label key={field} className="text-[9.5px] text-muted">
+                {field === 'width' ? 'W' : field === 'height' ? 'H' : field.toUpperCase()}
+                <input
+                  type="number"
+                  className="field mt-0.5 !px-1 !py-0.5 text-[11px]"
+                  value={value}
+                  aria-label={`Area ${field}`}
+                  onChange={(e) => {
+                    const n = Number(e.target.value)
+                    if (Number.isFinite(n))
+                      commentService.updateAreaGeometry(projectId, thread.id, {
+                        [field]: n,
+                      })
+                  }}
+                />
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      )}
 
       {thread.replies.map((r) => (
         <div key={r.id} className="mt-2 flex gap-2 border-l-2 border-bord pl-2">

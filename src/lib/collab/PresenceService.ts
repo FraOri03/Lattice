@@ -24,6 +24,7 @@ import { collabHub } from './hub'
 const HEARTBEAT_MS = 10_000
 const PEER_TTL_MS = 35_000
 const CURSOR_THROTTLE_MS = 60
+const DRAG_THROTTLE_MS = 50
 
 class PresenceService {
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null
@@ -35,6 +36,10 @@ class PresenceService {
   private cursor: PresencePeer['cursor']
   private selection: string[] = []
   private editing: PresencePeer['editing']
+  private dragging: PresencePeer['dragging']
+  private lastDragSentAt = 0
+  private sheetCell: PresencePeer['sheetCell']
+  private codeLine: PresencePeer['codeLine']
 
   start(): void {
     if (this.heartbeatTimer) return
@@ -117,6 +122,48 @@ class PresenceService {
     this.beat()
   }
 
+  /**
+   * Transient drag geometry (Phase 8): peers render it as a live outline
+   * while the committed positions arrive as CRDT ops on drag end.
+   * Throttled independently of the cursor so drags stay smooth without
+   * flooding the transport.
+   */
+  setDragging(dragging: PresencePeer['dragging']): void {
+    this.dragging = dragging
+    const now = Date.now()
+    if (dragging && now - this.lastDragSentAt < DRAG_THROTTLE_MS) return
+    this.lastDragSentAt = now
+    this.beat()
+  }
+
+  clearDragging(): void {
+    if (!this.dragging) return
+    this.dragging = undefined
+    this.beat()
+  }
+
+  /** Selected spreadsheet cell (Phase 8 presence). */
+  setSheetCell(sheetCell: PresencePeer['sheetCell']): void {
+    const a = this.sheetCell
+    if (
+      a?.sheetId === sheetCell?.sheetId &&
+      a?.sheetName === sheetCell?.sheetName &&
+      a?.r === sheetCell?.r &&
+      a?.c === sheetCell?.c
+    )
+      return
+    this.sheetCell = sheetCell
+    this.beat()
+  }
+
+  /** Active code line (Phase 8 presence). */
+  setCodeLine(codeLine: PresencePeer['codeLine']): void {
+    if (this.codeLine?.codeId === codeLine?.codeId && this.codeLine?.line === codeLine?.line)
+      return
+    this.codeLine = codeLine
+    this.beat()
+  }
+
   /** This session's presence, as peers see it. */
   self(): PresencePeer {
     const identity = currentIdentity()
@@ -131,6 +178,9 @@ class PresenceService {
       cursor: this.cursor,
       selection: this.selection.length ? this.selection : undefined,
       editing: this.editing,
+      dragging: this.dragging,
+      sheetCell: this.sheetCell,
+      codeLine: this.codeLine,
       lastSeenAt: Date.now(),
     }
   }

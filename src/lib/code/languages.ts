@@ -64,10 +64,14 @@ const EXT_TO_LANG: Record<string, string> = {
   sql: 'sql',
   sh: 'shell',
   bash: 'shell',
+  zsh: 'shell',
   ps1: 'powershell',
   bat: 'bat',
   svelte: 'html',
   vue: 'html',
+  // ".env", ".env.local" → ext "env"/"local"; both carry secret warnings
+  env: 'ini',
+  local: 'ini',
 }
 
 export const CODE_EXTS = Object.keys(EXT_TO_LANG)

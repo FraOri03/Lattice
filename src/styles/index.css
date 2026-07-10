@@ -896,3 +896,90 @@ body {
   border-color: var(--bord);
   color: var(--ink);
 }
+
+/* ---------- collaboration carets (Tiptap/Yjs, Phase 8) ---------- */
+.collaboration-cursor__caret {
+  position: relative;
+  margin-left: -1px;
+  margin-right: -1px;
+  border-left: 1px solid;
+  border-right: 1px solid;
+  word-break: normal;
+  pointer-events: none;
+}
+.collaboration-cursor__label {
+  position: absolute;
+  top: -1.35em;
+  left: -1px;
+  padding: 1px 5px;
+  border-radius: 4px 4px 4px 0;
+  color: #fff;
+  font-size: 9.5px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+  user-select: none;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .collaboration-cursor__caret {
+    transition: left 80ms ease-out;
+  }
+}
+
+/* remote selection highlight (y-prosemirror) */
+.ProseMirror .ProseMirror-yjs-selection {
+  border-radius: 2px;
+}
+
+/* ---------- peer drag outline (transient manipulation ghost) ---------- */
+.peer-drag-outline {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border: 1.5px dashed;
+  border-radius: 10px;
+  pointer-events: none;
+  z-index: 4;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .peer-drag-outline {
+    transition: transform 60ms linear;
+  }
+}
+
+/* ---------- area comments (Phase 8) ---------- */
+.comment-area {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border: 1.5px solid;
+  border-radius: 8px;
+  pointer-events: auto;
+  z-index: 3;
+}
+.comment-area.is-editable {
+  cursor: grab;
+}
+.comment-area.is-focused {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.comment-area-resize {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  width: 12px;
+  height: 12px;
+  border: 2px solid;
+  border-radius: 4px;
+  background: var(--panel);
+  cursor: nwse-resize;
+}
+.comment-area-draft {
+  position: absolute;
+  border: 1.5px dashed var(--accent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  pointer-events: none;
+}

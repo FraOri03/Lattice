@@ -1,11 +1,12 @@
-import type { FC } from 'react'
+import { useRef, useState, type FC } from 'react'
 import type { AssetDoc, AssetKind } from '@/types/model'
 import { useAssetUrl, downloadAsset } from '@/lib/assets/AssetRegistry'
 import { plannedEditorFor } from '@/lib/registry/documents'
 import { conversionNoteForAsset } from '@/lib/convert/ConversionService'
+import { RemoteConversionProvider } from '@/lib/convert/ConversionBackendProvider'
 import { formatBytes } from '@/lib/media'
 import { KIND_ICONS, KIND_LABEL } from '@/components/assetKinds'
-import { IcDownload } from '@/components/Icons'
+import { ActionIcon } from '@/components/ActionIcons'
 import { ThreeDViewer } from './ThreeDViewer'
 
 export interface PreviewProps {
@@ -58,7 +59,7 @@ export const AudioPreview: FC<PreviewProps> = ({ asset, url }) => {
 }
 
 export const Model3DPreview: FC<PreviewProps> = ({ asset, url }) => (
-  <ThreeDViewer url={url} ext={asset.ext} />
+  <ThreeDViewer url={url} ext={asset.ext} asset={asset} />
 )
 
 /** Office files and unknown types: metadata tile until their editor ships. */
@@ -89,10 +90,89 @@ export const GenericPreview: FC<PreviewProps> = ({ asset }) => {
           </span>
         )
       )}
-      <button className="btn mt-2" onClick={() => void downloadAsset(asset)}>
-        <IcDownload size={13} /> Download original
+      <RemoteConvertAction asset={asset} />
+      <button
+        className="btn mt-2"
+        title="Download the original file to this device"
+        onClick={() => void downloadAsset(asset)}
+      >
+        <ActionIcon.DownloadLocal size={13} /> Download original
       </button>
     </div>
+  )
+}
+
+/**
+ * Remote conversion affordance (Phase 8): only rendered when the
+ * external conversion worker is configured AND can honestly handle this
+ * format. Upload happens strictly after the consent dialog; progress
+ * and cancellation are visible; the converted copy re-enters through
+ * the normal import pipeline while the original stays untouched.
+ */
+function RemoteConvertAction({ asset }: { asset: AssetDoc }) {
+  const [busy, setBusy] = useState(false)
+  const abortRef = useRef<AbortController | null>(null)
+  const target = asset.ext === 'doc' ? 'docx' : asset.ext === 'ppt' ? 'pptx' : null
+  if (!target || !RemoteConversionProvider.canConvert(asset.ext, target)) return null
+
+  const run = async () => {
+    const { confirmDialog } = await import('@/components/ui/ConfirmDialog')
+    const ok = await confirmDialog({
+      title: `Convert ${asset.originalName} remotely?`,
+      body: `The file is uploaded to the configured conversion worker, processed temporarily and deleted after completion. The original stays in your vault untouched. Continue?`,
+      confirmLabel: 'Upload & convert',
+    })
+    if (!ok) return
+    setBusy(true)
+    abortRef.current = new AbortController()
+    const { toast } = await import('@/components/ui/Toaster')
+    try {
+      const { storage } = await import('@/lib/storage/StorageProvider')
+      const file = await storage.getBlob(asset.id)
+      if (!file) throw new Error('Original file not found in local storage')
+      const res = await RemoteConversionProvider.convertFile(
+        {
+          sourceAssetId: asset.id,
+          sourceFormat: asset.ext,
+          targetFormat: target,
+          projectId: asset.projectId ?? '',
+          file,
+        },
+        { uploadConsent: true, signal: abortRef.current.signal },
+      )
+      const { importFile } = await import('@/lib/import/ImportService')
+      const converted = new File(
+        [res.outputFile],
+        asset.originalName.replace(/\.[^.]+$/, `.${res.outputFormat}`),
+      )
+      await importFile(converted)
+      toast.success(
+        `Converted with ${res.conversionEngine} in ${(res.durationMs / 1000).toFixed(1)}s`,
+        res.warnings.length ? `Fidelity notes: ${res.warnings.join(' · ')}` : undefined,
+      )
+    } catch (err) {
+      toast.error(
+        'Conversion failed',
+        err instanceof Error ? err.message : String(err),
+      )
+    } finally {
+      setBusy(false)
+      abortRef.current = null
+    }
+  }
+
+  return busy ? (
+    <button className="btn mt-1" onClick={() => abortRef.current?.abort()}>
+      Converting… (click to cancel)
+    </button>
+  ) : (
+    <button
+      className="btn mt-1"
+      title="Upload to the configured conversion worker (explicit consent required)"
+      onClick={() => void run()}
+    >
+      Convert to .{target} via backend
+    </button>
   )
 }
 

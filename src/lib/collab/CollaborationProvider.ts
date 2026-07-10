@@ -1,5 +1,8 @@
 import { nid } from '@/lib/id'
-import type { CollabCapabilities, CollabMessage } from '@/types/collab'
+import type { CollabCapabilities, CollabMessage, PresencePeer } from '@/types/collab'
+import { authService } from '@/lib/auth/AuthService'
+import { hasRealtimeBackend } from '@/lib/env'
+import { yjsManager } from '@/lib/crdt/YjsManager'
 
 /**
  * CollaborationProvider — pluggable transport for collaboration traffic
@@ -17,10 +20,13 @@ import type { CollabCapabilities, CollabMessage } from '@/types/collab'
  *    Google Drive folder on a short polling interval. No live cursors —
  *    latency is "seconds to minutes" and the UI says so.
  *
- *  - RealtimeCollaborationProvider: placeholder for a true realtime
- *    backend (Supabase Realtime, Liveblocks, PartyKit, y-websocket…).
- *    Activates only when VITE_REALTIME_WS_URL is configured; the class
- *    documents the contract a backend must fulfil. Nothing is faked.
+ *  - RealtimeCollaborationProvider: PRODUCTION realtime backend
+ *    (Liveblocks + Yjs, Phase 8). Activates only when
+ *    VITE_REALTIME_BACKEND=liveblocks is configured AND the user is
+ *    signed in with Google; identity and per-project permissions are
+ *    verified server-side (api/realtime/*) on every connection. When not
+ *    configured, the UI shows an honest setup state — a remote
+ *    connection is never simulated.
  */
 
 export interface CollaborationProvider {
@@ -111,6 +117,14 @@ export class LocalCollaborationProvider implements CollaborationProvider {
     liveDocuments: true,
     latency: 'instant',
     scope: 'this browser',
+    // CRDT sync between tabs rides the BroadcastChannel Yjs relay
+    boardRealtime: true,
+    documentCRDT: true,
+    codeCRDT: true,
+    commentsRealtime: true,
+    // there is no server in this transport — permissions are UI-only here
+    serverPermissions: false,
+    offlineRecovery: true,
   }
   private channel: BroadcastChannel | null = null
 
@@ -141,17 +155,26 @@ export class LocalCollaborationProvider implements CollaborationProvider {
   }
 }
 
-/* ---------------- realtime placeholder ---------------- */
+/* ---------------- production realtime (Liveblocks + Yjs) ---------------- */
 
 /**
- * Contract for a real backend (Phase 8). A conforming server relays
- * CollabMessage frames between sessions subscribed to the same project
- * and answers presence snapshots on join. Candidates: y-websocket,
- * PartyKit room, Supabase Realtime channel, Liveblocks room.
+ * Production realtime transport (Phase 8). The heavy lifting lives in
+ * src/lib/crdt/ (YjsManager owns the rooms; ./liveblocks.ts is the
+ * lazy-loaded SDK attachment). This class adapts that machinery to the
+ * CollaborationProvider interface so CollabHub keeps routing exactly as
+ * it did in Phase 7:
+ *
+ *  - presence heartbeats → Liveblocks presence (every role may send)
+ *  - locks / durable collab-state / legacy frames → room broadcast events
+ *  - documents / code / boards / comments → Yjs CRDT sync (not messages)
+ *
+ * isAvailable() is strict: a configured backend AND a signed-in Google
+ * account. Anything less and the provider stays out of the hub while the
+ * settings UI shows the honest setup state (crdtStore.status).
  */
 export class RealtimeCollaborationProvider implements CollaborationProvider {
   readonly id = 'realtime' as const
-  readonly label = 'Realtime backend'
+  readonly label = 'Realtime backend (Liveblocks + Yjs)'
   readonly capabilities: CollabCapabilities = {
     presence: true,
     liveCursors: true,
@@ -159,23 +182,35 @@ export class RealtimeCollaborationProvider implements CollaborationProvider {
     liveDocuments: true,
     latency: 'instant',
     scope: 'anywhere',
+    boardRealtime: true,
+    documentCRDT: true,
+    codeCRDT: true,
+    commentsRealtime: true,
+    serverPermissions: true,
+    offlineRecovery: true,
   }
-  private url = (import.meta.env.VITE_REALTIME_WS_URL as string | undefined) ?? ''
 
   isAvailable(): boolean {
-    // Intentionally strict: without a configured backend this provider
-    // does not run. We never simulate a websocket.
-    return this.url.length > 0
-  }
-
-  start(): void {
-    if (!this.isAvailable()) return
-    console.warn(
-      '[collab] VITE_REALTIME_WS_URL is set but the realtime client is not implemented yet (Phase 8). Falling back to local + polling providers.',
+    // strict: configured backend + real Google account, nothing simulated
+    return (
+      hasRealtimeBackend && authService.kind === 'google' && authService.restore() !== null
     )
   }
 
-  stop(): void {}
+  start(onMessage: (msg: CollabMessage) => void): void {
+    if (!this.isAvailable()) return
+    yjsManager.setMessageHandler(onMessage)
+  }
 
-  send(): void {}
+  stop(): void {
+    yjsManager.setMessageHandler(null)
+  }
+
+  send(msg: CollabMessage): void {
+    if (msg.type === 'presence') {
+      yjsManager.sendPresence(msg.payload as PresencePeer)
+      return
+    }
+    yjsManager.sendRealtime(msg)
+  }
 }

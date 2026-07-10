@@ -20,13 +20,12 @@ import { confirmDialog } from '@/components/ui/ConfirmDialog'
 import {
   IcBoard,
   IcClock,
-  IcDownload,
   IcPlus,
   IcSearch,
   IcTag,
   IcTrash,
-  IcUpload,
 } from '@/components/Icons'
+import { ActionIcon } from '@/components/ActionIcons'
 
 const FILTERS: { key: SidebarFilter; label: string }[] = [
   { key: 'all', label: 'All' },
@@ -41,6 +40,7 @@ const RECENT_KIND: Record<RecentEntry['kind'], FileKind> = {
   note: 'note',
   doc: 'richdoc',
   sheet: 'sheet',
+  present: 'presentation',
   code: 'code',
   asset: 'file',
   board: 'board',
@@ -59,26 +59,31 @@ export function Sidebar() {
   const docs = useStore((s) => s.docs)
   const codeDocs = useStore((s) => s.codeDocs)
   const sheetDocs = useStore((s) => s.sheetDocs)
+  const presentDocs = useStore((s) => s.presentDocs)
   const activeNoteId = useStore((s) => s.activeNoteId)
   const activeAssetId = useStore((s) => s.activeAssetId)
   const activeDocId = useStore((s) => s.activeDocId)
   const activeCodeId = useStore((s) => s.activeCodeId)
   const activeSheetId = useStore((s) => s.activeSheetId)
+  const activePresentId = useStore((s) => s.activePresentId)
   const recents = useStore((s) => s.recents)
   const openNote = useStore((s) => s.openNote)
   const openAsset = useStore((s) => s.openAsset)
   const openDoc = useStore((s) => s.openDoc)
   const openCode = useStore((s) => s.openCode)
   const openSheet = useStore((s) => s.openSheet)
+  const openPresent = useStore((s) => s.openPresent)
   const createNote = useStore((s) => s.createNote)
   const createDoc = useStore((s) => s.createDoc)
   const createCode = useStore((s) => s.createCode)
   const createSheetDoc = useStore((s) => s.createSheetDoc)
+  const createPresentDoc = useStore((s) => s.createPresentDoc)
   const deleteNote = useStore((s) => s.deleteNote)
   const deleteAsset = useStore((s) => s.deleteAsset)
   const deleteDoc = useStore((s) => s.deleteDoc)
   const deleteCode = useStore((s) => s.deleteCode)
   const deleteSheetDoc = useStore((s) => s.deleteSheetDoc)
+  const deletePresentDoc = useStore((s) => s.deletePresentDoc)
   const search = useStore((s) => s.search)
   const setSearch = useStore((s) => s.setSearch)
   const tagFilter = useStore((s) => s.tagFilter)
@@ -171,6 +176,20 @@ export function Sidebar() {
         )
         .sort((a, b) => b.updatedAt - a.updatedAt),
     [sheetDocs, q, activeProjectId],
+  )
+
+  const presentList = useMemo(
+    () =>
+      Object.values(presentDocs)
+        .filter(
+          (p) =>
+            p.projectId === activeProjectId &&
+            (!q ||
+              p.title.toLowerCase().includes(q) ||
+              p.snippet.toLowerCase().includes(q)),
+        )
+        .sort((a, b) => b.updatedAt - a.updatedAt),
+    [presentDocs, q, activeProjectId],
   )
 
   const allTags = useMemo(
@@ -510,6 +529,65 @@ export function Sidebar() {
           </>
         )}
 
+        {/* presentations (Phase 8) */}
+        {show('all') && (
+          <>
+            <div className="insp-h flex items-center justify-between">
+              <span>Presentations</span>
+              {mayCreate && (
+                <button
+                  className="icon-btn h-5 w-5"
+                  title="New presentation"
+                  aria-label="New presentation"
+                  onClick={() => openPresent(createPresentDoc())}
+                >
+                  <IcPlus size={12} />
+                </button>
+              )}
+            </div>
+            {presentList.length === 0 && (
+              <div className="px-2 py-1 text-[11px] text-muted italic">
+                No presentations — create one or import PPTX/ODP
+              </div>
+            )}
+            {presentList.map((p) => (
+              <div
+                key={p.id}
+                onClick={() => openPresent(p.id)}
+                title="Click to edit slides"
+                className={`group flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 ${
+                  p.id === activePresentId ? 'bg-panel2 text-ink' : 'text-muted hover:bg-panel2/60'
+                }`}
+              >
+                <FileKindIcon kind="presentation" size={13} />
+                <span className="min-w-0 flex-1 truncate text-xs">{p.title}</span>
+                <span className="text-[10px] text-muted">{p.slideCount}s</span>
+                {mayDelete && (
+                  <button
+                    className="icon-btn hidden h-5 w-5 group-hover:flex"
+                    title="Delete presentation"
+                    aria-label={`Delete presentation ${p.title}`}
+                    onClick={async (e) => {
+                      e.stopPropagation()
+                      if (
+                        await confirmDialog({
+                          title: `Delete “${p.title}”?`,
+                          body: 'The presentation is removed. A preserved source file (if any) stays in Files.',
+                          confirmLabel: 'Delete presentation',
+                          danger: true,
+                        })
+                      )
+                        deletePresentDoc(p.id)
+                    }}
+                  >
+                    <IcTrash size={11} />
+                  </button>
+                )}
+              </div>
+            ))}
+          </>
+        )}
+
         {/* code files */}
         {show('code') && (
           <>
@@ -706,7 +784,7 @@ export function Sidebar() {
                 onClick={() => filesInput.current?.click()}
                 title="Import PDF, DOCX, XLSX, PPTX, images, video, audio, GLB/OBJ and more"
               >
-                <IcUpload size={13} /> Import files…
+                <ActionIcon.Import size={13} /> Import files…
               </button>
             )}
           </>
@@ -751,17 +829,19 @@ export function Sidebar() {
         <button
           className="btn flex-1"
           disabled={exporting}
-          title="Download the whole vault (all projects, boards, notes, assets) as one file"
+          title="Export — download the whole vault (all projects, boards, notes, assets) as one file"
+          aria-label="Export vault to file"
           onClick={() => void onExportVault()}
         >
-          <IcDownload size={13} /> {exporting ? 'Packing…' : 'Export'}
+          <ActionIcon.Export size={13} /> {exporting ? 'Packing…' : 'Export'}
         </button>
         <button
           className="btn flex-1"
-          title="Open a .lattice.json project file"
+          title="Import — open a .lattice.json project file"
+          aria-label="Import vault from file"
           onClick={() => vaultInput.current?.click()}
         >
-          <IcUpload size={13} /> Import
+          <ActionIcon.Import size={13} /> Import
         </button>
         <input
           ref={vaultInput}

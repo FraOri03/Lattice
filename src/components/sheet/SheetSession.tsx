@@ -37,6 +37,7 @@ import {
   withComputedCache,
   type ComputedCell,
 } from '@/lib/sheet/FormulaEngine'
+import { awareness } from '@/lib/crdt/AwarenessService'
 
 export interface CellPos {
   r: number
@@ -157,6 +158,19 @@ export function SheetSessionProvider({
       alive = false
     }
   }, [sheetId])
+
+  // presence: peers see which sheet + cell everyone is on (Phase 8)
+  useEffect(() => {
+    if (!body) return
+    const sheetName = body.sheets[sheetIndex]?.name ?? ''
+    awareness.setSheetCell({
+      sheetId,
+      sheetName,
+      r: selection.anchor.r,
+      c: selection.anchor.c,
+    })
+  }, [sheetId, body, sheetIndex, selection])
+  useEffect(() => () => awareness.clearSheetCell(), [sheetId])
 
   const flush = useCallback(() => {
     if (pending.current === null) return

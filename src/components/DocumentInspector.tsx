@@ -9,7 +9,8 @@ import { KIND_ICONS } from '@/components/assetKinds'
 import { DocumentOutline } from '@/components/richdoc/DocumentOutline'
 import { toast } from '@/components/ui/Toaster'
 import { confirmDialog } from '@/components/ui/ConfirmDialog'
-import { IcDownload, IcTrash } from '@/components/Icons'
+import { IcTrash } from '@/components/Icons'
+import { ActionIcon } from '@/components/ActionIcons'
 
 /**
  * Right panel of the document workspace: metadata, outline, linked
@@ -99,9 +100,10 @@ export function DocumentInspector() {
             <button
               className="icon-btn h-6 w-6"
               title="Download original"
+              aria-label="Download original file"
               onClick={() => void downloadAsset(sourceAsset)}
             >
-              <IcDownload size={12} />
+              <ActionIcon.DownloadLocal size={12} />
             </button>
           </div>
         </>
@@ -152,7 +154,7 @@ export function DocumentInspector() {
             onClick={() => void onExport(f.format)}
           >
             <span className="flex items-center gap-1.5">
-              <IcDownload size={12} /> {f.label}
+              <ActionIcon.Export size={12} /> {f.label}
             </span>
             {f.status === 'planned' && (
               <span className="rounded bg-panel px-1.5 py-0.5 text-[9px] font-semibold tracking-wider text-muted uppercase">

@@ -155,14 +155,7 @@ export const AssetEmbed = Node.create({
   },
 })
 
-/**
- * Schema-relevant extensions, shared by every consumer that must agree on
- * the document format: the editor itself, DOCX import (generateJSON) and
- * HTML export (generateHTML). Editor-only concerns (placeholder, slash
- * commands) are added by RichTextEditor on top.
- */
-export const baseExtensions = [
-  StarterKit,
+const richExtensions = [
   Underline,
   Link.configure({ openOnClick: false, autolink: true }),
   Image.configure({ allowBase64: true }),
@@ -175,4 +168,23 @@ export const baseExtensions = [
   Wikilink,
   Callout,
   AssetEmbed,
+]
+
+/**
+ * Schema-relevant extensions, shared by every consumer that must agree on
+ * the document format: DOCX import (generateJSON), HTML export
+ * (generateHTML) and any headless transformation. Editor-only concerns
+ * (placeholder, slash commands) are added by RichTextEditor on top.
+ */
+export const baseExtensions = [StarterKit, ...richExtensions]
+
+/**
+ * The live editor's variant: identical schema, but StarterKit's history
+ * is disabled — undo/redo comes from the Yjs UndoManager through the
+ * Collaboration extension (local-only undo that never rolls back other
+ * people's edits).
+ */
+export const collabBaseExtensions = [
+  StarterKit.configure({ history: false }),
+  ...richExtensions,
 ]

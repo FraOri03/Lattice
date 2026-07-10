@@ -17,6 +17,7 @@ import type {
   CardType,
   CodeDocMeta,
   NoteDoc,
+  PresentationDocMeta,
   Project,
   RecentEntry,
   RichDocMeta,
@@ -25,6 +26,7 @@ import type {
   VaultExport,
   ViewMode,
   WebEmbed,
+  Workspace,
 } from '@/types/model'
 import { nid } from '@/lib/id'
 import { blobToDataUrl } from '@/lib/media'
@@ -38,6 +40,12 @@ import {
   normalizeBody,
   type SpreadsheetBody,
 } from '@/lib/sheet/sheetModel'
+import {
+  createPresentBody,
+  digestPresentation,
+  normalizePresentBody,
+  type PresentationBody,
+} from '@/lib/present/presentModel'
 import {
   releaseAllAssetUrls,
   releaseAssetUrl,
@@ -107,6 +115,9 @@ function dropRecent(recents: RecentEntry[], kind: RecentEntry['kind'], id: strin
 }
 
 interface AppState {
+  /** workspaces — the layer above projects (Phase 8) */
+  workspaces: Record<string, Workspace>
+  activeWorkspaceId: string
   projects: Record<string, Project>
   activeProjectId: string
   /** recently active project ids, newest first */
@@ -122,11 +133,14 @@ interface AppState {
   codeDocs: Record<string, CodeDocMeta>
   /** Spreadsheet METADATA only — workbook bodies are lazy-loaded from storage. */
   sheetDocs: Record<string, SpreadsheetDocMeta>
+  /** Presentation METADATA only — deck bodies are lazy-loaded from storage. */
+  presentDocs: Record<string, PresentationDocMeta>
   activeNoteId: string | null
   activeAssetId: string | null
   activeDocId: string | null
   activeCodeId: string | null
   activeSheetId: string | null
+  activePresentId: string | null
   /** open tabs in the code workspace (code doc ids) */
   codeTabs: string[]
   /** recently opened entities, newest first */
@@ -142,6 +156,13 @@ interface AppState {
   setSidebarFilter: (f: SidebarFilter) => void
   setViewMode: (m: ViewMode) => void
   setTheme: (t: Theme) => void
+
+  createWorkspace: (partial?: Partial<Workspace>) => string
+  updateWorkspace: (id: string, patch: Partial<Omit<Workspace, 'id'>>) => void
+  /** Safe deletion: its projects move to the personal workspace. */
+  deleteWorkspace: (id: string) => void
+  setActiveWorkspace: (id: string) => void
+  moveProjectToWorkspace: (projectId: string, workspaceId: string) => void
 
   createProject: (partial?: Partial<Project>) => string
   updateProject: (id: string, patch: Partial<Omit<Project, 'id'>>) => void
@@ -189,14 +210,20 @@ interface AppState {
 
   addAsset: (asset: AssetDoc) => void
   renameAsset: (id: string, name: string) => void
+  /** Patch asset fields (e.g. bundle dependency maps after a relink). */
+  patchAsset: (id: string, patch: Partial<Omit<AssetDoc, 'id'>>) => void
   deleteAsset: (id: string) => void
   openAsset: (id: string) => void
   closeAsset: () => void
 
   createDoc: (partial?: Partial<RichDocMeta>) => string
   updateDocMeta: (id: string, patch: Partial<Omit<RichDocMeta, 'id' | 'type'>>) => void
-  /** Write a document body to storage and refresh its digested metadata. */
-  persistDocContent: (id: string, body: JSONContent) => void
+  /**
+   * Write a document body to storage and refresh its digested metadata.
+   * `silent` skips the activity/announce hooks — used when persisting
+   * remote CRDT changes that another user already authored.
+   */
+  persistDocContent: (id: string, body: JSONContent, opts?: { silent?: boolean }) => void
   deleteDoc: (id: string) => void
   openDoc: (id: string) => void
   closeDoc: () => void
@@ -212,10 +239,21 @@ interface AppState {
   openSheet: (id: string) => void
   closeSheet: () => void
 
+  createPresentDoc: (partial?: Partial<PresentationDocMeta>) => string
+  updatePresentMeta: (
+    id: string,
+    patch: Partial<Omit<PresentationDocMeta, 'id' | 'type'>>,
+  ) => void
+  /** Write a deck body to storage and refresh its digested metadata. */
+  persistPresentBody: (id: string, body: PresentationBody) => void
+  deletePresentDoc: (id: string) => void
+  openPresent: (id: string) => void
+  closePresent: () => void
+
   createCode: (partial?: Partial<CodeDocMeta>) => string
   updateCodeMeta: (id: string, patch: Partial<Omit<CodeDocMeta, 'id' | 'type'>>) => void
   /** Write code source to storage and refresh its digested metadata. */
-  persistCodeContent: (id: string, content: string) => void
+  persistCodeContent: (id: string, content: string, opts?: { silent?: boolean }) => void
   deleteCode: (id: string) => void
   openCode: (id: string) => void
   closeCode: () => void
@@ -260,7 +298,11 @@ function stripCards(
  * (deduped). Dynamic imports keep the store free of static dependencies
  * on the collab layer (which itself imports this store).
  */
-function announceEdit(kind: 'doc' | 'code' | 'sheet', id: string, message: string) {
+function announceEdit(
+  kind: 'doc' | 'code' | 'sheet' | 'present',
+  id: string,
+  message: string,
+) {
   void import('@/lib/collab/RealtimeDocumentSync').then(({ realtimeDocumentSync }) =>
     realtimeDocumentSync.announceSave(id, kind),
   )
@@ -272,6 +314,41 @@ function announceEdit(kind: 'doc' | 'code' | 'sheet', id: string, message: strin
       id,
     ),
   )
+  // 10-minute auto snapshots for actively edited targets (Phase 8)
+  void import('@/lib/collab/AutoSnapshot').then(({ autoSnapshot }) =>
+    autoSnapshot.markDirty(kind, id),
+  )
+}
+
+/** Current account id straight from storage (no collab-layer import cycle). */
+function accountIdFromStorage(): string {
+  try {
+    const raw = localStorage.getItem('lattice-account')
+    return raw ? ((JSON.parse(raw) as { id?: string }).id ?? 'local') : 'local'
+  } catch {
+    return 'local'
+  }
+}
+
+export const PERSONAL_WORKSPACE_ID = 'ws_personal'
+
+/** The personal workspace every vault starts with (undeletable). */
+export function makePersonalWorkspace(projectIds: string[]): Workspace {
+  const now = Date.now()
+  return {
+    id: PERSONAL_WORKSPACE_ID,
+    name: 'Personal',
+    icon: '🏠',
+    color: 'blue',
+    ownerId: accountIdFromStorage(),
+    memberIds: [],
+    projectIds,
+    settings: {},
+    archived: false,
+    personal: true,
+    createdAt: now,
+    updatedAt: now,
+  }
 }
 
 /** Stamp every entity of a legacy (pre-projects) vault with a project id. */
@@ -290,6 +367,10 @@ function stampProject<T extends { projectId?: string }>(
 export const useStore = create<AppState>()(
   persist(
     (set, get) => ({
+      workspaces: {
+        [PERSONAL_WORKSPACE_ID]: makePersonalWorkspace(Object.keys(seedProjects)),
+      },
+      activeWorkspaceId: PERSONAL_WORKSPACE_ID,
       projects: seedProjects,
       activeProjectId: DEFAULT_PROJECT_ID,
       recentProjectIds: [DEFAULT_PROJECT_ID],
@@ -301,11 +382,13 @@ export const useStore = create<AppState>()(
       docs: {},
       codeDocs: {},
       sheetDocs: {},
+      presentDocs: {},
       activeNoteId: null,
       activeAssetId: null,
       activeDocId: null,
       activeCodeId: null,
       activeSheetId: null,
+      activePresentId: null,
       codeTabs: [],
       recents: [],
       viewMode: 'board',
@@ -319,6 +402,109 @@ export const useStore = create<AppState>()(
       setSidebarFilter: (sidebarFilter) => set({ sidebarFilter }),
       setViewMode: (viewMode) => set({ viewMode }),
       setTheme: (theme) => set({ theme }),
+
+      /* ---------------- workspaces (Phase 8) ---------------- */
+
+      createWorkspace: (partial = {}) => {
+        const id = nid('ws')
+        const now = Date.now()
+        const ws: Workspace = {
+          id,
+          name: 'New workspace',
+          icon: '🏢',
+          color: 'purple',
+          ownerId: accountIdFromStorage(),
+          memberIds: [],
+          projectIds: [],
+          settings: {},
+          archived: false,
+          personal: false,
+          createdAt: now,
+          updatedAt: now,
+          ...partial,
+        }
+        set((s) => ({ workspaces: { ...s.workspaces, [id]: ws } }))
+        return id
+      },
+
+      updateWorkspace: (id, patch) =>
+        set((s) => {
+          const ws = s.workspaces[id]
+          if (!ws) return {}
+          return {
+            workspaces: {
+              ...s.workspaces,
+              [id]: { ...ws, ...patch, updatedAt: Date.now() },
+            },
+          }
+        }),
+
+      deleteWorkspace: (id) => {
+        const s = get()
+        const ws = s.workspaces[id]
+        if (!ws || ws.personal) return // the personal workspace stays
+        const personal = s.workspaces[PERSONAL_WORKSPACE_ID]
+        const workspaces = { ...s.workspaces }
+        delete workspaces[id]
+        // safe deletion: projects survive, adopted by the personal workspace
+        if (personal) {
+          workspaces[PERSONAL_WORKSPACE_ID] = {
+            ...personal,
+            projectIds: [...new Set([...personal.projectIds, ...ws.projectIds])],
+            updatedAt: Date.now(),
+          }
+        }
+        set({
+          workspaces,
+          activeWorkspaceId:
+            s.activeWorkspaceId === id ? PERSONAL_WORKSPACE_ID : s.activeWorkspaceId,
+        })
+      },
+
+      setActiveWorkspace: (id) => {
+        const s = get()
+        const ws = s.workspaces[id]
+        if (!ws || s.activeWorkspaceId === id) return
+        set({ activeWorkspaceId: id })
+        const target =
+          ws.projectIds.map((p) => s.projects[p]).find((p) => p && !p.archived) ??
+          ws.projectIds.map((p) => s.projects[p]).find(Boolean)
+        if (target) {
+          get().setActiveProject(target.id)
+        } else {
+          // a workspace is never empty for long: give it a first project
+          const pid = get().createProject({ name: `${ws.name} project` })
+          get().setActiveProject(pid)
+        }
+      },
+
+      moveProjectToWorkspace: (projectId, workspaceId) => {
+        const s = get()
+        if (!s.projects[projectId] || !s.workspaces[workspaceId]) return
+        const workspaces = Object.fromEntries(
+          Object.entries(s.workspaces).map(([wid, ws]) => {
+            const has = ws.projectIds.includes(projectId)
+            const should = wid === workspaceId
+            if (has === should) return [wid, ws]
+            return [
+              wid,
+              {
+                ...ws,
+                projectIds: should
+                  ? [...ws.projectIds, projectId]
+                  : ws.projectIds.filter((p) => p !== projectId),
+                updatedAt: Date.now(),
+              },
+            ]
+          }),
+        )
+        set({
+          workspaces,
+          // the visible context follows the moved active project
+          activeWorkspaceId:
+            s.activeProjectId === projectId ? workspaceId : s.activeWorkspaceId,
+        })
+      },
 
       /* ---------------- projects ---------------- */
 
@@ -348,11 +534,25 @@ export const useStore = create<AppState>()(
           edges: [],
           projectId: id,
         }
-        set((s) => ({
-          projects: { ...s.projects, [id]: project },
-          boards: { ...s.boards, [boardId]: board },
-          boardOrder: [...s.boardOrder, boardId],
-        }))
+        set((s) => {
+          const ws = s.workspaces[s.activeWorkspaceId]
+          return {
+            projects: { ...s.projects, [id]: project },
+            boards: { ...s.boards, [boardId]: board },
+            boardOrder: [...s.boardOrder, boardId],
+            // every project belongs to the workspace it was created in
+            workspaces: ws
+              ? {
+                  ...s.workspaces,
+                  [ws.id]: {
+                    ...ws,
+                    projectIds: [...ws.projectIds, id],
+                    updatedAt: Date.now(),
+                  },
+                }
+              : s.workspaces,
+          }
+        })
         void import('@/lib/collab/ActivityLogService').then(({ activityLog }) =>
           activityLog.log(id, 'project.created', `Project “${project.name}” created`),
         )
@@ -375,17 +575,26 @@ export const useStore = create<AppState>()(
         const s = get()
         const remaining = Object.values(s.projects).filter((p) => p.id !== id)
         if (!remaining.length) return // never delete the last project
+        // tear down the realtime rooms too (server verifies ownership)
+        void import('@/lib/collab/ServerAclService').then(({ serverAcl }) =>
+          serverAcl.deleteRooms(id),
+        )
         // collect and remove everything the project owns
         const ownedBoards = Object.values(s.boards).filter((b) => b.projectId === id)
         const ownedNotes = Object.values(s.notes).filter((n) => n.projectId === id)
         const ownedDocs = Object.values(s.docs).filter((d) => d.projectId === id)
         const ownedCode = Object.values(s.codeDocs).filter((c) => c.projectId === id)
         const ownedSheets = Object.values(s.sheetDocs).filter((sh) => sh.projectId === id)
+        const ownedPresents = Object.values(s.presentDocs).filter(
+          (p) => p.projectId === id,
+        )
         const ownedAssets = Object.values(s.assets).filter((a) => a.projectId === id)
         for (const d of ownedDocs) void storage.deleteDocument(d.id).catch(console.error)
         for (const c of ownedCode) void storage.deleteDocument(c.id).catch(console.error)
         for (const sh of ownedSheets)
           void storage.deleteDocument(sh.id).catch(console.error)
+        for (const p of ownedPresents)
+          void storage.deleteDocument(p.id).catch(console.error)
         for (const a of ownedAssets) {
           releaseAssetUrl(a.id)
           void storage.deleteBlob(a.id).catch(console.error)
@@ -407,7 +616,23 @@ export const useStore = create<AppState>()(
             boardOrder.find((b) => boards[b]?.projectId === nextActiveProject) ??
             boardOrder[0]
         }
+        // unlink the deleted project from every workspace
+        const workspaces = Object.fromEntries(
+          Object.entries(s.workspaces).map(([wid, ws]) =>
+            ws.projectIds.includes(id)
+              ? [
+                  wid,
+                  {
+                    ...ws,
+                    projectIds: ws.projectIds.filter((p) => p !== id),
+                    updatedAt: Date.now(),
+                  },
+                ]
+              : [wid, ws],
+          ),
+        )
         set({
+          workspaces,
           projects,
           activeProjectId: nextActiveProject,
           recentProjectIds: s.recentProjectIds.filter((p) => p !== id),
@@ -418,12 +643,14 @@ export const useStore = create<AppState>()(
           docs: omit(s.docs, new Set(ownedDocs.map((d) => d.id))),
           codeDocs: omit(s.codeDocs, new Set(ownedCode.map((c) => c.id))),
           sheetDocs: omit(s.sheetDocs, new Set(ownedSheets.map((sh) => sh.id))),
+          presentDocs: omit(s.presentDocs, new Set(ownedPresents.map((p) => p.id))),
           assets: omit(s.assets, new Set(ownedAssets.map((a) => a.id))),
           activeNoteId: null,
           activeAssetId: null,
           activeDocId: null,
           activeCodeId: null,
           activeSheetId: null,
+          activePresentId: null,
           codeTabs: [],
         })
       },
@@ -448,7 +675,12 @@ export const useStore = create<AppState>()(
           }
           boardOrder = [...boardOrder, activeBoardId]
         }
+        // the visible context (workspace → project) always matches
+        const containing = Object.values(s.workspaces).find((ws) =>
+          ws.projectIds.includes(id),
+        )
         set({
+          activeWorkspaceId: containing?.id ?? s.activeWorkspaceId,
           activeProjectId: id,
           recentProjectIds: [id, ...s.recentProjectIds.filter((p) => p !== id)].slice(0, 8),
           boards,
@@ -459,6 +691,7 @@ export const useStore = create<AppState>()(
           activeDocId: null,
           activeCodeId: null,
           activeSheetId: null,
+          activePresentId: null,
           codeTabs: [],
           viewMode: s.viewMode === 'split' ? 'board' : s.viewMode,
         })
@@ -898,6 +1131,13 @@ export const useStore = create<AppState>()(
           return { assets: { ...s.assets, [id]: { ...asset, name } } }
         }),
 
+      patchAsset: (id, patch) =>
+        set((s) => {
+          const asset = s.assets[id]
+          if (!asset) return {}
+          return { assets: { ...s.assets, [id]: { ...asset, ...patch } } }
+        }),
+
       deleteAsset: (id) => {
         releaseAssetUrl(id)
         void storage.deleteBlob(id)
@@ -963,7 +1203,7 @@ export const useStore = create<AppState>()(
           }
         }),
 
-      persistDocContent: (id, body) => {
+      persistDocContent: (id, body, opts) => {
         void storage.putDocument(id, body).catch(console.error)
         const meta = get().docs[id]
         if (!meta) return
@@ -973,11 +1213,18 @@ export const useStore = create<AppState>()(
             [id]: { ...meta, ...digestDocJson(body), updatedAt: Date.now() },
           },
         }))
-        announceEdit('doc', id, `Edited document “${meta.title}”`)
+        if (!opts?.silent) announceEdit('doc', id, `Edited document “${meta.title}”`)
       },
 
       deleteDoc: (id) => {
         void storage.deleteDocument(id).catch(console.error)
+        const docProject = get().docs[id]?.projectId ?? get().activeProjectId
+        void Promise.all([
+          import('@/lib/crdt/YjsManager'),
+          import('@/lib/crdt/DocumentCRDT'),
+        ]).then(([{ yjsManager }, { deleteDocumentCRDT }]) =>
+          deleteDocumentCRDT(yjsManager.room(docProject), id),
+        )
         set((s) => {
           const docs = { ...s.docs }
           delete docs[id]
@@ -1075,6 +1322,80 @@ export const useStore = create<AppState>()(
 
       closeSheet: () => set({ activeSheetId: null }),
 
+      /* ---------------- presentations (Phase 8) ---------------- */
+
+      createPresentDoc: (partial = {}) => {
+        const id = nid('pres')
+        const title = partial.title ?? 'Untitled presentation'
+        const body = createPresentBody(title)
+        const meta: PresentationDocMeta = {
+          id,
+          title,
+          type: 'presentation',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          tags: [],
+          metadata: {},
+          projectId: get().activeProjectId,
+          ...digestPresentation(body),
+          ...partial,
+        }
+        set((s) => ({ presentDocs: { ...s.presentDocs, [id]: meta } }))
+        void storage.putDocument(id, body).catch(console.error)
+        return id
+      },
+
+      updatePresentMeta: (id, patch) =>
+        set((s) => {
+          const meta = s.presentDocs[id]
+          if (!meta) return {}
+          return {
+            presentDocs: {
+              ...s.presentDocs,
+              [id]: { ...meta, ...patch, updatedAt: Date.now() },
+            },
+          }
+        }),
+
+      persistPresentBody: (id, body) => {
+        void storage.putDocument(id, body).catch(console.error)
+        const meta = get().presentDocs[id]
+        if (!meta) return
+        set((s) => ({
+          presentDocs: {
+            ...s.presentDocs,
+            [id]: { ...meta, ...digestPresentation(body), updatedAt: Date.now() },
+          },
+        }))
+        announceEdit('present', id, `Edited presentation “${meta.title}”`)
+      },
+
+      deletePresentDoc: (id) => {
+        void storage.deleteDocument(id).catch(console.error)
+        set((s) => {
+          const presentDocs = { ...s.presentDocs }
+          delete presentDocs[id]
+          return {
+            presentDocs,
+            activePresentId: s.activePresentId === id ? null : s.activePresentId,
+            recents: dropRecent(s.recents, 'present', id),
+          }
+        })
+      },
+
+      openPresent: (id) =>
+        set((s) => ({
+          activePresentId: id,
+          activeAssetId: null,
+          activeDocId: null,
+          activeCodeId: null,
+          activeSheetId: null,
+          viewMode: 'presentation',
+          recents: pushRecent(s.recents, { kind: 'present', id }),
+        })),
+
+      closePresent: () => set({ activePresentId: null }),
+
       /* ---------------- code documents ---------------- */
 
       createCode: (partial = {}) => {
@@ -1114,7 +1435,7 @@ export const useStore = create<AppState>()(
           }
         }),
 
-      persistCodeContent: (id, content) => {
+      persistCodeContent: (id, content, opts) => {
         void storage.putDocument(id, content).catch(console.error)
         const meta = get().codeDocs[id]
         if (!meta) return
@@ -1124,11 +1445,18 @@ export const useStore = create<AppState>()(
             [id]: { ...meta, ...digestCode(content), updatedAt: Date.now() },
           },
         }))
-        announceEdit('code', id, `Edited ${meta.title}.${meta.extension}`)
+        if (!opts?.silent) announceEdit('code', id, `Edited ${meta.title}.${meta.extension}`)
       },
 
       deleteCode: (id) => {
         void storage.deleteDocument(id).catch(console.error)
+        const codeProject = get().codeDocs[id]?.projectId ?? get().activeProjectId
+        void Promise.all([
+          import('@/lib/crdt/YjsManager'),
+          import('@/lib/crdt/CodeCRDT'),
+        ]).then(([{ yjsManager }, { deleteCodeCRDT }]) =>
+          deleteCodeCRDT(yjsManager.room(codeProject), id),
+        )
         set((s) => {
           const codeDocs = { ...s.codeDocs }
           delete codeDocs[id]
@@ -1190,6 +1518,9 @@ export const useStore = create<AppState>()(
         for (const [id, body] of Object.entries(data.sheetData ?? {})) {
           await storage.putDocument(id, normalizeBody(body))
         }
+        for (const [id, body] of Object.entries(data.presentData ?? {})) {
+          await storage.putDocument(id, normalizePresentBody(body))
+        }
         // pre-v6 files have no projects: stamp everything with a default one
         const projects =
           data.projects && Object.keys(data.projects).length
@@ -1200,6 +1531,10 @@ export const useStore = create<AppState>()(
             ? data.activeProjectId
             : Object.keys(projects)[0]
         set({
+          workspaces: {
+            [PERSONAL_WORKSPACE_ID]: makePersonalWorkspace(Object.keys(projects)),
+          },
+          activeWorkspaceId: PERSONAL_WORKSPACE_ID,
           projects,
           activeProjectId: fallbackProject,
           recentProjectIds: [fallbackProject],
@@ -1210,6 +1545,7 @@ export const useStore = create<AppState>()(
           docs: stampProject(data.docs ?? {}, fallbackProject),
           codeDocs: stampProject(data.codeDocs ?? {}, fallbackProject),
           sheetDocs: stampProject(data.sheetDocs ?? {}, fallbackProject),
+          presentDocs: stampProject(data.presentDocs ?? {}, fallbackProject),
           codeTabs: [],
           recents: [],
           activeBoardId: boardOrder[0],
@@ -1218,12 +1554,13 @@ export const useStore = create<AppState>()(
           activeDocId: null,
           activeCodeId: null,
           activeSheetId: null,
+          activePresentId: null,
         })
       },
     }),
     {
       name: 'lattice-vault-v1',
-      version: 1,
+      version: 2,
       migrate: (persisted, version) => {
         // v0 → v1: introduce projects; the default project adopts everything
         const s = persisted as Partial<AppState>
@@ -1241,9 +1578,22 @@ export const useStore = create<AppState>()(
           if (s.codeDocs) s.codeDocs = stampProject(s.codeDocs, project.id)
           if (s.sheetDocs) s.sheetDocs = stampProject(s.sheetDocs, project.id)
         }
+        // v1 → v2 (Phase 8): the personal workspace adopts every project
+        if (version < 2) {
+          s.presentDocs = s.presentDocs ?? {}
+          s.activePresentId = s.activePresentId ?? null
+          s.workspaces = {
+            [PERSONAL_WORKSPACE_ID]: makePersonalWorkspace(
+              Object.keys(s.projects ?? {}),
+            ),
+          }
+          s.activeWorkspaceId = PERSONAL_WORKSPACE_ID
+        }
         return s as AppState
       },
       partialize: (s) => ({
+        workspaces: s.workspaces,
+        activeWorkspaceId: s.activeWorkspaceId,
         projects: s.projects,
         activeProjectId: s.activeProjectId,
         recentProjectIds: s.recentProjectIds,
@@ -1255,6 +1605,7 @@ export const useStore = create<AppState>()(
         docs: s.docs,
         codeDocs: s.codeDocs,
         sheetDocs: s.sheetDocs,
+        presentDocs: s.presentDocs,
         codeTabs: s.codeTabs,
         recents: s.recents,
         activeNoteId: s.activeNoteId,
@@ -1262,6 +1613,7 @@ export const useStore = create<AppState>()(
         activeDocId: s.activeDocId,
         activeCodeId: s.activeCodeId,
         activeSheetId: s.activeSheetId,
+        activePresentId: s.activePresentId,
         viewMode: s.viewMode,
         theme: s.theme,
       }),
@@ -1296,9 +1648,14 @@ export async function exportVaultFull(): Promise<VaultExport> {
     const body = await storage.getDocument(id)
     if (body) sheetData[id] = body
   }
+  const presentData: Record<string, unknown> = {}
+  for (const id of Object.keys(s.presentDocs)) {
+    const body = await storage.getDocument(id)
+    if (body) presentData[id] = body
+  }
   return {
     app: 'lattice',
-    version: 6,
+    version: 7,
     exportedAt: Date.now(),
     boards: s.boards,
     boardOrder: s.boardOrder,
@@ -1311,6 +1668,8 @@ export async function exportVaultFull(): Promise<VaultExport> {
     codeData,
     sheetDocs: s.sheetDocs,
     sheetData,
+    presentDocs: s.presentDocs,
+    presentData,
     projects: s.projects,
     activeProjectId: s.activeProjectId,
   }

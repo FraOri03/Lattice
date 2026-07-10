@@ -11,9 +11,31 @@ const escapeHtml = (s: string): string =>
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
 
+/**
+ * Scheme allow-list for markdown links/images (Phase 8 security fix):
+ * escaping alone still lets `[x](javascript:…)` produce a live XSS
+ * link. Anything but http(s)/mailto/relative collapses to '#'.
+ */
+function safeUrl(url: string): string {
+  const trimmed = url.trim()
+  if (/^(https?:|mailto:)/i.test(trimmed)) return trimmed
+  if (/^[/#.]/.test(trimmed) && !/^\/\//.test(trimmed)) return trimmed
+  return '#'
+}
+
+/** Images additionally allow safe inline data: images. */
+function safeImgUrl(url: string): string {
+  const trimmed = url.trim()
+  if (/^data:image\/(png|jpe?g|gif|webp|avif);/i.test(trimmed)) return trimmed
+  return safeUrl(trimmed)
+}
+
 function inline(s: string): string {
   return s
-    .replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, '<img alt="$1" src="$2">')
+    .replace(
+      /!\[([^\]]*)\]\(([^)\s]+)\)/g,
+      (_m, alt: string, url: string) => `<img alt="${alt}" src="${safeImgUrl(url)}">`,
+    )
     .replace(
       /\[\[([^\]]+)\]\]/g,
       (_m, t: string) =>
@@ -21,7 +43,8 @@ function inline(s: string): string {
     )
     .replace(
       /\[([^\]]+)\]\(([^)\s]+)\)/g,
-      '<a href="$2" target="_blank" rel="noreferrer">$1</a>',
+      (_m, label: string, url: string) =>
+        `<a href="${safeUrl(url)}" target="_blank" rel="noreferrer">${label}</a>`,
     )
     .replace(/`([^`]+)`/g, '<code>$1</code>')
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')

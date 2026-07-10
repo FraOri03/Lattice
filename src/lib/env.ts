@@ -17,6 +17,30 @@ export const env = {
   githubClientId: (import.meta.env.VITE_GITHUB_CLIENT_ID as string | undefined) ?? '',
   appEnv: (import.meta.env.VITE_APP_ENV as string | undefined) || 'development',
   appVersion: (import.meta.env.VITE_APP_VERSION as string | undefined) || '0.6.0',
+  /**
+   * Realtime collaboration backend (Phase 8). 'liveblocks' enables the
+   * production RealtimeCollaborationProvider; anything else leaves only
+   * the local (tabs) and Drive-polling providers. The client never holds
+   * a backend secret — it authenticates through the serverless endpoint
+   * below, which validates the user's Google token and the project ACL.
+   */
+  realtimeBackend:
+    (import.meta.env.VITE_REALTIME_BACKEND as string | undefined) ?? '',
+  realtimeAuthUrl:
+    (import.meta.env.VITE_REALTIME_AUTH_URL as string | undefined) ||
+    '/api/realtime/auth',
+  realtimeRoomsUrl:
+    (import.meta.env.VITE_REALTIME_ROOMS_URL as string | undefined) ||
+    '/api/realtime/rooms',
+  /**
+   * Remote conversion worker (Phase 8) for legacy/complex formats
+   * (DOC, PPT, high-fidelity office). Empty = disabled, and the UI says
+   * so honestly. The worker runs OUTSIDE this app (e.g. headless
+   * LibreOffice behind an authenticated HTTP endpoint) — a native
+   * converter is never bundled into the frontend.
+   */
+  conversionApiUrl:
+    (import.meta.env.VITE_CONVERSION_API_URL as string | undefined) ?? '',
 } as const
 
 /** True when real Google OAuth is configured (otherwise the mock auth provider is used). */
@@ -24,3 +48,9 @@ export const hasGoogleAuth = env.googleClientId.length > 0
 
 /** True when the GitHub OAuth app flow is available (PAT connect always works). */
 export const hasGithubOAuth = env.githubClientId.length > 0
+
+/** True when a production realtime backend is configured for this build. */
+export const hasRealtimeBackend = env.realtimeBackend === 'liveblocks'
+
+/** True when a remote conversion worker is configured for this build. */
+export const hasConversionBackend = env.conversionApiUrl.length > 0

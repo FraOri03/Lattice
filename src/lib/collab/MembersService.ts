@@ -4,6 +4,7 @@ import { currentIdentity } from './CollaborationProvider'
 import { canManageRole } from './permissions'
 import { activityLog } from './ActivityLogService'
 import { collabHub } from './hub'
+import { serverAcl } from './ServerAclService'
 
 /**
  * MembersService — project membership. Every project has exactly one
@@ -84,6 +85,7 @@ class MembersService {
       userId,
     )
     collabHub.broadcastState(projectId)
+    void serverAcl.setRole(projectId, target.email, role)
     return true
   }
 
@@ -108,6 +110,7 @@ class MembersService {
       userId,
     )
     collabHub.broadcastState(projectId)
+    void serverAcl.setRole(projectId, target.email, null)
     return true
   }
 
@@ -173,6 +176,7 @@ class MembersService {
       member.userId,
     )
     collabHub.broadcastState(projectId)
+    void serverAcl.setRole(projectId, member.email, member.role)
   }
 
   /** Refresh the current user's lastActiveAt (cheap presence-over-Drive). */

@@ -36,6 +36,15 @@ export interface Project {
   settings: ProjectSettings
 }
 
+/**
+ * How code files are edited together (Phase 8):
+ *  - collaborative: CRDT multiplayer — several people type at once,
+ *    merges are deterministic (Yjs)
+ *  - checkout: soft file lock — one active editor at a time, others
+ *    request control; owner/admin may force-unlock
+ */
+export type CodeEditingPolicy = 'collaborative' | 'checkout'
+
 export interface ProjectSettings {
   /** GitHub code-sync link: only code documents ever sync to GitHub */
   github?: {
@@ -46,7 +55,38 @@ export interface ProjectSettings {
     /** repo default branch (protected; Lattice never commits to it) */
     defaultBranch: string
   }
+  /** code collaboration mode; default 'collaborative' */
+  codeEditingPolicy?: CodeEditingPolicy
   [key: string]: unknown
+}
+
+/* ---------------- workspaces (Phase 8) ---------------- */
+
+/**
+ * A workspace is the organizational layer ABOVE projects:
+ * Workspace → Projects → boards/docs/sheets/presentations/code/assets.
+ * Projects link to workspaces through workspace.projectIds; the project
+ * records themselves stay unchanged. The information architecture stops
+ * here on purpose — no deeper nesting.
+ *
+ * Enforcement note: access control is enforced per PROJECT (realtime
+ * room ACLs); workspace membership is organizational grouping.
+ */
+export interface Workspace {
+  id: string
+  name: string
+  /** single emoji/short glyph shown in the switcher */
+  icon: string
+  color: CardColor
+  ownerId: string
+  memberIds: string[]
+  projectIds: string[]
+  settings: Record<string, unknown>
+  archived: boolean
+  /** the automatically created personal workspace (undeletable) */
+  personal: boolean
+  createdAt: number
+  updatedAt: number
 }
 
 /* ---------------- account (Phase 6) ---------------- */
@@ -108,6 +148,17 @@ export type AssetKind =
   | 'file' // anything else, kept as an attachment
 
 /**
+ * Multi-file asset bundle (Phase 8): a main file (.gltf, .obj) plus the
+ * companion files it references by RELATIVE path (buffers, materials,
+ * textures). Dependencies are regular assets; the map lets viewers
+ * resolve `textures/wood.png` to the right stored blob.
+ */
+export interface AssetBundleInfo {
+  /** normalized relative path (as referenced by the main file) → asset id */
+  dependencies: Record<string, string>
+}
+
+/**
  * An imported file. Metadata lives in the vault store; the binary lives in
  * the StorageProvider (IndexedDB today, File System Access API later).
  * assetPath/importPath are the file's virtual locations inside the vault —
@@ -125,6 +176,8 @@ export interface AssetDoc {
   assetPath: string // e.g. assets/asset_x1y2.pdf
   importPath: string // e.g. imports/report.pdf
   projectId?: string
+  /** companion files for multi-file formats (GLTF+BIN+textures, OBJ+MTL) */
+  bundle?: AssetBundleInfo
 }
 
 /* ---------------- rich documents ---------------- */
@@ -218,6 +271,30 @@ export interface SpreadsheetDocMeta {
   snippet: string
   tags: string[]
   /** open extension point for plugins / future fields */
+  metadata: Record<string, unknown>
+  projectId?: string
+}
+
+/* ---------------- presentations (Phase 8) ---------------- */
+
+/**
+ * Metadata for a presentation document. Like docs/sheets/code, the body
+ * (a PresentationBody JSON from src/lib/present/presentModel.ts) lives in
+ * the StorageProvider and is lazy-loaded when the editor opens.
+ */
+export interface PresentationDocMeta {
+  id: string
+  title: string
+  type: 'presentation'
+  createdAt: number
+  updatedAt: number
+  /** original imported file (PPTX/ODP/PPT), kept in /imports */
+  sourceAssetId?: string
+  /** digested: number of slides */
+  slideCount: number
+  /** digested: first text lines, for cards/search */
+  snippet: string
+  tags: string[]
   metadata: Record<string, unknown>
   projectId?: string
 }
@@ -348,7 +425,7 @@ export type Theme = 'dark' | 'light'
 
 /** A recently opened entity, newest first. */
 export interface RecentEntry {
-  kind: 'note' | 'doc' | 'sheet' | 'code' | 'asset' | 'board'
+  kind: 'note' | 'doc' | 'sheet' | 'code' | 'asset' | 'board' | 'present'
   id: string
   at: number
 }
@@ -359,11 +436,13 @@ export interface RecentEntry {
  * in assetData so a project file is fully self-contained. v3 adds rich
  * documents: metadata in docs, Tiptap JSON bodies in docData. v4 adds
  * code documents. v5 adds spreadsheets: metadata in sheetDocs,
- * SpreadsheetBody JSON workbooks in sheetData. v6 adds projects.
+ * SpreadsheetBody JSON workbooks in sheetData. v6 adds projects. v7 adds
+ * presentations: metadata in presentDocs, PresentationBody JSON in
+ * presentData.
  */
 export interface VaultExport {
   app: 'lattice'
-  version: 1 | 2 | 3 | 4 | 5 | 6
+  version: 1 | 2 | 3 | 4 | 5 | 6 | 7
   exportedAt: number
   boards: Record<string, Board>
   boardOrder: string[]
@@ -378,4 +457,6 @@ export interface VaultExport {
   sheetData?: Record<string, unknown> // sheet id → SpreadsheetBody JSON
   projects?: Record<string, Project> // v6
   activeProjectId?: string // v6
+  presentDocs?: Record<string, PresentationDocMeta> // v7
+  presentData?: Record<string, unknown> // present id → PresentationBody JSON
 }
