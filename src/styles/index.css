@@ -947,3 +947,39 @@ body {
     transition: transform 60ms linear;
   }
 }
+
+/* ---------- area comments (Phase 8) ---------- */
+.comment-area {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border: 1.5px solid;
+  border-radius: 8px;
+  pointer-events: auto;
+  z-index: 3;
+}
+.comment-area.is-editable {
+  cursor: grab;
+}
+.comment-area.is-focused {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.comment-area-resize {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  width: 12px;
+  height: 12px;
+  border: 2px solid;
+  border-radius: 4px;
+  background: var(--panel);
+  cursor: nwse-resize;
+}
+.comment-area-draft {
+  position: absolute;
+  border: 1.5px dashed var(--accent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  pointer-events: none;
+}

@@ -153,13 +153,17 @@ export function CanvasToolbar() {
               : 'text-muted hover:bg-panel2 hover:text-ink'
           }`}
           onClick={item.onClick}
-          aria-label={item.key === 'comment' ? 'Pin a comment on the canvas' : `Add ${item.label.toLowerCase()} card`}
+          aria-label={
+            item.key === 'comment'
+              ? 'Comment tool — click to pin, drag to mark an area'
+              : `Add ${item.label.toLowerCase()} card`
+          }
           aria-pressed={item.key === 'comment' ? !!item.active : undefined}
           title={
             item.key === 'import'
               ? 'Import any file — PDF, Office, media, 3D…'
               : item.key === 'comment'
-                ? 'Pin a comment anywhere on the canvas'
+                ? 'Comment (C) — click to pin, drag to comment on an area'
                 : `Add ${item.label.toLowerCase()} card`
           }
         >

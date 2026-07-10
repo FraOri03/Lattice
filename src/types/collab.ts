@@ -118,6 +118,7 @@ export const LOCK_TTL_MS = 45_000
 
 export type CommentTargetType =
   | 'board' // free pin on the canvas (anchor.x/y in flow coords)
+  | 'area' // rectangular region of a board (thread.area holds geometry)
   | 'card' // any board card (pin follows the card)
   | 'section'
   | 'doc'
@@ -125,6 +126,28 @@ export type CommentTargetType =
   | 'sheet'
   | 'asset'
   | 'webembed'
+
+/**
+ * Area comment geometry (Phase 8): a translucent rectangle drawn over
+ * the board in FLOW coordinates. Lives on its thread (thread.area), so
+ * it persists, merges and syncs exactly like every other comment.
+ */
+export interface CommentArea {
+  id: string
+  boardId: string
+  projectId: string
+  x: number
+  y: number
+  width: number
+  height: number
+  threadId: string
+  authorId: string
+  createdAt: number
+  updatedAt: number
+  resolved: boolean
+  color: string
+  metadata: Record<string, unknown>
+}
 
 export interface CommentAnchor {
   /** board the pin lives on (board/card/section targets) */
@@ -164,6 +187,8 @@ export interface CommentThread {
   resolvedBy?: string
   resolvedByName?: string
   replies: CommentReply[]
+  /** rectangle geometry when targetType === 'area' */
+  area?: CommentArea
 }
 
 /* ---------------- activity log ---------------- */
