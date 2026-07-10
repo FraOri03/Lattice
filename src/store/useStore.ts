@@ -17,6 +17,7 @@ import type {
   CardType,
   CodeDocMeta,
   NoteDoc,
+  PresentationDocMeta,
   Project,
   RecentEntry,
   RichDocMeta,
@@ -38,6 +39,12 @@ import {
   normalizeBody,
   type SpreadsheetBody,
 } from '@/lib/sheet/sheetModel'
+import {
+  createPresentBody,
+  digestPresentation,
+  normalizePresentBody,
+  type PresentationBody,
+} from '@/lib/present/presentModel'
 import {
   releaseAllAssetUrls,
   releaseAssetUrl,
@@ -122,11 +129,14 @@ interface AppState {
   codeDocs: Record<string, CodeDocMeta>
   /** Spreadsheet METADATA only — workbook bodies are lazy-loaded from storage. */
   sheetDocs: Record<string, SpreadsheetDocMeta>
+  /** Presentation METADATA only — deck bodies are lazy-loaded from storage. */
+  presentDocs: Record<string, PresentationDocMeta>
   activeNoteId: string | null
   activeAssetId: string | null
   activeDocId: string | null
   activeCodeId: string | null
   activeSheetId: string | null
+  activePresentId: string | null
   /** open tabs in the code workspace (code doc ids) */
   codeTabs: string[]
   /** recently opened entities, newest first */
@@ -216,6 +226,17 @@ interface AppState {
   openSheet: (id: string) => void
   closeSheet: () => void
 
+  createPresentDoc: (partial?: Partial<PresentationDocMeta>) => string
+  updatePresentMeta: (
+    id: string,
+    patch: Partial<Omit<PresentationDocMeta, 'id' | 'type'>>,
+  ) => void
+  /** Write a deck body to storage and refresh its digested metadata. */
+  persistPresentBody: (id: string, body: PresentationBody) => void
+  deletePresentDoc: (id: string) => void
+  openPresent: (id: string) => void
+  closePresent: () => void
+
   createCode: (partial?: Partial<CodeDocMeta>) => string
   updateCodeMeta: (id: string, patch: Partial<Omit<CodeDocMeta, 'id' | 'type'>>) => void
   /** Write code source to storage and refresh its digested metadata. */
@@ -264,7 +285,11 @@ function stripCards(
  * (deduped). Dynamic imports keep the store free of static dependencies
  * on the collab layer (which itself imports this store).
  */
-function announceEdit(kind: 'doc' | 'code' | 'sheet', id: string, message: string) {
+function announceEdit(
+  kind: 'doc' | 'code' | 'sheet' | 'present',
+  id: string,
+  message: string,
+) {
   void import('@/lib/collab/RealtimeDocumentSync').then(({ realtimeDocumentSync }) =>
     realtimeDocumentSync.announceSave(id, kind),
   )
@@ -305,11 +330,13 @@ export const useStore = create<AppState>()(
       docs: {},
       codeDocs: {},
       sheetDocs: {},
+      presentDocs: {},
       activeNoteId: null,
       activeAssetId: null,
       activeDocId: null,
       activeCodeId: null,
       activeSheetId: null,
+      activePresentId: null,
       codeTabs: [],
       recents: [],
       viewMode: 'board',
@@ -389,11 +416,16 @@ export const useStore = create<AppState>()(
         const ownedDocs = Object.values(s.docs).filter((d) => d.projectId === id)
         const ownedCode = Object.values(s.codeDocs).filter((c) => c.projectId === id)
         const ownedSheets = Object.values(s.sheetDocs).filter((sh) => sh.projectId === id)
+        const ownedPresents = Object.values(s.presentDocs).filter(
+          (p) => p.projectId === id,
+        )
         const ownedAssets = Object.values(s.assets).filter((a) => a.projectId === id)
         for (const d of ownedDocs) void storage.deleteDocument(d.id).catch(console.error)
         for (const c of ownedCode) void storage.deleteDocument(c.id).catch(console.error)
         for (const sh of ownedSheets)
           void storage.deleteDocument(sh.id).catch(console.error)
+        for (const p of ownedPresents)
+          void storage.deleteDocument(p.id).catch(console.error)
         for (const a of ownedAssets) {
           releaseAssetUrl(a.id)
           void storage.deleteBlob(a.id).catch(console.error)
@@ -426,12 +458,14 @@ export const useStore = create<AppState>()(
           docs: omit(s.docs, new Set(ownedDocs.map((d) => d.id))),
           codeDocs: omit(s.codeDocs, new Set(ownedCode.map((c) => c.id))),
           sheetDocs: omit(s.sheetDocs, new Set(ownedSheets.map((sh) => sh.id))),
+          presentDocs: omit(s.presentDocs, new Set(ownedPresents.map((p) => p.id))),
           assets: omit(s.assets, new Set(ownedAssets.map((a) => a.id))),
           activeNoteId: null,
           activeAssetId: null,
           activeDocId: null,
           activeCodeId: null,
           activeSheetId: null,
+          activePresentId: null,
           codeTabs: [],
         })
       },
@@ -467,6 +501,7 @@ export const useStore = create<AppState>()(
           activeDocId: null,
           activeCodeId: null,
           activeSheetId: null,
+          activePresentId: null,
           codeTabs: [],
           viewMode: s.viewMode === 'split' ? 'board' : s.viewMode,
         })
@@ -1090,6 +1125,80 @@ export const useStore = create<AppState>()(
 
       closeSheet: () => set({ activeSheetId: null }),
 
+      /* ---------------- presentations (Phase 8) ---------------- */
+
+      createPresentDoc: (partial = {}) => {
+        const id = nid('pres')
+        const title = partial.title ?? 'Untitled presentation'
+        const body = createPresentBody(title)
+        const meta: PresentationDocMeta = {
+          id,
+          title,
+          type: 'presentation',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          tags: [],
+          metadata: {},
+          projectId: get().activeProjectId,
+          ...digestPresentation(body),
+          ...partial,
+        }
+        set((s) => ({ presentDocs: { ...s.presentDocs, [id]: meta } }))
+        void storage.putDocument(id, body).catch(console.error)
+        return id
+      },
+
+      updatePresentMeta: (id, patch) =>
+        set((s) => {
+          const meta = s.presentDocs[id]
+          if (!meta) return {}
+          return {
+            presentDocs: {
+              ...s.presentDocs,
+              [id]: { ...meta, ...patch, updatedAt: Date.now() },
+            },
+          }
+        }),
+
+      persistPresentBody: (id, body) => {
+        void storage.putDocument(id, body).catch(console.error)
+        const meta = get().presentDocs[id]
+        if (!meta) return
+        set((s) => ({
+          presentDocs: {
+            ...s.presentDocs,
+            [id]: { ...meta, ...digestPresentation(body), updatedAt: Date.now() },
+          },
+        }))
+        announceEdit('present', id, `Edited presentation “${meta.title}”`)
+      },
+
+      deletePresentDoc: (id) => {
+        void storage.deleteDocument(id).catch(console.error)
+        set((s) => {
+          const presentDocs = { ...s.presentDocs }
+          delete presentDocs[id]
+          return {
+            presentDocs,
+            activePresentId: s.activePresentId === id ? null : s.activePresentId,
+            recents: dropRecent(s.recents, 'present', id),
+          }
+        })
+      },
+
+      openPresent: (id) =>
+        set((s) => ({
+          activePresentId: id,
+          activeAssetId: null,
+          activeDocId: null,
+          activeCodeId: null,
+          activeSheetId: null,
+          viewMode: 'presentation',
+          recents: pushRecent(s.recents, { kind: 'present', id }),
+        })),
+
+      closePresent: () => set({ activePresentId: null }),
+
       /* ---------------- code documents ---------------- */
 
       createCode: (partial = {}) => {
@@ -1212,6 +1321,9 @@ export const useStore = create<AppState>()(
         for (const [id, body] of Object.entries(data.sheetData ?? {})) {
           await storage.putDocument(id, normalizeBody(body))
         }
+        for (const [id, body] of Object.entries(data.presentData ?? {})) {
+          await storage.putDocument(id, normalizePresentBody(body))
+        }
         // pre-v6 files have no projects: stamp everything with a default one
         const projects =
           data.projects && Object.keys(data.projects).length
@@ -1232,6 +1344,7 @@ export const useStore = create<AppState>()(
           docs: stampProject(data.docs ?? {}, fallbackProject),
           codeDocs: stampProject(data.codeDocs ?? {}, fallbackProject),
           sheetDocs: stampProject(data.sheetDocs ?? {}, fallbackProject),
+          presentDocs: stampProject(data.presentDocs ?? {}, fallbackProject),
           codeTabs: [],
           recents: [],
           activeBoardId: boardOrder[0],
@@ -1240,6 +1353,7 @@ export const useStore = create<AppState>()(
           activeDocId: null,
           activeCodeId: null,
           activeSheetId: null,
+          activePresentId: null,
         })
       },
     }),
@@ -1277,6 +1391,7 @@ export const useStore = create<AppState>()(
         docs: s.docs,
         codeDocs: s.codeDocs,
         sheetDocs: s.sheetDocs,
+        presentDocs: s.presentDocs,
         codeTabs: s.codeTabs,
         recents: s.recents,
         activeNoteId: s.activeNoteId,
@@ -1284,6 +1399,7 @@ export const useStore = create<AppState>()(
         activeDocId: s.activeDocId,
         activeCodeId: s.activeCodeId,
         activeSheetId: s.activeSheetId,
+        activePresentId: s.activePresentId,
         viewMode: s.viewMode,
         theme: s.theme,
       }),
@@ -1318,9 +1434,14 @@ export async function exportVaultFull(): Promise<VaultExport> {
     const body = await storage.getDocument(id)
     if (body) sheetData[id] = body
   }
+  const presentData: Record<string, unknown> = {}
+  for (const id of Object.keys(s.presentDocs)) {
+    const body = await storage.getDocument(id)
+    if (body) presentData[id] = body
+  }
   return {
     app: 'lattice',
-    version: 6,
+    version: 7,
     exportedAt: Date.now(),
     boards: s.boards,
     boardOrder: s.boardOrder,
@@ -1333,6 +1454,8 @@ export async function exportVaultFull(): Promise<VaultExport> {
     codeData,
     sheetDocs: s.sheetDocs,
     sheetData,
+    presentDocs: s.presentDocs,
+    presentData,
     projects: s.projects,
     activeProjectId: s.activeProjectId,
   }

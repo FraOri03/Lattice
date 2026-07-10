@@ -233,6 +233,30 @@ export interface SpreadsheetDocMeta {
   projectId?: string
 }
 
+/* ---------------- presentations (Phase 8) ---------------- */
+
+/**
+ * Metadata for a presentation document. Like docs/sheets/code, the body
+ * (a PresentationBody JSON from src/lib/present/presentModel.ts) lives in
+ * the StorageProvider and is lazy-loaded when the editor opens.
+ */
+export interface PresentationDocMeta {
+  id: string
+  title: string
+  type: 'presentation'
+  createdAt: number
+  updatedAt: number
+  /** original imported file (PPTX/ODP/PPT), kept in /imports */
+  sourceAssetId?: string
+  /** digested: number of slides */
+  slideCount: number
+  /** digested: first text lines, for cards/search */
+  snippet: string
+  tags: string[]
+  metadata: Record<string, unknown>
+  projectId?: string
+}
+
 /* ---------------- board cards ---------------- */
 
 export type CardType =
@@ -359,7 +383,7 @@ export type Theme = 'dark' | 'light'
 
 /** A recently opened entity, newest first. */
 export interface RecentEntry {
-  kind: 'note' | 'doc' | 'sheet' | 'code' | 'asset' | 'board'
+  kind: 'note' | 'doc' | 'sheet' | 'code' | 'asset' | 'board' | 'present'
   id: string
   at: number
 }
@@ -370,11 +394,13 @@ export interface RecentEntry {
  * in assetData so a project file is fully self-contained. v3 adds rich
  * documents: metadata in docs, Tiptap JSON bodies in docData. v4 adds
  * code documents. v5 adds spreadsheets: metadata in sheetDocs,
- * SpreadsheetBody JSON workbooks in sheetData. v6 adds projects.
+ * SpreadsheetBody JSON workbooks in sheetData. v6 adds projects. v7 adds
+ * presentations: metadata in presentDocs, PresentationBody JSON in
+ * presentData.
  */
 export interface VaultExport {
   app: 'lattice'
-  version: 1 | 2 | 3 | 4 | 5 | 6
+  version: 1 | 2 | 3 | 4 | 5 | 6 | 7
   exportedAt: number
   boards: Record<string, Board>
   boardOrder: string[]
@@ -389,4 +415,6 @@ export interface VaultExport {
   sheetData?: Record<string, unknown> // sheet id → SpreadsheetBody JSON
   projects?: Record<string, Project> // v6
   activeProjectId?: string // v6
+  presentDocs?: Record<string, PresentationDocMeta> // v7
+  presentData?: Record<string, unknown> // present id → PresentationBody JSON
 }

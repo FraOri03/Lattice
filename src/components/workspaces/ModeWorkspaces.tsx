@@ -2,12 +2,15 @@ import { lazy, Suspense, type ReactNode } from 'react'
 import { useStore } from '@/store/useStore'
 import { useUiStore } from '@/store/useUiStore'
 import { CodeInspector } from '@/components/code/CodeInspector'
-import { FileKindIcon, fileKindRegistry, type FileKind } from '@/lib/registry/fileKinds'
+import { FileKindIcon, type FileKind } from '@/lib/registry/fileKinds'
 import { formatBytes } from '@/lib/media'
 import { IcGithub, IcPlus, IcPresentation } from '@/components/Icons'
 
 const CodeWorkspacePane = lazy(() => import('@/components/code/CodeWorkspacePane'))
 const SpreadsheetWorkspace = lazy(() => import('@/components/sheet/SpreadsheetWorkspace'))
+const PresentationWorkspace = lazy(
+  () => import('@/components/present/PresentationWorkspace'),
+)
 
 /**
  * Full-page workspaces behind the Phase 6 top navigation: Sheet,
@@ -176,37 +179,62 @@ export function CodeModeWorkspace() {
 }
 
 export function PresentationModeWorkspace() {
+  const activePresentId = useStore((s) => s.activePresentId)
+  const presentDocs = useStore((s) => s.presentDocs)
   const assets = useStore((s) => s.assets)
   const activeProjectId = useStore((s) => s.activeProjectId)
+  const openPresent = useStore((s) => s.openPresent)
   const openAsset = useStore((s) => s.openAsset)
+  const createPresentDoc = useStore((s) => s.createPresentDoc)
 
-  const decks = Object.values(assets)
+  const meta = activePresentId ? presentDocs[activePresentId] : undefined
+  if (meta) {
+    return (
+      <Suspense fallback={<Loading label="Loading presentation workspace…" />}>
+        <PresentationWorkspace meta={meta} />
+      </Suspense>
+    )
+  }
+
+  const decks = Object.values(presentDocs)
+    .filter((p) => p.projectId === activeProjectId)
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+  const rawDecks = Object.values(assets)
     .filter((a) => a.kind === 'presentation' && a.projectId === activeProjectId)
     .sort((a, b) => b.importedAt - a.importedAt)
 
   return (
     <EmptyMode
       kind="presentation"
-      headline="Presentation workspace"
-      hint="The slide editor is not built yet — this mode is the honest placeholder for it. Imported PPTX/ODP decks keep their original files in the vault and preview as assets; the editing engine is on the roadmap."
+      headline="No presentation open"
+      hint="Slides on a 960×540 canvas: text boxes, images, shapes, themes, speaker notes, PDF and PPTX export. Import a PPTX/ODP to convert it into an editable deck — the original file is always preserved."
       action={
-        decks.length === 0 ? (
-          <p className="flex items-center gap-2 text-[11px] text-muted">
-            <IcPresentation size={13} /> Import a .pptx / .odp from the sidebar to see it here
-          </p>
-        ) : undefined
+        <button className="btn" onClick={() => openPresent(createPresentDoc())}>
+          <IcPlus size={13} /> New presentation
+        </button>
       }
     >
       <JumpList
         items={decks}
         kind="presentation"
-        label={(a) => a.name}
-        detail={(a) => formatBytes(a.size)}
-        onOpen={openAsset}
+        label={(p) => p.title}
+        detail={(p) => `${p.slideCount} slide${p.slideCount === 1 ? '' : 's'}`}
+        onOpen={openPresent}
       />
-      <p className="mt-3 text-[10px] text-muted">
-        {fileKindRegistry.presentation.label} editing lands after Phase 6 — see the README roadmap.
-      </p>
+      {rawDecks.length > 0 && (
+        <>
+          <p className="mt-2 flex items-center gap-2 text-[11px] text-muted">
+            <IcPresentation size={13} /> Preserved originals (preview as assets)
+          </p>
+          <JumpList
+            items={rawDecks}
+            kind="presentation"
+            label={(a) => a.name}
+            detail={(a) => formatBytes(a.size)}
+            onOpen={openAsset}
+          />
+        </>
+      )}
     </EmptyMode>
   )
 }

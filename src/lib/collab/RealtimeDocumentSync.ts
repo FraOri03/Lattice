@@ -32,7 +32,7 @@ import { toast } from '@/components/ui/Toaster'
 
 interface DocUpdatePayload {
   docId: string
-  kind: 'doc' | 'code' | 'sheet'
+  kind: 'doc' | 'code' | 'sheet' | 'present'
   updatedAt: number
 }
 

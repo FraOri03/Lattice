@@ -20,6 +20,7 @@ export type ImportOutcome =
   | { kind: 'richdoc'; docId: string; asset: AssetDoc }
   | { kind: 'code'; codeId: string }
   | { kind: 'sheet'; sheetId: string; asset: AssetDoc }
+  | { kind: 'present'; presentId: string; asset: AssetDoc }
   | { kind: 'error'; fileName: string; message: string }
 
 /** Register the raw file as a vault asset (binary → StorageProvider). */
@@ -125,6 +126,39 @@ export async function importFile(file: File): Promise<ImportOutcome> {
       }
     }
 
+    if (assetOutcome.asset.kind === 'presentation') {
+      const ext = extOf(file.name)
+      if (ext === 'pptx' || ext === 'odp') {
+        try {
+          const { importPptx, importOdp } = await import('@/lib/present/presentImport')
+          const { body, report } = await (ext === 'pptx'
+            ? importPptx(file)
+            : importOdp(file))
+          const store = useStore.getState()
+          const presentId = store.createPresentDoc({
+            title: assetOutcome.asset.name,
+            sourceAssetId: assetOutcome.asset.id,
+            metadata: { conversionReport: report },
+          })
+          store.persistPresentBody(presentId, body)
+          if (report.length) {
+            void import('@/components/ui/Toaster').then(({ toast }) =>
+              toast.info(
+                `Imported “${file.name}” with fidelity notes`,
+                report.slice(0, 2).join(' · '),
+              ),
+            )
+          }
+          return { kind: 'present', presentId, asset: assetOutcome.asset }
+        } catch (err) {
+          console.error('Presentation conversion failed, keeping raw asset', err)
+          return assetOutcome
+        }
+      }
+      // legacy .ppt: preserved honestly — needs the conversion backend
+      return assetOutcome
+    }
+
     const adapter = importAdapterFor(file.name, file.type)
     if (adapter?.importDocument) {
       try {
@@ -204,6 +238,15 @@ export function cardSpecFor(outcome: ImportOutcome): {
       type: 'sheet',
       data: { sheetId: outcome.sheetId, mode: 'compact', color: 'green' },
       size: { w: 380, h: 260 },
+    }
+  }
+  if (outcome.kind === 'present') {
+    // decks have no dedicated card type yet: the preserved source asset
+    // represents them on boards, the editor opens from the sidebar/mode
+    return {
+      type: 'asset',
+      data: { assetId: outcome.asset.id, color: KIND_DEFAULT_COLOR.presentation },
+      size: KIND_CARD_SIZE.presentation,
     }
   }
   if (outcome.kind === 'asset') {

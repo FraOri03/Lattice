@@ -36,6 +36,7 @@ const RECENT_KIND_ICON: Record<RecentEntry['kind'], FileKind> = {
   note: 'note',
   doc: 'richdoc',
   sheet: 'sheet',
+  present: 'presentation',
   code: 'code',
   asset: 'file',
   board: 'board',
@@ -218,6 +219,7 @@ function usePaletteItems(query: string, close: () => void): PaletteItem[] {
           r.kind === 'note' ? s.notes[r.id]?.title
           : r.kind === 'doc' ? s.docs[r.id]?.title
           : r.kind === 'sheet' ? s.sheetDocs[r.id]?.title
+          : r.kind === 'present' ? s.presentDocs[r.id]?.title
           : r.kind === 'code' ? s.codeDocs[r.id] && `${s.codeDocs[r.id].title}.${s.codeDocs[r.id].extension}`
           : r.kind === 'asset' ? s.assets[r.id]?.name
           : s.boards[r.id]?.name
@@ -232,6 +234,7 @@ function usePaletteItems(query: string, close: () => void): PaletteItem[] {
             if (r.kind === 'note') s.openNote(r.id)
             else if (r.kind === 'doc') s.openDoc(r.id)
             else if (r.kind === 'sheet') s.openSheet(r.id)
+            else if (r.kind === 'present') s.openPresent(r.id)
             else if (r.kind === 'code') s.openCode(r.id)
             else if (r.kind === 'asset') s.openAsset(r.id)
             else s.setActiveBoard(r.id)

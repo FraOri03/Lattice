@@ -203,6 +203,7 @@ export type ActivityType =
   | 'doc.edited'
   | 'code.edited'
   | 'sheet.edited'
+  | 'present.edited'
   | 'board.card-moved'
   | 'board.card-added'
   | 'board.card-deleted'
