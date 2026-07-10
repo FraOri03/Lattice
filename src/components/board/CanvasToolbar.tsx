@@ -18,9 +18,10 @@ import {
   IcNote,
   IcSection,
   IcTable,
-  IcUpload,
   IcVideo,
 } from '@/components/Icons'
+import { ActionIcon } from '@/components/ActionIcons'
+import { ToolbarDivider } from '@/components/ui/ToolbarDivider'
 
 /** Floating Figma-style toolbar for inserting cards at the viewport center. */
 export function CanvasToolbar() {
@@ -55,75 +56,64 @@ export function CanvasToolbar() {
     }
   }
 
-  const items: {
+  interface ToolItem {
     key: string
     label: string
     icon: React.ReactNode
     onClick: () => void
     active?: boolean
-  }[] = [
-    {
-      key: 'section',
-      label: 'Section',
-      icon: <IcSection size={16} />,
-      onClick: () => addSection(centerPos()),
-    },
-    { key: 'note', label: 'Note', icon: <IcNote size={16} />, onClick: () => insert('note') },
-    {
-      key: 'richdoc',
-      label: 'Doc',
-      icon: <IcDoc size={16} />,
-      onClick: () => {
-        const docId = useStore.getState().createDoc()
-        addCard('richdoc', centerPos(), { docId, mode: 'compact', color: 'blue' })
+  }
+
+  // tools grouped by purpose: structure · creation · annotation · external
+  const groups: ToolItem[][] = [
+    [
+      {
+        key: 'section',
+        label: 'Section',
+        icon: <IcSection size={16} />,
+        onClick: () => addSection(centerPos()),
       },
-    },
-    {
-      key: 'code',
-      label: 'Code',
-      icon: <IcCode size={16} />,
-      onClick: () => {
-        const codeId = useStore.getState().createCode()
-        addCard('code', centerPos(), { codeId, mode: 'compact', color: 'purple' })
+    ],
+    [
+      { key: 'note', label: 'Note', icon: <IcNote size={16} />, onClick: () => insert('note') },
+      {
+        key: 'richdoc',
+        label: 'Doc',
+        icon: <IcDoc size={16} />,
+        onClick: () => {
+          const docId = useStore.getState().createDoc()
+          addCard('richdoc', centerPos(), { docId, mode: 'compact', color: 'blue' })
+        },
       },
-    },
-    {
-      key: 'sheet',
-      label: 'Sheet',
-      icon: <IcTable size={16} />,
-      onClick: () => {
-        const sheetId = useStore.getState().createSheetDoc()
-        addCard('sheet', centerPos(), { sheetId, mode: 'compact', color: 'green' })
+      {
+        key: 'sheet',
+        label: 'Sheet',
+        icon: <IcTable size={16} />,
+        onClick: () => {
+          const sheetId = useStore.getState().createSheetDoc()
+          addCard('sheet', centerPos(), { sheetId, mode: 'compact', color: 'green' })
+        },
       },
-    },
-    {
-      key: 'image',
-      label: 'Image',
-      icon: <IcImage size={16} />,
-      onClick: () => imageInput.current?.click(),
-    },
-    { key: 'video', label: 'Video', icon: <IcVideo size={16} />, onClick: () => insert('video') },
-    {
-      key: 'web',
-      label: 'Web',
-      icon: <IcGlobe size={16} />,
-      onClick: () => {
-        void promptDialog({
-          title: 'Embed a webpage',
-          body: 'Only http(s) URLs are allowed. Sites that refuse framing fall back to a link preview.',
-          label: 'URL',
-          placeholder: 'https://…',
-          confirmLabel: 'Embed',
-        }).then((url) => {
-          if (!url) return
-          const res = addWebEmbedCard(url, centerPos())
-          if (!res.cardId) toast.error('Could not embed that URL', res.reason)
-        })
+      {
+        key: 'code',
+        label: 'Code',
+        icon: <IcCode size={16} />,
+        onClick: () => {
+          const codeId = useStore.getState().createCode()
+          addCard('code', centerPos(), { codeId, mode: 'compact', color: 'purple' })
+        },
       },
-    },
-    { key: 'link', label: 'Link', icon: <IcLink size={16} />, onClick: () => insert('link') },
-    { key: 'embed3d', label: '3D', icon: <IcCube size={16} />, onClick: () => insert('embed3d') },
-    ...(mayComment
+      {
+        key: 'image',
+        label: 'Image',
+        icon: <IcImage size={16} />,
+        onClick: () => imageInput.current?.click(),
+      },
+      { key: 'video', label: 'Video', icon: <IcVideo size={16} />, onClick: () => insert('video') },
+      { key: 'link', label: 'Link', icon: <IcLink size={16} />, onClick: () => insert('link') },
+      { key: 'embed3d', label: '3D', icon: <IcCube size={16} />, onClick: () => insert('embed3d') },
+    ],
+    mayComment
       ? [
           {
             key: 'comment',
@@ -133,18 +123,41 @@ export function CanvasToolbar() {
             active: commentMode,
           },
         ]
-      : []),
-    {
-      key: 'import',
-      label: 'Import',
-      icon: <IcUpload size={16} />,
-      onClick: () => importInput.current?.click(),
-    },
+      : [],
+    [
+      {
+        key: 'web',
+        label: 'Web',
+        icon: <IcGlobe size={16} />,
+        onClick: () => {
+          void promptDialog({
+            title: 'Embed a webpage',
+            body: 'Only http(s) URLs are allowed. Sites that refuse framing fall back to a link preview.',
+            label: 'URL',
+            placeholder: 'https://…',
+            confirmLabel: 'Embed',
+          }).then((url) => {
+            if (!url) return
+            const res = addWebEmbedCard(url, centerPos())
+            if (!res.cardId) toast.error('Could not embed that URL', res.reason)
+          })
+        },
+      },
+      {
+        key: 'import',
+        label: 'Import',
+        icon: <ActionIcon.Import size={16} />,
+        onClick: () => importInput.current?.click(),
+      },
+    ],
   ]
+  const visibleGroups = groups.filter((g) => g.length > 0)
 
   return (
     <div className="flex items-center gap-1 rounded-xl border border-bord bg-panel p-1 shadow-lg">
-      {items.map((item) => (
+      {visibleGroups.flatMap((group, gi) => [
+        ...(gi > 0 ? [<ToolbarDivider key={`div-${gi}`} />] : []),
+        ...group.map((item) => (
         <button
           key={item.key}
           className={`flex cursor-pointer flex-col items-center gap-0.5 rounded-lg px-3 py-1.5 ${
@@ -170,7 +183,8 @@ export function CanvasToolbar() {
           {item.icon}
           <span className="text-[10px] font-medium">{item.label}</span>
         </button>
-      ))}
+        )),
+      ])}
       <input
         ref={imageInput}
         type="file"

@@ -20,13 +20,12 @@ import { confirmDialog } from '@/components/ui/ConfirmDialog'
 import {
   IcBoard,
   IcClock,
-  IcDownload,
   IcPlus,
   IcSearch,
   IcTag,
   IcTrash,
-  IcUpload,
 } from '@/components/Icons'
+import { ActionIcon } from '@/components/ActionIcons'
 
 const FILTERS: { key: SidebarFilter; label: string }[] = [
   { key: 'all', label: 'All' },
@@ -706,7 +705,7 @@ export function Sidebar() {
                 onClick={() => filesInput.current?.click()}
                 title="Import PDF, DOCX, XLSX, PPTX, images, video, audio, GLB/OBJ and more"
               >
-                <IcUpload size={13} /> Import files…
+                <ActionIcon.Import size={13} /> Import files…
               </button>
             )}
           </>
@@ -751,17 +750,19 @@ export function Sidebar() {
         <button
           className="btn flex-1"
           disabled={exporting}
-          title="Download the whole vault (all projects, boards, notes, assets) as one file"
+          title="Export — download the whole vault (all projects, boards, notes, assets) as one file"
+          aria-label="Export vault to file"
           onClick={() => void onExportVault()}
         >
-          <IcDownload size={13} /> {exporting ? 'Packing…' : 'Export'}
+          <ActionIcon.Export size={13} /> {exporting ? 'Packing…' : 'Export'}
         </button>
         <button
           className="btn flex-1"
-          title="Open a .lattice.json project file"
+          title="Import — open a .lattice.json project file"
+          aria-label="Import vault from file"
           onClick={() => vaultInput.current?.click()}
         >
-          <IcUpload size={13} /> Import
+          <ActionIcon.Import size={13} /> Import
         </button>
         <input
           ref={vaultInput}

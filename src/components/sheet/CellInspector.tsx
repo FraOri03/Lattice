@@ -15,7 +15,8 @@ import {
 } from '@/lib/sheet/SpreadsheetExportService'
 import { toast } from '@/components/ui/Toaster'
 import { confirmDialog } from '@/components/ui/ConfirmDialog'
-import { IcDownload, IcTrash } from '@/components/Icons'
+import { IcTrash } from '@/components/Icons'
+import { ActionIcon } from '@/components/ActionIcons'
 import { useSheetSession } from './SheetSession'
 
 function InfoRow({ label, value }: { label: string; value: string }) {
@@ -138,9 +139,10 @@ export function CellInspector() {
             <button
               className="icon-btn h-6 w-6"
               title="Download original"
+              aria-label="Download original file"
               onClick={() => void downloadAsset(sourceAsset)}
             >
-              <IcDownload size={12} />
+              <ActionIcon.DownloadLocal size={12} />
             </button>
           </div>
         </>
@@ -156,7 +158,7 @@ export function CellInspector() {
             title={f.note}
             onClick={() => void onExport(f.format)}
           >
-            <IcDownload size={12} />
+            <ActionIcon.Export size={12} />
             {exporting === f.format ? 'Exporting…' : f.label}
           </button>
         ))}

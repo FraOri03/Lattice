@@ -5,7 +5,7 @@ import { plannedEditorFor } from '@/lib/registry/documents'
 import { conversionNoteForAsset } from '@/lib/convert/ConversionService'
 import { formatBytes } from '@/lib/media'
 import { KIND_ICONS, KIND_LABEL } from '@/components/assetKinds'
-import { IcDownload } from '@/components/Icons'
+import { ActionIcon } from '@/components/ActionIcons'
 import { ThreeDViewer } from './ThreeDViewer'
 
 export interface PreviewProps {
@@ -89,8 +89,12 @@ export const GenericPreview: FC<PreviewProps> = ({ asset }) => {
           </span>
         )
       )}
-      <button className="btn mt-2" onClick={() => void downloadAsset(asset)}>
-        <IcDownload size={13} /> Download original
+      <button
+        className="btn mt-2"
+        title="Download the original file to this device"
+        onClick={() => void downloadAsset(asset)}
+      >
+        <ActionIcon.DownloadLocal size={13} /> Download original
       </button>
     </div>
   )

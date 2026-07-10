@@ -105,12 +105,19 @@ export const IcTrash = (p: P) => (
     <path d="M10 11v6M14 11v6" />
   </S>
 )
+/**
+ * @deprecated Phase 8 — use the semantic registry in ActionIcons.tsx
+ * (ActionIcon.Import / .Export / .DownloadLocal / .UploadToCloud /
+ * .Sync / .PullFromGitHub / .PushToGitHub). One ambiguous tray glyph for
+ * every transfer action is exactly the defect that registry fixes.
+ */
 export const IcDownload = (p: P) => (
   <S {...p}>
     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
     <path d="M7 10l5 5 5-5M12 15V3" />
   </S>
 )
+/** @deprecated Phase 8 — see IcDownload note. */
 export const IcUpload = (p: P) => (
   <S {...p}>
     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />

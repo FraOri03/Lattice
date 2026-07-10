@@ -81,12 +81,24 @@ export async function importFile(file: File): Promise<ImportOutcome> {
     if (isCodeExt(ext) && file.size <= MAX_CODE_BYTES) {
       const content = await file.text()
       const store = useStore.getState()
+      // env/credential files: loud privacy warning, flagged metadata —
+      // they are never auto-committed to GitHub or exposed via shares
+      const { isEnvFileName, secretWarningFor } = await import('@/lib/security/secrets')
+      const secretWarning = isEnvFileName(file.name)
+        ? secretWarningFor(file.name, content)
+        : null
       const codeId = store.createCode({
         title: file.name.replace(/\.[^.]+$/, '') || file.name,
         language: langForExt(ext),
         extension: ext,
+        metadata: secretWarning ? { secretWarning } : {},
       })
       store.persistCodeContent(codeId, content)
+      if (secretWarning) {
+        void import('@/components/ui/Toaster').then(({ toast }) =>
+          toast.warning(`“${file.name}” may contain secrets`, secretWarning),
+        )
+      }
       return { kind: 'code', codeId }
     }
 

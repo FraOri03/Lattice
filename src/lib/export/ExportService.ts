@@ -3,7 +3,7 @@ import type { RichDocMeta } from '@/types/model'
 import { storage } from '@/lib/storage/StorageProvider'
 import { EMPTY_DOC } from '@/lib/richdoc/docjson'
 import { baseExtensions } from '@/components/richdoc/extensions'
-import { OdtAdapter, RtfAdapter } from '@/lib/convert/ConversionService'
+import { DocxAdapter, OdtAdapter, RtfAdapter } from '@/lib/convert/ConversionService'
 import { downloadBlob, downloadText, slugify } from '@/lib/download'
 
 export type ExportFormat = 'html' | 'markdown' | 'odt' | 'rtf' | 'docx' | 'pdf'
@@ -16,18 +16,22 @@ export interface ExportFormatInfo {
 }
 
 /**
- * Export format registry. HTML, Markdown, ODT and RTF are implemented
- * (ODT/RTF through their ConversionService adapters); DOCX and PDF slots
- * exist so UI and plugins can already enumerate them — their serializers
- * land in a later phase (docx lib / print pipeline).
+ * Export format registry (all implemented since Phase 8). HTML, Markdown,
+ * ODT, RTF and DOCX serialize in the browser; PDF goes through the
+ * system print dialog on a standalone print view of the document.
  */
 export const EXPORT_FORMATS: ExportFormatInfo[] = [
   { format: 'markdown', label: 'Markdown (.md)', status: 'ready' },
   { format: 'html', label: 'HTML (.html)', status: 'ready' },
   { format: 'odt', label: 'OpenDocument (.odt)', status: 'ready', note: OdtAdapter.limitations[1] },
   { format: 'rtf', label: 'Rich Text (.rtf)', status: 'ready', note: RtfAdapter.limitations[0] },
-  { format: 'docx', label: 'Word (.docx)', status: 'planned', note: 'Phase 5 — docx serializer' },
-  { format: 'pdf', label: 'PDF (.pdf)', status: 'planned', note: 'Phase 5 — print pipeline' },
+  { format: 'docx', label: 'Word (.docx)', status: 'ready', note: DocxAdapter.limitations[1] },
+  {
+    format: 'pdf',
+    label: 'PDF (.pdf)',
+    status: 'ready',
+    note: 'Opens the print view — choose "Save as PDF" in the system dialog',
+  },
 ]
 
 export class ExportNotReadyError extends Error {}
@@ -81,14 +85,52 @@ ${inner}
       downloadBlob(`${name}.rtf`, await RtfAdapter.exportDocument!(body))
       return
     }
-    case 'docx':
+    case 'docx': {
+      downloadBlob(`${name}.docx`, await DocxAdapter.exportDocument!(body))
+      return
+    }
     case 'pdf': {
-      const info = EXPORT_FORMATS.find((f) => f.format === format)
-      throw new ExportNotReadyError(
-        `${info?.label ?? format} export is planned (${info?.note ?? 'coming soon'}).`,
-      )
+      exportHtmlViaPrint(meta.title, generateHTML(body, baseExtensions))
+      return
     }
   }
+}
+
+/**
+ * PDF export = a standalone print view + the system print dialog. This
+ * is the honest browser-native pipeline: layout is done by the real HTML
+ * renderer and the user picks "Save as PDF".
+ */
+function exportHtmlViaPrint(title: string, innerHtml: string): void {
+  const win = window.open('', '_blank', 'width=900,height=700')
+  if (!win) {
+    throw new ExportNotReadyError(
+      'The print window was blocked. Allow popups for this site and retry.',
+    )
+  }
+  win.document.write(`<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>${escapeHtml(title)}</title>
+<style>
+body{max-width:760px;margin:2rem auto;padding:0 1rem;font-family:ui-sans-serif,system-ui,sans-serif;line-height:1.6;color:#1f1f24}
+table{border-collapse:collapse}th,td{border:1px solid #ccc;padding:6px 10px}
+blockquote{border-left:3px solid #0d99ff;margin:1em 0;padding:.2em 1em;color:#555}
+pre{background:#f4f4f6;border:1px solid #e2e2e6;border-radius:8px;padding:12px;overflow-x:auto}
+code{font-family:ui-monospace,monospace}
+.callout{border:1px solid #e2e2e6;border-left:4px solid #0d99ff;border-radius:8px;padding:.4em 1em;margin:1em 0}
+img{max-width:100%}
+@media print { body { margin: 0 } }
+</style>
+</head>
+<body>
+<h1>${escapeHtml(title)}</h1>
+${innerHtml}
+<script>window.onload = () => { window.print() }</script>
+</body>
+</html>`)
+  win.document.close()
 }
 
 const escapeHtml = (s: string): string =>

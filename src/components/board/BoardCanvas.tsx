@@ -37,7 +37,8 @@ import { CommentPins } from '@/components/collab/CommentPins'
 import { CommentAreas, FOCUS_AREA_EVENT } from '@/components/collab/CommentAreas'
 import { toast } from '@/components/ui/Toaster'
 import { promptDialog } from '@/components/ui/ConfirmDialog'
-import { IcBoard, IcNote, IcSection, IcUpload } from '@/components/Icons'
+import { IcBoard, IcNote, IcSection } from '@/components/Icons'
+import { ActionIcon } from '@/components/ActionIcons'
 import {
   FileCardNode,
   ImageCardNode,
@@ -119,7 +120,7 @@ function EmptyBoardState({ readOnly }: { readOnly: boolean }) {
                   (document.querySelector('[data-import-input]') as HTMLInputElement)?.click()
                 }
               >
-                <IcUpload size={13} /> Import files
+                <ActionIcon.Import size={13} /> Import files
               </button>
             </div>
           </>

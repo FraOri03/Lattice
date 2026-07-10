@@ -9,7 +9,8 @@ import { useCan } from '@/lib/collab/useCollab'
 import { yjsManager } from '@/lib/crdt/YjsManager'
 import { reconciledCode } from '@/lib/crdt/CodeCRDT'
 import { confirmDialog } from '@/components/ui/ConfirmDialog'
-import { IcDownload, IcTrash } from '@/components/Icons'
+import { IcTrash } from '@/components/Icons'
+import { ActionIcon } from '@/components/ActionIcons'
 
 /** Right panel of the code workspace: metadata, source file, backlinks, export. */
 export function CodeInspector() {
@@ -73,9 +74,10 @@ export function CodeInspector() {
             <button
               className="icon-btn h-6 w-6"
               title="Download original"
+              aria-label="Download original file"
               onClick={() => void downloadAsset(sourceAsset)}
             >
-              <IcDownload size={12} />
+              <ActionIcon.DownloadLocal size={12} />
             </button>
           </div>
         </>
@@ -175,8 +177,12 @@ export function CodeInspector() {
       </div>
 
       <div className="insp-h">Export</div>
-      <button className="btn w-full" onClick={() => void download()}>
-        <IcDownload size={12} /> Download {meta.title}.{meta.extension}
+      <button
+        className="btn w-full"
+        title="Export the reconciled file to this device"
+        onClick={() => void download()}
+      >
+        <ActionIcon.Export size={12} /> Download {meta.title}.{meta.extension}
       </button>
 
       <div className="insp-h">Danger</div>

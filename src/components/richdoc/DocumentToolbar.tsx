@@ -2,6 +2,7 @@ import { useEffect, useReducer } from 'react'
 import type { Editor } from '@tiptap/core'
 import type { CalloutKind } from './extensions'
 import { IcImage, IcLink, IcTable } from '@/components/Icons'
+import { ToolbarDivider } from '@/components/ui/ToolbarDivider'
 
 /** Re-render on every editor transaction so active states stay fresh. */
 export function useEditorTick(editor: Editor | null): void {
@@ -36,6 +37,8 @@ function TBtn({
       className={`tbtn ${active ? 'is-active' : ''}`}
       disabled={disabled}
       title={title}
+      aria-label={title}
+      aria-pressed={active}
       onMouseDown={(e) => e.preventDefault() /* keep editor focus */}
       onClick={onClick}
     >
@@ -44,7 +47,7 @@ function TBtn({
   )
 }
 
-const Sep = () => <span className="mx-0.5 h-4 w-px flex-none bg-bord" />
+const Sep = () => <ToolbarDivider />
 
 export function setOrUnsetLink(editor: Editor): void {
   const existing = editor.getAttributes('link').href as string | undefined

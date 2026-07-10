@@ -4,7 +4,8 @@ import { downloadText, slugify } from '@/lib/download'
 import { MarkdownView } from '@/components/MarkdownView'
 import { AssetPreviewPane } from '@/components/preview/AssetPreviewPane'
 import { RichDocWorkspacePane } from '@/components/richdoc/RichDocWorkspacePane'
-import { IcDoc, IcDownload, IcNote, IcPlus, IcX } from '@/components/Icons'
+import { IcDoc, IcNote, IcPlus, IcX } from '@/components/Icons'
+import { ActionIcon } from '@/components/ActionIcons'
 
 // Monaco and friends load only when a code file is opened
 const CodeWorkspacePane = lazy(() => import('@/components/code/CodeWorkspacePane'))
@@ -110,11 +111,12 @@ export function DocumentView() {
         <button
           className="icon-btn"
           title="Export as .md"
+          aria-label="Export note as Markdown"
           onClick={() =>
             downloadText(`${slugify(note.title)}.md`, `# ${note.title}\n\n${note.content}`)
           }
         >
-          <IcDownload size={14} />
+          <ActionIcon.Export size={14} />
         </button>
         {viewMode !== 'board' && (
           <button

@@ -16,12 +16,11 @@ import { storage } from '@/lib/storage/StorageProvider'
 import {
   IcBranch,
   IcCheck,
-  IcDownload,
   IcGithub,
   IcShield,
-  IcUpload,
   IcX,
 } from '@/components/Icons'
+import { ActionIcon } from '@/components/ActionIcons'
 
 function slugify(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'project'
@@ -204,6 +203,20 @@ function ConnectedPanel() {
       if (!link) throw new Error('Link a repository first')
       const docs = projectCode.filter((c) => selectedExports.has(c.id))
       if (!docs.length) throw new Error('Select at least one code document')
+      // secret-flagged files (e.g. .env) need explicit re-confirmation
+      const risky = docs.filter((d) => d.metadata.secretWarning)
+      if (risky.length) {
+        const { confirmDialog } = await import('@/components/ui/ConfirmDialog')
+        const ok = await confirmDialog({
+          title: 'Commit files that may contain secrets?',
+          body: `${risky.map((d) => `${d.title}.${d.extension}`).join(', ')} ${
+            risky.length === 1 ? 'was' : 'were'
+          } flagged as possibly containing credentials. Committing secrets to GitHub is hard to undo.`,
+          confirmLabel: 'Commit anyway',
+          danger: true,
+        })
+        if (!ok) throw new Error('Sync cancelled — secret-flagged files were selected.')
+      }
       const { yjsManager } = await import('@/lib/crdt/YjsManager')
       const { reconciledCode } = await import('@/lib/crdt/CodeCRDT')
       const files = []
@@ -396,7 +409,7 @@ function ConnectedPanel() {
               disabled={!selectedImports.size || busy !== null}
               onClick={() => void importSelected()}
             >
-              <IcDownload size={13} />
+              <ActionIcon.PullFromGitHub size={13} />
               {busy === 'import'
                 ? 'Importing…'
                 : `Import ${selectedImports.size || ''} selected`}
@@ -455,7 +468,7 @@ function ConnectedPanel() {
                 onClick={() => void syncToGithub()}
                 title="Creates one commit on the feature branch — nothing happens without this click"
               >
-                <IcUpload size={13} />
+                <ActionIcon.PushToGitHub size={13} />
                 {busy === 'export' ? 'Committing…' : 'Sync code to GitHub'}
               </button>
             </div>
@@ -464,7 +477,7 @@ function ConnectedPanel() {
               disabled={busy !== null}
               onClick={() => void pullFromGithub()}
             >
-              <IcDownload size={13} />
+              <ActionIcon.PullFromGitHub size={13} />
               {busy === 'pull' ? 'Pulling…' : 'Pull code from GitHub'}
             </button>
           </section>

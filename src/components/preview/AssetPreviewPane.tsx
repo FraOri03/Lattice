@@ -3,7 +3,8 @@ import { useStore } from '@/store/useStore'
 import { downloadAsset } from '@/lib/assets/AssetRegistry'
 import { formatBytes } from '@/lib/media'
 import { KIND_ICONS, KIND_LABEL } from '@/components/assetKinds'
-import { IcDownload, IcX } from '@/components/Icons'
+import { IcX } from '@/components/Icons'
+import { ActionIcon } from '@/components/ActionIcons'
 import { AssetPreview } from './previews'
 import { ViewingPeers } from '@/components/collab/EntityPresence'
 
@@ -30,9 +31,10 @@ export function AssetPreviewPane({ asset }: { asset: AssetDoc }) {
         <button
           className="icon-btn"
           title="Download original file"
+          aria-label="Download original file"
           onClick={() => void downloadAsset(asset)}
         >
-          <IcDownload size={14} />
+          <ActionIcon.DownloadLocal size={14} />
         </button>
         <button className="icon-btn" title="Close preview" onClick={closeAsset}>
           <IcX size={14} />

@@ -5,14 +5,20 @@ export const NOTE_EXTS = ['md', 'markdown', 'txt']
 
 const EXT_KINDS: Record<Exclude<AssetKind, 'file'>, string[]> = {
   pdf: ['pdf'],
-  image: ['png', 'jpg', 'jpeg', 'svg', 'webp', 'gif', 'avif', 'bmp'],
-  video: ['mp4', 'webm', 'mov', 'm4v'],
-  audio: ['mp3', 'wav', 'ogg', 'm4a', 'flac'],
-  model3d: ['glb', 'gltf', 'obj'],
+  // tiff routes as image but browsers can't decode it — the preview says so
+  image: ['png', 'jpg', 'jpeg', 'svg', 'webp', 'gif', 'avif', 'bmp', 'tif', 'tiff'],
+  video: ['mp4', 'webm', 'mov', 'm4v', 'ogv'],
+  audio: ['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac'],
+  model3d: ['glb', 'gltf', 'obj', 'stl', 'mtl'],
   document: ['doc', 'docx', 'odt', 'rtf'],
   spreadsheet: ['xls', 'xlsx', 'ods', 'csv', 'tsv'],
   presentation: ['ppt', 'pptx', 'odp'],
 }
+
+/** Image formats current browsers cannot decode natively. */
+export const UNDECODABLE_IMAGE_EXTS = ['tif', 'tiff']
+/** Video containers whose codecs are often unsupported in browsers. */
+export const CODEC_DEPENDENT_VIDEO_EXTS = ['mov', 'ogv']
 
 export function extOf(name: string): string {
   const m = name.match(/\.([^.]+)$/)
