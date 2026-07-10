@@ -199,6 +199,8 @@ interface AppState {
 
   addAsset: (asset: AssetDoc) => void
   renameAsset: (id: string, name: string) => void
+  /** Patch asset fields (e.g. bundle dependency maps after a relink). */
+  patchAsset: (id: string, patch: Partial<Omit<AssetDoc, 'id'>>) => void
   deleteAsset: (id: string) => void
   openAsset: (id: string) => void
   closeAsset: () => void
@@ -939,6 +941,13 @@ export const useStore = create<AppState>()(
           const asset = s.assets[id]
           if (!asset) return {}
           return { assets: { ...s.assets, [id]: { ...asset, name } } }
+        }),
+
+      patchAsset: (id, patch) =>
+        set((s) => {
+          const asset = s.assets[id]
+          if (!asset) return {}
+          return { assets: { ...s.assets, [id]: { ...asset, ...patch } } }
         }),
 
       deleteAsset: (id) => {

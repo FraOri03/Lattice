@@ -60,7 +60,7 @@ const AudioBody: FC<BodyProps> = ({ url }) => {
 }
 
 const Model3DBody: FC<BodyProps> = ({ asset, url }) => (
-  <ThreeDViewer url={url} ext={asset.ext} />
+  <ThreeDViewer url={url} ext={asset.ext} asset={asset} />
 )
 
 /** Office files & generic attachments: a tile that says what it is honestly. */

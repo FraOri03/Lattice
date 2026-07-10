@@ -3,19 +3,48 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js'
+import { MTLLoader } from 'three/addons/loaders/MTLLoader.js'
+import { STLLoader } from 'three/addons/loaders/STLLoader.js'
+import type { AssetDoc } from '@/types/model'
+import { getAssetUrl } from '@/lib/assets/AssetRegistry'
+import { lookupDependency, normalizeRelPath } from '@/lib/assets/AssetBundle'
+import { useStore } from '@/store/useStore'
+import { importFiles } from '@/lib/import/ImportService'
 
 /**
- * Loads and displays a GLB/GLTF/OBJ model with orbit controls.
- * Models are centered and scaled to fit; OBJ files (which carry no
- * materials without an .mtl) get a neutral standard material.
+ * Loads and displays a GLB/GLTF/OBJ(+MTL)/STL model with orbit controls.
+ *
+ * Multi-file assets (Phase 8): when the asset carries a bundle map,
+ * every relative reference (buffers, textures, materials) resolves
+ * through it via a three.js LoadingManager URL modifier. Anything the
+ * model requests that the bundle can't satisfy is COLLECTED and shown —
+ * with a "Relink missing files" picker — instead of a silently empty
+ * viewport.
  */
-export function ThreeDViewer({ url, ext }: { url?: string; ext: string }) {
+export function ThreeDViewer({
+  url,
+  ext,
+  asset,
+}: {
+  url?: string
+  ext: string
+  asset?: AssetDoc
+}) {
   const hostRef = useRef<HTMLDivElement>(null)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [missing, setMissing] = useState<string[]>([])
+  const [reloadSeq, setReloadSeq] = useState(0)
+  const relinkInput = useRef<HTMLInputElement>(null)
+  const patchAsset = useStore((s) => s.patchAsset)
+  // live bundle (relink updates it without unmounting)
+  const liveBundle = useStore((s) =>
+    asset ? s.assets[asset.id]?.bundle : undefined,
+  )
 
   useEffect(() => {
     if (!url) return
     setStatus('loading')
+    setMissing([])
     const host = hostRef.current!
     let disposed = false
 
@@ -45,7 +74,6 @@ export function ThreeDViewer({ url, ext }: { url?: string; ext: string }) {
       if (disposed) return
       const box = new THREE.Box3().setFromObject(obj)
       if (box.isEmpty()) {
-        // parser produced no geometry (corrupt or non-model file)
         setStatus('error')
         return
       }
@@ -59,31 +87,110 @@ export function ThreeDViewer({ url, ext }: { url?: string; ext: string }) {
       scene.add(obj)
       setStatus('ready')
     }
+
+    const missingPaths = new Set<string>()
+    const reportMissing = () => {
+      if (!disposed && missingPaths.size) setMissing([...missingPaths].sort())
+    }
     const onError = () => {
-      if (!disposed) setStatus('error')
+      if (!disposed) {
+        setStatus('error')
+        reportMissing()
+      }
     }
 
-    if (ext === 'obj') {
-      new OBJLoader().load(
-        url,
-        (obj) => {
-          obj.traverse((child) => {
-            if ((child as THREE.Mesh).isMesh) {
-              ;(child as THREE.Mesh).material = new THREE.MeshStandardMaterial({
-                color: 0x9aa2ad,
-                metalness: 0.2,
-                roughness: 0.55,
-              })
-            }
-          })
+    let cancelled = false
+    const load = async () => {
+      // pre-resolve every bundle dependency to a blob: URL — the
+      // LoadingManager URL modifier is synchronous
+      const resolved = new Map<string, string>()
+      const bundle = liveBundle
+      if (bundle) {
+        for (const [path, id] of Object.entries(bundle.dependencies)) {
+          const depUrl = await getAssetUrl(id)
+          if (depUrl) resolved.set(path, depUrl)
+        }
+      }
+      if (cancelled || disposed) return
+
+      const manager = new THREE.LoadingManager()
+      manager.setURLModifier((requested) => {
+        if (requested === url || requested.startsWith('blob:') || requested.startsWith('data:'))
+          return requested
+        const norm = normalizeRelPath(requested.replace(/^blob:[^/]*\//, ''))
+        const hit =
+          resolved.get(norm) ??
+          resolved.get(norm.split('/').pop() ?? norm) ??
+          (bundle ? undefined : undefined)
+        if (hit) return hit
+        // basename fallback across all resolved deps
+        const base = norm.split('/').pop() ?? norm
+        for (const [p, u] of resolved) {
+          if ((p.split('/').pop() ?? p) === base) return u
+        }
+        missingPaths.add(norm)
+        return requested
+      })
+      manager.onLoad = reportMissing
+      manager.onError = () => reportMissing()
+
+      if (ext === 'obj') {
+        const finishObj = (obj: THREE.Object3D, hasMaterials: boolean) => {
+          if (!hasMaterials) {
+            obj.traverse((child) => {
+              if ((child as THREE.Mesh).isMesh) {
+                ;(child as THREE.Mesh).material = new THREE.MeshStandardMaterial({
+                  color: 0x9aa2ad,
+                  metalness: 0.2,
+                  roughness: 0.55,
+                })
+              }
+            })
+          }
           fitAndAdd(obj)
-        },
-        undefined,
-        onError,
-      )
-    } else {
-      new GLTFLoader().load(url, (gltf) => fitAndAdd(gltf.scene), undefined, onError)
+        }
+        const mtlId = bundle ? lookupDependency(bundle, findMtlKey(bundle)) : undefined
+        const mtlUrl = mtlId ? await getAssetUrl(mtlId) : undefined
+        if (mtlUrl) {
+          new MTLLoader(manager).load(
+            mtlUrl,
+            (materials) => {
+              materials.preload()
+              new OBJLoader(manager)
+                .setMaterials(materials)
+                .load(url, (obj) => finishObj(obj, true), undefined, onError)
+            },
+            undefined,
+            // broken MTL: still show the geometry with a neutral material
+            () =>
+              new OBJLoader(manager).load(
+                url,
+                (obj) => finishObj(obj, false),
+                undefined,
+                onError,
+              ),
+          )
+        } else {
+          new OBJLoader(manager).load(url, (obj) => finishObj(obj, false), undefined, onError)
+        }
+      } else if (ext === 'stl') {
+        new STLLoader(manager).load(
+          url,
+          (geometry) => {
+            const mesh = new THREE.Mesh(
+              geometry,
+              new THREE.MeshStandardMaterial({ color: 0x9aa2ad, metalness: 0.25, roughness: 0.5 }),
+            )
+            fitAndAdd(mesh)
+          },
+          undefined,
+          onError,
+        )
+      } else {
+        new GLTFLoader(manager).load(url, (gltf) => fitAndAdd(gltf.scene), undefined, onError)
+      }
     }
+    void load()
 
     let raf = 0
     const loop = () => {
@@ -104,6 +211,7 @@ export function ThreeDViewer({ url, ext }: { url?: string; ext: string }) {
 
     return () => {
       disposed = true
+      cancelled = true
       cancelAnimationFrame(raf)
       ro.disconnect()
       controls.dispose()
@@ -118,23 +226,78 @@ export function ThreeDViewer({ url, ext }: { url?: string; ext: string }) {
       renderer.dispose()
       renderer.domElement.remove()
     }
-  }, [url, ext])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [url, ext, reloadSeq, liveBundle])
+
+  /** Import picked files as new dependencies and reload the model. */
+  const relink = async (files: FileList | null) => {
+    if (!asset || !files?.length) return
+    const { depKeyFor } = await import('@/lib/assets/AssetBundle')
+    const outcomes = await importFiles(Array.from(files))
+    const additions: Record<string, string> = {}
+    let i = 0
+    for (const f of Array.from(files)) {
+      const outcome = outcomes[i++]
+      if (outcome?.kind === 'asset') additions[depKeyFor(f)] = outcome.asset.id
+    }
+    patchAsset(asset.id, {
+      bundle: {
+        dependencies: { ...(liveBundle?.dependencies ?? {}), ...additions },
+      },
+    })
+    setReloadSeq((n) => n + 1)
+  }
+
+  const showDiagnostics = missing.length > 0 && (ext === 'gltf' || ext === 'obj')
 
   return (
     <div className="relative h-full w-full">
       <div ref={hostRef} className="nodrag nowheel h-full w-full overflow-hidden [&>canvas]:block" />
-      {status !== 'ready' && (
+      {status !== 'ready' && !showDiagnostics && (
         <div className="placeholder absolute inset-0">
-          {status === 'loading'
-            ? 'Loading model…'
-            : 'Could not load this model. Single-file GLB works best; .gltf with external buffers is not supported yet.'}
+          {status === 'loading' ? 'Loading model…' : 'Could not load this model.'}
         </div>
       )}
-      {status === 'ready' && (
+      {showDiagnostics && (
+        <div
+          className="absolute inset-x-2 bottom-2 rounded-lg border border-[#ffa629]/50 bg-panel/95 p-2 text-[11px] shadow-lg"
+          role="alert"
+        >
+          <p className="mb-1 font-semibold">
+            {status === 'error' ? 'Model could not load — ' : ''}missing companion file
+            {missing.length > 1 ? 's' : ''}:
+          </p>
+          <p className="mb-1.5 font-mono text-[10px] break-all text-muted">
+            {missing.slice(0, 4).join(' · ')}
+            {missing.length > 4 ? ` +${missing.length - 4} more` : ''}
+          </p>
+          {asset && (
+            <button className="btn" onClick={() => relinkInput.current?.click()}>
+              Relink missing files…
+            </button>
+          )}
+          <input
+            ref={relinkInput}
+            type="file"
+            multiple
+            hidden
+            onChange={(e) => {
+              void relink(e.target.files)
+              e.target.value = ''
+            }}
+          />
+        </div>
+      )}
+      {status === 'ready' && !showDiagnostics && (
         <span className="pointer-events-none absolute right-2 bottom-1.5 text-[10px] text-muted">
           drag to orbit · scroll to zoom
         </span>
       )}
     </div>
   )
+}
+
+/** First .mtl key inside a bundle map ('' when none). */
+function findMtlKey(bundle: { dependencies: Record<string, string> }): string {
+  return Object.keys(bundle.dependencies).find((k) => k.endsWith('.mtl')) ?? ''
 }

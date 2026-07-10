@@ -119,6 +119,17 @@ export type AssetKind =
   | 'file' // anything else, kept as an attachment
 
 /**
+ * Multi-file asset bundle (Phase 8): a main file (.gltf, .obj) plus the
+ * companion files it references by RELATIVE path (buffers, materials,
+ * textures). Dependencies are regular assets; the map lets viewers
+ * resolve `textures/wood.png` to the right stored blob.
+ */
+export interface AssetBundleInfo {
+  /** normalized relative path (as referenced by the main file) → asset id */
+  dependencies: Record<string, string>
+}
+
+/**
  * An imported file. Metadata lives in the vault store; the binary lives in
  * the StorageProvider (IndexedDB today, File System Access API later).
  * assetPath/importPath are the file's virtual locations inside the vault —
@@ -136,6 +147,8 @@ export interface AssetDoc {
   assetPath: string // e.g. assets/asset_x1y2.pdf
   importPath: string // e.g. imports/report.pdf
   projectId?: string
+  /** companion files for multi-file formats (GLTF+BIN+textures, OBJ+MTL) */
+  bundle?: AssetBundleInfo
 }
 
 /* ---------------- rich documents ---------------- */

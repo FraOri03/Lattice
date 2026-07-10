@@ -32,6 +32,15 @@ export const env = {
   realtimeRoomsUrl:
     (import.meta.env.VITE_REALTIME_ROOMS_URL as string | undefined) ||
     '/api/realtime/rooms',
+  /**
+   * Remote conversion worker (Phase 8) for legacy/complex formats
+   * (DOC, PPT, high-fidelity office). Empty = disabled, and the UI says
+   * so honestly. The worker runs OUTSIDE this app (e.g. headless
+   * LibreOffice behind an authenticated HTTP endpoint) — a native
+   * converter is never bundled into the frontend.
+   */
+  conversionApiUrl:
+    (import.meta.env.VITE_CONVERSION_API_URL as string | undefined) ?? '',
 } as const
 
 /** True when real Google OAuth is configured (otherwise the mock auth provider is used). */
@@ -42,3 +51,6 @@ export const hasGithubOAuth = env.githubClientId.length > 0
 
 /** True when a production realtime backend is configured for this build. */
 export const hasRealtimeBackend = env.realtimeBackend === 'liveblocks'
+
+/** True when a remote conversion worker is configured for this build. */
+export const hasConversionBackend = env.conversionApiUrl.length > 0

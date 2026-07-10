@@ -54,7 +54,7 @@ export function AssetEmbedBlock({ node, selected, deleteNode }: NodeViewProps) {
     case 'model3d':
       body = (
         <div className="h-72 w-full">
-          <ThreeDViewer url={url} ext={asset.ext} />
+          <ThreeDViewer url={url} ext={asset.ext} asset={asset} />
         </div>
       )
       break
