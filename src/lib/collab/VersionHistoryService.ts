@@ -9,6 +9,7 @@ import { useCollabStore } from './collabStore'
 import { currentIdentity } from './CollaborationProvider'
 import { activityLog } from './ActivityLogService'
 import { collabHub } from './hub'
+import { yjsManager } from '@/lib/crdt/YjsManager'
 
 /**
  * VersionHistoryService — point-in-time snapshots for boards, rich
@@ -69,17 +70,25 @@ class VersionHistoryService {
       changeSummary,
       snapshotRef: refFor(nid('snap')),
     }
-    await storage.putDocument(entry.snapshotRef, {
+    const payload: SnapshotPayload = {
       targetType,
       data: captured.data,
       title: captured.title,
-    } satisfies SnapshotPayload)
+    }
+    await storage.putDocument(entry.snapshotRef, payload)
+    // durability (Phase 8): mirror the body into the project's collab
+    // CRDT doc so versions are restorable from OTHER devices too, not
+    // just indexed remotely with the payload stranded here
+    this.mirrorPayload(projectId, entry.snapshotRef, payload)
 
     const s = useCollabStore.getState()
     const forTarget = this.versionsForTarget(projectId, targetId)
     // cap history per target; drop (and clean up) the oldest
     const overflow = forTarget.slice(MAX_VERSIONS_PER_TARGET - 1)
-    for (const v of overflow) void storage.deleteDocument(v.snapshotRef)
+    for (const v of overflow) {
+      void storage.deleteDocument(v.snapshotRef)
+      this.dropMirroredPayload(projectId, v.snapshotRef)
+    }
     const overflowIds = new Set(overflow.map((v) => v.id))
     s.setVersions(projectId, [
       entry,
@@ -95,11 +104,51 @@ class VersionHistoryService {
     return entry
   }
 
-  /** Restore a snapshot over the current state (current state is snapshotted first). */
-  async restore(version: VersionEntry): Promise<boolean> {
-    const payload = (await storage.getDocument(version.snapshotRef)) as
+  /* ---------------- durable payloads (Phase 8) ---------------- */
+
+  /** Bodies ≤ 200 KB ride the collab CRDT doc (synced across devices). */
+  private mirrorPayload(projectId: string, ref: string, payload: SnapshotPayload): void {
+    try {
+      const json = JSON.stringify(payload)
+      if (json.length > 200_000) return // large bodies stay device-local
+      const room = yjsManager.room(projectId)
+      room.transactCollab(() => room.collab.getMap('versionBodies').set(ref, json))
+    } catch {
+      // mirroring is best-effort; the local snapshot always exists
+    }
+  }
+
+  private dropMirroredPayload(projectId: string, ref: string): void {
+    try {
+      const room = yjsManager.room(projectId)
+      room.transactCollab(() => room.collab.getMap('versionBodies').delete(ref))
+    } catch {
+      // best-effort
+    }
+  }
+
+  /** Local snapshot first; falls back to the CRDT-synced body. */
+  private async loadPayload(version: VersionEntry): Promise<SnapshotPayload | undefined> {
+    const local = (await storage.getDocument(version.snapshotRef)) as
       | SnapshotPayload
       | undefined
+    if (local) return local
+    try {
+      const room = yjsManager.room(version.projectId)
+      await room.loaded
+      const raw = room.collab.getMap('versionBodies').get(version.snapshotRef)
+      if (typeof raw !== 'string') return undefined
+      const payload = JSON.parse(raw) as SnapshotPayload
+      void storage.putDocument(version.snapshotRef, payload) // cache locally
+      return payload
+    } catch {
+      return undefined
+    }
+  }
+
+  /** Restore a snapshot over the current state (current state is snapshotted first). */
+  async restore(version: VersionEntry): Promise<boolean> {
+    const payload = await this.loadPayload(version)
     if (!payload) return false
 
     // safety net: capture what we are about to overwrite
@@ -131,6 +180,18 @@ class VersionHistoryService {
         s.persistCodeContent(version.targetId, String(payload.data))
         break
       }
+      case 'sheet': {
+        if (!s.sheetDocs[version.targetId] || !payload.data) return false
+        const { normalizeBody } = await import('@/lib/sheet/sheetModel')
+        s.persistSheetBody(version.targetId, normalizeBody(payload.data))
+        break
+      }
+      case 'present': {
+        if (!s.presentDocs[version.targetId] || !payload.data) return false
+        const { normalizePresentBody } = await import('@/lib/present/presentModel')
+        s.persistPresentBody(version.targetId, normalizePresentBody(payload.data))
+        break
+      }
       case 'project': {
         const meta = payload.data as { name: string; description: string; icon: string }
         s.updateProject(version.targetId, {
@@ -152,9 +213,7 @@ class VersionHistoryService {
 
   /** Materialize a snapshot as a NEW entity next to the original. */
   async duplicate(version: VersionEntry): Promise<boolean> {
-    const payload = (await storage.getDocument(version.snapshotRef)) as
-      | SnapshotPayload
-      | undefined
+    const payload = await this.loadPayload(version)
     if (!payload) return false
     const s = useStore.getState()
     switch (version.targetType) {
@@ -203,9 +262,7 @@ class VersionHistoryService {
    * board versions can still be compared line-by-line.
    */
   async textOf(version: VersionEntry): Promise<string | null> {
-    const payload = (await storage.getDocument(version.snapshotRef)) as
-      | SnapshotPayload
-      | undefined
+    const payload = await this.loadPayload(version)
     if (!payload) return null
     switch (payload.targetType) {
       case 'code':
@@ -222,6 +279,10 @@ class VersionHistoryService {
           .sort()
           .join('\n')
       }
+      case 'sheet':
+        return sheetInventory(payload.data)
+      case 'present':
+        return presentInventory(payload.data)
       case 'project':
         return JSON.stringify(payload.data, null, 2)
     }
@@ -251,6 +312,14 @@ class VersionHistoryService {
           )
           .sort()
           .join('\n')
+      }
+      case 'sheet': {
+        const body = await storage.getDocument(version.targetId)
+        return body ? sheetInventory(body) : ''
+      }
+      case 'present': {
+        const body = await storage.getDocument(version.targetId)
+        return body ? presentInventory(body) : ''
       }
       case 'project': {
         const p = s.projects[version.targetId]
@@ -284,6 +353,18 @@ class VersionHistoryService {
           title: `${meta.title}.${meta.extension}`,
         }
       }
+      case 'sheet': {
+        const meta = s.sheetDocs[targetId]
+        if (!meta) return null
+        const body = await storage.getDocument(targetId)
+        return { data: body ?? null, title: meta.title }
+      }
+      case 'present': {
+        const meta = s.presentDocs[targetId]
+        if (!meta) return null
+        const body = await storage.getDocument(targetId)
+        return { data: body ?? null, title: meta.title }
+      }
       case 'project': {
         const p = s.projects[targetId]
         return p
@@ -295,6 +376,47 @@ class VersionHistoryService {
       }
     }
   }
+}
+
+/**
+ * Stable line inventory of a workbook (one line per non-empty cell) —
+ * diffing two versions yields exactly the changed-cell summary.
+ */
+function sheetInventory(raw: unknown): string {
+  const body = raw as {
+    sheets?: { name?: string; cells?: Record<string, { v?: unknown; f?: string }> }[]
+  }
+  if (!Array.isArray(body?.sheets)) return ''
+  const lines: string[] = []
+  for (const sheet of body.sheets) {
+    for (const [key, cell] of Object.entries(sheet.cells ?? {})) {
+      const value = cell?.f ? `=${cell.f}` : String(cell?.v ?? '')
+      if (value !== '') lines.push(`${sheet.name ?? 'Sheet'}!${key}: ${value}`)
+    }
+  }
+  return lines.sort().join('\n')
+}
+
+/** Stable line inventory of a deck (slide + element text/geometry). */
+function presentInventory(raw: unknown): string {
+  const body = raw as {
+    slides?: {
+      elements?: { kind?: string; text?: string; x?: number; y?: number }[]
+      notes?: string
+    }[]
+  }
+  if (!Array.isArray(body?.slides)) return ''
+  return body.slides
+    .map((slide, i) => {
+      const els = (slide.elements ?? [])
+        .map(
+          (el) =>
+            `  ${el.kind ?? 'el'} @ ${Math.round(el.x ?? 0)},${Math.round(el.y ?? 0)}${el.text ? `: ${el.text.replace(/\n/g, ' ⏎ ')}` : ''}`,
+        )
+        .join('\n')
+      return `slide ${i + 1}\n${els}${slide.notes ? `\n  notes: ${slide.notes}` : ''}`
+    })
+    .join('\n')
 }
 
 export const versionHistory = new VersionHistoryService()

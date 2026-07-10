@@ -215,6 +215,16 @@ function EditorInner({
   useEffect(() => {
     if (!editor || editor.isDestroyed) return
     if (documentNeedsSeed(room, docId)) {
+      // preserve the pre-CRDT representation as a restorable version
+      void import('@/lib/collab/VersionHistoryService').then(({ versionHistory }) =>
+        versionHistory.create(
+          projectId,
+          'doc',
+          docId,
+          'Before CRDT migration',
+          'Automatic backup before the document became collaborative',
+        ),
+      )
       seedDocument(room, docId, (frag) =>
         prosemirrorJSONToYXmlFragment(editor.schema, initial, frag),
       )

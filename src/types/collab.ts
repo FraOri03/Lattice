@@ -274,7 +274,13 @@ export interface ActivityEvent {
 
 /* ---------------- version history ---------------- */
 
-export type VersionTargetType = 'board' | 'doc' | 'code' | 'project'
+export type VersionTargetType =
+  | 'board'
+  | 'doc'
+  | 'code'
+  | 'sheet'
+  | 'present'
+  | 'project'
 
 export interface VersionEntry {
   id: string

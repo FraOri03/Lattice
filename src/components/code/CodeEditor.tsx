@@ -138,6 +138,16 @@ function CollabCodeEditor({
     if (!model) return
     const room = yjsManager.room(projectId)
     if (ready !== null && codeNeedsSeed(room, codeId)) {
+      // preserve the pre-CRDT source as a restorable version
+      void import('@/lib/collab/VersionHistoryService').then(({ versionHistory }) =>
+        versionHistory.create(
+          projectId,
+          'code',
+          codeId,
+          'Before CRDT migration',
+          'Automatic backup before the file became collaborative',
+        ),
+      )
       seedCode(room, codeId, ready)
     }
     const yText = codeText(room, codeId)

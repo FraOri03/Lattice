@@ -314,6 +314,10 @@ function announceEdit(
       id,
     ),
   )
+  // 10-minute auto snapshots for actively edited targets (Phase 8)
+  void import('@/lib/collab/AutoSnapshot').then(({ autoSnapshot }) =>
+    autoSnapshot.markDirty(kind, id),
+  )
 }
 
 /** Current account id straight from storage (no collab-layer import cycle). */

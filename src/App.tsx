@@ -8,6 +8,7 @@ import { presenceService } from '@/lib/collab/PresenceService'
 import { realtimeBoardSync } from '@/lib/collab/RealtimeBoardSync'
 import { realtimeDocumentSync } from '@/lib/collab/RealtimeDocumentSync'
 import { notificationService } from '@/lib/collab/NotificationService'
+import { autoSnapshot } from '@/lib/collab/AutoSnapshot'
 import { membersService } from '@/lib/collab/MembersService'
 import { inviteService } from '@/lib/collab/InviteService'
 import { Sidebar } from '@/components/Sidebar'
@@ -68,7 +69,9 @@ function useCollaboration() {
     realtimeBoardSync.start()
     realtimeDocumentSync.start()
     notificationService.start()
+    autoSnapshot.start()
     return () => {
+      autoSnapshot.stop()
       notificationService.stop()
       realtimeDocumentSync.stop()
       realtimeBoardSync.stop()
