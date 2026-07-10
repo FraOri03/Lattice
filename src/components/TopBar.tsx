@@ -9,6 +9,7 @@ import type { ViewMode } from '@/types/model'
 import { ProfileMenu } from '@/components/account/ProfileMenu'
 import { PresenceAvatars } from '@/components/collab/PresenceAvatars'
 import { RealtimeStatusChip } from '@/components/collab/RealtimeStatusChip'
+import { NotificationCenter } from '@/components/collab/NotificationCenter'
 import {
   IcBoard,
   IcChevronRight,
@@ -197,6 +198,7 @@ function QuickCreate() {
  */
 function ContextBreadcrumb() {
   const project = useStore((s) => s.projects[s.activeProjectId])
+  const workspace = useStore((s) => s.workspaces[s.activeWorkspaceId])
   const viewMode = useStore((s) => s.viewMode)
   const board = useStore((s) => s.boards[s.activeBoardId])
   const renameBoard = useStore((s) => s.renameBoard)
@@ -224,6 +226,18 @@ function ContextBreadcrumb() {
 
   return (
     <div className="flex min-w-0 items-center gap-1 text-[12px]">
+      {workspace && (
+        <>
+          <span
+            className="hidden min-w-0 items-center gap-1 font-medium text-muted lg:flex"
+            title={`Workspace: ${workspace.name}`}
+          >
+            <span aria-hidden>{workspace.icon}</span>
+            <span className="max-w-24 truncate">{workspace.name}</span>
+          </span>
+          <IcChevronRight size={11} className="hidden flex-none text-muted lg:block" />
+        </>
+      )}
       {project && (
         <span className="flex min-w-0 items-center gap-1.5 font-medium text-muted" title={project.name}>
           <span aria-hidden>{project.icon}</span>
@@ -330,6 +344,7 @@ export function TopBar() {
 
       <PresenceAvatars />
       <RealtimeStatusChip />
+      <NotificationCenter />
       <button
         className="btn"
         onClick={() => setShareDialogOpen(true)}

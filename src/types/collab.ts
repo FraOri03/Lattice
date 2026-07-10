@@ -157,6 +157,8 @@ export interface CommentAnchor {
   y?: number
   /** 1-based line for code comments */
   line?: number
+  /** spreadsheet cell (Phase 8) */
+  cell?: { r: number; c: number; sheetName?: string }
 }
 
 export interface CommentReply {
@@ -189,6 +191,49 @@ export interface CommentThread {
   replies: CommentReply[]
   /** rectangle geometry when targetType === 'area' */
   area?: CommentArea
+  /* ---- Comments 2.0 (Phase 8) ---- */
+  /** member this thread is assigned to */
+  assigneeId?: string
+  assigneeName?: string
+  /** epoch ms due date */
+  dueAt?: number
+  /** emoji → user ids who reacted */
+  reactions?: Record<string, string[]>
+}
+
+/* ---------------- notifications (Phase 8) ---------------- */
+
+export type NotificationType =
+  | 'mention'
+  | 'reply'
+  | 'assignment'
+  | 'invite'
+  | 'comment-resolved'
+  | 'version-restored'
+  | 'drive-failure'
+  | 'realtime-failure'
+  | 'github-sync'
+  | 'conversion'
+
+/**
+ * A local, per-user notification. Derived from synced state (comments,
+ * invites, sync status) on THIS device — read state never leaves it.
+ * `link` deep-links to the target: threads focus (and area comments
+ * zoom), code lines reveal, sheet cells select.
+ */
+export interface AppNotification {
+  id: string
+  projectId: string
+  type: NotificationType
+  title: string
+  body: string
+  createdAt: number
+  read: boolean
+  link?: {
+    kind: 'thread' | 'doc' | 'sheet' | 'code' | 'board'
+    id: string
+    threadId?: string
+  }
 }
 
 /* ---------------- activity log ---------------- */

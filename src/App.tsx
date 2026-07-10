@@ -7,6 +7,7 @@ import { yjsManager } from '@/lib/crdt/YjsManager'
 import { presenceService } from '@/lib/collab/PresenceService'
 import { realtimeBoardSync } from '@/lib/collab/RealtimeBoardSync'
 import { realtimeDocumentSync } from '@/lib/collab/RealtimeDocumentSync'
+import { notificationService } from '@/lib/collab/NotificationService'
 import { membersService } from '@/lib/collab/MembersService'
 import { inviteService } from '@/lib/collab/InviteService'
 import { Sidebar } from '@/components/Sidebar'
@@ -66,7 +67,9 @@ function useCollaboration() {
     presenceService.start()
     realtimeBoardSync.start()
     realtimeDocumentSync.start()
+    notificationService.start()
     return () => {
+      notificationService.stop()
       realtimeDocumentSync.stop()
       realtimeBoardSync.stop()
       presenceService.stop()

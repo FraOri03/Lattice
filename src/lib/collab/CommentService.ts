@@ -251,6 +251,50 @@ class CommentService {
     return true
   }
 
+  /* ---------------- Comments 2.0 (Phase 8) ---------------- */
+
+  /** Assign/unassign a thread to a member (any commenter may triage). */
+  setAssignee(
+    projectId: string,
+    threadId: string,
+    assignee: { userId: string; name: string } | null,
+  ): boolean {
+    if (!can(membersService.effectiveRole(projectId), 'comments.add')) return false
+    this.patch(projectId, threadId, (t) => ({
+      ...t,
+      assigneeId: assignee?.userId,
+      assigneeName: assignee?.name,
+      updatedAt: Date.now(),
+    }))
+    return true
+  }
+
+  setDueDate(projectId: string, threadId: string, dueAt: number | null): boolean {
+    if (!can(membersService.effectiveRole(projectId), 'comments.add')) return false
+    this.patch(projectId, threadId, (t) => ({
+      ...t,
+      dueAt: dueAt ?? undefined,
+      updatedAt: Date.now(),
+    }))
+    return true
+  }
+
+  /** Toggle the current user's emoji reaction on a thread. */
+  toggleReaction(projectId: string, threadId: string, emoji: string): boolean {
+    if (!can(membersService.effectiveRole(projectId), 'comments.add')) return false
+    const me = currentIdentity().userId
+    this.patch(projectId, threadId, (t) => {
+      const reactions = { ...(t.reactions ?? {}) }
+      const users = new Set(reactions[emoji] ?? [])
+      if (users.has(me)) users.delete(me)
+      else users.add(me)
+      if (users.size) reactions[emoji] = [...users]
+      else delete reactions[emoji]
+      return { ...t, reactions, updatedAt: Date.now() }
+    })
+    return true
+  }
+
   remove(projectId: string, threadId: string): boolean {
     const thread = this.threadsOf(projectId).find((t) => t.id === threadId)
     if (!thread) return false

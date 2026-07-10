@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type {
   ActivityEvent,
+  AppNotification,
   CollabRole,
   CommentThread,
   FileLock,
@@ -33,6 +34,9 @@ interface CollabState {
   activity: Record<string, ActivityEvent[]>
   versions: Record<string, VersionEntry[]>
 
+  /* persisted, per device (never synced — read state is personal) */
+  notifications: AppNotification[]
+
   /* ephemeral */
   peers: Record<string, PresencePeer> // sessionId → peer
   locks: Record<string, FileLock> // fileId → lock
@@ -44,6 +48,11 @@ interface CollabState {
   focusedThreadId: string | null
   /** board comment-placement mode (click canvas to drop a pin) */
   commentMode: boolean
+
+  pushNotification: (n: AppNotification) => void
+  markNotificationRead: (id: string) => void
+  markAllNotificationsRead: () => void
+  clearNotifications: () => void
 
   setMembers: (projectId: string, members: ProjectMember[]) => void
   setInvites: (projectId: string, invites: ProjectInvite[]) => void
@@ -72,6 +81,7 @@ export const useCollabStore = create<CollabState>()(
       comments: {},
       activity: {},
       versions: {},
+      notifications: [],
 
       peers: {},
       locks: {},
@@ -80,6 +90,20 @@ export const useCollabStore = create<CollabState>()(
       commentFilter: 'open',
       focusedThreadId: null,
       commentMode: false,
+
+      pushNotification: (n) =>
+        set((s) => ({ notifications: [n, ...s.notifications].slice(0, 100) })),
+      markNotificationRead: (id) =>
+        set((s) => ({
+          notifications: s.notifications.map((n) =>
+            n.id === id ? { ...n, read: true } : n,
+          ),
+        })),
+      markAllNotificationsRead: () =>
+        set((s) => ({
+          notifications: s.notifications.map((n) => (n.read ? n : { ...n, read: true })),
+        })),
+      clearNotifications: () => set({ notifications: [] }),
 
       setMembers: (projectId, list) =>
         set((s) => ({ members: { ...s.members, [projectId]: list } })),
@@ -133,6 +157,7 @@ export const useCollabStore = create<CollabState>()(
         comments: s.comments,
         activity: s.activity,
         versions: s.versions,
+        notifications: s.notifications,
       }),
     },
   ),

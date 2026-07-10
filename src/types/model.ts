@@ -60,6 +60,35 @@ export interface ProjectSettings {
   [key: string]: unknown
 }
 
+/* ---------------- workspaces (Phase 8) ---------------- */
+
+/**
+ * A workspace is the organizational layer ABOVE projects:
+ * Workspace → Projects → boards/docs/sheets/presentations/code/assets.
+ * Projects link to workspaces through workspace.projectIds; the project
+ * records themselves stay unchanged. The information architecture stops
+ * here on purpose — no deeper nesting.
+ *
+ * Enforcement note: access control is enforced per PROJECT (realtime
+ * room ACLs); workspace membership is organizational grouping.
+ */
+export interface Workspace {
+  id: string
+  name: string
+  /** single emoji/short glyph shown in the switcher */
+  icon: string
+  color: CardColor
+  ownerId: string
+  memberIds: string[]
+  projectIds: string[]
+  settings: Record<string, unknown>
+  archived: boolean
+  /** the automatically created personal workspace (undeletable) */
+  personal: boolean
+  createdAt: number
+  updatedAt: number
+}
+
 /* ---------------- account (Phase 6) ---------------- */
 
 export type AuthProviderId = 'google' | 'github' | 'mock'

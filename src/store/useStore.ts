@@ -26,6 +26,7 @@ import type {
   VaultExport,
   ViewMode,
   WebEmbed,
+  Workspace,
 } from '@/types/model'
 import { nid } from '@/lib/id'
 import { blobToDataUrl } from '@/lib/media'
@@ -114,6 +115,9 @@ function dropRecent(recents: RecentEntry[], kind: RecentEntry['kind'], id: strin
 }
 
 interface AppState {
+  /** workspaces — the layer above projects (Phase 8) */
+  workspaces: Record<string, Workspace>
+  activeWorkspaceId: string
   projects: Record<string, Project>
   activeProjectId: string
   /** recently active project ids, newest first */
@@ -152,6 +156,13 @@ interface AppState {
   setSidebarFilter: (f: SidebarFilter) => void
   setViewMode: (m: ViewMode) => void
   setTheme: (t: Theme) => void
+
+  createWorkspace: (partial?: Partial<Workspace>) => string
+  updateWorkspace: (id: string, patch: Partial<Omit<Workspace, 'id'>>) => void
+  /** Safe deletion: its projects move to the personal workspace. */
+  deleteWorkspace: (id: string) => void
+  setActiveWorkspace: (id: string) => void
+  moveProjectToWorkspace: (projectId: string, workspaceId: string) => void
 
   createProject: (partial?: Partial<Project>) => string
   updateProject: (id: string, patch: Partial<Omit<Project, 'id'>>) => void
@@ -305,6 +316,37 @@ function announceEdit(
   )
 }
 
+/** Current account id straight from storage (no collab-layer import cycle). */
+function accountIdFromStorage(): string {
+  try {
+    const raw = localStorage.getItem('lattice-account')
+    return raw ? ((JSON.parse(raw) as { id?: string }).id ?? 'local') : 'local'
+  } catch {
+    return 'local'
+  }
+}
+
+export const PERSONAL_WORKSPACE_ID = 'ws_personal'
+
+/** The personal workspace every vault starts with (undeletable). */
+export function makePersonalWorkspace(projectIds: string[]): Workspace {
+  const now = Date.now()
+  return {
+    id: PERSONAL_WORKSPACE_ID,
+    name: 'Personal',
+    icon: '🏠',
+    color: 'blue',
+    ownerId: accountIdFromStorage(),
+    memberIds: [],
+    projectIds,
+    settings: {},
+    archived: false,
+    personal: true,
+    createdAt: now,
+    updatedAt: now,
+  }
+}
+
 /** Stamp every entity of a legacy (pre-projects) vault with a project id. */
 function stampProject<T extends { projectId?: string }>(
   record: Record<string, T>,
@@ -321,6 +363,10 @@ function stampProject<T extends { projectId?: string }>(
 export const useStore = create<AppState>()(
   persist(
     (set, get) => ({
+      workspaces: {
+        [PERSONAL_WORKSPACE_ID]: makePersonalWorkspace(Object.keys(seedProjects)),
+      },
+      activeWorkspaceId: PERSONAL_WORKSPACE_ID,
       projects: seedProjects,
       activeProjectId: DEFAULT_PROJECT_ID,
       recentProjectIds: [DEFAULT_PROJECT_ID],
@@ -353,6 +399,109 @@ export const useStore = create<AppState>()(
       setViewMode: (viewMode) => set({ viewMode }),
       setTheme: (theme) => set({ theme }),
 
+      /* ---------------- workspaces (Phase 8) ---------------- */
+
+      createWorkspace: (partial = {}) => {
+        const id = nid('ws')
+        const now = Date.now()
+        const ws: Workspace = {
+          id,
+          name: 'New workspace',
+          icon: '🏢',
+          color: 'purple',
+          ownerId: accountIdFromStorage(),
+          memberIds: [],
+          projectIds: [],
+          settings: {},
+          archived: false,
+          personal: false,
+          createdAt: now,
+          updatedAt: now,
+          ...partial,
+        }
+        set((s) => ({ workspaces: { ...s.workspaces, [id]: ws } }))
+        return id
+      },
+
+      updateWorkspace: (id, patch) =>
+        set((s) => {
+          const ws = s.workspaces[id]
+          if (!ws) return {}
+          return {
+            workspaces: {
+              ...s.workspaces,
+              [id]: { ...ws, ...patch, updatedAt: Date.now() },
+            },
+          }
+        }),
+
+      deleteWorkspace: (id) => {
+        const s = get()
+        const ws = s.workspaces[id]
+        if (!ws || ws.personal) return // the personal workspace stays
+        const personal = s.workspaces[PERSONAL_WORKSPACE_ID]
+        const workspaces = { ...s.workspaces }
+        delete workspaces[id]
+        // safe deletion: projects survive, adopted by the personal workspace
+        if (personal) {
+          workspaces[PERSONAL_WORKSPACE_ID] = {
+            ...personal,
+            projectIds: [...new Set([...personal.projectIds, ...ws.projectIds])],
+            updatedAt: Date.now(),
+          }
+        }
+        set({
+          workspaces,
+          activeWorkspaceId:
+            s.activeWorkspaceId === id ? PERSONAL_WORKSPACE_ID : s.activeWorkspaceId,
+        })
+      },
+
+      setActiveWorkspace: (id) => {
+        const s = get()
+        const ws = s.workspaces[id]
+        if (!ws || s.activeWorkspaceId === id) return
+        set({ activeWorkspaceId: id })
+        const target =
+          ws.projectIds.map((p) => s.projects[p]).find((p) => p && !p.archived) ??
+          ws.projectIds.map((p) => s.projects[p]).find(Boolean)
+        if (target) {
+          get().setActiveProject(target.id)
+        } else {
+          // a workspace is never empty for long: give it a first project
+          const pid = get().createProject({ name: `${ws.name} project` })
+          get().setActiveProject(pid)
+        }
+      },
+
+      moveProjectToWorkspace: (projectId, workspaceId) => {
+        const s = get()
+        if (!s.projects[projectId] || !s.workspaces[workspaceId]) return
+        const workspaces = Object.fromEntries(
+          Object.entries(s.workspaces).map(([wid, ws]) => {
+            const has = ws.projectIds.includes(projectId)
+            const should = wid === workspaceId
+            if (has === should) return [wid, ws]
+            return [
+              wid,
+              {
+                ...ws,
+                projectIds: should
+                  ? [...ws.projectIds, projectId]
+                  : ws.projectIds.filter((p) => p !== projectId),
+                updatedAt: Date.now(),
+              },
+            ]
+          }),
+        )
+        set({
+          workspaces,
+          // the visible context follows the moved active project
+          activeWorkspaceId:
+            s.activeProjectId === projectId ? workspaceId : s.activeWorkspaceId,
+        })
+      },
+
       /* ---------------- projects ---------------- */
 
       createProject: (partial = {}) => {
@@ -381,11 +530,25 @@ export const useStore = create<AppState>()(
           edges: [],
           projectId: id,
         }
-        set((s) => ({
-          projects: { ...s.projects, [id]: project },
-          boards: { ...s.boards, [boardId]: board },
-          boardOrder: [...s.boardOrder, boardId],
-        }))
+        set((s) => {
+          const ws = s.workspaces[s.activeWorkspaceId]
+          return {
+            projects: { ...s.projects, [id]: project },
+            boards: { ...s.boards, [boardId]: board },
+            boardOrder: [...s.boardOrder, boardId],
+            // every project belongs to the workspace it was created in
+            workspaces: ws
+              ? {
+                  ...s.workspaces,
+                  [ws.id]: {
+                    ...ws,
+                    projectIds: [...ws.projectIds, id],
+                    updatedAt: Date.now(),
+                  },
+                }
+              : s.workspaces,
+          }
+        })
         void import('@/lib/collab/ActivityLogService').then(({ activityLog }) =>
           activityLog.log(id, 'project.created', `Project “${project.name}” created`),
         )
@@ -449,7 +612,23 @@ export const useStore = create<AppState>()(
             boardOrder.find((b) => boards[b]?.projectId === nextActiveProject) ??
             boardOrder[0]
         }
+        // unlink the deleted project from every workspace
+        const workspaces = Object.fromEntries(
+          Object.entries(s.workspaces).map(([wid, ws]) =>
+            ws.projectIds.includes(id)
+              ? [
+                  wid,
+                  {
+                    ...ws,
+                    projectIds: ws.projectIds.filter((p) => p !== id),
+                    updatedAt: Date.now(),
+                  },
+                ]
+              : [wid, ws],
+          ),
+        )
         set({
+          workspaces,
           projects,
           activeProjectId: nextActiveProject,
           recentProjectIds: s.recentProjectIds.filter((p) => p !== id),
@@ -492,7 +671,12 @@ export const useStore = create<AppState>()(
           }
           boardOrder = [...boardOrder, activeBoardId]
         }
+        // the visible context (workspace → project) always matches
+        const containing = Object.values(s.workspaces).find((ws) =>
+          ws.projectIds.includes(id),
+        )
         set({
+          activeWorkspaceId: containing?.id ?? s.activeWorkspaceId,
           activeProjectId: id,
           recentProjectIds: [id, ...s.recentProjectIds.filter((p) => p !== id)].slice(0, 8),
           boards,
@@ -1343,6 +1527,10 @@ export const useStore = create<AppState>()(
             ? data.activeProjectId
             : Object.keys(projects)[0]
         set({
+          workspaces: {
+            [PERSONAL_WORKSPACE_ID]: makePersonalWorkspace(Object.keys(projects)),
+          },
+          activeWorkspaceId: PERSONAL_WORKSPACE_ID,
           projects,
           activeProjectId: fallbackProject,
           recentProjectIds: [fallbackProject],
@@ -1368,7 +1556,7 @@ export const useStore = create<AppState>()(
     }),
     {
       name: 'lattice-vault-v1',
-      version: 1,
+      version: 2,
       migrate: (persisted, version) => {
         // v0 → v1: introduce projects; the default project adopts everything
         const s = persisted as Partial<AppState>
@@ -1386,9 +1574,22 @@ export const useStore = create<AppState>()(
           if (s.codeDocs) s.codeDocs = stampProject(s.codeDocs, project.id)
           if (s.sheetDocs) s.sheetDocs = stampProject(s.sheetDocs, project.id)
         }
+        // v1 → v2 (Phase 8): the personal workspace adopts every project
+        if (version < 2) {
+          s.presentDocs = s.presentDocs ?? {}
+          s.activePresentId = s.activePresentId ?? null
+          s.workspaces = {
+            [PERSONAL_WORKSPACE_ID]: makePersonalWorkspace(
+              Object.keys(s.projects ?? {}),
+            ),
+          }
+          s.activeWorkspaceId = PERSONAL_WORKSPACE_ID
+        }
         return s as AppState
       },
       partialize: (s) => ({
+        workspaces: s.workspaces,
+        activeWorkspaceId: s.activeWorkspaceId,
         projects: s.projects,
         activeProjectId: s.activeProjectId,
         recentProjectIds: s.recentProjectIds,
