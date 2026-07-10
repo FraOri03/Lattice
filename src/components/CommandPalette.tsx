@@ -150,6 +150,7 @@ function usePaletteItems(query: string, close: () => void): PaletteItem[] {
   const s = useStore()
   const syncProvider = useSyncStore((st) => st.provider)
   const setGithubDialogOpen = useUiStore((st) => st.setGithubDialogOpen)
+  const setDriveDialogOpen = useUiStore((st) => st.setDriveDialogOpen)
 
   return useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -174,6 +175,7 @@ function usePaletteItems(query: string, close: () => void): PaletteItem[] {
         () => s.setTheme(s.theme === 'dark' ? 'light' : 'dark'),
       ],
       ['GitHub — sync code', <IcGithub size={14} />, () => setGithubDialogOpen(true)],
+      ['Google Drive — connect & diagnostics', <IcCloud size={14} />, () => setDriveDialogOpen(true)],
     ]
     if (syncProvider === 'google-drive') {
       actions.push(['Sync now (Google Drive)', <IcCloud size={14} />, () => void syncEngine.syncNow()])
@@ -296,5 +298,5 @@ function usePaletteItems(query: string, close: () => void): PaletteItem[] {
     }
 
     return items.slice(0, 30)
-  }, [query, s, syncProvider, setGithubDialogOpen, close])
+  }, [query, s, syncProvider, setGithubDialogOpen, setDriveDialogOpen, close])
 }

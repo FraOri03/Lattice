@@ -11,6 +11,7 @@ import { DocumentView } from '@/components/DocumentView'
 import { BoardCanvas } from '@/components/board/BoardCanvas'
 import { LoginScreen } from '@/components/account/LoginScreen'
 import { GithubDialog } from '@/components/github/GithubDialog'
+import { DriveDialog } from '@/components/account/DriveDialog'
 import { CommandPalette } from '@/components/CommandPalette'
 import {
   CodeModeWorkspace,
@@ -79,6 +80,7 @@ function Workspace() {
         </div>
       </div>
       <GithubDialog />
+      <DriveDialog />
       <CommandPalette />
       <ImportProgressToast />
     </div>

@@ -37,6 +37,11 @@ export interface DriveFileMeta {
   appProperties?: Record<string, string>
 }
 
+export interface DriveAbout {
+  user?: { displayName?: string; emailAddress?: string }
+  storageQuota?: { limit?: string; usage?: string }
+}
+
 export type TokenSupplier = () => Promise<string | null>
 
 function q(value: string): string {
@@ -47,9 +52,59 @@ export class DriveApiError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    /** Google error reason, e.g. "accessNotConfigured", "rateLimitExceeded" */
+    readonly reason: string = '',
   ) {
     super(message)
   }
+}
+
+/** Pull status + reason out of a Drive error response body. */
+function parseDriveError(status: number, body: string): DriveApiError {
+  try {
+    const data = JSON.parse(body) as {
+      error?: {
+        message?: string
+        status?: string
+        errors?: { reason?: string; message?: string }[]
+      }
+    }
+    const reason = data.error?.errors?.[0]?.reason ?? data.error?.status ?? ''
+    const message = data.error?.message ?? body.slice(0, 300)
+    return new DriveApiError(status, `Drive API ${status}: ${message}`, reason)
+  } catch {
+    return new DriveApiError(status, `Drive API ${status}: ${body.slice(0, 300)}`)
+  }
+}
+
+/** Human-readable, actionable message for a failed Drive/auth operation. */
+export function describeDriveError(err: unknown): string {
+  if (err instanceof TypeError) {
+    // fetch() network failure — DNS, blocked request, dropped connection
+    return 'Could not reach Google Drive (network error) — changes stay local and sync will resume once Drive is reachable.'
+  }
+  if (!(err instanceof DriveApiError)) {
+    return err instanceof Error ? err.message : 'Google Drive request failed'
+  }
+  if (err.status === 401) {
+    return 'Google Drive session expired — use "Reconnect Drive" to sign in again.'
+  }
+  if (err.status === 429 || /ratelimitexceeded|userratelimitexceeded/i.test(err.reason)) {
+    return 'Google Drive rate limit reached — sync will retry automatically; your data stays safe locally.'
+  }
+  if (err.status === 403) {
+    if (/accessnotconfigured|service_disabled/i.test(err.reason)) {
+      return 'The Google Drive API is disabled for this OAuth client’s Google Cloud project. Enable "Google Drive API" under APIs & Services → Library, then retry.'
+    }
+    if (/insufficient|access_token_scope_insufficient/i.test(err.reason)) {
+      return 'The Google token is missing the Drive permission (drive.file scope). Use "Reconnect Drive" and grant access to files created with this app.'
+    }
+    if (/dailylimitexceeded|quota/i.test(err.reason)) {
+      return 'Google Drive API quota exceeded for this project — try again later.'
+    }
+    return `Google Drive refused the request (403 ${err.reason || 'forbidden'}).`
+  }
+  return err.message
 }
 
 export class GoogleDriveStorageProvider implements StorageProvider {
@@ -71,9 +126,21 @@ export class GoogleDriveStorageProvider implements StorageProvider {
     const res = await fetch(url, { ...init, headers })
     if (!res.ok) {
       const body = await res.text().catch(() => '')
-      throw new DriveApiError(res.status, `Drive API ${res.status}: ${body.slice(0, 300)}`)
+      throw parseDriveError(res.status, body)
     }
     return res
+  }
+
+  /**
+   * Reachability probe: cheapest authenticated Drive call. Succeeds only
+   * when the token is valid, carries the Drive scope AND the Drive API is
+   * enabled for the OAuth client's project.
+   */
+  async about(): Promise<DriveAbout> {
+    const res = await this.request(
+      `${API}/about?fields=user(displayName,emailAddress),storageQuota(limit,usage)`,
+    )
+    return (await res.json()) as DriveAbout
   }
 
   /* ---------------- folders ---------------- */

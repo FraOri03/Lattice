@@ -66,7 +66,14 @@ export interface Account {
 
 /* ---------------- sync (Phase 6) ---------------- */
 
-export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'offline' | 'error' | 'disabled'
+export type SyncStatus =
+  | 'idle'
+  | 'connecting'
+  | 'syncing'
+  | 'synced'
+  | 'offline'
+  | 'error'
+  | 'disabled'
 
 export interface SyncConflict {
   /** entity kind + id, e.g. "doc:doc_x1" */
