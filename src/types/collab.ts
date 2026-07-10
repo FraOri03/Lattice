@@ -82,6 +82,19 @@ export interface PresencePeer {
   selection?: string[]
   /** entity the peer is actively editing right now */
   editing?: { kind: 'doc' | 'code' | 'sheet'; id: string; title: string }
+  /**
+   * transient drag state (Phase 8): node geometry while the peer drags,
+   * rendered as a live outline; the final position arrives as a CRDT op
+   * on drag end. Never persisted.
+   */
+  dragging?: {
+    boardId: string
+    nodes: Record<string, { x: number; y: number; w?: number; h?: number }>
+  }
+  /** selected cell/range in a spreadsheet (Phase 8 presence) */
+  sheetCell?: { sheetId: string; sheetName: string; r: number; c: number }
+  /** cursor line in a code file (Phase 8 presence) */
+  codeLine?: { codeId: string; line: number }
   lastSeenAt: number
 }
 
@@ -237,4 +250,30 @@ export interface CollabCapabilities {
   /** how quickly peers see changes */
   latency: 'instant' | 'seconds' | 'minutes' | 'none'
   scope: 'this browser' | 'same Google Drive' | 'anywhere'
+  /* ---- Phase 8: CRDT-era capabilities ---- */
+  /** granular CRDT board operations (not full-board rebroadcast) */
+  boardRealtime: boolean
+  /** rich documents merge through Yjs (no last-writer-wins) */
+  documentCRDT: boolean
+  /** code files merge through Yjs */
+  codeCRDT: boolean
+  /** comments/areas appear on peers without polling */
+  commentsRealtime: boolean
+  /** the backend independently rejects unauthorized operations */
+  serverPermissions: boolean
+  /** offline edits are queued and deterministically merged on reconnect */
+  offlineRecovery: boolean
 }
+
+/* ---------------- realtime connection state (Phase 8) ---------------- */
+
+export type RealtimeStatus =
+  | 'unconfigured' // no realtime backend in this build — honest setup state
+  | 'no-account' // backend configured but user is not signed in with Google
+  | 'inactive' // configured but not currently attached to a project room
+  | 'connecting'
+  | 'connected'
+  | 'reconnecting'
+  | 'offline'
+  | 'unauthorized' // server rejected this user for the project room
+  | 'error'

@@ -52,6 +52,11 @@ class InviteService {
       invite.id,
     )
     collabHub.broadcastState(projectId)
+    // reserve the role server-side so the invitee's Google account is
+    // recognized by the realtime backend the moment they sign in
+    void import('./ServerAclService').then(({ serverAcl }) =>
+      serverAcl.setRole(projectId, clean, role),
+    )
     return invite
   }
 
@@ -60,7 +65,14 @@ class InviteService {
   }
 
   revoke(projectId: string, inviteId: string): void {
+    const invite = this.invitesOf(projectId).find((i) => i.id === inviteId)
     this.patch(projectId, inviteId, { status: 'revoked' })
+    // drop the server-side reservation unless they already joined
+    if (invite && invite.status === 'pending') {
+      void import('./ServerAclService').then(({ serverAcl }) =>
+        serverAcl.setRole(projectId, invite.email, null),
+      )
+    }
   }
 
   resend(projectId: string, inviteId: string): void {

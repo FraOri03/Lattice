@@ -375,6 +375,10 @@ export const useStore = create<AppState>()(
         const s = get()
         const remaining = Object.values(s.projects).filter((p) => p.id !== id)
         if (!remaining.length) return // never delete the last project
+        // tear down the realtime rooms too (server verifies ownership)
+        void import('@/lib/collab/ServerAclService').then(({ serverAcl }) =>
+          serverAcl.deleteRooms(id),
+        )
         // collect and remove everything the project owns
         const ownedBoards = Object.values(s.boards).filter((b) => b.projectId === id)
         const ownedNotes = Object.values(s.notes).filter((n) => n.projectId === id)
@@ -978,6 +982,13 @@ export const useStore = create<AppState>()(
 
       deleteDoc: (id) => {
         void storage.deleteDocument(id).catch(console.error)
+        const docProject = get().docs[id]?.projectId ?? get().activeProjectId
+        void Promise.all([
+          import('@/lib/crdt/YjsManager'),
+          import('@/lib/crdt/DocumentCRDT'),
+        ]).then(([{ yjsManager }, { deleteDocumentCRDT }]) =>
+          deleteDocumentCRDT(yjsManager.room(docProject), id),
+        )
         set((s) => {
           const docs = { ...s.docs }
           delete docs[id]
@@ -1129,6 +1140,13 @@ export const useStore = create<AppState>()(
 
       deleteCode: (id) => {
         void storage.deleteDocument(id).catch(console.error)
+        const codeProject = get().codeDocs[id]?.projectId ?? get().activeProjectId
+        void Promise.all([
+          import('@/lib/crdt/YjsManager'),
+          import('@/lib/crdt/CodeCRDT'),
+        ]).then(([{ yjsManager }, { deleteCodeCRDT }]) =>
+          deleteCodeCRDT(yjsManager.room(codeProject), id),
+        )
         set((s) => {
           const codeDocs = { ...s.codeDocs }
           delete codeDocs[id]

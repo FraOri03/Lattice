@@ -43,6 +43,13 @@ export class DrivePollingCollaborationProvider implements CollaborationProvider 
     liveDocuments: false,
     latency: 'seconds',
     scope: 'same Google Drive',
+    // polling moves durable state only — none of this is realtime/CRDT
+    boardRealtime: false,
+    documentCRDT: false,
+    codeCRDT: false,
+    commentsRealtime: false,
+    serverPermissions: false,
+    offlineRecovery: false,
   }
 
   private drive: GoogleDriveStorageProvider | null = null

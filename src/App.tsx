@@ -3,6 +3,7 @@ import { useStore } from '@/store/useStore'
 import { useUiStore } from '@/store/useUiStore'
 import { AccountProvider, useAccount } from '@/lib/auth/AccountProvider'
 import { collabHub } from '@/lib/collab/hub'
+import { yjsManager } from '@/lib/crdt/YjsManager'
 import { presenceService } from '@/lib/collab/PresenceService'
 import { realtimeBoardSync } from '@/lib/collab/RealtimeBoardSync'
 import { realtimeDocumentSync } from '@/lib/collab/RealtimeDocumentSync'
@@ -60,6 +61,7 @@ function useCollaboration() {
   const activeProjectId = useStore((s) => s.activeProjectId)
 
   useEffect(() => {
+    yjsManager.start() // CRDT rooms + optional realtime attach (Phase 8)
     collabHub.start()
     presenceService.start()
     realtimeBoardSync.start()
@@ -69,6 +71,7 @@ function useCollaboration() {
       realtimeBoardSync.stop()
       presenceService.stop()
       collabHub.stop()
+      yjsManager.stop()
     }
   }, [])
 

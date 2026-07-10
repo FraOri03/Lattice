@@ -1,8 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { JSONContent } from '@tiptap/core'
 import { NodeSelection } from '@tiptap/pm/state'
 import { BubbleMenu, EditorContent, FloatingMenu, useEditor } from '@tiptap/react'
 import Placeholder from '@tiptap/extension-placeholder'
+import Collaboration from '@tiptap/extension-collaboration'
+import CollaborationCursor from '@tiptap/extension-collaboration-cursor'
+import { prosemirrorJSONToYXmlFragment } from 'y-prosemirror'
 import { useStore } from '@/store/useStore'
 import { storage } from '@/lib/storage/StorageProvider'
 import { EMPTY_DOC } from '@/lib/richdoc/docjson'
@@ -10,9 +13,19 @@ import { ASSET_DRAG_MIME, DOC_DRAG_MIME, NOTE_DRAG_MIME } from '@/lib/dnd'
 import { importFile } from '@/lib/import/ImportService'
 import { useReadOnly } from '@/lib/collab/useCollab'
 import { presenceService } from '@/lib/collab/PresenceService'
-import { realtimeDocumentSync } from '@/lib/collab/RealtimeDocumentSync'
+import {
+  colorForUser,
+  currentIdentity,
+} from '@/lib/collab/CollaborationProvider'
+import { yjsManager } from '@/lib/crdt/YjsManager'
+import { useCrdtStore } from '@/lib/crdt/crdtStore'
+import {
+  documentFragment,
+  documentNeedsSeed,
+  seedDocument,
+} from '@/lib/crdt/DocumentCRDT'
 import { toast } from '@/components/ui/Toaster'
-import { baseExtensions } from './extensions'
+import { collabBaseExtensions } from './extensions'
 import { SlashCommands } from './SlashCommandMenu'
 import { AssetPickerDialog } from './AssetPickerDialog'
 import { DocumentToolbar, setOrUnsetLink, useEditorTick } from './DocumentToolbar'
@@ -24,41 +37,63 @@ export interface RichTextEditorProps {
 }
 
 /**
- * The RichTextEditor. Loads the document body lazily from the
- * StorageProvider, then debounce-saves JSON back on every change,
- * refreshing the digested metadata (snippet, outline, link graph).
+ * The RichTextEditor — CRDT-native since Phase 8.
+ *
+ * The editor binds to the document's Y.XmlFragment in the project room:
+ * every keystroke is a CRDT update that merges deterministically across
+ * tabs (BroadcastChannel) and devices (realtime backend). Last-writer-
+ * wins is gone as the active editing model.
+ *
+ * The stored Tiptap JSON body remains the durable representation: it
+ * seeds the fragment once (migration, marker-guarded, original preserved)
+ * and is re-exported from CRDT state on every save so Drive backup,
+ * version history and the digested metadata keep working unchanged.
  */
 export function RichTextEditor({ docId, variant }: RichTextEditorProps) {
+  const projectIdOfDoc = useStore((s) => s.docs[docId]?.projectId)
+  const activeProjectId = useStore((s) => s.activeProjectId)
+  const projectId = projectIdOfDoc ?? activeProjectId
+  // rebind collaboration (fragment + awareness) when the transport changes
+  const attachEpoch = useCrdtStore((s) => s.attachEpoch)
   const [initial, setInitial] = useState<JSONContent | null>(null)
 
   useEffect(() => {
     let alive = true
     setInitial(null)
-    void storage
-      .getDocument(docId)
-      .then((body) => {
-        if (alive) setInitial((body as JSONContent) ?? EMPTY_DOC)
-      })
-      .catch(() => {
-        if (alive) setInitial(EMPTY_DOC)
-      })
+    const room = yjsManager.room(projectId)
+    void Promise.all([
+      room.loaded,
+      storage.getDocument(docId).catch(() => undefined),
+    ]).then(([, body]) => {
+      if (alive) setInitial((body as JSONContent) ?? EMPTY_DOC)
+    })
     return () => {
       alive = false
     }
-  }, [docId])
+  }, [docId, projectId])
 
   if (!initial) {
     return <div className="placeholder">Loading document…</div>
   }
-  return <EditorInner key={docId} docId={docId} initial={initial} variant={variant} />
+  return (
+    <EditorInner
+      key={`${docId}:${attachEpoch}`}
+      docId={docId}
+      projectId={projectId}
+      initial={initial}
+      variant={variant}
+    />
+  )
 }
 
 function EditorInner({
   docId,
+  projectId,
   initial,
   variant,
 }: {
   docId: string
+  projectId: string
   initial: JSONContent
   variant: 'full' | 'mini'
 }) {
@@ -69,10 +104,26 @@ function EditorInner({
   const [assetPickerOpen, setAssetPickerOpen] = useState(false)
   const imageInput = useRef<HTMLInputElement>(null)
 
+  // CRDT bindings — stable for the lifetime of this mount (keyed above)
+  const { room, fragment, cursorProvider, user } = useMemo(() => {
+    const room = yjsManager.room(projectId)
+    const identity = currentIdentity()
+    return {
+      room,
+      fragment: documentFragment(room, docId),
+      cursorProvider: { awareness: yjsManager.contentAwareness(projectId) },
+      user: {
+        name: identity.name || 'User',
+        color: colorForUser(identity.userId),
+      },
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, docId])
+
   const editor = useEditor({
     editable: !readOnly,
     extensions: [
-      ...baseExtensions,
+      ...collabBaseExtensions,
       Placeholder.configure({
         placeholder: variant === 'full' ? "Type '/' for commands…" : 'Write…',
       }),
@@ -86,8 +137,9 @@ function EditorInner({
           setAssetPickerOpen(true)
         },
       }),
+      Collaboration.configure({ fragment }),
+      CollaborationCursor.configure({ provider: cursorProvider, user }),
     ],
-    content: initial,
     editorProps: {
       attributes: { class: 'richdoc-content' },
       handleClickOn(_view, _pos, node) {
@@ -136,6 +188,7 @@ function EditorInner({
       },
     },
     onUpdate: ({ editor }) => {
+      // export the durable JSON body from the current CRDT state
       window.clearTimeout(saveTimer.current)
       saveTimer.current = window.setTimeout(
         () => persistDocContent(docId, editor.getJSON()),
@@ -152,32 +205,22 @@ function EditorInner({
   editorRef.current = editor
   useEditorTick(variant === 'mini' ? null : editor)
 
+  // Migration: seed the fragment from the stored body exactly once. Runs
+  // after the editor exists because seeding needs its ProseMirror schema.
+  useEffect(() => {
+    if (!editor || editor.isDestroyed) return
+    if (documentNeedsSeed(room, docId)) {
+      seedDocument(room, docId, (frag) =>
+        prosemirrorJSONToYXmlFragment(editor.schema, initial, frag),
+      )
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor, docId])
+
   // role changes (or "view as" preview) flip editability live
   useEffect(() => {
     editor?.setEditable(!readOnly)
   }, [editor, readOnly])
-
-  // another session saved this document: refresh if we're not mid-edit
-  useEffect(() => {
-    return realtimeDocumentSync.onRemoteUpdate(docId, () => {
-      const ed = editorRef.current
-      if (!ed || ed.isDestroyed) return
-      const refresh = async () => {
-        const body = (await storage.getDocument(docId)) as JSONContent | undefined
-        const cur = editorRef.current
-        if (cur && !cur.isDestroyed && body)
-          cur.commands.setContent(body, false)
-      }
-      if (ed.isFocused) {
-        toast.info('Document changed elsewhere', 'Someone saved a newer version of this document.', {
-          label: 'Load newest',
-          run: () => void refresh(),
-        })
-      } else {
-        void refresh()
-      }
-    })
-  }, [docId])
 
   // never leave a stale "editing…" indicator behind
   useEffect(() => () => presenceService.setEditing(undefined), [docId])
