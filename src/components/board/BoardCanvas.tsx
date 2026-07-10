@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useMemo } from 'react'
 import {
   Background,
   BackgroundVariant,
@@ -31,7 +31,7 @@ import { CARD_COLORS, type BoardNode } from '@/types/model'
 import { presenceService } from '@/lib/collab/PresenceService'
 import { commentService } from '@/lib/collab/CommentService'
 import { useCollabStore } from '@/lib/collab/collabStore'
-import { useReadOnly } from '@/lib/collab/useCollab'
+import { usePeers, useReadOnly } from '@/lib/collab/useCollab'
 import { BoardPresenceLayer } from '@/components/collab/BoardPresenceLayer'
 import { CommentPins } from '@/components/collab/CommentPins'
 import { toast } from '@/components/ui/Toaster'
@@ -144,6 +144,25 @@ function Canvas() {
   const setFocusedThread = useCollabStore((s) => s.setFocusedThread)
   const readOnly = useReadOnly()
   const { screenToFlowPosition } = useReactFlow()
+  const peers = usePeers()
+
+  // one authoritative drag at a time: a node a peer is actively dragging
+  // cannot be grabbed here until they release it
+  const peerDraggedIds = useMemo(() => {
+    const ids = new Set<string>()
+    for (const p of peers) {
+      if (p.dragging?.boardId !== board?.id) continue
+      for (const id of Object.keys(p.dragging.nodes)) ids.add(id)
+    }
+    return ids
+  }, [peers, board?.id])
+
+  const renderNodes = useMemo(() => {
+    if (!peerDraggedIds.size) return board?.nodes ?? []
+    return (board?.nodes ?? []).map((n) =>
+      peerDraggedIds.has(n.id) ? { ...n, draggable: false } : n,
+    )
+  }, [board?.nodes, peerDraggedIds])
 
   /** Cards dropped on a section join it; dragged out, they leave it. */
   const onNodeDragStop = useCallback<OnNodeDrag<BoardNode>>(
@@ -336,7 +355,7 @@ function Canvas() {
       onPointerLeave={() => presenceService.clearCursor()}
     >
       <ReactFlow
-        nodes={board.nodes}
+        nodes={renderNodes}
         edges={board.edges}
         nodeTypes={nodeTypes}
         onNodesChange={onNodesChange}

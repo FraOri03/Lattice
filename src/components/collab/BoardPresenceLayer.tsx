@@ -69,11 +69,65 @@ function PeerSelections({ boardId }: { boardId: string }) {
   )
 }
 
+/**
+ * Live manipulation outlines: while a peer drags cards, their throttled
+ * transient geometry renders as a dashed ghost in the peer's color. The
+ * real node only moves when the committed CRDT op lands on drag end, so
+ * objects never jump under the local user's pointer.
+ */
+function PeerDragOutlines({ boardId }: { boardId: string }) {
+  const peers = usePeers()
+  const rects: {
+    key: string
+    x: number
+    y: number
+    w: number
+    h: number
+    peer: PresencePeer
+  }[] = []
+  for (const peer of peers) {
+    if (!peer.dragging || peer.dragging.boardId !== boardId) continue
+    for (const [id, g] of Object.entries(peer.dragging.nodes)) {
+      rects.push({
+        key: `${peer.sessionId}:drag:${id}`,
+        x: g.x,
+        y: g.y,
+        w: g.w ?? 120,
+        h: g.h ?? 60,
+        peer,
+      })
+    }
+  }
+  if (!rects.length) return null
+  return (
+    <>
+      {rects.map((r) => (
+        <div
+          key={r.key}
+          className="peer-drag-outline"
+          style={{
+            transform: `translate(${r.x}px, ${r.y}px)`,
+            width: r.w,
+            height: r.h,
+            borderColor: r.peer.color,
+          }}
+          aria-hidden
+        >
+          <span className="peer-selection-name" style={{ background: r.peer.color }}>
+            {r.peer.name} ↕
+          </span>
+        </div>
+      ))}
+    </>
+  )
+}
+
 export function BoardPresenceLayer({ boardId }: { boardId: string }) {
   const cursorPeers = useBoardPeers(boardId)
   return (
     <ViewportPortal>
       <PeerSelections boardId={boardId} />
+      <PeerDragOutlines boardId={boardId} />
       {cursorPeers.map((p) => (
         <PeerCursor key={p.sessionId} peer={p} />
       ))}

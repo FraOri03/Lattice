@@ -931,3 +931,19 @@ body {
 .ProseMirror .ProseMirror-yjs-selection {
   border-radius: 2px;
 }
+
+/* ---------- peer drag outline (transient manipulation ghost) ---------- */
+.peer-drag-outline {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border: 1.5px dashed;
+  border-radius: 10px;
+  pointer-events: none;
+  z-index: 4;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .peer-drag-outline {
+    transition: transform 60ms linear;
+  }
+}

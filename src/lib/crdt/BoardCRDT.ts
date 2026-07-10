@@ -35,6 +35,8 @@ export interface CRDTNode {
   parentId: string | null
   hidden: boolean
   data: CardData
+  /** layer order — index in the board's node array (z-stacking) */
+  order: number
   /** LWW tiebreaker + "who moved last" for conflict labels */
   movedAt: number
 }
@@ -46,10 +48,11 @@ export interface NodeGeometryPatch {
   height?: number
   parentId?: string | null
   hidden?: boolean
+  order?: number
   movedAt: number
 }
 
-export function serializeNode(n: BoardNode): CRDTNode {
+export function serializeNode(n: BoardNode, order = 0): CRDTNode {
   return {
     id: n.id,
     type: n.type ?? 'note',
@@ -60,6 +63,7 @@ export function serializeNode(n: BoardNode): CRDTNode {
     parentId: n.parentId ?? null,
     hidden: n.hidden ?? false,
     data: n.data,
+    order,
     movedAt: Date.now(),
   }
 }
@@ -124,7 +128,7 @@ export class BoardCRDT {
       map.set('name', board.name)
       map.set('nodes', nodes)
       map.set('edges', edges)
-      for (const n of board.nodes) nodes.set(n.id, serializeNode(n))
+      board.nodes.forEach((n, i) => nodes.set(n.id, serializeNode(n, i)))
       for (const e of board.edges) edges.set(e.id, JSON.parse(JSON.stringify(e)))
       this.room.boards().set(board.id, map)
     }, MIGRATION_ORIGIN)
@@ -138,12 +142,12 @@ export class BoardCRDT {
       this.room.transactContent(() => map?.set('name', name))
   }
 
-  upsertNodes(boardId: string, nodesToAdd: BoardNode[]): void {
+  upsertNodes(boardId: string, nodesToAdd: { node: BoardNode; order: number }[]): void {
     if (!nodesToAdd.length) return
     const nodes = this.nodesMap(boardId, true)
     if (!nodes) return
     this.room.transactContent(() => {
-      for (const n of nodesToAdd) nodes.set(n.id, serializeNode(n))
+      for (const { node, order } of nodesToAdd) nodes.set(node.id, serializeNode(node, order))
     })
   }
 
@@ -174,6 +178,7 @@ export class BoardCRDT {
           height: p.height ?? rec.height,
           parentId: p.parentId === undefined ? rec.parentId : p.parentId,
           hidden: p.hidden ?? rec.hidden,
+          order: p.order ?? rec.order,
           movedAt: p.movedAt,
         })
       }
@@ -220,16 +225,19 @@ export class BoardCRDT {
     if (!map) return null
     const nodesMap = map.get('nodes') as Y.Map<unknown> | undefined
     const edgesMap = map.get('edges') as Y.Map<unknown> | undefined
-    const nodes: BoardNode[] = []
-    nodesMap?.forEach((rec) => nodes.push(deserializeNode(rec as CRDTNode)))
-    const edges: Edge[] = []
-    edgesMap?.forEach((e) => edges.push(e as Edge))
-    // sections must precede children for React Flow parent resolution
-    nodes.sort((a, b) => {
+    const recs: CRDTNode[] = []
+    nodesMap?.forEach((rec) => recs.push(rec as CRDTNode))
+    // layer order, but sections always precede children (React Flow
+    // resolves parents top-down and paints in array order)
+    recs.sort((a, b) => {
       const sa = a.type === 'section' ? 0 : 1
       const sb = b.type === 'section' ? 0 : 1
-      return sa - sb
+      if (sa !== sb) return sa - sb
+      return (a.order ?? 0) - (b.order ?? 0)
     })
+    const nodes = recs.map(deserializeNode)
+    const edges: Edge[] = []
+    edgesMap?.forEach((e) => edges.push(e as Edge))
     return { name: (map.get('name') as string) ?? '', nodes, edges }
   }
 
