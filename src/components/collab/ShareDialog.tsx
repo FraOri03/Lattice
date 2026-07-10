@@ -266,6 +266,17 @@ function SettingsTab() {
         </div>
       )}
 
+      <div className="insp-h">Public links</div>
+      <div className="rounded-lg border border-dashed border-bord p-2.5 text-[11px] leading-relaxed text-muted">
+        Sharing with people is role-based and server-enforced: invite them
+        above and the realtime backend rejects anything their role does not
+        allow. Truly public no-login links need an anonymous read-only
+        viewer, which is not built yet — until then, share a copy instead:
+        documents export to HTML/PDF/DOCX, presentations to PDF/PPTX, and
+        the whole vault to a .lattice.json file. Nothing is ever exposed
+        publicly by default.
+      </div>
+
       <div className="insp-h">Roles</div>
       {(Object.keys(ROLE_LABEL) as CollabRole[]).map((r) => (
         <div key={r} className="mb-1 flex gap-2 text-[11px]">
