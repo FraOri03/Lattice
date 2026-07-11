@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📍 Roadmap
+    url: https://github.com/FraOri03/Lattice/blob/main/ROADMAP.md
+    about: See what is planned, in progress and shipped before opening a new request.
+  - name: 📚 Documentation
+    url: https://github.com/FraOri03/Lattice/tree/main/docs
+    about: Setup, architecture, integrations, collaboration, file formats and known limitations.
+  - name: 🐛 Security concern
+    url: https://github.com/FraOri03/Lattice/blob/main/docs/limitations.md#security-notes-documented-not-defects
+    about: Review the documented security model before filing a security-sensitive issue.

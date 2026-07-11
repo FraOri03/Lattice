@@ -1,0 +1,29 @@
+name: Docs link check
+
+on:
+  push:
+    branches: [main]
+    paths: ["**/*.md"]
+  pull_request:
+    branches: [main]
+    paths: ["**/*.md"]
+
+permissions:
+  contents: read
+
+jobs:
+  links:
+    name: Check relative Markdown links
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lychee (offline — relative links only)
+        uses: lycheeverse/lychee-action@v2
+        with:
+          # Offline mode validates local/relative links and skips external URLs,
+          # so the check stays fast and does not flake on rate-limited hosts.
+          args: >-
+            --offline
+            --no-progress
+            README.md ROADMAP.md CHANGELOG.md CONTRIBUTING.md docs
+          fail: true

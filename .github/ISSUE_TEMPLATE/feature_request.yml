@@ -1,0 +1,77 @@
+name: Feature request
+description: Suggest a feature, improvement or change.
+title: "[Feature] "
+labels: ["type: feature"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the idea. Describe the problem first — solutions are easier to evaluate
+        against a clear need. Triage assigns priority, area, status and a milestone; this
+        template does not set them automatically.
+  - type: checkboxes
+    id: duplicates
+    attributes:
+      label: Pre-flight
+      options:
+        - label: I searched existing issues and the roadmap and this is not a duplicate.
+          required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: What are you trying to do that is hard or impossible today?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: What would you like to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other approaches you thought about, and why they fall short.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Product area
+      options:
+        - Board
+        - Documents
+        - Notes
+        - Spreadsheets
+        - Presentations
+        - Code
+        - Import / export
+        - Collaboration
+        - Sync
+        - Authentication
+        - Projects
+        - Storage
+        - UI / UX
+        - Accessibility
+        - Performance
+        - Developer experience
+        - Other / cross-cutting
+    validations:
+      required: true
+  - type: dropdown
+    id: impact
+    attributes:
+      label: Impact
+      description: Roughly how much would this help? (Triage confirms the real priority.)
+      options:
+        - Nice to have
+        - Would noticeably improve my workflow
+        - Blocks something important for me
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Mockups, references, related issues, anything else.
