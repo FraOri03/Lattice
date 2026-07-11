@@ -157,6 +157,7 @@ function QuickCreate() {
     { label: 'Note', icon: <IcNote size={13} />, run: () => s.getState().openNote(s.getState().createNote()) },
     { label: 'Document', icon: <IcDoc size={13} />, run: () => s.getState().openDoc(s.getState().createDoc()) },
     { label: 'Spreadsheet', icon: <IcTable size={13} />, run: () => s.getState().openSheet(s.getState().createSheetDoc()) },
+    { label: 'Presentation', icon: <IcPresentation size={13} />, run: () => s.getState().openPresent(s.getState().createPresentDoc()) },
     { label: 'Code file', icon: <IcCode size={13} />, run: () => s.getState().openCode(s.getState().createCode()) },
     { label: 'Board', icon: <IcBoard size={13} />, run: () => s.getState().addBoard() },
   ]

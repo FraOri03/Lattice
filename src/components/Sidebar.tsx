@@ -8,6 +8,7 @@ import {
   CODE_DRAG_MIME,
   DOC_DRAG_MIME,
   NOTE_DRAG_MIME,
+  PRESENT_DRAG_MIME,
   SHEET_DRAG_MIME,
 } from '@/lib/dnd'
 import { importFiles, reportErrors } from '@/lib/import/ImportService'
@@ -212,6 +213,7 @@ export function Sidebar() {
           r.kind === 'note' ? notes[r.id]?.title
           : r.kind === 'doc' ? docs[r.id]?.title
           : r.kind === 'sheet' ? sheetDocs[r.id]?.title
+          : r.kind === 'present' ? presentDocs[r.id]?.title
           : r.kind === 'code' ? codeDocs[r.id] && `${codeDocs[r.id].title}.${codeDocs[r.id].extension}`
           : r.kind === 'asset' ? assets[r.id]?.name
           : boards[r.id]?.name
@@ -219,12 +221,13 @@ export function Sidebar() {
       })
       .filter((r): r is RecentEntry & { label: string } => !!r)
       .slice(0, 5)
-  }, [recents, notes, docs, sheetDocs, codeDocs, assets, boards, q, sidebarFilter])
+  }, [recents, notes, docs, sheetDocs, presentDocs, codeDocs, assets, boards, q, sidebarFilter])
 
   const openRecent = (r: RecentEntry) => {
     if (r.kind === 'note') openNote(r.id)
     else if (r.kind === 'doc') openDoc(r.id)
     else if (r.kind === 'sheet') openSheet(r.id)
+    else if (r.kind === 'present') openPresent(r.id)
     else if (r.kind === 'code') openCode(r.id)
     else if (r.kind === 'asset') openAsset(r.id)
     else setActiveBoard(r.id)
@@ -553,9 +556,14 @@ export function Sidebar() {
             {presentList.map((p) => (
               <div
                 key={p.id}
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData(PRESENT_DRAG_MIME, p.id)
+                  e.dataTransfer.effectAllowed = 'copy'
+                }}
                 onClick={() => openPresent(p.id)}
-                title="Click to edit slides"
-                className={`group flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 ${
+                title="Click to edit slides · drag onto the canvas"
+                className={`group flex cursor-grab items-center gap-2 rounded-md px-2 py-1.5 active:cursor-grabbing ${
                   p.id === activePresentId ? 'bg-panel2 text-ink' : 'text-muted hover:bg-panel2/60'
                 }`}
               >
