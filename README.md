@@ -430,11 +430,146 @@ Skeleton/loading states cover every lazy module. Presence cursors are throttled 
 - PPTX/ODP import flattens masters/themes/animations (reported per file); PPTX export is basic fidelity by design.
 - Realtime requires Google sign-in (identity source); local mock accounts stay tabs-only + Drive.
 
+## 15a · Phase 8.5 — UX/UI audit & Presentation-in-Board integration
+
+After the Phase 8 build, a **senior UX/UI audit** ran across the whole product (branch `phase-8` @ `bef3dc5`; full inspection of 148 source files + the running app at `localhost:5173` through all six modes + git history), in the same spirit as the Phase 7 audit (§14) but broadened to every surface. It produced a scorecard, a complete feature inventory, per-surface findings, an issue register (`LAT-*`) and a prioritized remediation plan — and it **autonomously remediated the flagship product-coherence gap**: presentations could not be board cards. Deliverables live under `docs/` (`ux-ui-audit-phase-8.md`, `ux-ui-audit-scorecard.md`, `ux-ui-remediation-roadmap.md`, `presentation-board-integration-spec.md`).
+
+**One-line verdict:** a genuinely impressive engineering platform with a coherent visual system and rare honesty of state, held back by an over-deep information architecture, canvas-level accessibility gaps, and surface-level feature threading (of which Presentation-in-Board was the flagship example, now closed).
+
+### 15a.1 Scorecard (0–10, evidence-based)
+
+Verification legend: `✅ code` verified in source · `🖥️ browser` verified in the running app · `📄 doc` documented but not independently verified.
+
+| Dimension | Score | Trend | One-line rationale |
+|---|---:|---|---|
+| Product coherence | 7.0 | ↑ | One design language; Presentation was bolted-on (now fixed); Split ambiguous |
+| Information architecture | 6.5 | → | 4–5 nesting levels; "Board" is mode+surface+layout; asset/doc duality |
+| Navigation | 7.0 | ↑ | Clear 6-mode switcher + breadcrumb; no browser history; thin deep links |
+| Board UX | 7.5 | ↑ | Strong Figma-like canvas + presence; no keyboard ops, no visible undo |
+| Document UX | 7.5 | → | Solid Tiptap CRDT; three competing metaphors (Notion/Word/Obsidian) |
+| Spreadsheet UX | 7.0 | → | Real grid + formulas; save-granular (not cell CRDT); small function set |
+| Presentation UX | 6.5 | ↑ | Real v1 editor; no presenter mode / masters; board gap fixed here |
+| Code UX | 8.0 | → | Monaco + CRDT + GitHub + secret detection — strongest surface |
+| Collaboration UX | 7.5 | → | Server-enforced ACLs + CRDT; honest but config-gated; presence UI good |
+| Cloud/account UX | 7.0 | → | Honest Drive states + diagnostics; identity-vs-storage nuance under-explained |
+| Visual consistency | 8.0 | → | Tokens, icon registry, card chrome, one dialog/toast system |
+| Accessibility | 5.5 | → | aria/focus/reduced-motion present; canvas not keyboard-operable; color-only cues |
+| Performance perception | 6.5 | → | Skeletons + throttling; 700 kB gz main w/ three.js; no board virtualization |
+| Error handling | 7.0 | → | Toasts, honest chips, diagnostics; a few silent recovery paths |
+| Onboarding | 6.0 | → | Good empty states; no tour; steep mental model |
+| **Overall UX** | **7.0** | ↑ | Powerful and honest; friction from IA depth + a11y + threading |
+| **Overall UI** | **7.5** | → | Cohesive, professional, dark-first; density risks at narrow widths |
+
+### 15a.2 Presentation-in-Board integration (implemented)
+
+**The gap:** presentations were full entities (`PresentationDocMeta`, an editor mode, a sidebar section, PPTX/ODP import) but could **not** be board cards — no `presentation` card type, no node registration, no toolbar/drag/inspector — and an imported deck landed on the canvas as an inert *raw asset* card (`ImportService.cardSpecFor`, comment: *"decks have no dedicated card type yet"*). This broke the core promise that "every entity can be a card on the infinite canvas." **This builds directly upon** the Phase 1 board and the Phase 8 presentation engine (§15.7) — it adds a card view, not a new engine.
+
+**Data model** — `presentation` joins `CardType`; `CardData.presentId` references a `PresentationDocMeta`; the reused `mode: 'compact' | 'expanded'` field drives the card; `CARD_DEFAULTS.presentation = { w: 360, h: 260 }`. The deck **body** stays in the `StorageProvider` (lazy-loaded), exactly like docs/sheets — the node holds only a reference + display mode, so it rides the existing serialization with **zero CRDT changes**.
+
+**Component** — `PresentationCardNode` (`src/components/board/PresentationCardNode.tsx`), registered as `nodeTypes.presentation` in `BoardCanvas.tsx`. A key perf decision: `SlideView`/`StaticElement`/`elementStyle` were **extracted** out of `PresentationWorkspace.tsx` into `src/components/present/SlideView.tsx` so a card can render a slide **without** pulling the heavy editor (and its lazy chunk) into the main bundle — measured impact ≈ **0.5 kB gz**; the workspace stayed a lazy chunk.
+
+**Interaction states:**
+
+| Mode | Trigger | Renders | Body load |
+|---|---|---|---|
+| **Compact** (default) | insert / drag / import; inspector toggle | title, snippet, slide count, `imported` badge | none (meta only) |
+| **Expanded** | inspector "Card mode → expanded" | live `SlideView` thumbnail + prev/next navigator + "Slide i/n" (aria-labeled) | lazy from storage; re-reads on `updatedAt` |
+| **Full** | double-click card / "Open in workspace" / sidebar click | the `PresentationWorkspace` editor | full editor |
+
+- **Drag-and-drop** — sidebar deck rows are `draggable` and set `PRESENT_DRAG_MIME = 'application/x-lattice-present'`; `BoardCanvas.onDrop` verifies the deck exists and calls `addCard('presentation', …)`, early-returning with a toast for read-only roles. The canvas toolbar gains a **Deck** button (`createPresentDoc()` → compact card at viewport center).
+- **Inspector** — a `presentation` branch (parity with sheet/doc/code): rename, slide count, `Source: imported deck`, a compact/expanded segmented toggle, "Open in workspace", and a danger "Delete presentation from vault" (separate from "Delete card"). `TYPE_LABEL.presentation` is compile-enforced by the exhaustive `Record<CardData['type'], string>`.
+- **Import** — `cardSpecFor({kind:'present'})` now returns a `presentation` card pointing at the **editable deck** instead of an `asset` card pointing at the raw PPTX; the original stays preserved and reachable via `sourceAssetId`.
+- **Lifecycle** — `deletePresentDoc` now strips the deck's cards from **every** board (like docs/sheets/code). Realtime-safe (generic CRDT node serialization); comments (via `CardChrome`'s badge) and version history inherited; permissions inherited from `src/lib/collab/permissions.ts` — read-only roles hide the toolbar and reject drops, viewers get a read-only card whose navigator still pages.
+
+**Fallback states** — deck deleted but card remains → "Missing presentation" placeholder; body missing/corrupt → `normalizePresentBody` yields a valid 1-slide deck (never a blank card); lazy chunk fails → compact card still renders, expanded shows "Loading slides…", the board never hard-crashes.
+
+**Navigation fixes shipped alongside** — presentations were also absent from create/search paths; the audit added them to **Quick Create**, the **command palette** (create + search), and fixed **sidebar recents** silently dropping decks (plus a new `IcChevronLeft` icon for the navigator).
+
+**Tests** — `src/lib/present/presentBoardCard.test.ts` (vitest, `npm test`, 3/3 pass): a `presentation` node round-trips through JSON preserving `type`/`presentId` and never carries an `assetId`; a fresh deck body digests to `slideCount: 1`; garbage from storage normalizes to a valid deck. Component/DOM tests are deferred until a jsdom harness lands.
+
+**Acceptance criteria (all met):**
+
+- [x] `presentation` is a valid `CardType`; `CardData.presentId` exists; `PresentationCardNode` registered.
+- [x] Toolbar "Deck", Quick Create, command-palette create/search, and sidebar drag all create/place a deck card.
+- [x] Compact shows title/snippet/slide-count/source; expanded shows a live slide + working prev/next navigator; double-click opens the workspace.
+- [x] Imported PPTX/ODP lands as an editable deck card (not a raw asset); source preserved.
+- [x] Inspector: rename, compact/expanded toggle, open-in-workspace, delete-from-vault; deleting a deck strips its cards on all boards.
+- [x] Node serializes generically (vault export / Drive / CRDT); permissions, comments and versions inherited.
+- [x] Typecheck ✅, production build ✅, unit tests ✅ (3/3).
+- [~] Full in-browser click-through of insert/expand was **partially blocked by an environment issue** during the session (canvas click delivery); the toolbar button and sidebar drag/recents were DOM-verified and the render path is covered by build + tests — **re-verify interactively before release.**
+
+> Individual-slide-to-board (dragging one slide out as its own image) was evaluated and **deliberately deferred**: it would fork slide ownership and needs a product decision. Recommended future path: a "copy slide as image" that produces a self-contained `image` card, keeping decks authoritative.
+
+### 15a.3 Key findings & issue register
+
+The audit's material findings, most feeding Phase 9 (§15b). Severity in brackets.
+
+- **Information architecture** — "Board" is simultaneously a *mode*, a *surface* and (via Split) a *layout* [med]; the hierarchy is 4–5 levels deep (Workspace → Project → Mode → Entity → Card) with Workspaces organizational-only [med]; the asset/entity duality leaks (import creates both a preserved asset and an editable sibling) [med]; Notes vs Documents are under-differentiated at the decision point [med].
+- **Navigation** — no browser back/forward (the SPA has no router; Back exits the app) [high]; Split is a peer "mode" that behaves like a layout toggle [med]; the mode switcher sheds text labels below `xl` [med]; no per-entity shareable deep link [med].
+- **Accessibility** — the **board canvas is not keyboard-operable** (create/select/move/link are pointer-only) [**critical**]; status is conveyed by color alone (sync/role/presence/realtime/minimap) [high]; several targets dip below 24 px; live-region announcements are incomplete. The chrome *is* accessible (global focus-visible, broad aria-labels, reduced-motion, and the slide inspector's numeric X/Y/W/H fields as a genuine keyboard alternative to drag).
+- **Performance** — **three.js ships in the main bundle** (~170 kB gz) though only 3D previews use it [high]; there is **no board node virtualization** and off-screen 3D cards run continuous `requestAnimationFrame`/`OrbitControls` loops, which made the renderer unresponsive during the audit [high].
+- **Collaboration honesty (the one leak, `COL-1`)** — presence avatars and the Share affordance are always visible, but cross-device realtime only works when `VITE_REALTIME_BACKEND=liveblocks` is set *and* the user signs in with Google; otherwise "live" means tabs-of-one-browser + ~20 s Drive polling. The realtime chip is honest, but the surrounding collaboration UI doesn't visibly downgrade [high — communication].
+- **Responsive & device** — fixed-width sidebar/inspectors starve the canvas below ~1100 px; there is no mobile story (nothing blocks a phone, but Monaco/Sheet/Presentation are unusable) [high]. Recommendation: explicit tiers — **Desktop (full)**, **Tablet (read + light edit, drawers)**, **Mobile (read-only viewer + comments)** — that block unsupported editors with an honest message.
+
+Issue register (severity · effort · target phase):
+
+| ID | Area | Title | Sev | Effort | Phase |
+|---|---|---|---|---|---|
+| LAT-1 | Board/Present | Presentations not board cards | High | L | **8.5 (done)** |
+| LAT-19 | Nav | Presentation missing from create/search/recents | Medium | S | **8.5 (done)** |
+| LAT-2 | A11y | Canvas not keyboard-operable | Critical | L | 9 · P1 |
+| LAT-3 | Collab | Presence/Share imply realtime when off | High | S | 9 · P1 |
+| LAT-4 | Perf | three.js in main bundle | High | M | 9 · P1 |
+| LAT-5 | Perf | No board virtualization; off-screen anim loops | High | L | 9 · P1 |
+| LAT-6 | Nav | No browser back/forward | High | M | 9 · P1 |
+| LAT-12 | Responsive | Fixed panels starve canvas; no mobile | High | L | 9 · P1 |
+| LAT-7 | IA | Split is a mode, not a layout | Medium | M | 9 · P2 |
+| LAT-8 | IA | Workspaces add nesting w/o enforcement | Medium | S | 9 · P2 |
+| LAT-9 | Present | No presenter/slideshow mode | Medium | M | 9 · P2 |
+| LAT-10 | Sheet | Save-granular, not cell CRDT | Medium | S / XL | 9 · P2 |
+| LAT-11 | UI/A11y | Color-only status encoding | Medium | S | 9 · P2 |
+| LAT-13 | Cloud | Identity vs storage under-explained | Medium | XS | 9 · P2 |
+| LAT-15 | Board | No visible undo/redo | Medium | M | 9 · P2 |
+| LAT-18 | Onboarding | No product tour / mental-model intro | Medium | M | 9 · P2 |
+| LAT-14 | Nav | Presentations hidden under filter chips | Low | XS | 9 · P3 |
+| LAT-16 | Assets | Preview-failure copy inconsistent | Low | S | 9 · P3 |
+| LAT-17 | UI | Duplicate recent-kind icon maps | Low | XS | 9 · P3 |
+
+### 15a.4 Verification & compatibility
+
+All Phase 8.5 changes are **additive** — a new card type, a shared-module extraction, one icon, and edits across nine files (model, dnd, store, `BoardCanvas`, `CanvasToolbar`, `Sidebar`, `Inspector`, `ImportService`, `CommandPalette`, `TopBar`) plus tests. No data migration is required; pre-Phase-8.5 boards and vaults load unchanged. A `test` script (`vitest run`) was added to `package.json`. Verification: typecheck ✅, production build ✅, unit tests ✅ (3/3); interactive card-render spot-check was environment-blocked and is flagged for re-verification before release.
+
 ## 15b · Phase 9 roadmap
 
-- Anonymous read-only **public viewer** (server groundwork exists: room `defaultAccesses` + metadata flags).
-- Unified transfer dialog (import planning UI); cell-level sheet CRDT; doc-range comment anchors.
-- Lazy three.js; CRDT subdocument partitioning for very large projects; PR-based GitHub flow; File System Access API vault; plugin API; billing; web clipper; AI assistant; mobile UI.
+Phase 8.5's prioritized remediation plan (`docs/ux-ui-remediation-roadmap.md`) defines most of Phase 9; the **P0** item (Presentation-in-Board) already shipped in Phase 8.5 (§15a). Priorities: **P1 before public beta · P2 before broader adoption · P3 refinement.**
+
+**P1 — before public beta**
+
+- **Board canvas keyboard accessibility** (`LAT-2`, Critical) — roving-tabindex node focus, arrow-move, Enter-to-open, a keyboard-invokable "add card" menu; a documented keyboard alternative to drag-and-drop.
+- **Propagate the realtime off-state** (`LAT-3`/`COL-1`) — when `VITE_REALTIME_BACKEND` is unset, mark presence/Share surfaces "local / Drive only" so the chip's honesty reaches the features it governs.
+- **Lazy-load three.js** (`LAT-4`) — move ~170 kB gz of 3D out of the main bundle behind a Suspense boundary + skeleton (§15.11 flags this).
+- **Board virtualization + pause off-screen animation loops** (`LAT-5`) — `IntersectionObserver` to pause off-screen `requestAnimationFrame`/OrbitControls; virtualize nodes; cap concurrent live cards so 100+ card boards stay interactive.
+- **Browser history / back-forward** (`LAT-6`) — history entries per mode/entity (without breaking the existing invite-hash handling), enabling entity deep links.
+- **Responsive tiers + drawer inspectors** (`LAT-12`) — sidebar/inspectors become drawers below a breakpoint; a defined **Mobile = read-only viewer + comments** tier; unsupported editors show an honest "best on desktop" message.
+
+**P2 — before broader adoption**
+
+- **Demote Split** from a peer mode to a layout toggle on Board/Doc (`LAT-7`); **auto-hide Workspaces** for single-workspace accounts (`LAT-8`).
+- **Presenter / slideshow mode** (`LAT-9`) — a full-screen present view with speaker notes (optionally on a second screen) and Esc to exit — the presentation mode's namesake job.
+- **Sheet co-editing** — an in-sheet "edits are save-level while another editor is present" notice now (`LAT-10`), with **cell-level sheet CRDT** as the larger follow-up.
+- **Status redundancy** (color + icon + text) everywhere status is currently color-only (`LAT-11`); **identity-vs-storage cue** ("signed in ≠ synced — connect Drive to back up", `LAT-13`); **visible board undo/redo** with Ctrl/Cmd+Z (`LAT-15`).
+- **Onboarding** — a dismissible 3-step tour or annotated starter board teaching entities-vs-cards / local-vs-cloud / roles (`LAT-18`); an explicit **admin-bootstrap / first-run ownership** moment.
+- **Exact doc-range comment anchors** inside rich documents (§15.12).
+
+**P3 — refinement**
+
+- "Decks" sidebar filter chip (`LAT-14`); a standard "can't preview + download original" fallback (`LAT-16`); dedupe the two recent-kind icon maps (`LAT-17`); minimap card-kind colors; **slide-level linking** (`[[Deck#3]]`-style references, now that decks have a slide navigator); tokenize remaining hard-coded hex; a browsable "Supported formats" view over `formatMatrix`.
+
+**Engine & platform (carried forward)**
+
+- Anonymous read-only **public viewer** / published boards — the Phase 8 server groundwork exists (room `defaultAccesses` + metadata flags); this is the no-login share link §15.12 defers.
+- **Unified transfer dialog** (import planning → confirm → report in one surface); **CRDT subdocument partitioning** for very large projects.
+- Standing items from earlier roadmaps: **File System Access API vault**, **plugin API**, **PR-based GitHub flow**, **remote-deletion management UI**, **billing/subscriptions**, **web clipper**, **AI assistant inside projects**, and **mobile/tablet UI**.
 
 ## 16 · Folder structure (source)
 
