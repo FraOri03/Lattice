@@ -16,6 +16,7 @@ import {
   IcLink,
   IcMessage,
   IcNote,
+  IcPresentation,
   IcSection,
   IcTable,
   IcVideo,
@@ -101,6 +102,19 @@ export function CanvasToolbar() {
         onClick: () => {
           const codeId = useStore.getState().createCode()
           addCard('code', centerPos(), { codeId, mode: 'compact', color: 'purple' })
+        },
+      },
+      {
+        key: 'presentation',
+        label: 'Deck',
+        icon: <IcPresentation size={16} />,
+        onClick: () => {
+          const presentId = useStore.getState().createPresentDoc()
+          addCard('presentation', centerPos(), {
+            presentId,
+            mode: 'compact',
+            color: 'orange',
+          })
         },
       },
       {

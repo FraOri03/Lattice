@@ -176,6 +176,7 @@ function usePaletteItems(query: string, close: () => void): PaletteItem[] {
       ['New note', <FileKindIcon kind="note" size={14} />, () => s.openNote(s.createNote())],
       ['New document', <FileKindIcon kind="richdoc" size={14} />, () => s.openDoc(s.createDoc())],
       ['New spreadsheet', <FileKindIcon kind="sheet" size={14} />, () => s.openSheet(s.createSheetDoc())],
+      ['New presentation', <FileKindIcon kind="presentation" size={14} />, () => s.openPresent(s.createPresentDoc())],
       ['New code file', <FileKindIcon kind="code" size={14} />, () => s.openCode(s.createCode())],
       ['New board', <IcBoard size={14} />, () => s.addBoard()],
       ['New project', <IcPlus size={14} />, () => s.setActiveProject(s.createProject())],
@@ -268,6 +269,14 @@ function usePaletteItems(query: string, close: () => void): PaletteItem[] {
           pool.push({
             key: `s:${sh.id}`, icon: <FileKindIcon kind="sheet" size={14} />, label: sh.title,
             hint: 'sheet', section: 'files', run: done(() => s.openSheet(sh.id)),
+          })
+        }
+      }
+      for (const p of Object.values(s.presentDocs)) {
+        if (p.projectId === pid && match(p.title)) {
+          pool.push({
+            key: `pr:${p.id}`, icon: <FileKindIcon kind="presentation" size={14} />, label: p.title,
+            hint: 'presentation', section: 'files', run: done(() => s.openPresent(p.id)),
           })
         }
       }

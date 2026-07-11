@@ -19,6 +19,7 @@ import {
   CODE_DRAG_MIME,
   DOC_DRAG_MIME,
   NOTE_DRAG_MIME,
+  PRESENT_DRAG_MIME,
   SHEET_DRAG_MIME,
 } from '@/lib/dnd'
 import { KIND_CARD_SIZE } from '@/lib/assets/detect'
@@ -51,6 +52,7 @@ import { AssetCardNode } from './AssetCardNode'
 import { RichDocCardNode } from './RichDocCardNode'
 import { CodeCardNode } from './CodeCardNode'
 import { SheetCardNode } from './SheetCardNode'
+import { PresentationCardNode } from './PresentationCardNode'
 import { SectionNode } from './SectionNode'
 import { WebEmbedCardNode } from './WebEmbedCardNode'
 import { CanvasToolbar } from './CanvasToolbar'
@@ -66,6 +68,7 @@ const nodeTypes = {
   richdoc: RichDocCardNode,
   code: CodeCardNode,
   sheet: SheetCardNode,
+  presentation: PresentationCardNode,
   section: SectionNode,
   webembed: WebEmbedCardNode,
 }
@@ -295,6 +298,19 @@ function Canvas() {
             base,
             { sheetId, mode: 'compact', color: 'green' },
             { w: CARD_DEFAULTS.sheet.w, h: CARD_DEFAULTS.sheet.h },
+          )
+        }
+        return
+      }
+
+      const presentId = e.dataTransfer.getData(PRESENT_DRAG_MIME)
+      if (presentId) {
+        if (useStore.getState().presentDocs[presentId]) {
+          addCard(
+            'presentation',
+            base,
+            { presentId, mode: 'compact', color: 'orange' },
+            { w: CARD_DEFAULTS.presentation.w, h: CARD_DEFAULTS.presentation.h },
           )
         }
         return

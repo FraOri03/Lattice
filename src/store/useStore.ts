@@ -77,6 +77,7 @@ export const CARD_DEFAULTS: Record<CardType, { w: number; h: number; label: stri
   richdoc: { w: 320, h: 230, label: 'Document' },
   code: { w: 360, h: 250, label: 'Code' },
   sheet: { w: 380, h: 260, label: 'Spreadsheet' },
+  presentation: { w: 360, h: 260, label: 'Presentation' },
   section: { w: 640, h: 420, label: 'Section' },
   webembed: { w: 460, h: 340, label: 'Web embed' },
 }
@@ -1377,6 +1378,7 @@ export const useStore = create<AppState>()(
           delete presentDocs[id]
           return {
             presentDocs,
+            boards: stripCards(s.boards, (d) => d.presentId === id),
             activePresentId: s.activePresentId === id ? null : s.activePresentId,
             recents: dropRecent(s.recents, 'present', id),
           }

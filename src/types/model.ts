@@ -312,6 +312,7 @@ export type CardType =
   | 'richdoc' // renders a RichDocMeta (compact preview or inline editor)
   | 'code' // renders a CodeDocMeta (compact info or read-only editor)
   | 'sheet' // renders a SpreadsheetDocMeta (compact info or mini grid)
+  | 'presentation' // renders a PresentationDocMeta (compact info or slide preview)
   | 'section' // Figma-like frame that groups cards (Phase 6)
   | 'webembed' // sandboxed website embed / link preview (Phase 6)
 
@@ -376,6 +377,7 @@ export interface WebEmbed {
  * Which fields are used depends on the card type:
  *  - note:   noteId (references a NoteDoc)
  *  - asset:  assetId (references an AssetDoc)
+ *  - presentation: presentId (references a PresentationDocMeta)
  *  - image:  src (data URL or remote URL), caption
  *  - video:  url (YouTube / Vimeo / direct file / data URL)
  *  - link:   url, title
@@ -392,6 +394,7 @@ export interface CardData extends Record<string, unknown> {
   docId?: string
   codeId?: string
   sheetId?: string
+  presentId?: string
   mode?: RichDocCardMode
   title?: string
   src?: string

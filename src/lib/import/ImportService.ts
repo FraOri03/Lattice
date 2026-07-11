@@ -325,11 +325,15 @@ export function cardSpecFor(outcome: ImportOutcome): {
     }
   }
   if (outcome.kind === 'present') {
-    // decks have no dedicated card type yet: the preserved source asset
-    // represents them on boards, the editor opens from the sidebar/mode
+    // imported decks become editable presentation cards pointing at the
+    // converted deck (the original file stays preserved as a source asset)
     return {
-      type: 'asset',
-      data: { assetId: outcome.asset.id, color: KIND_DEFAULT_COLOR.presentation },
+      type: 'presentation',
+      data: {
+        presentId: outcome.presentId,
+        mode: 'compact',
+        color: KIND_DEFAULT_COLOR.presentation,
+      },
       size: KIND_CARD_SIZE.presentation,
     }
   }
