@@ -30,6 +30,7 @@ const TYPE_LABEL: Record<CardData['type'], string> = {
   richdoc: 'Document card',
   code: 'Code card',
   sheet: 'Spreadsheet card',
+  presentation: 'Presentation card',
   section: 'Section',
   webembed: 'Web embed card',
 }
@@ -79,24 +80,29 @@ function NodeInspector({ node }: { node: BoardNode }) {
   const openDoc = useStore((s) => s.openDoc)
   const openCode = useStore((s) => s.openCode)
   const openSheet = useStore((s) => s.openSheet)
+  const openPresent = useStore((s) => s.openPresent)
   const deleteAsset = useStore((s) => s.deleteAsset)
   const deleteDoc = useStore((s) => s.deleteDoc)
   const deleteCode = useStore((s) => s.deleteCode)
   const deleteSheetDoc = useStore((s) => s.deleteSheetDoc)
+  const deletePresentDoc = useStore((s) => s.deletePresentDoc)
   const renameAsset = useStore((s) => s.renameAsset)
   const updateDocMeta = useStore((s) => s.updateDocMeta)
   const updateCodeMeta = useStore((s) => s.updateCodeMeta)
   const updateSheetMeta = useStore((s) => s.updateSheetMeta)
+  const updatePresentMeta = useStore((s) => s.updatePresentMeta)
   const notes = useStore((s) => s.notes)
   const assets = useStore((s) => s.assets)
   const docs = useStore((s) => s.docs)
   const codeDocs = useStore((s) => s.codeDocs)
   const sheetDocs = useStore((s) => s.sheetDocs)
+  const presentDocs = useStore((s) => s.presentDocs)
   const note = node.data.noteId ? notes[node.data.noteId] : undefined
   const asset = node.data.assetId ? assets[node.data.assetId] : undefined
   const richdoc = node.data.docId ? docs[node.data.docId] : undefined
   const codeDoc = node.data.codeId ? codeDocs[node.data.codeId] : undefined
   const sheetDoc = node.data.sheetId ? sheetDocs[node.data.sheetId] : undefined
+  const presentDoc = node.data.presentId ? presentDocs[node.data.presentId] : undefined
   const backlinks = note ? backlinksTo(notes, note) : []
   const plannedEditor = asset ? plannedEditorFor(asset.kind) : null
   const conversionNote = asset ? conversionNoteForAsset(asset) : null
@@ -356,6 +362,53 @@ function NodeInspector({ node }: { node: BoardNode }) {
         </p>
       )}
 
+      {d.type === 'presentation' && presentDoc && (
+        <>
+          <div className="insp-h">Presentation</div>
+          <input
+            className="field mb-2"
+            value={presentDoc.title}
+            onChange={(e) => updatePresentMeta(presentDoc.id, { title: e.target.value })}
+            placeholder="Presentation title"
+          />
+          <InfoRow label="Slides" value={String(presentDoc.slideCount)} />
+          <InfoRow
+            label="Edited"
+            value={new Date(presentDoc.updatedAt).toLocaleDateString()}
+          />
+          {presentDoc.sourceAssetId && <InfoRow label="Source" value="imported deck" />}
+          <div className="insp-h">Card mode</div>
+          <div className="flex rounded-lg border border-bord bg-panel2 p-0.5">
+            {(['compact', 'expanded'] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => updateCardData(node.id, { mode: m })}
+                className={`flex-1 cursor-pointer rounded-md px-2 py-1 text-xs font-medium capitalize ${
+                  (d.mode ?? 'compact') === m
+                    ? 'bg-panel text-ink shadow-sm'
+                    : 'text-muted hover:text-ink'
+                }`}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+          <p className="mt-1.5 text-[10.5px] leading-relaxed text-muted">
+            Compact shows a slide summary; expanded is a read-only slide
+            thumbnail with a navigator. Double-click the card for the full
+            presentation workspace.
+          </p>
+          <button className="btn mt-2 w-full" onClick={() => openPresent(presentDoc.id)}>
+            <IcEdit size={12} /> Open in workspace
+          </button>
+        </>
+      )}
+      {d.type === 'presentation' && !presentDoc && (
+        <p className="mt-2 text-xs text-muted">
+          The presentation behind this card was deleted.
+        </p>
+      )}
+
       {(d.type === 'image' || d.type === 'video' || d.type === 'link') && (
         <>
           <div className="insp-h">{d.type === 'image' ? 'Source' : 'URL'}</div>
@@ -493,6 +546,24 @@ function NodeInspector({ node }: { node: BoardNode }) {
           }}
         >
           <IcTrash size={12} /> Delete spreadsheet from vault
+        </button>
+      )}
+      {d.type === 'presentation' && presentDoc && (
+        <button
+          className="btn mt-2 w-full text-[#f24822]"
+          onClick={async () => {
+            if (
+              await confirmDialog({
+                title: `Delete “${presentDoc.title}”?`,
+                body: 'The presentation and its cards on all boards are removed. A preserved source file (if any) stays in Files.',
+                confirmLabel: 'Delete presentation',
+                danger: true,
+              })
+            )
+              deletePresentDoc(presentDoc.id)
+          }}
+        >
+          <IcTrash size={12} /> Delete presentation from vault
         </button>
       )}
     </>
