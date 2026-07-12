@@ -6,6 +6,7 @@ import { syncEngine } from '@/lib/sync/SyncEngine'
 import { useCollabStore } from '@/lib/collab/collabStore'
 import { useCan, useReadOnly } from '@/lib/collab/useCollab'
 import type { ViewMode } from '@/types/model'
+import { MODE_METAS } from '@/components/topbarModes'
 import { ProfileMenu } from '@/components/account/ProfileMenu'
 import { PresenceAvatars } from '@/components/collab/PresenceAvatars'
 import { RealtimeStatusChip } from '@/components/collab/RealtimeStatusChip'
@@ -18,6 +19,7 @@ import {
   IcCode,
   IcCommand,
   IcDoc,
+  IcGraph,
   IcHistory,
   IcMessage,
   IcMoon,
@@ -33,14 +35,19 @@ import {
   IcChevronDown,
 } from '@/components/Icons'
 
-const MODES: { mode: ViewMode; label: string; icon: React.ReactNode }[] = [
-  { mode: 'board', label: 'Board', icon: <IcBoard size={13} /> },
-  { mode: 'split', label: 'Split', icon: <IcSplit size={13} /> },
-  { mode: 'doc', label: 'Document', icon: <IcDoc size={13} /> },
-  { mode: 'sheet', label: 'Sheet', icon: <IcTable size={13} /> },
-  { mode: 'presentation', label: 'Presentation', icon: <IcPresentation size={13} /> },
-  { mode: 'code', label: 'Code', icon: <IcCode size={13} /> },
-]
+const MODE_ICONS: Record<ViewMode, React.ReactNode> = {
+  board: <IcBoard size={13} />,
+  graph: <IcGraph size={13} />,
+  split: <IcSplit size={13} />,
+  doc: <IcDoc size={13} />,
+  sheet: <IcTable size={13} />,
+  presentation: <IcPresentation size={13} />,
+  code: <IcCode size={13} />,
+}
+
+// order (Board · Graph · Split · Document · Sheet · Presentation · Code)
+// comes from the shared MODE_METAS so it stays testable without a DOM
+const MODES = MODE_METAS.map((m) => ({ ...m, icon: MODE_ICONS[m.mode] }))
 
 function useOnline(): boolean {
   const [online, setOnline] = useState(navigator.onLine)
@@ -245,7 +252,14 @@ function ContextBreadcrumb() {
           <span className="max-w-28 truncate">{project.name}</span>
         </span>
       )}
-      {boardVisible && board ? (
+      {viewMode === 'graph' ? (
+        <>
+          <IcChevronRight size={11} className="flex-none text-muted" />
+          <span className="flex items-center gap-1.5 font-semibold">
+            <IcGraph size={13} /> Graph
+          </span>
+        </>
+      ) : boardVisible && board ? (
         <>
           <IcChevronRight size={11} className="flex-none text-muted" />
           <input

@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { useStore } from '@/store/useStore'
 import { useUiStore } from '@/store/useUiStore'
 import { AccountProvider, useAccount } from '@/lib/auth/AccountProvider'
@@ -33,6 +33,10 @@ import {
   PresentationModeWorkspace,
   SheetModeWorkspace,
 } from '@/components/workspaces/ModeWorkspaces'
+
+/** Graph mode is lazily loaded: the renderer, worker client and layout code
+ * stay out of the main bundle until the user opens Graph. */
+const GraphWorkspace = lazy(() => import('@/components/graph/GraphWorkspace'))
 
 /** Floating progress toast while the universal importer is working. */
 function ImportProgressToast() {
@@ -117,15 +121,62 @@ function useCollaboration() {
 function useGlobalShortcuts() {
   const setShortcutsOpen = useUiStore((s) => s.setShortcutsOpen)
   useEffect(() => {
+    let lastG = 0
     const onKey = (e: KeyboardEvent) => {
       if (e.key === '/' && (e.ctrlKey || e.metaKey)) {
         e.preventDefault()
         setShortcutsOpen(true)
+        return
+      }
+      // "G G" chord opens Graph mode — ignored while typing / with modifiers
+      const el = e.target as HTMLElement | null
+      const typing =
+        !!el &&
+        (el.isContentEditable ||
+          el.tagName === 'INPUT' ||
+          el.tagName === 'TEXTAREA' ||
+          el.tagName === 'SELECT')
+      if (!typing && !e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'g' || e.key === 'G')) {
+        const now = Date.now()
+        if (now - lastG < 500) {
+          e.preventDefault()
+          useStore.getState().setViewMode('graph')
+          lastG = 0
+        } else {
+          lastG = now
+        }
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [setShortcutsOpen])
+}
+
+/**
+ * Put Graph mode in browser history so Back/Forward move in and out of it,
+ * via a lightweight `#graph` hash — the app is otherwise route-less.
+ */
+function useGraphHistory() {
+  const viewMode = useStore((s) => s.viewMode)
+  const setViewMode = useStore((s) => s.setViewMode)
+  useEffect(() => {
+    const isGraphHash = location.hash === '#graph'
+    if (viewMode === 'graph' && !isGraphHash) {
+      history.pushState({ lattice: 'graph' }, '', '#graph')
+    } else if (viewMode !== 'graph' && isGraphHash) {
+      history.replaceState(null, '', location.pathname + location.search)
+    }
+  }, [viewMode])
+  useEffect(() => {
+    const onPop = () => {
+      const graphHash = location.hash === '#graph'
+      const mode = useStore.getState().viewMode
+      if (graphHash && mode !== 'graph') setViewMode('graph')
+      else if (!graphHash && mode === 'graph') setViewMode('board')
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [setViewMode])
 }
 
 function Workspace() {
@@ -137,6 +188,7 @@ function Workspace() {
 
   useCollaboration()
   useGlobalShortcuts()
+  useGraphHistory()
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
@@ -160,6 +212,17 @@ function Workspace() {
           {viewMode === 'sheet' && <SheetModeWorkspace />}
           {viewMode === 'presentation' && <PresentationModeWorkspace />}
           {viewMode === 'code' && <CodeModeWorkspace />}
+          {viewMode === 'graph' && (
+            <Suspense
+              fallback={
+                <div className="flex min-w-0 flex-1 items-center justify-center bg-bg text-xs text-muted">
+                  Loading graph…
+                </div>
+              }
+            >
+              <GraphWorkspace />
+            </Suspense>
+          )}
           {(viewMode === 'board' || viewMode === 'split') && (
             <>
               <BoardCanvas />

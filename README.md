@@ -571,6 +571,75 @@ Phase 8.5's prioritized remediation plan (`docs/ux-ui-remediation-roadmap.md`) d
 - **Unified transfer dialog** (import planning → confirm → report in one surface); **CRDT subdocument partitioning** for very large projects.
 - Standing items from earlier roadmaps: **File System Access API vault**, **plugin API**, **PR-based GitHub flow**, **remote-deletion management UI**, **billing/subscriptions**, **web clipper**, **AI assistant inside projects**, and **mobile/tablet UI**.
 
+## 15c · Phase 9.5 — Project Graph View
+
+A **Lattice-native Graph View inspired by Logseq's graph interaction
+principles** — an automatically generated **relationship browser**, placed
+immediately after Board in the top nav: **Board · Graph · Split · Document ·
+Sheet · Presentation · Code**. Open it with the tab, the command palette
+("Open Graph view"), or **`G G`**.
+
+**Graph vs Board — kept distinct on purpose.** Board is a *manually arranged
+creative workspace* (you place cards; positions are content). Graph is an
+*automatically generated relationship browser* (the app derives the picture;
+positions are a view, never a source of truth). Graph is read-only — selecting
+and focusing are inspection states; opening a node hands off to its native
+workspace.
+
+**Renderer.** A **custom Canvas 2D renderer with a Web-Worker force layout** —
+no new runtime dependencies, no new license surface, full control over Lattice's
+design tokens, and trivial code-splitting. React Flow (which the Board uses) was
+rejected for the graph: it is built for manual node editors, not automatic
+relationship layout at scale. Sigma/Graphology/Pixi/Cytoscape were evaluated and
+declined on footprint/fit (all MIT — see `docs/graph-view-licensing.md`).
+
+**Relationship sources (all real, all typed & explainable).** Wikilinks/
+backlinks (notes, documents, code — resolved by title), Board → Entity
+membership and drawn board edges, imported **source assets** (DOCX/XLSX/PPTX →
+editable entity) and 3D bundle dependencies, embedded assets, tags (shared tag
+nodes → clusters), and GitHub-linked code. Project hub, card instances,
+comments, versions and users are opt-in (off by default to avoid noise). Every
+node mirrors a real entity; unresolved links never invent nodes.
+
+**Scopes & features.** Project Graph and Local Graph (depth 1–5); force / grid /
+radial layouts (deterministic, stable across reloads); search; per-kind and
+per-relationship filters that remove hidden nodes from the data (so they can't
+be clicked or found); a context inspector that **explains why each relationship
+exists**; empty/loading/error states that always say why.
+
+**Permissions.** Graph respects Lattice's per-project model — every entity is
+filtered to the active project before it reaches the renderer, so no other
+project's entities, titles or counts leak. Viewer/Commenter get the same graph
+visibility (read-only) plus their existing abilities.
+
+**Performance.** Lazy-loaded (`GraphWorkspace` chunk ≈ 50 kB / 16 kB gz; worker
+its own chunk; **no main-bundle impact** beyond a tiny settings decoder). Build
++ layout run in a Web Worker; no perpetual animation; off-screen culling and
+capped labels. Tiers: Small ≤ 500 · Medium ≤ 5,000 · Large ≤ 20,000 · Extreme >
+20,000. Measured: 20,000 nodes / ~61,000 edges index in ~0.12 s and lay out in
+~2–6 s in-worker.
+
+**Accessibility.** Full keyboard traversal of the canvas (arrows move / traverse
+connected nodes, Enter open, Space select, Esc clear), an `aria-live` status
+line, an always-available **structured list view** as a screen-reader
+alternative, reduced-motion support, fixed-size mode, and icon+shape+label
+redundancy (never colour-only).
+
+**Known limitations.** Edge-only selection is via the inspector's relationship
+rows (canvas hit-testing is node-first); comment/version/user edges are wired as
+seams but not populated in v1 (they need collaboration data); the Local Graph
+sidebar panel (`LocalGraphPanel`) exists but is not yet embedded in other modes;
+AI "suggested-related" edges are a reserved seam for Phase 9.5 Project
+Intelligence, visually distinguished and never mixed into verified
+relationships.
+
+Docs: `docs/graph-view-architecture.md`, `graph-view-data-model.md`,
+`graph-view-interactions.md`, `graph-view-accessibility.md`,
+`graph-view-performance.md`, `graph-view-licensing.md`. Settings/state are
+additive (`ViewMode` gains `graph`; store gains per-project `graphSettings`) —
+no data migration; Board/Split/Document/Sheet/Presentation/Code, palette,
+history, collaboration, Drive and GitHub are unchanged.
+
 ## 16 · Folder structure (source)
 
 ```
