@@ -325,6 +325,15 @@ export const IcBranch = (p: P) => (
     <path d="M6 7.2v9.6M18 10.2c0 4-4 4.5-9.5 4.7" />
   </S>
 )
+/** Graph / relationship network — three nodes joined by edges (Phase 9.5). */
+export const IcGraph = (p: P) => (
+  <S {...p}>
+    <circle cx="6" cy="18" r="2.4" />
+    <circle cx="18" cy="16" r="2.4" />
+    <circle cx="13" cy="5.5" r="2.4" />
+    <path d="M7.7 16.2 11.4 7.3M14.9 6.9l2.2 6.9M8.3 17.7l7.4-1.2" />
+  </S>
+)
 export const IcShield = (p: P) => (
   <S {...p}>
     <path d="M12 2 4 5.5v6c0 5 3.4 8.6 8 10.5 4.6-1.9 8-5.5 8-10.5v-6z" />

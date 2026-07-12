@@ -56,6 +56,8 @@ import {
   refreshSectionChildren,
 } from '@/lib/board/sections'
 import { createWebEmbed } from '@/lib/web/WebEmbedService'
+import type { GraphViewSettings } from '@/lib/graph/graphTypes'
+import { decodeGraphSettings } from '@/lib/graph/GraphSettingsService'
 import {
   DEFAULT_PROJECT_ID,
   makeDefaultProject,
@@ -151,12 +153,16 @@ interface AppState {
   search: string
   tagFilter: string | null
   sidebarFilter: SidebarFilter
+  /** Graph View preferences, persisted per project (Phase 9.5). */
+  graphSettings: Record<string, GraphViewSettings>
 
   setSearch: (s: string) => void
   setTagFilter: (t: string | null) => void
   setSidebarFilter: (f: SidebarFilter) => void
   setViewMode: (m: ViewMode) => void
   setTheme: (t: Theme) => void
+  /** Merge + clamp a project's graph settings (creates defaults on first use). */
+  setGraphSettings: (projectId: string, patch: Partial<GraphViewSettings>) => void
 
   createWorkspace: (partial?: Partial<Workspace>) => string
   updateWorkspace: (id: string, patch: Partial<Omit<Workspace, 'id'>>) => void
@@ -417,12 +423,19 @@ export const useStore = create<AppState>()(
       search: '',
       tagFilter: null,
       sidebarFilter: 'all',
+      graphSettings: {},
 
       setSearch: (search) => set({ search }),
       setTagFilter: (tagFilter) => set({ tagFilter }),
       setSidebarFilter: (sidebarFilter) => set({ sidebarFilter }),
       setViewMode: (viewMode) => set({ viewMode }),
       setTheme: (theme) => set({ theme }),
+      setGraphSettings: (projectId, patch) =>
+        set((s) => {
+          const current = decodeGraphSettings(s.graphSettings[projectId])
+          const next = decodeGraphSettings({ ...current, ...patch })
+          return { graphSettings: { ...s.graphSettings, [projectId]: next } }
+        }),
 
       /* ---------------- workspaces (Phase 8) ---------------- */
 
@@ -1712,6 +1725,7 @@ export const useStore = create<AppState>()(
         activePresentId: s.activePresentId,
         viewMode: s.viewMode,
         theme: s.theme,
+        graphSettings: s.graphSettings,
       }),
     },
   ),

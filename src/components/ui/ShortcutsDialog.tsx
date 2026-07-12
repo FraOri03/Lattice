@@ -9,7 +9,21 @@ const GROUPS: { title: string; rows: [string, string][] }[] = [
     rows: [
       ['Ctrl K', 'Command palette'],
       ['Ctrl /', 'This shortcuts overview'],
+      ['G G', 'Open Graph view'],
       ['Esc', 'Close dialogs and panels'],
+    ],
+  },
+  {
+    title: 'Graph',
+    rows: [
+      ['↑ / ↓', 'Move between nodes'],
+      ['← / →', 'Traverse connected nodes'],
+      ['Enter', 'Open node in its workspace'],
+      ['Ctrl + Enter', 'Open beside graph (split)'],
+      ['Space', 'Select / inspect node'],
+      ['F', 'Fit graph to view'],
+      ['+ / −', 'Zoom in / out'],
+      ['Drag node', 'Reposition (pins the node)'],
     ],
   },
   {

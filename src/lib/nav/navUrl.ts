@@ -22,6 +22,7 @@ export interface NavState {
 
 const MODES: readonly ViewMode[] = [
   'board',
+  'graph',
   'split',
   'doc',
   'sheet',
