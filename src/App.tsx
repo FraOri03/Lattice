@@ -23,6 +23,8 @@ import { GithubDialog } from '@/components/github/GithubDialog'
 import { DriveDialog } from '@/components/account/DriveDialog'
 import { CommandPalette } from '@/components/CommandPalette'
 import { Toaster, toast } from '@/components/ui/Toaster'
+import { LiveRegion } from '@/components/a11y/LiveRegion'
+import { useUrlHistory } from '@/lib/nav/useUrlHistory'
 import { DialogHost, confirmDialog } from '@/components/ui/ConfirmDialog'
 import { ShortcutsDialog } from '@/components/ui/ShortcutsDialog'
 import { ShareDialog } from '@/components/collab/ShareDialog'
@@ -188,7 +190,7 @@ function Workspace() {
 
   useCollaboration()
   useGlobalShortcuts()
-  useGraphHistory()
+  useUrlHistory()
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
@@ -254,6 +256,7 @@ export default function App() {
       <Gate />
       <DialogHost />
       <Toaster />
+      <LiveRegion />
     </AccountProvider>
   )
 }

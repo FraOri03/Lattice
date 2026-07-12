@@ -1,342 +1,76 @@
 # Lattice
 
-A **local-first unified creative workspace**: Obsidian-style linked notes, a Figma-style infinite board with sections, a Word/Notion-style rich document editor, a VS Code-style code workspace with GitHub sync, an Excel-style spreadsheet engine, a slide editor, projects inside **workspaces**, a personal account area, Google Drive cloud sync — and, since Phase 8, **production realtime multiplayer**: Yjs CRDT co-editing for documents, code and boards over Liveblocks with **server-enforced permissions**, live cursors and presence everywhere, area comments, a notification center, and a completed file-format pipeline (DOCX/PPTX/PDF export included).
+A **local-first unified creative workspace** — Obsidian-style linked notes, a Figma-style
+infinite board with sections, a Word/Notion-style rich document editor, a VS Code-style
+code workspace with GitHub sync, an Excel-style spreadsheet engine, and a slide editor,
+all organized into **projects** inside **workspaces**, with optional Google Drive cloud
+sync and CRDT realtime collaboration.
 
-```
-npm install
-npm run dev        # → http://localhost:5173
-npm run build      # typecheck + production build
-```
-
-Deployed on Vercel — see [§ Deployment](#12--deployment-vercel) below.
-
----
-
-## 1 · Product vision
-
-**Lattice is a thinking canvas backed by a document engine.** One vault holds every kind of thing you work with — notes, documents, spreadsheets, decks, boards, code and imported files — organized into **projects**, and every one of them can be a card on an infinite canvas, linked visually and semantically.
-
-Core mental model:
+One vault holds every kind of thing you work with — notes, documents, spreadsheets, decks,
+boards, code and imported files — and every one of them can be a **card** on an infinite
+canvas, linked visually and semantically.
 
 > **Documents and assets are entities. Cards are views of them. Projects own them. The cloud mirrors them.**
 
-- A **note** is a markdown document with `[[wikilinks]]`, backlinks and tags.
-- An **asset** is any imported file (PDF, Office, media, 3D). Its metadata lives in the vault; its binary lives behind a storage interface.
-- A **board** is an infinite canvas of **cards**; a card *references* a note or asset, so the same entity can appear on many boards. **Sections** group cards Figma-style; **web embeds** put live websites on the canvas.
-- A **project** is an organizational space (like ChatGPT/Claude projects): it owns boards, notes, documents, code and assets.
-- The app is **offline-first**: IndexedDB + localStorage are the working copy; Google Drive is a synced backup, never a requirement.
+## Project status
 
-Feel targets: Figma (board), Obsidian (linked notes), Notion (organization), Office/Workspace (editing), Milanote (visual research).
+**Alpha / experimental.** Functionally broad, but no public release has been cut (no Git
+tags, no CI). Based on the project's own [UX/UI audit](https://github.com/FraOri03/Lattice/issues/5):
+single-user local work is the most mature (late-alpha / early-beta); team & realtime
+features work but are **config-gated and alpha**. Cloud and realtime features degrade
+honestly when unconfigured — nothing is faked. See [docs/limitations.md](docs/limitations.md).
 
-## 2 · What works today
+## Features
 
-**Phases 1–4 (complete):** universal import (PDF, Office, media, 3D, code — see §7), asset library with previews, board cards for every kind, markdown notes with wikilinks/backlinks/tags, rich document editor (Tiptap), code workspace (Monaco), spreadsheet engine with formulas, visual card linking, dark/light theme, JSON project export/import.
+- **Six editing surfaces** — board, rich documents, markdown notes, spreadsheets, slide
+  decks, and a Monaco code workspace.
+- **Infinite board** — Figma-like sections, web-embed cards, and a card view for every
+  entity kind.
+- **Universal import/export** — PDF, Office (DOCX/XLSX/PPTX/ODF), media, 3D, code;
+  DOCX/PPTX/PDF export. See [docs/file-formats.md](docs/file-formats.md).
+- **Projects & workspaces** — everything scoped to the active project; command palette,
+  quick create, recents, dark/light theme.
+- **Cloud sync** — offline-first Google Drive backup (`drive.file` scope; single-user,
+  multi-device).
+- **GitHub code sync** — connect a repo, import/commit code documents to a feature branch.
+- **Collaboration** — roles & server-enforced permissions, presence, comments, version
+  history, and CRDT co-editing (Liveblocks + Yjs) when configured. See
+  [docs/collaboration.md](docs/collaboration.md).
 
-**Phase 6 (this release):**
+A full, status-tagged inventory is in [docs/features.md](docs/features.md).
 
-| Area | Status |
+## Tech stack
+
+React 19 · TypeScript · Vite 6 · Zustand · Tiptap (ProseMirror) · Monaco · React Flow ·
+Yjs + Liveblocks (CRDT realtime) · SheetJS · jsPDF · three.js · Tailwind CSS. Deployed on
+Vercel with serverless functions for GitHub OAuth and realtime auth.
+
+## Quick start
+
+```bash
+npm install
+npm run dev        # → http://localhost:5173
+```
+
+With no configuration the app runs fully local (mock account, sync disabled, GitHub via
+personal access token, realtime limited to tabs of one browser).
+
+### Commands
+
+| Command | What it does |
 |---|---|
-| Projects (create/rename/archive/delete/star, icon/color, switcher, per-project content) | ✅ implemented |
-| Personal account area (login screen, profile menu, connected-services status) | ✅ implemented |
-| Google sign-in (OAuth via Google Identity Services) | ✅ real when `VITE_GOOGLE_CLIENT_ID` is set; honest local mock otherwise |
-| Google Drive cloud sync (offline-first push/pull, conflict handling) | ✅ implemented (single-user; see §10 limits) |
-| GitHub code sync (connect, link repo, browse, import, commit to feature branch, pull) | ✅ implemented (code documents only) |
-| Board sections (Figma-like frames: rename, resize, color, collapse, group-move, minimap) | ✅ implemented |
-| Web embed cards (paste URL → sandboxed iframe, link-preview fallback, full-page resize) | ✅ implemented |
-| Top navigation: Board · Split · Document · Sheet · Presentation · Code | ✅ implemented |
-| Command palette (Ctrl/Cmd+K), quick create, recents, file-type filters, sync/offline indicators, import progress | ✅ implemented |
-| Presentation editor | ✅ **built in Phase 8** — see § Phase 8 below |
+| `npm run dev` | Dev server (HMR) at http://localhost:5173 |
+| `npm run build` | Typecheck + production build → `dist/` |
+| `npm run typecheck` | TypeScript typecheck only |
+| `npm test` | Unit tests (Vitest) |
+| `npm run preview` | Serve the production build locally |
 
-**Phase 7 (this release):**
+### Minimal configuration
 
-| Area | Status |
-|---|---|
-| Project members & roles (owner/admin/editor/commenter/viewer) with a permission matrix | ✅ implemented (`PermissionsService`) |
-| Invitations (invite by email, role, pending state, copy link, revoke, resend, accept flow, offline "simulate acceptance") | ✅ implemented (link-based — no email backend, and it says so) |
-| Presence: active avatars in the top bar, per-user location ("viewing X", "editing Y"), last-active times | ✅ real across tabs of one browser (BroadcastChannel); cross-device needs the realtime backend |
-| Live board collaboration: cursors, selection outlines, live card/section movement, safe op merging | ✅ real across tabs; provider-ready for cross-device |
-| Comments: pins on the canvas, threads on cards/sections/docs/code/sheets/assets/embeds, replies, resolve/reopen, @mentions, filters, badges | ✅ implemented |
-| Activity log (invites, joins, edits, moves, comments, versions, Drive/GitHub sync, imports, exports) | ✅ implemented |
-| Version history: snapshots of boards/docs/code/project meta, restore (with auto-backup), duplicate, line diff | ✅ implemented |
-| Role-based read-only: boards, docs, sheets, code, sidebar and inspectors all honor the role; "Preview as role" for testing | ✅ implemented |
-| Code collaboration: soft file locks ("X is editing"), read-only for others, request edit control, owner/admin force-unlock | ✅ implemented |
-| Document collaboration: editing indicators, conflict-safe refresh on remote saves (never clobbers a focused editor) | ✅ implemented (LWW at save granularity — **not** keystroke CRDT; see §14) |
-| Drive-polling collaboration provider (members/invites/comments/activity/versions sync via the project's Drive folder) | ✅ implemented, ~20s latency, honestly labeled |
-| True realtime backend (websocket) | ✅ **built in Phase 8** — Liveblocks + Yjs with server-side permissions; see § Phase 8 |
-| UX/UI fix pass: toast system, styled confirm/prompt dialogs, focus-visible states, aria-labels, reduced-motion, context breadcrumb, empty-board state, shortcuts overlay (Ctrl+/) | ✅ implemented (see §14 audit summary) |
+Everything is optional. Copy the template and fill in only what you need:
 
-## 3 · Architecture: the document engine + cloud layer
-
-```
-            ┌───────────────────────────────────────────────────────┐
-            │                        UI layer                        │
-            │ Sidebar (ProjectSwitcher) · TopBar (6 modes, sync dot) │
-            │ Board · Editors · Inspectors · CommandPalette · Login  │
-            └──────┬──────────────────┬──────────────────┬──────────┘
-                   │                  │                   │
-            ┌──────┴──────────────────┴───────────────────┴─────────┐
-            │              Vault store (Zustand, persisted)          │
-            │  projects · boards · notes · asset/doc/code/sheet META │
-            └──┬───────────┬───────────┬──────────────┬─────────────┘
-               │           │           │              │
-        ImportService  AssetRegistry  SyncEngine   AccountProvider
-               │           │           │  ConflictResolver   │
-        ┌──────┴───────────┴──────┐    │              AuthService
-        │ StorageProvider (iface) │    │             (Google GIS / mock)
-        │  IndexedDB (local)      │◄───┤
-        │  GoogleDriveStorage-    │    └── GithubCodeProvider
-        │  Provider (remote)      │        (code documents only)
-        └─────────────────────────┘
-```
-
-Named abstractions and where they live:
-
-| Abstraction | File | Role |
-|---|---|---|
-| `StorageProvider` | `src/lib/storage/StorageProvider.ts` | binary + document body storage interface (IndexedDB impl) |
-| `GoogleDriveStorageProvider` | `src/lib/storage/GoogleDriveStorageProvider.ts` | **real** Drive REST v3 client implementing the same interface + path-aware ops |
-| `SyncEngine` | `src/lib/sync/SyncEngine.ts` | offline-first push/pull between vault and Drive |
-| `ConflictResolver` | `src/lib/sync/ConflictResolver.ts` | newest-wins policy + conflict records (Phase 7 seam) |
-| `AuthService` | `src/lib/auth/AuthService.ts` | Google OAuth (GIS token flow) or honest mock |
-| `AccountProvider` | `src/lib/auth/AccountProvider.tsx` | React session context |
-| `GithubCodeProvider` | `src/lib/github/GithubCodeProvider.ts` | GitHub REST client — code documents only |
-| `ProjectRegistry` / `ProjectStore` | `src/lib/projects/` | project helpers + hook-level API |
-| `FileKindRegistry` / `FileKindIcon` | `src/lib/registry/fileKinds.tsx` | unified kind → icon/label/color |
-| `WebEmbedService` | `src/lib/web/WebEmbedService.ts` | URL sanitization + embed payloads |
-| `BoardSectionNode` | `src/components/board/SectionNode.tsx` | Figma-like frames |
-| `WebEmbedCardNode` | `src/components/board/WebEmbedCardNode.tsx` | sandboxed website cards |
-| `ImportService` | `src/lib/import/ImportService.ts` | universal import pipeline (+ progress reporting) |
-| `AssetRegistry` | `src/lib/assets/AssetRegistry.ts` | asset id → object URL cache |
-| `DocumentRegistry` / `EditorRegistry` | `src/lib/registry/documents.ts` | document kinds → editors (plugin seam) |
-
-**Entity model** (`src/types/model.ts`): `Project`, `Account`, `SyncState`, `BoardSection`, `WebEmbed` joined the existing `NoteDoc`, `AssetDoc`, `Board`, `RichDocMeta`, `CodeDocMeta`, `SpreadsheetDocMeta`. Every entity now carries a `projectId`; a persisted-store migration stamps pre-Phase-6 vaults with a default project automatically.
-
-## 4 · Projects
-
-Projects are ChatGPT/Claude-style spaces. The switcher lives at the top of the sidebar:
-
-- create · rename · archive · delete (with confirmation) · star
-- icon (emoji) + color + description per project
-- starred / recent grouping in the switcher
-- all sidebar lists, search, the command palette and boards are scoped to the active project
-- each project gets its own folder in cloud storage (`/Lattice/projects/<id>`)
-
-Deleting a project deletes its local content after confirmation. **Files already synced to Drive are kept remotely** (Lattice never bulk-deletes remote data).
-
-## 5 · Account & cloud sync (Google Drive)
-
-**Sign-in** uses Google OAuth (Google Identity Services token flow) and requests the `drive.file` scope — Lattice can only touch files it created, never the rest of your Drive. Without OAuth credentials configured, the login screen offers a clearly-labeled **local-only mock account** so the UI works in dev; cloud sync stays disabled — no fake syncing.
-
-**Sync model** (single-user, multi-device — *not* collaboration):
-
-- Local vault (Zustand + IndexedDB) is always the working copy; the app is fully usable offline.
-- The SyncEngine debounces local changes (10s) and pushes only entities that changed since their last upload.
-- On sign-in/startup it pulls remote project snapshots and merges them per-entity.
-- Conflicts (both sides changed since last sync) resolve **newest-wins**; the losing local body is backed up to Drive as `<id>.conflict-<ts>.json` first, and Drive's own revision history keeps prior remote versions. Resolved conflicts are listed in the profile menu.
-- **Deletions never propagate automatically** in either direction, and remote deletes go to Drive's trash (recoverable), only ever from explicit user actions.
-
-**Drive layout:**
-
-```
-/Lattice
-  /projects/<project-id>
-    project.json          # project + all entity metadata (incl. boards & notes)
-    /documents/<id>.json  # rich document bodies (Tiptap JSON)
-    /spreadsheets/<id>.json
-    /code/<id>.<ext>      # code sources as real text files
-    /assets/<id>.<ext>    # imported binaries
-  /data                   # flat area used by the raw StorageProvider interface
-```
-
-The status chip in the top bar shows Synced / Syncing / pending count / Offline / error; click it to sync now.
-
-## 6 · GitHub integration (code documents only)
-
-GitHub sync is deliberately scoped: **only code documents** ever touch GitHub — never boards, rich documents, notes, spreadsheets or assets.
-
-- **Connect** in the profile menu: one-click OAuth (when `VITE_GITHUB_CLIENT_ID` + serverless function are configured) or paste a personal access token (works everywhere; stored only in your browser).
-- **Link a project to a repo** in the GitHub panel; Lattice proposes a feature branch `lattice/<project-slug>`.
-- **Browse & import**: the panel lists the repo's code files; selected files import into Code mode and remember their repo path.
-- **Sync code to GitHub**: select code documents, write a commit message, click — one commit lands on the feature branch. Commits happen **only** on this explicit action.
-- **Pull code from GitHub** refreshes linked documents from their branch.
-- The repo's **default branch is protected by default**: Lattice refuses to commit to it. The branch-based workflow leaves room for an optional PR flow later.
-
-## 7 · Boards: sections & web embeds
-
-**Sections** (Figma-like frames): create from the canvas toolbar; rename (double-click), resize, recolor, collapse/expand. Drop a card inside a section to attach it — dragging the section header moves the whole group (React Flow parent/child). Dragging a card out detaches it. Sections appear in the minimap in their color and serialize into the board JSON (`BoardSection` + `childCardIds`).
-
-**Web embeds**: paste a URL on the canvas (or use the toolbar Web button / drop a link) to create a website card. Live sandboxed iframe by default with a one-click **link-preview fallback** — sites that send `X-Frame-Options`/CSP render blank, which JS cannot detect, so the card offers the switch inline. Header actions: favicon + title, open externally, resize to full page.
-
-Security: URLs are sanitized on creation (`http`/`https` only — `javascript:`, `data:`, `file:` etc. are rejected with a visible warning card); iframes always carry `sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"` and `referrerPolicy="no-referrer"`.
-
-## 8 · Navigation & QOL
-
-Top navigation: **Board · Split · Document · Sheet · Presentation · Code**. Board = canvas; Split = workspace + canvas side-by-side; Document = notes/rich docs with inspector; Sheet = spreadsheet workspace; Presentation = honest placeholder listing imported decks; Code = Monaco workspace with inspector. Opening an entity from a full-page mode jumps to its matching mode; from the board it opens Split.
-
-- **Command palette** (Ctrl/Cmd+K): create anything, switch modes/projects/theme, search the active project's files and boards, recents.
-- **Quick create** ("+ New") in the top bar; **recents** in sidebar + palette; **file-type filter chips** in the sidebar; **sync + offline indicators**; **import progress toast**; empty states with jump lists in every mode.
-- `FileKindIcon`/`fileKindRegistry` give every kind (notes, docs, sheets, decks, code, PDF, image, video, audio, 3D, board, generic, webpage, GitHub, Drive) one consistent icon everywhere.
-
-## 9 · Document engines (Phases 2–4 recap)
-
-- **Rich documents** — Tiptap v2 (ProseMirror); canonical JSON bodies lazy-loaded from storage; headings, lists, tables, tasks, callouts, wikilinks, asset embeds; DOCX/ODT/RTF import with the original preserved in `/imports`; Markdown/HTML/ODT/RTF export.
-- **Code** — Monaco (bundled, lazy chunk); language detection for 30+ extensions; digested metadata (snippet, line count, wikilinks in comments); board cards with read-only preview. Now with GitHub link metadata per file.
-- **Spreadsheets** — custom virtualized grid + dependency-free `FormulaEngine` (SUM, AVERAGE, MIN, MAX, COUNT, COUNTA, IF, ROUND, ABS, SQRT; A1/$A$1/ranges; `#CYCLE!` guard); XLSX/CSV/ODS import-export via lazy SheetJS chunk.
-- **Conversion** — every office format is declared by a `FormatAdapter` with honest `limitations`; nothing pretends to be editable when it isn't.
-
-## 10 · Known limitations (honest list)
-
-- **Sync is single-user** (multi-device for one account). Timestamps, not CRDTs: simultaneous edits on two devices resolve newest-wins with backups, not merges. Realtime collaboration is Phase 7.
-- Local deletions don't delete on Drive (by design) — a cleanup UI is future work; board layout changes alone don't bump a timestamp, so they upload with the next content change of the same project (or on manual "Sync now").
-- OAuth tokens live in browser storage; sign out to clear. The mock account never syncs anything.
-- Presentation mode is a placeholder; PPTX/ODP remain preserved assets with their source files intact.
-- Web embed favicons load from `<origin>/favicon.ico` (external request by nature); sites that block framing need the preview mode.
-- GitHub sync writes text files only (code documents); binary assets are out of scope on purpose.
-- Vault metadata still lives in localStorage (~5 MB); binaries/document bodies in IndexedDB.
-- Everything listed in previous phases' limitations (formula scope, ODT/RTF fidelity, Monaco chunk size, base64 project export size, …) still applies.
-
-## 11 · Environment variables
-
-Copy `.env.example` → `.env.local` (never commit real values):
-
-| Variable | Required for | Notes |
-|---|---|---|
-| `VITE_GOOGLE_CLIENT_ID` | Google sign-in + Drive sync | OAuth 2.0 **Web** client id |
-| `VITE_GOOGLE_API_KEY` | — (optional) | only for future discovery-based APIs |
-| `VITE_GOOGLE_DRIVE_APP_FOLDER` | — (default `Lattice`) | name of the Drive root folder |
-| `VITE_GITHUB_CLIENT_ID` | one-click GitHub OAuth | PAT connect works without it |
-| `GITHUB_CLIENT_SECRET` | GitHub OAuth exchange | **server-side only** — read by `api/github/oauth.ts`, never bundled |
-| `VITE_REALTIME_BACKEND` | cross-device realtime (Phase 8) | set to `liveblocks` to enable; empty = honest "Realtime off" state |
-| `LIVEBLOCKS_SECRET_KEY` | realtime auth + room ACLs | **server-side only** — read by `api/realtime/*.ts`; create at liveblocks.io |
-| `VITE_REALTIME_AUTH_URL` / `VITE_REALTIME_ROOMS_URL` | — (optional) | endpoint overrides; default `/api/realtime/{auth,rooms}` |
-| `VITE_CONVERSION_API_URL` | remote DOC/PPT conversion (Phase 8, optional) | external worker endpoint; empty = conversion honestly disabled |
-| `VITE_APP_ENV` | display | `development` / `preview` / `production` |
-| `VITE_APP_VERSION` | display | shown in the account menu |
-
-With all of them empty the app still runs fully local (mock account, sync disabled, PAT-only GitHub).
-
-### Google OAuth + Drive API setup
-
-1. [Google Cloud Console](https://console.cloud.google.com) → create a project.
-2. **APIs & Services → Library** → enable **Google Drive API**.
-3. **OAuth consent screen** → External → add yourself as test user; scopes: `openid`, `email`, `profile`, `.../auth/drive.file`.
-4. **Credentials → Create credentials → OAuth client ID → Web application**. Authorized JavaScript origins: `http://localhost:5173` and your Vercel URL(s). (The GIS token flow needs no redirect URI.)
-5. Put the client id in `VITE_GOOGLE_CLIENT_ID`.
-
-### GitHub OAuth app setup (optional — PAT works without it)
-
-1. [github.com/settings/developers](https://github.com/settings/developers) → **New OAuth App**.
-2. Homepage URL: your deployment URL. **Authorization callback URL:** `https://<your-app>.vercel.app/api/github/oauth` (and `http://localhost:5173/api/github/oauth` for a second dev app if wanted — note the function only runs on Vercel/`vercel dev`).
-3. Set `VITE_GITHUB_CLIENT_ID` (client id) and `GITHUB_CLIENT_SECRET` (client secret, server-side env var only).
-
-## 12 · Deployment (Vercel)
-
-The repo ships `vercel.json` (Vite framework preset, SPA rewrites that spare `/api/*`, immutable asset caching) and three serverless functions: `api/github/oauth.ts` (GitHub token exchange) plus, since Phase 8, `api/realtime/auth.ts` and `api/realtime/rooms.ts` (Google-verified identity → scoped Liveblocks room tokens, and the server-side membership ACL).
-
-**Via dashboard:** import `FraOri03/Lattice` at [vercel.com/new](https://vercel.com/new) → framework auto-detects Vite (`npm run build` → `dist`) → add the environment variables above → Deploy.
-
-**Via CLI:**
-
-```
-npm install --global vercel@latest
-vercel          # first deploy / preview
-vercel --prod   # production
-```
-
-Checklist after the first deploy:
-- add the Vercel URL to the Google OAuth client's **Authorized JavaScript origins**
-- point the GitHub OAuth app's callback at `https://<app>.vercel.app/api/github/oauth`
-- set env vars for *Production* and *Preview* environments
-- no secrets in the client: only `VITE_*` values reach the bundle; `GITHUB_CLIENT_SECRET` must **not** be prefixed
-
-## 13 · Phase 7 — collaboration architecture
-
-```
-                 UI: ShareDialog · PresenceAvatars · BoardPresenceLayer ·
-                     CommentPins · CollabPanel (Comments/Activity/Versions) ·
-                     ReadOnlyBanner · lock banners
-                                   │  (hooks: useMyRole/useCan/usePeers…)
-      ┌────────────────────────────┴─────────────────────────────┐
-      │                collab services (src/lib/collab)          │
-      │  PermissionsService · MembersService · InviteService     │
-      │  PresenceService · CommentService · ActivityLogService   │
-      │  VersionHistoryService · RealtimeBoardSync               │
-      │  RealtimeDocumentSync (incl. code locks)                 │
-      └──────────────┬──────────────────────────┬────────────────┘
-                     │ collabStore (Zustand)    │ ConflictResolverV2
-      ┌──────────────┴──────────────────────────┴────────────────┐
-      │                     CollabHub (router)                   │
-      │   send() ─▶ every active provider · recv ─▶ handlers     │
-      └──────┬─────────────────────┬──────────────────┬──────────┘
-             │                     │                  │
-   LocalCollaborationProvider   DrivePolling-      Realtime-
-   (BroadcastChannel: REAL      Collaboration-     CollaborationProvider
-    live sync between tabs)     Provider (~20s,    (placeholder — needs a
-                                durable state      websocket backend,
-                                via collab.json)   Phase 8)
-```
-
-### Permission matrix
-
-| Capability | Owner | Admin | Editor | Commenter | Viewer |
-|---|---|---|---|---|---|
-| View content | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Add comments / resolve own | ✅ | ✅ | ✅ | ✅ | — |
-| Resolve any comment | ✅ | ✅ | ✅ | — | — |
-| Create / edit / delete content | ✅ | ✅ | ✅ | — | — |
-| Create & restore versions | ✅ | ✅ | ✅ | — | — |
-| Manage members (below own rank), invites | ✅ | ✅ | — | — | — |
-| Force-unlock locked code files | ✅ | ✅ | — | — | — |
-| Manage integrations (Drive/GitHub) | ✅ | — | — | — | — |
-| Delete project / transfer ownership | ✅ | — | — | — | — |
-
-The matrix lives in one place (`src/lib/collab/permissions.ts`); UI and services both consult it, and the owner can **preview the app as any role** from Share → Settings.
-
-### Provider strategy (no vendor lock-in)
-
-`CollaborationProvider` is a transport interface with honest, self-reported capabilities (`presence`, `liveCursors`, `latency`, `scope`). The hub runs every available provider simultaneously:
-
-- **LocalCollaborationProvider** — BroadcastChannel. Real, instant collaboration between tabs/windows of the same browser: presence, cursors, selections, live board ops, document/lock messages. This is what makes every collaboration feature testable without any backend.
-- **DrivePollingCollaborationProvider** — durable collab state (members, invites, comments, activity, version index) synced through `/Lattice/projects/<id>/collab.json` on a ~20s poll. **Drive polling limitation:** latency is the polling interval, there is no live presence (only last-active timestamps), and every participant needs access to the same Drive folder. The UI labels it exactly that way.
-- **RealtimeCollaborationProvider** — **production since Phase 8**: Liveblocks + Yjs with server-enforced permissions. Activates only with `VITE_REALTIME_BACKEND=liveblocks` + `LIVEBLOCKS_SECRET_KEY` + Google sign-in; otherwise the status chip shows the honest setup checklist. See § 15.
-
-Merging is structure-aware (`ConflictResolverV2`): collab records union by id with per-record newest-wins, comment replies always union, activity/version sets union, and boards merge **node-by-node** so two people moving different cards both keep their change.
-
-### Honest limitations (collaboration) — status after Phase 8
-
-- ~~True low-latency multiplayer across devices requires a realtime backend~~ → **shipped** (Liveblocks + Yjs, § 15). Without configuration, "live" still means tabs of one browser + Drive polling, and the UI says so.
-- ~~Document co-editing is last-writer-wins~~ → **shipped**: keystroke-level CRDT for rich documents and code (y-prosemirror / y-monaco).
-- Code soft locking still exists as the optional **Checkout required** policy; Collaborative (CRDT) is the default.
-- Invites are links, not emails — Lattice has no mail server and says so in the dialog. With the realtime backend, the invitee's Google e-mail is recognized server-side the moment they sign in.
-- ~~Version snapshot payloads live only on this device~~ → bodies ≤ 200 KB now sync through the collab CRDT doc; larger ones stay device-local (documented in § 15.12).
-- ~~No server enforcing ACLs~~ → **shipped**: room-token scopes enforced by the backend on every operation (§ 15.3).
-
-## 14 · Phase 7 — UX/UI audit summary & fixes
-
-A structural audit ran before the collaboration work; what it found and what was fixed:
-
-| Finding (audit) | Fix (this release) |
-|---|---|
-| Native `alert()`/`confirm()`/`prompt()` for deletes, imports and URL entry — jarring, blocking, unstyled | Global **toast system** + promise-based **styled confirm/prompt dialogs** with a danger variant; every native dialog call replaced |
-| No visible keyboard focus anywhere; icon-only buttons without accessible names; no reduced-motion support | Global `:focus-visible` ring, `aria-label`s across the chrome (mode switcher, icon buttons, dialogs), `prefers-reduced-motion` handling |
-| Top bar went blank outside Board mode (literal spacer); project context invisible | **Context breadcrumb** (project icon + name → board/document/code/sheet) in every mode; duplicate card-count stat removed |
-| Empty board = bare dot grid with zero guidance | **Empty-board state** with first-note / add-section / import actions (read-only aware) |
-| No keyboard shortcut reference | **Shortcuts overlay** (Ctrl+/ and command palette entry) |
-| Destructive actions confirmed with plain-text `confirm()` | Danger-styled dialogs with explicit consequences ("Notes are kept", "cannot be undone locally…") |
-| Collaboration UX (net-new) | Avatars in the top bar; cursors/selections on the canvas; comments as pins + one right-side drawer (Comments·Activity·Versions — one drawer, not three); role state as a persistent banner + disabled-with-explanation controls; locks as in-context banners |
-
-Product coherence: the app keeps one design token set (`--panel/--bord/--ink/--accent`), one icon system, one card chrome, one dialog/toast language — Figma-like on the board, Obsidian-like in notes, VS Code-like in code, Notion-like in documents.
-
-## 15 · Phase 8 — production realtime multiplayer, formats, QOL
-
-### 15.1 Realtime backend: Liveblocks + Yjs (and why)
-
-Evaluated against Supabase Realtime, PartyKit and self-hosted y-websocket. **Liveblocks won** because it is the only option that (a) needs **zero self-hosted infrastructure** next to a Vercel frontend — just two serverless functions, (b) has first-class Yjs providers that plug straight into Tiptap and Monaco, (c) gives real **server-side permission enforcement** through scoped room tokens, and (d) handles reconnect/backoff out of the box. PartyKit + Yjs remains the documented fallback (it would slot behind the same `RealtimeAttachment` interface in `src/lib/crdt/liveblocks.ts`).
-
-The Phase 7 provider architecture is intact: `LocalCollaborationProvider` (tabs), `DrivePollingCollaborationProvider` (durable state over Drive) and the now-**production** `RealtimeCollaborationProvider` all run behind `CollabHub`. The realtime provider reports the full capability set — `presence, liveCursors, boardRealtime, documentCRDT, codeCRDT, commentsRealtime, serverPermissions, offlineRecovery` — and activates **only** when `VITE_REALTIME_BACKEND=liveblocks` is configured *and* the user is signed in with Google. Otherwise the top-bar status chip shows the honest setup state with the exact checklist; a remote connection is never simulated.
-
-### 15.2 CRDT architecture (`src/lib/crdt/`)
-
+```bash
+cp .env.example .env.local
 ```
 YjsManager ── one ProjectRoom per project ──┬─ content Y.Doc: documents (Y.XmlFragment each),
   │ owns rooms + optional realtime attach   │  codeDocuments (Y.Text each), boards (Y.Map of
@@ -410,7 +144,8 @@ Generated from `src/lib/registry/formatMatrix.ts` (code and docs cannot drift). 
 
 | Chunk | Size (gzip) | Loading |
 |---|---|---|
-| Main bundle (React, board, Tiptap, Yjs, three.js) | **699 kB** | initial |
+| Main bundle (React, board, Tiptap, Yjs) | **550 kB** | initial (three.js removed in Phase 9 — see §15c.5) |
+| three.js (viewer/scene) | 154 kB | **lazy** (Phase 9 — only 3D previews/cards) |
 | Monaco code editor | 865 kB | lazy (Code mode) |
 | SheetJS (xlsx) | 161 kB | lazy (first sheet import/export) |
 | jsPDF | 129 kB | lazy (PDF export) |
@@ -418,7 +153,7 @@ Generated from `src/lib/registry/formatMatrix.ts` (code and docs cannot drift). 
 | Presentation workspace | 5.8 kB | lazy |
 | Spreadsheet workspace | 8.7 kB | lazy |
 
-Skeleton/loading states cover every lazy module. Presence cursors are throttled (60 ms), drags (50 ms), board CRDT commits batched (80 ms). Known optimization for Phase 9: three.js is still in the main bundle (~170 kB gz of it) — the viewer can go lazy.
+Skeleton/loading states cover every lazy module. Presence cursors are throttled (60 ms), drags (50 ms), board CRDT commits batched (80 ms). **Phase 9 update:** three.js is no longer in the main bundle — it is a dedicated lazy chunk, and off-screen 3D/media animation loops are suspended (§15c.5).
 
 ### 15.12 Known limitations (Phase 8)
 
@@ -430,146 +165,101 @@ Skeleton/loading states cover every lazy module. Presence cursors are throttled 
 - PPTX/ODP import flattens masters/themes/animations (reported per file); PPTX export is basic fidelity by design.
 - Realtime requires Google sign-in (identity source); local mock accounts stay tabs-only + Drive.
 
-## 15a · Phase 8.5 — UX/UI audit & Presentation-in-Board integration
+| Variable | Unlocks |
+|---|---|
+| `VITE_GOOGLE_CLIENT_ID` | Google sign-in + Drive sync |
+| `VITE_GITHUB_CLIENT_ID` + `GITHUB_CLIENT_SECRET` | One-click GitHub OAuth (PAT works without it) |
+| `VITE_REALTIME_BACKEND=liveblocks` + `LIVEBLOCKS_SECRET_KEY` | Cross-device realtime |
 
-After the Phase 8 build, a **senior UX/UI audit** ran across the whole product (branch `phase-8` @ `bef3dc5`; full inspection of 148 source files + the running app at `localhost:5173` through all six modes + git history), in the same spirit as the Phase 7 audit (§14) but broadened to every surface. It produced a scorecard, a complete feature inventory, per-surface findings, an issue register (`LAT-*`) and a prioritized remediation plan — and it **autonomously remediated the flagship product-coherence gap**: presentations could not be board cards. Deliverables live under `docs/` (`ux-ui-audit-phase-8.md`, `ux-ui-audit-scorecard.md`, `ux-ui-remediation-roadmap.md`, `presentation-board-integration-spec.md`).
+Full setup, provider configuration and deployment are in [docs/setup.md](docs/setup.md)
+and [docs/integrations.md](docs/integrations.md).
 
-**One-line verdict:** a genuinely impressive engineering platform with a coherent visual system and rare honesty of state, held back by an over-deep information architecture, canvas-level accessibility gaps, and surface-level feature threading (of which Presentation-in-Board was the flagship example, now closed).
+> **Deployment:** the repo is Vercel-ready (`vercel.json` + `api/`), but no public demo
+> URL is published in this repository. Deploy your own following
+> [docs/setup.md](docs/setup.md#deployment-vercel).
 
-### 15a.1 Scorecard (0–10, evidence-based)
+## Roadmap
 
-Verification legend: `✅ code` verified in source · `🖥️ browser` verified in the running app · `📄 doc` documented but not independently verified.
+Planning lives in **GitHub Issues and a GitHub Project**, not in this README.
 
-| Dimension | Score | Trend | One-line rationale |
-|---|---:|---|---|
-| Product coherence | 7.0 | ↑ | One design language; Presentation was bolted-on (now fixed); Split ambiguous |
-| Information architecture | 6.5 | → | 4–5 nesting levels; "Board" is mode+surface+layout; asset/doc duality |
-| Navigation | 7.0 | ↑ | Clear 6-mode switcher + breadcrumb; no browser history; thin deep links |
-| Board UX | 7.5 | ↑ | Strong Figma-like canvas + presence; no keyboard ops, no visible undo |
-| Document UX | 7.5 | → | Solid Tiptap CRDT; three competing metaphors (Notion/Word/Obsidian) |
-| Spreadsheet UX | 7.0 | → | Real grid + formulas; save-granular (not cell CRDT); small function set |
-| Presentation UX | 6.5 | ↑ | Real v1 editor; no presenter mode / masters; board gap fixed here |
-| Code UX | 8.0 | → | Monaco + CRDT + GitHub + secret detection — strongest surface |
-| Collaboration UX | 7.5 | → | Server-enforced ACLs + CRDT; honest but config-gated; presence UI good |
-| Cloud/account UX | 7.0 | → | Honest Drive states + diagnostics; identity-vs-storage nuance under-explained |
-| Visual consistency | 8.0 | → | Tokens, icon registry, card chrome, one dialog/toast system |
-| Accessibility | 5.5 | → | aria/focus/reduced-motion present; canvas not keyboard-operable; color-only cues |
-| Performance perception | 6.5 | → | Skeletons + throttling; 700 kB gz main w/ three.js; no board virtualization |
-| Error handling | 7.0 | → | Toasts, honest chips, diagnostics; a few silent recovery paths |
-| Onboarding | 6.0 | → | Good empty states; no tour; steep mental model |
-| **Overall UX** | **7.0** | ↑ | Powerful and honest; friction from IA depth + a11y + threading |
-| **Overall UI** | **7.5** | → | Cohesive, professional, dark-first; density risks at narrow widths |
+- **GitHub Project — _Lattice Roadmap_:** _pending — see [ROADMAP.md](ROADMAP.md#creating-the-github-project) for the setup commands._ <!-- Replace with the Project URL once created. -->
+- **Roadmap overview & conventions:** [ROADMAP.md](ROADMAP.md)
+- **Open issues:** https://github.com/FraOri03/Lattice/issues
+- **What already shipped:** [CHANGELOG.md](CHANGELOG.md)
 
-### 15a.2 Presentation-in-Board integration (implemented)
+## Documentation
 
-**The gap:** presentations were full entities (`PresentationDocMeta`, an editor mode, a sidebar section, PPTX/ODP import) but could **not** be board cards — no `presentation` card type, no node registration, no toolbar/drag/inspector — and an imported deck landed on the canvas as an inert *raw asset* card (`ImportService.cardSpecFor`, comment: *"decks have no dedicated card type yet"*). This broke the core promise that "every entity can be a card on the infinite canvas." **This builds directly upon** the Phase 1 board and the Phase 8 presentation engine (§15.7) — it adds a card view, not a new engine.
+| Doc | Contents |
+|---|---|
+| [docs/architecture.md](docs/architecture.md) | Data model, stores, services, CRDT layer, source layout |
+| [docs/features.md](docs/features.md) | Status-tagged feature inventory |
+| [docs/setup.md](docs/setup.md) | Install, commands, build, test, deploy, troubleshooting |
+| [docs/integrations.md](docs/integrations.md) | Google, Drive, GitHub, Liveblocks, conversion backend |
+| [docs/collaboration.md](docs/collaboration.md) | Realtime model, permission matrix, honest limits |
+| [docs/file-formats.md](docs/file-formats.md) | Import/export support matrix and fidelity |
+| [docs/limitations.md](docs/limitations.md) | Known limitations and the security model |
 
-**Data model** — `presentation` joins `CardType`; `CardData.presentId` references a `PresentationDocMeta`; the reused `mode: 'compact' | 'expanded'` field drives the card; `CARD_DEFAULTS.presentation = { w: 360, h: 260 }`. The deck **body** stays in the `StorageProvider` (lazy-loaded), exactly like docs/sheets — the node holds only a reference + display mode, so it rides the existing serialization with **zero CRDT changes**.
+## 15c · Phase 9 (P1) — accessibility, navigation & performance
 
-**Component** — `PresentationCardNode` (`src/components/board/PresentationCardNode.tsx`), registered as `nodeTypes.presentation` in `BoardCanvas.tsx`. A key perf decision: `SlideView`/`StaticElement`/`elementStyle` were **extracted** out of `PresentationWorkspace.tsx` into `src/components/present/SlideView.tsx` so a card can render a slide **without** pulling the heavy editor (and its lazy chunk) into the main bundle — measured impact ≈ **0.5 kB gz**; the workspace stayed a lazy chunk.
+The Phase 8.5 audit's **P1** items (§15b) — the ones gating public beta — are implemented. Details live in dedicated docs: [`docs/accessibility.md`](docs/accessibility.md), [`docs/navigation.md`](docs/navigation.md), [`docs/performance.md`](docs/performance.md), [`docs/collaboration.md`](docs/collaboration.md).
 
-**Interaction states:**
+### 15c.1 Board keyboard accessibility (`LAT-2`, was Critical)
 
-| Mode | Trigger | Renders | Body load |
-|---|---|---|---|
-| **Compact** (default) | insert / drag / import; inspector toggle | title, snippet, slide count, `imported` badge | none (meta only) |
-| **Expanded** | inspector "Card mode → expanded" | live `SlideView` thumbnail + prev/next navigator + "Slide i/n" (aria-labeled) | lazy from storage; re-reads on `updatedAt` |
-| **Full** | double-click card / "Open in workspace" / sidebar click | the `PresentationWorkspace` editor | full editor |
+The infinite board is now fully operable without a mouse, layered on React Flow's focus model rather than replacing it. React Flow keeps every card **Tab-focusable** (`nodesFocusable`) while its own key handling is turned **off** (`disableKeyboardA11y`), so a single tested controller (`useBoardKeyboard` over the pure `src/lib/board/keyboardNav.ts`) owns all board keys with no double-firing.
 
-- **Drag-and-drop** — sidebar deck rows are `draggable` and set `PRESENT_DRAG_MIME = 'application/x-lattice-present'`; `BoardCanvas.onDrop` verifies the deck exists and calls `addCard('presentation', …)`, early-returning with a toast for read-only roles. The canvas toolbar gains a **Deck** button (`createPresentDoc()` → compact card at viewport center).
-- **Inspector** — a `presentation` branch (parity with sheet/doc/code): rename, slide count, `Source: imported deck`, a compact/expanded segmented toggle, "Open in workspace", and a danger "Delete presentation from vault" (separate from "Delete card"). `TYPE_LABEL.presentation` is compile-enforced by the exhaustive `Record<CardData['type'], string>`.
-- **Import** — `cardSpecFor({kind:'present'})` now returns a `presentation` card pointing at the **editable deck** instead of an `asset` card pointing at the raw PPTX; the original stays preserved and reachable via `sourceAssetId`.
-- **Lifecycle** — `deletePresentDoc` now strips the deck's cards from **every** board (like docs/sheets/code). Realtime-safe (generic CRDT node serialization); comments (via `CardChrome`'s badge) and version history inherited; permissions inherited from `src/lib/collab/permissions.ts` — read-only roles hide the toolbar and reject drops, viewers get a read-only card whose navigator still pages.
+| Key | Action |
+|---|---|
+| `Tab` / `Shift+Tab` | Move focus between cards; the focused card is selected and announced |
+| Arrow keys | Move the focused card (10 px) |
+| `Shift`+Arrow | Move in coarse steps (50 px) |
+| `Alt`+Arrow | Move in precise steps (1 px) |
+| `Enter` | Open the focused card's entity in its workspace |
+| `L` | Start a keyboard connection from the focused card; `Enter`/`L` on another card completes it, `Esc` cancels |
+| `Delete` / `Backspace` | Delete the selection (or the focused card) |
+| `A` | Open the keyboard-navigable **Add card** menu |
+| `Esc` | Cancel a link / close the add menu |
 
-**Fallback states** — deck deleted but card remains → "Missing presentation" placeholder; body missing/corrupt → `normalizePresentBody` yields a valid 1-slide deck (never a blank card); lazy chunk fails → compact card still renders, expanded shows "Loading slides…", the board never hard-crashes.
+Shortcuts **never fire inside an editor** — inputs, textareas, contenteditable (Tiptap), Monaco and the spreadsheet grid are all excluded (`isEditableTarget`). Every action announces through one polite `aria-live` region (`src/lib/a11y/announcer.ts` → `<LiveRegion/>`): selection, move (with coordinates), link, add and delete. The board region is a `role="application"` with an `aria-describedby` instructions block; cards carry accessible names ("Document card: Roadmap"). Pointer drag-and-drop, box-select and connection-handle dragging are untouched.
 
-**Navigation fixes shipped alongside** — presentations were also absent from create/search paths; the audit added them to **Quick Create**, the **command palette** (create + search), and fixed **sidebar recents** silently dropping decks (plus a new `IcChevronLeft` icon for the navigator).
+### 15c.2 Status is never colour-only (`LAT-11` / A11Y-2)
 
-**Tests** — `src/lib/present/presentBoardCard.test.ts` (vitest, `npm test`, 3/3 pass): a `presentation` node round-trips through JSON preserving `type`/`presentId` and never carries an `assetId`; a fresh deck body digests to `slideCount: 1`; garbage from storage normalizes to a valid deck. Component/DOM tests are deferred until a jsdom harness lands.
+Sync, Drive, realtime, roles, presence and the minimap now encode state with **icon/shape + text + accessible name**, colour only reinforcing. The realtime chip shows a distinct icon per state (check / spinner / alert / cloud-off / lock) so statuses that share a colour stay distinguishable; the Drive chip uses a warning glyph for errors; presence carries a scope badge; the minimap has an `ariaLabel`. `:focus-visible` and `prefers-reduced-motion` are preserved.
 
-**Acceptance criteria (all met):**
+### 15c.3 Collaboration honesty propagated (`COL-1` / issue #9)
 
-- [x] `presentation` is a valid `CardType`; `CardData.presentId` exists; `PresentationCardNode` registered.
-- [x] Toolbar "Deck", Quick Create, command-palette create/search, and sidebar drag all create/place a deck card.
-- [x] Compact shows title/snippet/slide-count/source; expanded shows a live slide + working prev/next navigator; double-click opens the workspace.
-- [x] Imported PPTX/ODP lands as an editable deck card (not a raw asset); source preserved.
-- [x] Inspector: rename, compact/expanded toggle, open-in-workspace, delete-from-vault; deleting a deck strips its cards on all boards.
-- [x] Node serializes generically (vault export / Drive / CRDT); permissions, comments and versions inherited.
-- [x] Typecheck ✅, production build ✅, unit tests ✅ (3/3).
-- [~] Full in-browser click-through of insert/expand was **partially blocked by an environment issue** during the session (canvas click delivery); the toolbar button and sidebar drag/recents were DOM-verified and the render path is covered by build + tests — **re-verify interactively before release.**
+The honesty of the realtime chip now reaches every collaboration surface, from **one source of truth** — `src/lib/collab/collabPresentation.ts` derives the tier from the active provider's real capability signals (a configured backend **and** a Google identity), not scattered env reads:
 
-> Individual-slide-to-board (dragging one slide out as its own image) was evaluated and **deliberately deferred**: it would fork slide ownership and needs a product decision. Recommended future path: a "copy slide as image" that produces a self-contained `image` card, keeping decks authoritative.
+- **realtime** — Liveblocks + Yjs across devices (only when `VITE_REALTIME_BACKEND=liveblocks` + Google sign-in);
+- **drive** — Google Drive polling (~20 s), no live cross-device presence;
+- **local** — BroadcastChannel, tabs of this one browser.
 
-### 15a.3 Key findings & issue register
+Presence avatars carry a "same browser" / "Drive" scope badge, the Share button and dialog state the exact scope, and the Share dialog shows one honest banner — so no avatar or control implies live remote collaboration that isn't configured. The realtime setup checklist stays available; nothing is simulated.
 
-The audit's material findings, most feeding Phase 9 (§15b). Severity in brackets.
+### 15c.4 Browser back/forward + deep links (`NAV-1` / issue #10)
 
-- **Information architecture** — "Board" is simultaneously a *mode*, a *surface* and (via Split) a *layout* [med]; the hierarchy is 4–5 levels deep (Workspace → Project → Mode → Entity → Card) with Workspaces organizational-only [med]; the asset/entity duality leaks (import creates both a preserved asset and an editable sibling) [med]; Notes vs Documents are under-differentiated at the decision point [med].
-- **Navigation** — no browser back/forward (the SPA has no router; Back exits the app) [high]; Split is a peer "mode" that behaves like a layout toggle [med]; the mode switcher sheds text labels below `xl` [med]; no per-entity shareable deep link [med].
-- **Accessibility** — the **board canvas is not keyboard-operable** (create/select/move/link are pointer-only) [**critical**]; status is conveyed by color alone (sync/role/presence/realtime/minimap) [high]; several targets dip below 24 px; live-region announcements are incomplete. The chrome *is* accessible (global focus-visible, broad aria-labels, reduced-motion, and the slide inspector's numeric X/Y/W/H fields as a genuine keyboard alternative to drag).
-- **Performance** — **three.js ships in the main bundle** (~170 kB gz) though only 3D previews use it [high]; there is **no board node virtualization** and off-screen 3D cards run continuous `requestAnimationFrame`/`OrbitControls` loops, which made the renderer unresponsive during the audit [high].
-- **Collaboration honesty (the one leak, `COL-1`)** — presence avatars and the Share affordance are always visible, but cross-device realtime only works when `VITE_REALTIME_BACKEND=liveblocks` is set *and* the user signs in with Google; otherwise "live" means tabs-of-one-browser + ~20 s Drive polling. The realtime chip is honest, but the surrounding collaboration UI doesn't visibly downgrade [high — communication].
-- **Responsive & device** — fixed-width sidebar/inspectors starve the canvas below ~1100 px; there is no mobile story (nothing blocks a phone, but Monaco/Sheet/Presentation are unusable) [high]. Recommendation: explicit tiers — **Desktop (full)**, **Tablet (read + light edit, drawers)**, **Mobile (read-only viewer + comments)** — that block unsupported editors with an honest message.
+A tiny centralized abstraction (`src/lib/nav/navUrl.ts` + `useUrlHistory`) binds the **navigable identity** — project · mode · board · the single open entity — to the History API:
 
-Issue register (severity · effort · target phase):
+```
+store change (project/mode/board/entity) ──▶ history.pushState
+Back / Forward (popstate)                ──▶ store.applyNav
+direct load / refresh                    ──▶ restore from ?p=…&m=…&b=…&e=…
+```
 
-| ID | Area | Title | Sev | Effort | Phase |
-|---|---|---|---|---|---|
-| LAT-1 | Board/Present | Presentations not board cards | High | L | **8.5 (done)** |
-| LAT-19 | Nav | Presentation missing from create/search/recents | Medium | S | **8.5 (done)** |
-| LAT-2 | A11y | Canvas not keyboard-operable | Critical | L | 9 · P1 |
-| LAT-3 | Collab | Presence/Share imply realtime when off | High | S | 9 · P1 |
-| LAT-4 | Perf | three.js in main bundle | High | M | 9 · P1 |
-| LAT-5 | Perf | No board virtualization; off-screen anim loops | High | L | 9 · P1 |
-| LAT-6 | Nav | No browser back/forward | High | M | 9 · P1 |
-| LAT-12 | Responsive | Fixed panels starve canvas; no mobile | High | L | 9 · P1 |
-| LAT-7 | IA | Split is a mode, not a layout | Medium | M | 9 · P2 |
-| LAT-8 | IA | Workspaces add nesting w/o enforcement | Medium | S | 9 · P2 |
-| LAT-9 | Present | No presenter/slideshow mode | Medium | M | 9 · P2 |
-| LAT-10 | Sheet | Save-granular, not cell CRDT | Medium | S / XL | 9 · P2 |
-| LAT-11 | UI/A11y | Color-only status encoding | Medium | S | 9 · P2 |
-| LAT-13 | Cloud | Identity vs storage under-explained | Medium | XS | 9 · P2 |
-| LAT-15 | Board | No visible undo/redo | Medium | M | 9 · P2 |
-| LAT-18 | Onboarding | No product tour / mental-model intro | Medium | M | 9 · P2 |
-| LAT-14 | Nav | Presentations hidden under filter chips | Low | XS | 9 · P3 |
-| LAT-16 | Assets | Preview-failure copy inconsistent | Low | S | 9 · P3 |
-| LAT-17 | UI | Duplicate recent-kind icon maps | Low | XS | 9 · P3 |
+Back no longer exits the app; refresh and direct links restore the view; **invalid ids degrade safely** (unknown project → current, bad board → the project's first, missing entity → dropped, bad mode → `board`). Transient churn (selection, drag, typing) never touches history — a `navKey` dedup + an `applying` guard prevent React↔URL↔popstate loops. The existing `#invite=` hash flow is preserved (history owns the search string, never the hash). Split-as-mode and Workspace nesting (the Medium items) were intentionally left out of scope.
 
-### 15a.4 Verification & compatibility
+### 15c.5 Performance — lazy three.js + off-screen pausing (`LAT-4`/`LAT-5`)
 
-All Phase 8.5 changes are **additive** — a new card type, a shared-module extraction, one icon, and edits across nine files (model, dnd, store, `BoardCanvas`, `CanvasToolbar`, `Sidebar`, `Inspector`, `ImportService`, `CommandPalette`, `TopBar`) plus tests. No data migration is required; pre-Phase-8.5 boards and vaults load unchanged. A `test` script (`vitest run`) was added to `package.json`. Verification: typecheck ✅, production build ✅, unit tests ✅ (3/3); interactive card-render spot-check was environment-blocked and is flagged for re-verification before release.
+**three.js left the main bundle.** It is imported only through lazy boundaries (`ThreeScene.tsx` for `embed3d` cards, `ThreeDViewerLazy.tsx` for asset models), and a `manualChunks` rule keeps it in one dedicated `three` chunk.
 
-## 15b · Phase 9 roadmap
+| Chunk (gzip) | Before | After |
+|---|---:|---:|
+| **main `index`** | **700.5 kB** (incl. three.js) | **549.7 kB** |
+| `three` (lazy) | — | 153.6 kB |
+| `ThreeScene` / `ThreeDViewer` (lazy) | — | 0.9 / 2.6 kB |
 
-Phase 8.5's prioritized remediation plan (`docs/ux-ui-remediation-roadmap.md`) defines most of Phase 9; the **P0** item (Presentation-in-Board) already shipped in Phase 8.5 (§15a). Priorities: **P1 before public beta · P2 before broader adoption · P3 refinement.**
+The main entry chunk dropped **≈ 151 kB gzip** and no longer contains three.js. 3D previews and cards render via a Suspense skeleton.
 
-**P1 — before public beta**
-
-- **Board canvas keyboard accessibility** (`LAT-2`, Critical) — roving-tabindex node focus, arrow-move, Enter-to-open, a keyboard-invokable "add card" menu; a documented keyboard alternative to drag-and-drop.
-- **Propagate the realtime off-state** (`LAT-3`/`COL-1`) — when `VITE_REALTIME_BACKEND` is unset, mark presence/Share surfaces "local / Drive only" so the chip's honesty reaches the features it governs.
-- **Lazy-load three.js** (`LAT-4`) — move ~170 kB gz of 3D out of the main bundle behind a Suspense boundary + skeleton (§15.11 flags this).
-- **Board virtualization + pause off-screen animation loops** (`LAT-5`) — `IntersectionObserver` to pause off-screen `requestAnimationFrame`/OrbitControls; virtualize nodes; cap concurrent live cards so 100+ card boards stay interactive.
-- **Browser history / back-forward** (`LAT-6`) — history entries per mode/entity (without breaking the existing invite-hash handling), enabling entity deep links.
-- **Responsive tiers + drawer inspectors** (`LAT-12`) — sidebar/inspectors become drawers below a breakpoint; a defined **Mobile = read-only viewer + comments** tier; unsupported editors show an honest "best on desktop" message.
-
-**P2 — before broader adoption**
-
-- **Demote Split** from a peer mode to a layout toggle on Board/Doc (`LAT-7`); **auto-hide Workspaces** for single-workspace accounts (`LAT-8`).
-- **Presenter / slideshow mode** (`LAT-9`) — a full-screen present view with speaker notes (optionally on a second screen) and Esc to exit — the presentation mode's namesake job.
-- **Sheet co-editing** — an in-sheet "edits are save-level while another editor is present" notice now (`LAT-10`), with **cell-level sheet CRDT** as the larger follow-up.
-- **Status redundancy** (color + icon + text) everywhere status is currently color-only (`LAT-11`); **identity-vs-storage cue** ("signed in ≠ synced — connect Drive to back up", `LAT-13`); **visible board undo/redo** with Ctrl/Cmd+Z (`LAT-15`).
-- **Onboarding** — a dismissible 3-step tour or annotated starter board teaching entities-vs-cards / local-vs-cloud / roles (`LAT-18`); an explicit **admin-bootstrap / first-run ownership** moment.
-- **Exact doc-range comment anchors** inside rich documents (§15.12).
-
-**P3 — refinement**
-
-- "Decks" sidebar filter chip (`LAT-14`); a standard "can't preview + download original" fallback (`LAT-16`); dedupe the two recent-kind icon maps (`LAT-17`); minimap card-kind colors; **slide-level linking** (`[[Deck#3]]`-style references, now that decks have a slide navigator); tokenize remaining hard-coded hex; a browsable "Supported formats" view over `formatMatrix`.
-
-**Engine & platform (carried forward)**
-
-- Anonymous read-only **public viewer** / published boards — the Phase 8 server groundwork exists (room `defaultAccesses` + metadata flags); this is the no-login share link §15.12 defers.
-- **Unified transfer dialog** (import planning → confirm → report in one surface); **CRDT subdocument partitioning** for very large projects.
-- Standing items from earlier roadmaps: **File System Access API vault**, **plugin API**, **PR-based GitHub flow**, **remote-deletion management UI**, **billing/subscriptions**, **web clipper**, **AI assistant inside projects**, and **mobile/tablet UI**.
+Off-screen and idle work is suspended (`src/lib/perf/`): an `IntersectionObserver` (`useInViewport`) plus page-visibility gate every 3D scene, so `requestAnimationFrame`, OrbitControls auto-rotate and continuous rendering **stop** when a card is off-screen, the tab is hidden, or the board is inactive; the asset viewer renders **on-demand** (a frame only on interaction/damping/resize — zero frames while a model sits still). A `ViewerBudget` caps concurrent live 3D scenes (4), expensive media (video) defers its player until first on-screen, and a dimensionally-stable placeholder holds every un-mounted card so edges and layout never shift. This is deliberate **content-windowing** (card chrome stays mounted; only heavy content suspends) rather than React Flow's destructive `onlyRenderVisibleElements`, so selected/dragged/linked cards and CRDT/editor state are never lost. A static board with no visible 3D runs no animation loops.
 
 ## 15c · Phase 9.5 — Project Graph View
 
@@ -641,46 +331,13 @@ no data migration; Board/Split/Document/Sheet/Presentation/Code, palette,
 history, collaboration, Drive and GitHub are unchanged.
 
 ## 16 · Folder structure (source)
+## Contributing
 
-```
-api/
-  github/oauth.ts              # Vercel function: GitHub OAuth token exchange
-src/
-  App.tsx                      # providers + login gate + mode router
-  types/model.ts               # entities incl. Project/Account/SyncState/BoardSection/WebEmbed
-  types/collab.ts              # Phase 7: roles, members, invites, presence, comments, activity, versions
-  store/useStore.ts, seed.ts   # vault store (persisted, versioned migration), useUiStore.ts
-  lib/
-    env.ts                     # VITE_* configuration
-    auth/                      # AuthService (Google GIS / mock) + AccountProvider
-    collab/                    # Phase 7: hub + providers (local/drive-polling/realtime),
-                               #   permissions, members, invites, presence, comments,
-                               #   activity, versions, board/document sync, ConflictResolverV2
-    sync/                      # SyncEngine + ConflictResolver + syncStore
-    storage/                   # StorageProvider (IndexedDB) + GoogleDriveStorageProvider
-    github/GithubCodeProvider.ts
-    projects/                  # ProjectRegistry + ProjectStore
-    registry/fileKinds.tsx     # FileKindRegistry + FileKindIcon
-    registry/documents.ts      # DocumentRegistry + EditorRegistry
-    web/WebEmbedService.ts     # URL sanitization + embeds
-    board/sections.ts          # section geometry/ordering helpers
-    import/ export/ convert/ assets/ code/ richdoc/ sheet/  # engines (Phases 1–4)
-  components/
-    Sidebar.tsx TopBar.tsx CommandPalette.tsx Inspector.tsx DocumentView.tsx
-    ui/                        # Phase 7: Toaster, ConfirmDialog (confirm/prompt), ShortcutsDialog
-    collab/                    # Phase 7: ShareDialog, PresenceAvatars, BoardPresenceLayer,
-                               #   CommentPins, CollabPanel (comments/activity/versions), ReadOnlyBanner
-    account/                   # LoginScreen + ProfileMenu
-    projects/ProjectSwitcher.tsx
-    github/GithubDialog.tsx
-    workspaces/ModeWorkspaces.tsx   # Sheet/Code/Presentation modes + empty states
-    board/                     # canvas, cards, SectionNode, WebEmbedCardNode
-    richdoc/ code/ sheet/ preview/  # editors & previews
-```
+See [CONTRIBUTING.md](CONTRIBUTING.md). In short: branch from `main`, pick or open an
+issue, run `npm run build` and `npm test`, update the docs you touch, and link the issue
+in your PR.
 
-## 17 · Vault structure (virtual, mirrors cloud + future disk layout)
+## License
 
-```
-/projects/<id>    project spaces (config in project.json when synced)
-  /notes /documents /spreadsheets /presentations /code /boards /assets /imports /config
-```
+Released under the **[CC0 1.0 Universal](LICENSE)** public-domain dedication — do whatever
+you like with it, no attribution required.
