@@ -3,7 +3,7 @@ import { useStore } from '@/store/useStore'
 import { useAssetUrl } from '@/lib/assets/AssetRegistry'
 import { formatBytes } from '@/lib/media'
 import { KIND_ICONS, KIND_LABEL } from '@/components/assetKinds'
-import { ThreeDViewer } from '@/components/preview/ThreeDViewer'
+import { ThreeDViewer } from '@/components/preview/ThreeDViewerLazy'
 import { IcExternal, IcX } from '@/components/Icons'
 
 /**

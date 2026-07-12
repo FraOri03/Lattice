@@ -10,7 +10,9 @@ import { ProfileMenu } from '@/components/account/ProfileMenu'
 import { PresenceAvatars } from '@/components/collab/PresenceAvatars'
 import { RealtimeStatusChip } from '@/components/collab/RealtimeStatusChip'
 import { NotificationCenter } from '@/components/collab/NotificationCenter'
+import { useCollabMode } from '@/lib/collab/collabPresentation'
 import {
+  IcAlert,
   IcBoard,
   IcChevronRight,
   IcCloud,
@@ -87,9 +89,10 @@ function SyncIndicator() {
         <button
           className="flex cursor-pointer items-center gap-1.5 rounded-full border border-[#f24822]/40 bg-panel2 px-2 py-1 text-[10px] font-medium text-[#f24822]"
           title={`${sync.error ?? 'Google Drive is not connected'} — click for diagnostics`}
+          aria-label={`Drive sync error: ${sync.error ?? 'Google Drive is not connected'}. Click for diagnostics.`}
           onClick={() => setDriveDialogOpen(true)}
         >
-          <IcCloudOff size={12} /> Drive error
+          <IcAlert size={12} /> Drive error
         </button>
       )
     }
@@ -123,13 +126,15 @@ function SyncIndicator() {
     <button
       className={`flex cursor-pointer items-center gap-1.5 rounded-full border border-bord bg-panel2 px-2 py-1 text-[10px] font-medium ${color}`}
       title={sync.error ?? 'Google Drive sync — click to sync now'}
-      aria-label="Sync now"
+      aria-label={`Google Drive: ${label}${sync.status === 'error' ? ' — click for diagnostics' : ' — click to sync now'}`}
       onClick={() =>
         sync.status === 'error' ? setDriveDialogOpen(true) : void syncEngine.syncNow()
       }
     >
       {sync.status === 'syncing' ? (
         <IcRefresh size={12} className="animate-spin" />
+      ) : sync.status === 'error' ? (
+        <IcAlert size={12} />
       ) : (
         <IcCloud size={12} />
       )}
@@ -312,6 +317,7 @@ export function TopBar() {
   const setPaletteOpen = useUiStore((s) => s.setPaletteOpen)
   const setShareDialogOpen = useUiStore((s) => s.setShareDialogOpen)
   const mayCreate = useCan('content.create')
+  const collabMode = useCollabMode()
 
   return (
     <header className="flex h-11 flex-none items-center gap-2 border-b border-bord bg-panel px-3">
@@ -349,11 +355,20 @@ export function TopBar() {
       <button
         className="btn"
         onClick={() => setShareDialogOpen(true)}
-        title="Share — members, roles & invites"
-        aria-label="Share project"
+        title={
+          collabMode.isRealtime
+            ? 'Share — members, roles & invites · realtime multiplayer is active'
+            : `Share — members, roles & invites · collaboration reaches ${collabMode.scopeLabel}`
+        }
+        aria-label={`Share project — collaboration reaches ${collabMode.scopeLabel}`}
       >
         <IcUserPlus size={13} />
         <span className="hidden lg:inline">Share</span>
+        {!collabMode.isRealtime && (
+          <span className="hidden rounded bg-panel px-1 text-[9px] font-semibold text-muted xl:inline">
+            {collabMode.shortLabel}
+          </span>
+        )}
       </button>
       <PanelButtons />
       <button

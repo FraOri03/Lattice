@@ -1,12 +1,13 @@
-import { useEffect, useRef } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import type { NodeProps } from '@xyflow/react'
-import * as THREE from 'three'
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { CARD_COLORS, type BoardNode } from '@/types/model'
 import { useStore } from '@/store/useStore'
 import { formatBytes, hostnameOf, toVideoEmbed } from '@/lib/media'
 import { MarkdownView } from '@/components/MarkdownView'
+import { useInViewport } from '@/lib/perf/useInViewport'
+import { useViewerSlot } from '@/lib/perf/useViewerSlot'
 import { CardChrome } from './CardChrome'
+import { ThreePlaceholder } from './ThreePlaceholder'
 import {
   IcCube,
   IcExternal,
@@ -16,6 +17,11 @@ import {
   IcNote,
   IcVideo,
 } from '@/components/Icons'
+
+// three.js is loaded ONLY through this lazy boundary (PERF-1): the scene and
+// its three.js imports live in ThreeScene.tsx, so nothing here drags three
+// into the main bundle.
+const ThreeScene = lazy(() => import('./ThreeScene'))
 
 type Props = NodeProps<BoardNode>
 
@@ -93,6 +99,16 @@ export function ImageCardNode({ data, selected }: Props) {
 
 export function VideoCardNode({ data, selected }: Props) {
   const embed = toVideoEmbed(data.url || data.src)
+  // Windowing for expensive media (PERF-2): don't load an off-screen player
+  // at board load; once first seen it stays mounted (no reload churn), and a
+  // native <video> pauses whenever it leaves the viewport.
+  const { ref, onScreen } = useInViewport<HTMLDivElement>()
+  const [everOnScreen, setEverOnScreen] = useState(false)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  useEffect(() => {
+    if (onScreen) setEverOnScreen(true)
+    else videoRef.current?.pause()
+  }, [onScreen])
   return (
     <CardChrome
       data={data}
@@ -102,22 +118,36 @@ export function VideoCardNode({ data, selected }: Props) {
       minWidth={220}
       minHeight={140}
     >
-      {embed?.kind === 'iframe' ? (
-        <iframe
-          src={embed.src}
-          className="nodrag h-full w-full"
-          title={data.title || 'video'}
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowFullScreen
-        />
-      ) : embed?.kind === 'video' ? (
-        <video src={embed.src} controls className="nodrag h-full w-full bg-black" />
-      ) : (
-        <div className="placeholder">
-          <IcVideo size={22} />
-          Paste a YouTube / Vimeo / .mp4 URL in the inspector
-        </div>
-      )}
+      <div ref={ref} className="h-full w-full">
+        {embed?.kind === 'iframe' ? (
+          everOnScreen ? (
+            <iframe
+              src={embed.src}
+              className="nodrag h-full w-full"
+              title={data.title || 'video'}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          ) : (
+            <div className="placeholder">
+              <IcVideo size={22} />
+              Scroll into view to load
+            </div>
+          )
+        ) : embed?.kind === 'video' ? (
+          <video
+            ref={videoRef}
+            src={embed.src}
+            controls
+            className="nodrag h-full w-full bg-black"
+          />
+        ) : (
+          <div className="placeholder">
+            <IcVideo size={22} />
+            Paste a YouTube / Vimeo / .mp4 URL in the inspector
+          </div>
+        )}
+      </div>
     </CardChrome>
   )
 }
@@ -200,85 +230,12 @@ export function FileCardNode({ data, selected }: Props) {
 
 /* ---------------- 3D embed ---------------- */
 
-function ThreeScene({ color }: { color: string }) {
-  const hostRef = useRef<HTMLDivElement>(null)
-  const matRef = useRef<THREE.MeshStandardMaterial | null>(null)
-
-  useEffect(() => {
-    const host = hostRef.current!
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-    host.appendChild(renderer.domElement)
-
-    const scene = new THREE.Scene()
-    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100)
-    camera.position.set(0, 1.4, 4.2)
-
-    scene.add(new THREE.AmbientLight(0xffffff, 0.7))
-    const key = new THREE.DirectionalLight(0xffffff, 1.8)
-    key.position.set(3, 4, 5)
-    scene.add(key)
-
-    const geo = new THREE.TorusKnotGeometry(0.9, 0.3, 140, 20)
-    const mat = new THREE.MeshStandardMaterial({
-      color,
-      metalness: 0.35,
-      roughness: 0.25,
-    })
-    matRef.current = mat
-    scene.add(new THREE.Mesh(geo, mat))
-
-    const grid = new THREE.GridHelper(10, 20, 0x555555, 0x3a3a3a)
-    grid.position.y = -1.5
-    scene.add(grid)
-
-    const controls = new OrbitControls(camera, renderer.domElement)
-    controls.enableDamping = true
-    controls.autoRotate = true
-    controls.autoRotateSpeed = 1.5
-
-    let raf = 0
-    const loop = () => {
-      controls.update()
-      renderer.render(scene, camera)
-      raf = requestAnimationFrame(loop)
-    }
-    const ro = new ResizeObserver(() => {
-      const w = host.clientWidth
-      const h = host.clientHeight
-      if (!w || !h) return
-      renderer.setSize(w, h)
-      camera.aspect = w / h
-      camera.updateProjectionMatrix()
-    })
-    ro.observe(host)
-    loop()
-
-    return () => {
-      cancelAnimationFrame(raf)
-      ro.disconnect()
-      controls.dispose()
-      geo.dispose()
-      mat.dispose()
-      renderer.dispose()
-      renderer.domElement.remove()
-      matRef.current = null
-    }
-  }, [])
-
-  useEffect(() => {
-    matRef.current?.color.set(color)
-  }, [color])
-
-  return (
-    <div
-      ref={hostRef}
-      className="nodrag nowheel h-full w-full overflow-hidden [&>canvas]:block"
-    />
-  )
-}
-
-export function ThreeDCardNode({ data, selected }: Props) {
+export function ThreeDCardNode({ id, data, selected }: Props) {
+  // three.js loads + animates only while the card is on-screen and within the
+  // live-viewer budget; otherwise a stable placeholder holds the card size.
+  const { ref, onScreen, active } = useInViewport<HTMLDivElement>()
+  const hasSlot = useViewerSlot(id, onScreen)
+  const mountScene = onScreen && hasSlot
   return (
     <CardChrome
       data={data}
@@ -288,10 +245,21 @@ export function ThreeDCardNode({ data, selected }: Props) {
       minWidth={200}
       minHeight={160}
     >
-      <ThreeScene color={CARD_COLORS[data.color] ?? CARD_COLORS.orange} />
-      <span className="pointer-events-none absolute right-2 bottom-1.5 text-[10px] text-muted">
-        drag to orbit · three.js
-      </span>
+      <div ref={ref} className="relative h-full w-full">
+        {mountScene ? (
+          <Suspense fallback={<ThreePlaceholder label="Loading 3D…" />}>
+            <ThreeScene color={CARD_COLORS[data.color] ?? CARD_COLORS.orange} active={active} />
+          </Suspense>
+        ) : (
+          <ThreePlaceholder
+            label="3D preview"
+            hint={onScreen ? 'Paused — too many 3D views active' : 'Scroll into view to load'}
+          />
+        )}
+        <span className="pointer-events-none absolute right-2 bottom-1.5 text-[10px] text-muted">
+          drag to orbit · three.js
+        </span>
+      </div>
     </CardChrome>
   )
 }

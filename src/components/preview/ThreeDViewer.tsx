@@ -25,10 +25,13 @@ export function ThreeDViewer({
   url,
   ext,
   asset,
+  active = true,
 }: {
   url?: string
   ext: string
   asset?: AssetDoc
+  /** false = off-screen / page hidden: render on-demand only, no idle loop */
+  active?: boolean
 }) {
   const hostRef = useRef<HTMLDivElement>(null)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -36,6 +39,8 @@ export function ThreeDViewer({
   const [reloadSeq, setReloadSeq] = useState(0)
   const relinkInput = useRef<HTMLInputElement>(null)
   const patchAsset = useStore((s) => s.patchAsset)
+  const activeRef = useRef(active)
+  const requestRenderRef = useRef<() => void>(() => {})
   // live bundle (relink updates it without unmounting)
   const liveBundle = useStore((s) =>
     asset ? s.assets[asset.id]?.bundle : undefined,
@@ -86,6 +91,7 @@ export function ThreeDViewer({
       grid.position.y = (box.min.y - center.y) * s
       scene.add(obj)
       setStatus('ready')
+      requestRenderRef.current() // draw the first frame (on-demand)
     }
 
     const missingPaths = new Set<string>()
@@ -192,12 +198,30 @@ export function ThreeDViewer({
     }
     void load()
 
+    // On-demand rendering (PERF-2): no continuous rAF while the model sits
+    // still. A frame is scheduled on user interaction (OrbitControls 'change'),
+    // while damping settles, on resize, and when the viewer becomes active.
+    // Idle model + idle board ⇒ zero frames scheduled.
     let raf = 0
-    const loop = () => {
-      controls.update()
+    let running = false
+    const tick = () => {
+      const changed = controls.update()
       renderer.render(scene, camera)
-      raf = requestAnimationFrame(loop)
+      if (activeRef.current && changed) {
+        raf = requestAnimationFrame(tick)
+      } else {
+        running = false
+      }
     }
+    const requestRender = () => {
+      if (!running && activeRef.current) {
+        running = true
+        raf = requestAnimationFrame(tick)
+      }
+    }
+    requestRenderRef.current = requestRender
+    controls.addEventListener('change', requestRender)
+
     const ro = new ResizeObserver(() => {
       const w = host.clientWidth
       const h = host.clientHeight
@@ -205,9 +229,10 @@ export function ThreeDViewer({
       renderer.setSize(w, h)
       camera.aspect = w / h
       camera.updateProjectionMatrix()
+      requestRender()
     })
     ro.observe(host)
-    loop()
+    requestRender()
 
     return () => {
       disposed = true
@@ -228,6 +253,12 @@ export function ThreeDViewer({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [url, ext, reloadSeq, liveBundle])
+
+  // resume on-demand rendering when the viewer becomes visible again (PERF-2)
+  useEffect(() => {
+    activeRef.current = active
+    if (active) requestRenderRef.current()
+  }, [active])
 
   /** Import picked files as new dependencies and reload the model. */
   const relink = async (files: FileList | null) => {

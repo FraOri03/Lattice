@@ -56,6 +56,10 @@ import { PresentationCardNode } from './PresentationCardNode'
 import { SectionNode } from './SectionNode'
 import { WebEmbedCardNode } from './WebEmbedCardNode'
 import { CanvasToolbar } from './CanvasToolbar'
+import { BoardAddMenu } from './BoardAddMenu'
+import { useBoardKeyboard } from './useBoardKeyboard'
+import { cardAccessibleName, isEditableTarget } from '@/lib/board/keyboardNav'
+import { announce } from '@/lib/a11y/announcer'
 
 const nodeTypes = {
   note: NoteCardNode,
@@ -76,17 +80,6 @@ const nodeTypes = {
 const defaultEdgeOptions = {
   type: 'default',
   markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16 },
-}
-
-function isEditableTarget(t: EventTarget | null): boolean {
-  const el = t as HTMLElement | null
-  if (!el) return false
-  return (
-    el.tagName === 'INPUT' ||
-    el.tagName === 'TEXTAREA' ||
-    el.tagName === 'SELECT' ||
-    el.isContentEditable
-  )
 }
 
 /** First-run guidance when a board is empty (previously: a blank dot grid). */
@@ -149,6 +142,17 @@ function Canvas() {
   const { screenToFlowPosition, fitBounds } = useReactFlow()
   const peers = usePeers()
 
+  // Keyboard operability (A11Y-1): the container owns arrow-move / open /
+  // delete / link / add; React Flow keeps nodes Tab-focusable but its own
+  // key handling is off (disableKeyboardA11y) so nothing double-fires.
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [addMenuOpen, setAddMenuOpen] = useState(false)
+  const { onKeyDown, linkSourceId, focusCard } = useBoardKeyboard({
+    containerRef,
+    readOnly,
+    onOpenAddMenu: () => setAddMenuOpen(true),
+  })
+
   // one authoritative drag at a time: a node a peer is actively dragging
   // cannot be grabbed here until they release it
   const peerDraggedIds = useMemo(() => {
@@ -161,11 +165,16 @@ function Canvas() {
   }, [peers, board?.id])
 
   const renderNodes = useMemo(() => {
-    if (!peerDraggedIds.size) return board?.nodes ?? []
-    return (board?.nodes ?? []).map((n) =>
-      peerDraggedIds.has(n.id) ? { ...n, draggable: false } : n,
-    )
-  }, [board?.nodes, peerDraggedIds])
+    return (board?.nodes ?? []).map((n) => ({
+      ...n,
+      // one authoritative drag at a time (a peer is dragging this node)
+      draggable: peerDraggedIds.has(n.id) ? false : n.draggable,
+      // accessible name for screen readers (rich title announced on focus)
+      ariaLabel: cardAccessibleName(n),
+      // highlight the source card while a keyboard link is being drawn
+      className: n.id === linkSourceId ? 'is-link-source' : undefined,
+    }))
+  }, [board?.nodes, peerDraggedIds, linkSourceId])
 
   /** Cards dropped on a section join it; dragged out, they leave it. */
   const onNodeDragStop = useCallback<OnNodeDrag<BoardNode>>(
@@ -353,7 +362,13 @@ function Canvas() {
 
   return (
     <div
-      className={`relative h-full min-w-0 flex-1 ${commentMode ? 'cursor-crosshair' : ''}`}
+      ref={containerRef}
+      role="application"
+      aria-label="Board canvas"
+      aria-describedby="board-kbd-help"
+      tabIndex={-1}
+      className={`relative h-full min-w-0 flex-1 outline-none ${commentMode ? 'cursor-crosshair' : ''}`}
+      onKeyDown={onKeyDown}
       onDrop={(e) => void onDrop(e)}
       onDragOver={(e) => {
         e.preventDefault()
@@ -365,6 +380,13 @@ function Canvas() {
       }}
       onPointerLeave={() => presenceService.clearCursor()}
     >
+      <p id="board-kbd-help" className="sr-only">
+        Interactive board canvas. Press Tab to move between cards. With a card
+        focused, use the arrow keys to move it (hold Shift for larger steps,
+        Alt for precise steps), Enter to open it, L to start a connection to
+        another card, and Delete or Backspace to remove it. Press A to add a
+        card. Press Escape to cancel.
+      </p>
       <ReactFlow
         nodes={renderNodes}
         edges={board.edges}
@@ -384,13 +406,19 @@ function Canvas() {
         nodesDraggable={!readOnly}
         nodesConnectable={!readOnly}
         edgesReconnectable={!readOnly}
-        deleteKeyCode={readOnly ? null : ['Delete', 'Backspace']}
+        // keyboard delete + arrow-move are owned by useBoardKeyboard (guarded
+        // against editor focus, with live announcements); React Flow's own
+        // key handling is disabled so nothing double-fires. Nodes stay
+        // Tab-focusable (nodesFocusable defaults true).
+        deleteKeyCode={null}
+        disableKeyboardA11y
         selectionKeyCode="Shift"
       >
         <Background variant={BackgroundVariant.Dots} gap={22} size={1.2} />
         <MiniMap
           pannable
           zoomable
+          ariaLabel="Board minimap — spatial overview of cards and sections"
           nodeColor={(n) =>
             n.type === 'section'
               ? (CARD_COLORS[(n as BoardNode).data.section?.color ?? 'gray'] ?? '#888') + '66'
@@ -403,11 +431,29 @@ function Canvas() {
             <CanvasToolbar />
           </Panel>
         )}
+        {!readOnly && (
+          <Panel position="bottom-left">
+            <BoardAddMenu
+              open={addMenuOpen}
+              onOpenChange={setAddMenuOpen}
+              onInserted={(id, label) => {
+                // move focus onto the freshly inserted card
+                requestAnimationFrame(() => focusCard(id))
+                announce(`Added ${label} card`)
+              }}
+            />
+          </Panel>
+        )}
         <BoardPresenceLayer boardId={board.id} />
         <CommentPins boardId={board.id} />
         <CommentAreas boardId={board.id} />
       </ReactFlow>
       {board.nodes.length === 0 && <EmptyBoardState readOnly={readOnly} />}
+      {linkSourceId && (
+        <div className="pointer-events-none absolute top-3 left-1/2 z-20 -translate-x-1/2 rounded-full border border-accent/40 bg-accent/15 px-3 py-1 text-[11px] font-medium text-accent">
+          Linking — Tab to another card, press Enter to connect · Esc to cancel
+        </div>
+      )}
       {commentMode && <CommentDrawOverlay boardId={board.id} />}
       {commentMode && (
         <div className="pointer-events-none absolute top-3 left-1/2 z-20 -translate-x-1/2 rounded-full border border-accent/40 bg-accent/15 px-3 py-1 text-[11px] font-medium text-accent">

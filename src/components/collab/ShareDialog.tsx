@@ -6,6 +6,7 @@ import { membersService } from '@/lib/collab/MembersService'
 import { inviteService } from '@/lib/collab/InviteService'
 import { collabHub } from '@/lib/collab/hub'
 import { useMyRole } from '@/lib/collab/useCollab'
+import { useCollabMode } from '@/lib/collab/collabPresentation'
 import { assignableRoles, can, canManageRole } from '@/lib/collab/permissions'
 import { currentIdentity, colorForUser } from '@/lib/collab/CollaborationProvider'
 import {
@@ -296,6 +297,7 @@ export function ShareDialog() {
   const members = useCollabStore((s) => s.members[projectId]) ?? []
   const invites = useCollabStore((s) => s.invites[projectId]) ?? []
   const myRole = useMyRole()
+  const mode = useCollabMode()
   const [tab, setTab] = useState<'members' | 'settings'>('members')
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<CollabRole>('editor')
@@ -360,6 +362,30 @@ export function ShareDialog() {
           </button>
         </div>
 
+        {/* One honest banner about what "collaborate" means right now — the
+            same source of truth the top-bar chip and presence badge use. */}
+        <div
+          className={`mt-3 flex items-start gap-2 rounded-lg border px-3 py-2 text-[11px] leading-relaxed ${
+            mode.isRealtime
+              ? 'border-[#14ae5c]/40 bg-[#14ae5c]/10 text-ink'
+              : 'border-bord bg-panel2 text-muted'
+          }`}
+        >
+          {mode.isRealtime ? (
+            <IcUsers size={13} className="mt-0.5 flex-none" />
+          ) : (
+            <IcInfo size={13} className="mt-0.5 flex-none" />
+          )}
+          <span>
+            <span className="font-semibold">
+              {mode.isRealtime
+                ? 'Realtime multiplayer'
+                : `Collaboration scope: ${mode.scopeLabel}`}
+            </span>{' '}
+            — {mode.description}
+          </span>
+        </div>
+
         {tab === 'members' ? (
           <>
             {/* invite composer */}
@@ -413,9 +439,9 @@ export function ShareDialog() {
             <div className="mt-2 flex items-start gap-2 rounded-lg bg-panel2 px-3 py-2 text-[10.5px] leading-relaxed text-muted">
               <IcEye size={12} className="mt-0.5 flex-none" />
               <span>
-                Live presence works across tabs of this browser today; across devices,
-                membership/comments sync through Google Drive when connected. “Simulate
-                acceptance” (✓) creates a mock member so you can test roles offline.
+                Invites work wherever this project’s data is reachable (see the
+                collaboration scope above). “Simulate acceptance” (✓) creates a mock
+                member so you can test roles offline.
               </span>
             </div>
           </>

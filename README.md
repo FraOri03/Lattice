@@ -410,7 +410,8 @@ Generated from `src/lib/registry/formatMatrix.ts` (code and docs cannot drift). 
 
 | Chunk | Size (gzip) | Loading |
 |---|---|---|
-| Main bundle (React, board, Tiptap, Yjs, three.js) | **699 kB** | initial |
+| Main bundle (React, board, Tiptap, Yjs) | **550 kB** | initial (three.js removed in Phase 9 — see §15c.5) |
+| three.js (viewer/scene) | 154 kB | **lazy** (Phase 9 — only 3D previews/cards) |
 | Monaco code editor | 865 kB | lazy (Code mode) |
 | SheetJS (xlsx) | 161 kB | lazy (first sheet import/export) |
 | jsPDF | 129 kB | lazy (PDF export) |
@@ -418,7 +419,7 @@ Generated from `src/lib/registry/formatMatrix.ts` (code and docs cannot drift). 
 | Presentation workspace | 5.8 kB | lazy |
 | Spreadsheet workspace | 8.7 kB | lazy |
 
-Skeleton/loading states cover every lazy module. Presence cursors are throttled (60 ms), drags (50 ms), board CRDT commits batched (80 ms). Known optimization for Phase 9: three.js is still in the main bundle (~170 kB gz of it) — the viewer can go lazy.
+Skeleton/loading states cover every lazy module. Presence cursors are throttled (60 ms), drags (50 ms), board CRDT commits batched (80 ms). **Phase 9 update:** three.js is no longer in the main bundle — it is a dedicated lazy chunk, and off-screen 3D/media animation loops are suspended (§15c.5).
 
 ### 15.12 Known limitations (Phase 8)
 
@@ -570,6 +571,68 @@ Phase 8.5's prioritized remediation plan (`docs/ux-ui-remediation-roadmap.md`) d
 - Anonymous read-only **public viewer** / published boards — the Phase 8 server groundwork exists (room `defaultAccesses` + metadata flags); this is the no-login share link §15.12 defers.
 - **Unified transfer dialog** (import planning → confirm → report in one surface); **CRDT subdocument partitioning** for very large projects.
 - Standing items from earlier roadmaps: **File System Access API vault**, **plugin API**, **PR-based GitHub flow**, **remote-deletion management UI**, **billing/subscriptions**, **web clipper**, **AI assistant inside projects**, and **mobile/tablet UI**.
+
+## 15c · Phase 9 (P1) — accessibility, navigation & performance
+
+The Phase 8.5 audit's **P1** items (§15b) — the ones gating public beta — are implemented. Details live in dedicated docs: [`docs/accessibility.md`](docs/accessibility.md), [`docs/navigation.md`](docs/navigation.md), [`docs/performance.md`](docs/performance.md), [`docs/collaboration.md`](docs/collaboration.md).
+
+### 15c.1 Board keyboard accessibility (`LAT-2`, was Critical)
+
+The infinite board is now fully operable without a mouse, layered on React Flow's focus model rather than replacing it. React Flow keeps every card **Tab-focusable** (`nodesFocusable`) while its own key handling is turned **off** (`disableKeyboardA11y`), so a single tested controller (`useBoardKeyboard` over the pure `src/lib/board/keyboardNav.ts`) owns all board keys with no double-firing.
+
+| Key | Action |
+|---|---|
+| `Tab` / `Shift+Tab` | Move focus between cards; the focused card is selected and announced |
+| Arrow keys | Move the focused card (10 px) |
+| `Shift`+Arrow | Move in coarse steps (50 px) |
+| `Alt`+Arrow | Move in precise steps (1 px) |
+| `Enter` | Open the focused card's entity in its workspace |
+| `L` | Start a keyboard connection from the focused card; `Enter`/`L` on another card completes it, `Esc` cancels |
+| `Delete` / `Backspace` | Delete the selection (or the focused card) |
+| `A` | Open the keyboard-navigable **Add card** menu |
+| `Esc` | Cancel a link / close the add menu |
+
+Shortcuts **never fire inside an editor** — inputs, textareas, contenteditable (Tiptap), Monaco and the spreadsheet grid are all excluded (`isEditableTarget`). Every action announces through one polite `aria-live` region (`src/lib/a11y/announcer.ts` → `<LiveRegion/>`): selection, move (with coordinates), link, add and delete. The board region is a `role="application"` with an `aria-describedby` instructions block; cards carry accessible names ("Document card: Roadmap"). Pointer drag-and-drop, box-select and connection-handle dragging are untouched.
+
+### 15c.2 Status is never colour-only (`LAT-11` / A11Y-2)
+
+Sync, Drive, realtime, roles, presence and the minimap now encode state with **icon/shape + text + accessible name**, colour only reinforcing. The realtime chip shows a distinct icon per state (check / spinner / alert / cloud-off / lock) so statuses that share a colour stay distinguishable; the Drive chip uses a warning glyph for errors; presence carries a scope badge; the minimap has an `ariaLabel`. `:focus-visible` and `prefers-reduced-motion` are preserved.
+
+### 15c.3 Collaboration honesty propagated (`COL-1` / issue #9)
+
+The honesty of the realtime chip now reaches every collaboration surface, from **one source of truth** — `src/lib/collab/collabPresentation.ts` derives the tier from the active provider's real capability signals (a configured backend **and** a Google identity), not scattered env reads:
+
+- **realtime** — Liveblocks + Yjs across devices (only when `VITE_REALTIME_BACKEND=liveblocks` + Google sign-in);
+- **drive** — Google Drive polling (~20 s), no live cross-device presence;
+- **local** — BroadcastChannel, tabs of this one browser.
+
+Presence avatars carry a "same browser" / "Drive" scope badge, the Share button and dialog state the exact scope, and the Share dialog shows one honest banner — so no avatar or control implies live remote collaboration that isn't configured. The realtime setup checklist stays available; nothing is simulated.
+
+### 15c.4 Browser back/forward + deep links (`NAV-1` / issue #10)
+
+A tiny centralized abstraction (`src/lib/nav/navUrl.ts` + `useUrlHistory`) binds the **navigable identity** — project · mode · board · the single open entity — to the History API:
+
+```
+store change (project/mode/board/entity) ──▶ history.pushState
+Back / Forward (popstate)                ──▶ store.applyNav
+direct load / refresh                    ──▶ restore from ?p=…&m=…&b=…&e=…
+```
+
+Back no longer exits the app; refresh and direct links restore the view; **invalid ids degrade safely** (unknown project → current, bad board → the project's first, missing entity → dropped, bad mode → `board`). Transient churn (selection, drag, typing) never touches history — a `navKey` dedup + an `applying` guard prevent React↔URL↔popstate loops. The existing `#invite=` hash flow is preserved (history owns the search string, never the hash). Split-as-mode and Workspace nesting (the Medium items) were intentionally left out of scope.
+
+### 15c.5 Performance — lazy three.js + off-screen pausing (`LAT-4`/`LAT-5`)
+
+**three.js left the main bundle.** It is imported only through lazy boundaries (`ThreeScene.tsx` for `embed3d` cards, `ThreeDViewerLazy.tsx` for asset models), and a `manualChunks` rule keeps it in one dedicated `three` chunk.
+
+| Chunk (gzip) | Before | After |
+|---|---:|---:|
+| **main `index`** | **700.5 kB** (incl. three.js) | **549.7 kB** |
+| `three` (lazy) | — | 153.6 kB |
+| `ThreeScene` / `ThreeDViewer` (lazy) | — | 0.9 / 2.6 kB |
+
+The main entry chunk dropped **≈ 151 kB gzip** and no longer contains three.js. 3D previews and cards render via a Suspense skeleton.
+
+Off-screen and idle work is suspended (`src/lib/perf/`): an `IntersectionObserver` (`useInViewport`) plus page-visibility gate every 3D scene, so `requestAnimationFrame`, OrbitControls auto-rotate and continuous rendering **stop** when a card is off-screen, the tab is hidden, or the board is inactive; the asset viewer renders **on-demand** (a frame only on interaction/damping/resize — zero frames while a model sits still). A `ViewerBudget` caps concurrent live 3D scenes (4), expensive media (video) defers its player until first on-screen, and a dimensionally-stable placeholder holds every un-mounted card so edges and layout never shift. This is deliberate **content-windowing** (card chrome stays mounted; only heavy content suspends) rather than React Flow's destructive `onlyRenderVisibleElements`, so selected/dragged/linked cards and CRDT/editor state are never lost. A static board with no visible 3D runs no animation loops.
 
 ## 16 · Folder structure (source)
 
