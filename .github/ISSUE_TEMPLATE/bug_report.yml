@@ -1,0 +1,84 @@
+name: Bug report
+description: Report something that is broken or behaves incorrectly.
+title: "[Bug] "
+labels: ["type: bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Please fill in as much as you can — it makes triage much faster.
+        Triage will assign priority, area and status; this template does not set them automatically.
+  - type: checkboxes
+    id: duplicates
+    attributes:
+      label: Pre-flight
+      options:
+        - label: I searched existing issues and this is not a duplicate.
+          required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A clear and concise description of the bug.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Numbered steps that reliably reproduce the problem.
+      placeholder: |
+        1. Go to '...'
+        2. Click on '...'
+        3. See error
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: observed
+    attributes:
+      label: Observed behavior
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Affected mode / surface
+      options:
+        - Board
+        - Document / Notes
+        - Spreadsheet
+        - Presentation
+        - Code
+        - Split
+        - Sync (Google Drive)
+        - GitHub integration
+        - Collaboration / realtime
+        - Account / authentication
+        - Import / export
+        - Other / not sure
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Browser & OS
+      placeholder: e.g. Chrome 126 on Windows 11
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Console logs
+      description: Relevant browser console / network output, if any.
+      render: shell
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots or recordings
+      description: Drag images or videos here if they help.
