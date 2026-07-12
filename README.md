@@ -72,6 +72,98 @@ Everything is optional. Copy the template and fill in only what you need:
 ```bash
 cp .env.example .env.local
 ```
+YjsManager ── one ProjectRoom per project ──┬─ content Y.Doc: documents (Y.XmlFragment each),
+  │ owns rooms + optional realtime attach   │  codeDocuments (Y.Text each), boards (Y.Map of
+  │                                         │  nodes/edges per board), projectMetadata
+  ├─ OfflineUpdateQueue (honest pending     └─ collab Y.Doc: comments/areas, durable collab
+  │  counter; y-indexeddb holds the data)      state mirror, version bodies ≤200 KB
+  ├─ AwarenessService (drag ghosts, sheet cells, code lines → presence)
+  └─ CRDTPersistenceAdapter (labelled binary snapshots for migrations/versions)
+```
+
+Persistence roles: **Liveblocks** = active shared state · **y-indexeddb** = local CRDT cache (offline editing, instant loads, deterministic replay on reconnect) · **Google Drive** = durable JSON bodies + assets (unchanged paths — every CRDT save re-exports the JSON body through the existing persist pipeline) · **version history** = explicit restorable states. Even with **no backend configured**, tabs of one browser co-edit through a BroadcastChannel Yjs relay. Cursor movement and keystrokes never touch Drive polling.
+
+- **Rich documents** are CRDT-native Tiptap (`Collaboration` + `CollaborationCursor`): simultaneous typing, remote carets/selections with names+colors, collaborative tables/lists, offline merge, undo via Y.UndoManager. Existing Tiptap JSON bodies migrate **once**, marker-guarded, with a "Before CRDT migration" version created first and the original body preserved. Last-writer-wins is gone as the active editing model.
+- **Code** is y-monaco with remote cursors/selections/labels and per-project **Code editing policy**: *Collaborative* (CRDT multiplayer, default) or *Checkout required* (Phase 7 soft locks: request control, owner/admin force-unlock). GitHub commits stay explicit and ship the **reconciled** CRDT state; realtime edits never auto-commit.
+- **Boards** use granular CRDT ops (node upserts/patches/data updates, edge ops, layer order) — the full board is serialized only on one-time seeding. During drags, geometry travels as **throttled transient presence** rendered as a dashed manipulation outline in the dragger's color; the committed CRDT op lands on drag end. A node a peer is dragging is locally non-draggable (one authoritative drag; takeover after release); remote updates never move a node you are dragging.
+
+### 15.3 Server-enforced permissions
+
+Two Vercel functions (`api/realtime/auth.ts`, `api/realtime/rooms.ts`) plus `LIVEBLOCKS_SECRET_KEY`:
+
+- **Identity**: the client sends its Google OAuth access token; the server verifies it against Google (`tokeninfo`, audience-checked against `VITE_GOOGLE_CLIENT_ID`) and derives the e-mail from Google's answer — never from the request body.
+- **Authorization**: each project maps to two rooms — *content* (docs/code/boards; writable by owner/admin/editor) and *collab* (comments/areas/durable state; writable by commenters too). The ACL lives in room metadata, writable only through the rooms endpoint, which evaluates **the same permission matrix module the UI uses** (`permissions.ts` — imported by both, so rules can't drift) for `set-role`/`delete`/`ensure`. Tokens are minted per-role (`room:write` vs `room:read`+`room:presence:write`) and **Liveblocks enforces them on every websocket op** — a tampered client cannot exceed its role, viewers can present but not write a single CRDT byte.
+- Invites/role changes/removals mirror to the server ACL automatically (`ServerAclService`); ACL keys are Google e-mails, so invite people with the address they sign in with.
+
+### 15.4 Workspaces
+
+`Workspace → Project → Mode → Entity`, always visible in the breadcrumb. Personal workspace is automatic (migration wraps existing projects); team workspaces support create/rename/archive and **safe deletion** (projects move to Personal). Projects move between workspaces from Project settings. Enforcement stays per-project (room ACLs) — workspace membership is organizational, stated as such.
+
+### 15.5 Area comments + notifications
+
+The board comment tool: **click = pin, drag = translucent area rectangle** (C activates, Esc cancels, Enter submits). Areas live in flow coordinates on their thread — they persist with the project, sync over every transport, can be moved/resized by author/admin (plus numeric X/Y/W/H fields for keyboard access), show a numbered pin, minimize on resolve, restore on reopen, and the comments panel zooms the board to them (reduced-motion aware). **Comments 2.0**: reactions, assignment to a member, due dates with overdue highlight. The **notification center** (top-bar bell) derives per-device notifications from synced state — mentions, replies, assignments, invites, resolved/reopened, Drive failures, realtime failures — with deep links that focus threads and zoom areas.
+
+### 15.6 Toolbar & QOL corrections
+
+The inverted import/export icons are fixed everywhere via a semantic registry (`ActionIcons.tsx`): `Import` (arrow into tray), `Export` (arrow out), `DownloadLocal`, `UploadToCloud`, `Sync`, `PullFromGitHub`, `PushToGitHub` — one icon per meaning, applied across sidebar, board toolbar, GitHub dialog, inspectors and menus; every icon-only control carries `aria-label` + tooltip. `<ToolbarDivider />` (a keyboard-transparent `role="separator"`) groups all toolbars by purpose (board: structure · creation · annotation · external).
+
+### 15.7 Presentation engine v1
+
+Real slide editor on a 960×540 canvas: slide list with thumbnails (reorder/duplicate/delete), text boxes, images, rect/ellipse/line shapes, layer order, per-slide backgrounds, three themes, speaker notes, viewer-role read-only. Internal JSON source format (`presentModel.ts`). **Export: PDF** (true vector via lazy jsPDF) and **PPTX** (a valid PresentationML package — labelled *basic fidelity*: text/shapes/images, no themes/animations). **Import: PPTX and ODP** become editable decks (text geometry, embedded images) with a per-file conversion report; the source file is always preserved; legacy PPT stays honestly preserved until a conversion backend is configured.
+
+### 15.8 Format capability matrix
+
+Generated from `src/lib/registry/formatMatrix.ts` (code and docs cannot drift). States: **Native editable · Converted to editable · Preview only · Preserved original · Needs conversion backend · Unsupported**.
+
+| Group | Native / converted (editable) | Preview only | Preserved / backend | Notes |
+|---|---|---|---|---|
+| Text | TXT, MD, HTML(code), RTF, DOCX, ODT | — | DOC/PPT → backend; DOCG/ODF-generic preserved by MIME signature | DOCX now exports natively; docs also export PDF/ODT/RTF/HTML/MD |
+| Sheets | CSV, TSV, XLS, XLSX, ODS | — | — | export XLSX/CSV; ODS export not yet (reported) |
+| Decks | PPTX, ODP | — | PPT → backend | export PDF + PPTX (basic fidelity) |
+| PDF | — | ✅ (browser viewer, text selectable) | — | docs/sheets/decks export **to** PDF |
+| Images | — | PNG, JPG, WEBP, GIF, SVG (sandboxed `img`), AVIF, BMP | TIFF preserved (browsers can't decode; the preview says so) | |
+| Video | — | MP4, WEBM, OGV/MOV (codec-dependent, honest fallback) | — | |
+| Audio | — | MP3, WAV, OGG, M4A/AAC, FLAC | — | |
+| 3D | — | GLB, GLTF+deps, OBJ+MTL+textures, STL | FBX unsupported (no reliable loader) | **asset bundles** resolve external buffers/textures; missing-dependency diagnostics + “Relink missing files” — never a silent empty viewport |
+| Code | 30+ languages incl. TOML/INI/env | — | — | env files: secret detection, privacy warning, never auto-committed |
+| Archives | ZIP with a 3D model unpacks into a bundle | — | any other file preserved as attachment | |
+
+### 15.9 Conversion backend
+
+`ConversionBackendProvider` seam with three honest implementations: **Local** (the in-browser pairs above), **Remote** (external worker — e.g. headless LibreOffice — behind `VITE_CONVERSION_API_URL`: authenticated multipart `convertFile`, explicit consent dialog before any upload, 50 MB cap, 120 s timeout, cancel, progress, fidelity warnings from response headers, original always untouched) and **Disabled** (the default; the UI states exactly what is missing). No native conversion binary is ever bundled into the frontend.
+
+### 15.10 Security model (Phase 8 audit)
+
+- Realtime auth: Google tokens verified server-side with **audience check**; role scopes minted server-side; the browser's claimed role is never trusted.
+- Markdown renderer XSS fix: `javascript:`/`data:` URLs in links/images now collapse to `#` (scheme allow-list) on top of the existing HTML escaping.
+- SVG previews render through `<img>` (scripts never execute); web-embed iframes keep `sandbox` + `referrerPolicy=no-referrer` + http(s)-only URL sanitization.
+- Env/credential files: heuristic secret detection on import → privacy warning + metadata flag; committing flagged files to GitHub requires an explicit danger re-confirmation; conversion uploads require explicit consent.
+- Known: OAuth tokens live in browser storage (XSS-scoped; documented), public no-login links are not built (see 15.12).
+
+### 15.11 Performance (production build, gzip)
+
+| Chunk | Size (gzip) | Loading |
+|---|---|---|
+| Main bundle (React, board, Tiptap, Yjs) | **550 kB** | initial (three.js removed in Phase 9 — see §15c.5) |
+| three.js (viewer/scene) | 154 kB | **lazy** (Phase 9 — only 3D previews/cards) |
+| Monaco code editor | 865 kB | lazy (Code mode) |
+| SheetJS (xlsx) | 161 kB | lazy (first sheet import/export) |
+| jsPDF | 129 kB | lazy (PDF export) |
+| Realtime SDK (Liveblocks) | 54 kB | lazy (only when configured) |
+| Presentation workspace | 5.8 kB | lazy |
+| Spreadsheet workspace | 8.7 kB | lazy |
+
+Skeleton/loading states cover every lazy module. Presence cursors are throttled (60 ms), drags (50 ms), board CRDT commits batched (80 ms). **Phase 9 update:** three.js is no longer in the main bundle — it is a dedicated lazy chunk, and off-screen 3D/media animation loops are suspended (§15c.5).
+
+### 15.12 Known limitations (Phase 8)
+
+- **Public no-login share links are not built.** Sharing is role-based and server-enforced; the Share dialog says exactly that and points to the real alternatives (HTML/PDF/DOCX/PPTX exports, vault files). An anonymous read-only viewer is the Phase 9 item.
+- The unified import/export **transfer dialog** (plan → confirm → report in one surface) is partial: per-file progress, error reporting and conversion reports exist, but the planning step before import is not a dedicated dialog yet.
+- Version snapshot payloads over 200 KB stay device-local (index syncs; smaller bodies sync through the collab CRDT doc).
+- Sheet editing is body-level sync (save-granular), not cell-level CRDT; sheet/deck *presence* is live.
+- Board same-node conflicts resolve last-writer-wins per node (different nodes never conflict); doc-range-anchored comments inside rich documents are not anchored to exact ranges yet.
+- PPTX/ODP import flattens masters/themes/animations (reported per file); PPTX export is basic fidelity by design.
+- Realtime requires Google sign-in (identity source); local mock accounts stay tabs-only + Drive.
 
 | Variable | Unlocks |
 |---|---|
@@ -107,6 +199,69 @@ Planning lives in **GitHub Issues and a GitHub Project**, not in this README.
 | [docs/file-formats.md](docs/file-formats.md) | Import/export support matrix and fidelity |
 | [docs/limitations.md](docs/limitations.md) | Known limitations and the security model |
 
+## 15c · Phase 9 (P1) — accessibility, navigation & performance
+
+The Phase 8.5 audit's **P1** items (§15b) — the ones gating public beta — are implemented. Details live in dedicated docs: [`docs/accessibility.md`](docs/accessibility.md), [`docs/navigation.md`](docs/navigation.md), [`docs/performance.md`](docs/performance.md), [`docs/collaboration.md`](docs/collaboration.md).
+
+### 15c.1 Board keyboard accessibility (`LAT-2`, was Critical)
+
+The infinite board is now fully operable without a mouse, layered on React Flow's focus model rather than replacing it. React Flow keeps every card **Tab-focusable** (`nodesFocusable`) while its own key handling is turned **off** (`disableKeyboardA11y`), so a single tested controller (`useBoardKeyboard` over the pure `src/lib/board/keyboardNav.ts`) owns all board keys with no double-firing.
+
+| Key | Action |
+|---|---|
+| `Tab` / `Shift+Tab` | Move focus between cards; the focused card is selected and announced |
+| Arrow keys | Move the focused card (10 px) |
+| `Shift`+Arrow | Move in coarse steps (50 px) |
+| `Alt`+Arrow | Move in precise steps (1 px) |
+| `Enter` | Open the focused card's entity in its workspace |
+| `L` | Start a keyboard connection from the focused card; `Enter`/`L` on another card completes it, `Esc` cancels |
+| `Delete` / `Backspace` | Delete the selection (or the focused card) |
+| `A` | Open the keyboard-navigable **Add card** menu |
+| `Esc` | Cancel a link / close the add menu |
+
+Shortcuts **never fire inside an editor** — inputs, textareas, contenteditable (Tiptap), Monaco and the spreadsheet grid are all excluded (`isEditableTarget`). Every action announces through one polite `aria-live` region (`src/lib/a11y/announcer.ts` → `<LiveRegion/>`): selection, move (with coordinates), link, add and delete. The board region is a `role="application"` with an `aria-describedby` instructions block; cards carry accessible names ("Document card: Roadmap"). Pointer drag-and-drop, box-select and connection-handle dragging are untouched.
+
+### 15c.2 Status is never colour-only (`LAT-11` / A11Y-2)
+
+Sync, Drive, realtime, roles, presence and the minimap now encode state with **icon/shape + text + accessible name**, colour only reinforcing. The realtime chip shows a distinct icon per state (check / spinner / alert / cloud-off / lock) so statuses that share a colour stay distinguishable; the Drive chip uses a warning glyph for errors; presence carries a scope badge; the minimap has an `ariaLabel`. `:focus-visible` and `prefers-reduced-motion` are preserved.
+
+### 15c.3 Collaboration honesty propagated (`COL-1` / issue #9)
+
+The honesty of the realtime chip now reaches every collaboration surface, from **one source of truth** — `src/lib/collab/collabPresentation.ts` derives the tier from the active provider's real capability signals (a configured backend **and** a Google identity), not scattered env reads:
+
+- **realtime** — Liveblocks + Yjs across devices (only when `VITE_REALTIME_BACKEND=liveblocks` + Google sign-in);
+- **drive** — Google Drive polling (~20 s), no live cross-device presence;
+- **local** — BroadcastChannel, tabs of this one browser.
+
+Presence avatars carry a "same browser" / "Drive" scope badge, the Share button and dialog state the exact scope, and the Share dialog shows one honest banner — so no avatar or control implies live remote collaboration that isn't configured. The realtime setup checklist stays available; nothing is simulated.
+
+### 15c.4 Browser back/forward + deep links (`NAV-1` / issue #10)
+
+A tiny centralized abstraction (`src/lib/nav/navUrl.ts` + `useUrlHistory`) binds the **navigable identity** — project · mode · board · the single open entity — to the History API:
+
+```
+store change (project/mode/board/entity) ──▶ history.pushState
+Back / Forward (popstate)                ──▶ store.applyNav
+direct load / refresh                    ──▶ restore from ?p=…&m=…&b=…&e=…
+```
+
+Back no longer exits the app; refresh and direct links restore the view; **invalid ids degrade safely** (unknown project → current, bad board → the project's first, missing entity → dropped, bad mode → `board`). Transient churn (selection, drag, typing) never touches history — a `navKey` dedup + an `applying` guard prevent React↔URL↔popstate loops. The existing `#invite=` hash flow is preserved (history owns the search string, never the hash). Split-as-mode and Workspace nesting (the Medium items) were intentionally left out of scope.
+
+### 15c.5 Performance — lazy three.js + off-screen pausing (`LAT-4`/`LAT-5`)
+
+**three.js left the main bundle.** It is imported only through lazy boundaries (`ThreeScene.tsx` for `embed3d` cards, `ThreeDViewerLazy.tsx` for asset models), and a `manualChunks` rule keeps it in one dedicated `three` chunk.
+
+| Chunk (gzip) | Before | After |
+|---|---:|---:|
+| **main `index`** | **700.5 kB** (incl. three.js) | **549.7 kB** |
+| `three` (lazy) | — | 153.6 kB |
+| `ThreeScene` / `ThreeDViewer` (lazy) | — | 0.9 / 2.6 kB |
+
+The main entry chunk dropped **≈ 151 kB gzip** and no longer contains three.js. 3D previews and cards render via a Suspense skeleton.
+
+Off-screen and idle work is suspended (`src/lib/perf/`): an `IntersectionObserver` (`useInViewport`) plus page-visibility gate every 3D scene, so `requestAnimationFrame`, OrbitControls auto-rotate and continuous rendering **stop** when a card is off-screen, the tab is hidden, or the board is inactive; the asset viewer renders **on-demand** (a frame only on interaction/damping/resize — zero frames while a model sits still). A `ViewerBudget` caps concurrent live 3D scenes (4), expensive media (video) defers its player until first on-screen, and a dimensionally-stable placeholder holds every un-mounted card so edges and layout never shift. This is deliberate **content-windowing** (card chrome stays mounted; only heavy content suspends) rather than React Flow's destructive `onlyRenderVisibleElements`, so selected/dragged/linked cards and CRDT/editor state are never lost. A static board with no visible 3D runs no animation loops.
+
+## 16 · Folder structure (source)
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). In short: branch from `main`, pick or open an
