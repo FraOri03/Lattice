@@ -6,8 +6,10 @@
   Code** — Graph sits immediately after Board.
 - Command palette: **Open Graph view** (`Ctrl/Cmd K` → "graph").
 - Keyboard: **`G G`** (press G twice within 500 ms; ignored while typing).
-- Browser history: entering Graph pushes a `#graph` entry, so Back/Forward move
-  in and out of it. The mode is also persisted, so a reload restores it.
+- Browser history: Graph is a first-class navigable mode in the unified URL
+  history system (`src/lib/nav/`) — entering Graph pushes a `?m=graph` history
+  entry, so Back/Forward move in and out of it and a direct link / reload
+  restores it. The mode is also persisted in the store.
 
 ## Pointer
 

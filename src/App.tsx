@@ -154,33 +154,6 @@ function useGlobalShortcuts() {
   }, [setShortcutsOpen])
 }
 
-/**
- * Put Graph mode in browser history so Back/Forward move in and out of it,
- * via a lightweight `#graph` hash — the app is otherwise route-less.
- */
-function useGraphHistory() {
-  const viewMode = useStore((s) => s.viewMode)
-  const setViewMode = useStore((s) => s.setViewMode)
-  useEffect(() => {
-    const isGraphHash = location.hash === '#graph'
-    if (viewMode === 'graph' && !isGraphHash) {
-      history.pushState({ lattice: 'graph' }, '', '#graph')
-    } else if (viewMode !== 'graph' && isGraphHash) {
-      history.replaceState(null, '', location.pathname + location.search)
-    }
-  }, [viewMode])
-  useEffect(() => {
-    const onPop = () => {
-      const graphHash = location.hash === '#graph'
-      const mode = useStore.getState().viewMode
-      if (graphHash && mode !== 'graph') setViewMode('graph')
-      else if (!graphHash && mode === 'graph') setViewMode('board')
-    }
-    window.addEventListener('popstate', onPop)
-    return () => window.removeEventListener('popstate', onPop)
-  }, [setViewMode])
-}
-
 function Workspace() {
   const theme = useStore((s) => s.theme)
   const viewMode = useStore((s) => s.viewMode)
