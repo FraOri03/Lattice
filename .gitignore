@@ -7,3 +7,6 @@ dist
 .env.*
 !.env.example
 .vercel
+
+# Graphify generated knowledge graph (dev-only, rebuild with `npm run graph:build`)
+graphify-out/
