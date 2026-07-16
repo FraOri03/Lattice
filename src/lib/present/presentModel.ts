@@ -12,6 +12,14 @@ import { nid } from '@/lib/id'
 export const SLIDE_W = 960
 export const SLIDE_H = 540
 
+/**
+ * Body schema version. Bumped when the shape grows; `migratePresentBody`
+ * upgrades older bodies and never drops unknown fields (Phase 0). v1 → v2
+ * (Phase 1): additive optional element fields (rotation/opacity/locked/hidden)
+ * and image `alt` — none required, so v1 bodies load unchanged.
+ */
+export const PRESENT_BODY_VERSION = 2
+
 export type PresentTheme = 'plain' | 'ink' | 'accent'
 
 export interface PresentElementBase {
@@ -22,6 +30,14 @@ export interface PresentElementBase {
   h: number
   /** paint order inside the slide (low first) */
   z: number
+  /** clockwise rotation in degrees (Phase 1); absent = 0 */
+  rotation?: number
+  /** 0..1 element opacity (Phase 1); absent = 1 */
+  opacity?: number
+  /** locked elements can't be selected/moved on the canvas (Phase 1) */
+  locked?: boolean
+  /** hidden elements don't render on the slide/thumbnail (Phase 1) */
+  hidden?: boolean
 }
 
 export interface TextElement extends PresentElementBase {
@@ -38,6 +54,8 @@ export interface ImageElement extends PresentElementBase {
   kind: 'image'
   /** data URL (self-contained decks survive export/import/Drive) */
   src: string
+  /** alternative text for accessibility + export descr (Phase 1 field) */
+  alt?: string
 }
 
 export interface ShapeElement extends PresentElementBase {
@@ -60,7 +78,7 @@ export interface PresentSlide {
 
 export interface PresentationBody {
   app: 'lattice-present'
-  version: 1
+  version: number
   theme: PresentTheme
   slides: PresentSlide[]
 }
@@ -127,7 +145,7 @@ export function createTitleSlide(title: string): PresentSlide {
 export function createPresentBody(title = 'Untitled presentation'): PresentationBody {
   return {
     app: 'lattice-present',
-    version: 1,
+    version: PRESENT_BODY_VERSION,
     theme: 'plain',
     slides: [createTitleSlide(title)],
   }
@@ -152,21 +170,68 @@ export function digestPresentation(body: PresentationBody): {
   }
 }
 
-/** Accept whatever storage returns; always produce a valid body. */
-export function normalizePresentBody(raw: unknown): PresentationBody {
-  const b = raw as Partial<PresentationBody> | undefined
-  if (b?.app === 'lattice-present' && Array.isArray(b.slides) && b.slides.length) {
-    return {
-      app: 'lattice-present',
-      version: 1,
-      theme: b.theme && b.theme in THEME_COLORS ? b.theme : 'plain',
-      slides: b.slides.map((s) => ({
-        id: s.id || nid('slide'),
-        background: s.background ?? null,
-        notes: s.notes ?? '',
-        elements: Array.isArray(s.elements) ? s.elements : [],
-      })),
-    }
+const isFiniteNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v)
+const num = (v: unknown, fallback: number): number => (isFiniteNumber(v) ? v : fallback)
+
+/**
+ * Repair one element: guarantee a valid id + finite geometry so a corrupt or
+ * legacy body can never produce malformed geometry (audit §19 / DM-8), while
+ * **preserving every other field** — including unknown ones from a future
+ * schema — via the spread. Returns null only for non-objects.
+ */
+function migrateElement(raw: unknown): PresentElement | null {
+  if (!raw || typeof raw !== 'object') return null
+  const e = raw as Record<string, unknown>
+  return {
+    ...(e as unknown as PresentElement),
+    id: typeof e.id === 'string' && e.id ? (e.id as string) : nid('el'),
+    x: num(e.x, 0),
+    y: num(e.y, 0),
+    w: Math.max(1, num(e.w, 100)),
+    h: Math.max(1, num(e.h, 40)),
+    z: num(e.z, 0),
   }
-  return createPresentBody()
+}
+
+/** Repair one slide, preserving unknown slide-level fields (layoutId, etc.). */
+function migrateSlide(raw: unknown): PresentSlide {
+  const s = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
+  const elements = Array.isArray(s.elements)
+    ? (s.elements.map(migrateElement).filter(Boolean) as PresentElement[])
+    : []
+  return {
+    ...(s as object),
+    id: typeof s.id === 'string' && s.id ? (s.id as string) : nid('slide'),
+    background: typeof s.background === 'string' ? (s.background as string) : null,
+    notes: typeof s.notes === 'string' ? (s.notes as string) : '',
+    elements,
+  } as PresentSlide
+}
+
+/**
+ * Versioned migration runner (Phase 0). Accepts whatever storage returns and
+ * always yields a valid, current-version body. It **never discards unknown
+ * fields** (deck-, slide- and element-level spreads preserve them), so a body
+ * written by a newer build round-trips through an older one without data loss.
+ */
+export function migratePresentBody(raw: unknown): PresentationBody {
+  const b = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : null
+  if (!b || b.app !== 'lattice-present' || !Array.isArray(b.slides) || b.slides.length === 0) {
+    return createPresentBody()
+  }
+  return {
+    ...(b as object),
+    app: 'lattice-present',
+    version: PRESENT_BODY_VERSION,
+    theme: typeof b.theme === 'string' && b.theme in THEME_COLORS ? (b.theme as PresentTheme) : 'plain',
+    slides: b.slides.map(migrateSlide),
+  } as PresentationBody
+}
+
+/**
+ * Accept whatever storage returns; always produce a valid body.
+ * Kept as the stable public name; delegates to the migration runner.
+ */
+export function normalizePresentBody(raw: unknown): PresentationBody {
+  return migratePresentBody(raw)
 }
