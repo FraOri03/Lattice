@@ -592,3 +592,70 @@ export const IcGrip = (p: P) => (
     <path d="M21 9 9 21M21 15.5 15.5 21" />
   </S>
 )
+
+/* ---------------- presentation editor (Phase 1) ---------------- */
+/* IcUndo / IcRedo are already defined above and reused here. */
+export const IcZoomIn = (p: P) => (
+  <S {...p}>
+    <circle cx="11" cy="11" r="7" />
+    <path d="M11 8v6M8 11h6M21 21l-4.3-4.3" />
+  </S>
+)
+export const IcZoomOut = (p: P) => (
+  <S {...p}>
+    <circle cx="11" cy="11" r="7" />
+    <path d="M8 11h6M21 21l-4.3-4.3" />
+  </S>
+)
+export const IcAlignTop = (p: P) => (
+  <S {...p}>
+    <path d="M4 5h16M9 8v11M15 8v7" />
+  </S>
+)
+export const IcAlignMiddle = (p: P) => (
+  <S {...p}>
+    <path d="M4 12h16M9 6v12M15 8v8" />
+  </S>
+)
+export const IcAlignBottom = (p: P) => (
+  <S {...p}>
+    <path d="M4 19h16M9 5v11M15 9v7" />
+  </S>
+)
+export const IcDistributeH = (p: P) => (
+  <S {...p}>
+    <path d="M5 5v14M12 5v14M19 5v14" />
+  </S>
+)
+export const IcDistributeV = (p: P) => (
+  <S {...p}>
+    <path d="M5 5h14M5 12h14M5 19h14" />
+  </S>
+)
+export const IcMagnet = (p: P) => (
+  <S {...p}>
+    <path d="M7 3H4v8a8 8 0 0 0 16 0V3h-3v8a5 5 0 0 1-10 0z" />
+    <path d="M4 7h3M17 7h3" />
+  </S>
+)
+export const IcSquare = (p: P) => (
+  <S {...p}>
+    <rect x="4" y="4" width="16" height="16" rx="2" />
+  </S>
+)
+export const IcCircle = (p: P) => (
+  <S {...p}>
+    <circle cx="12" cy="12" r="8" />
+  </S>
+)
+export const IcLine = (p: P) => (
+  <S {...p}>
+    <path d="M5 19 19 5" />
+  </S>
+)
+export const IcRotate = (p: P) => (
+  <S {...p}>
+    <path d="M21 12a9 9 0 1 1-3-6.7L21 8" />
+    <path d="M21 3v5h-5" />
+  </S>
+)

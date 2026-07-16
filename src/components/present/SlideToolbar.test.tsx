@@ -17,15 +17,28 @@ const handlers = {
   onAddShape: vi.fn(),
   onBackground: vi.fn(),
   onResetBackground: vi.fn(),
+  onToggleSnap: vi.fn(),
+  onAlign: vi.fn(),
+  onDistribute: vi.fn(),
 }
 
-const renderBar = (props: Partial<{ background: string | null; slideIndex: number; slideCount: number }> = {}) =>
+const renderBar = (
+  props: Partial<{
+    background: string | null
+    slideIndex: number
+    slideCount: number
+    selectedCount: number
+    snapEnabled: boolean
+  }> = {},
+) =>
   render(
     <SlideToolbar
       slideIndex={props.slideIndex ?? 0}
       slideCount={props.slideCount ?? 3}
       background={props.background ?? null}
       themeBackground="#ffffff"
+      selectedCount={props.selectedCount ?? 0}
+      snapEnabled={props.snapEnabled ?? true}
       {...handlers}
     />,
   )
@@ -117,6 +130,80 @@ describe('SlideToolbar — commands', () => {
   })
 })
 
+describe('SlideToolbar — precision (19E.0)', () => {
+  it('states the snapping state through aria-pressed, not colour alone', () => {
+    const { unmount } = renderBar({ snapEnabled: true })
+    expect(screen.getByRole('button', { name: 'Snapping' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    unmount()
+    renderBar({ snapEnabled: false })
+    expect(screen.getByRole('button', { name: 'Snapping' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    )
+  })
+
+  it('toggles snapping', () => {
+    renderBar()
+    fireEvent.click(screen.getByRole('button', { name: 'Snapping' }))
+    expect(handlers.onToggleSnap).toHaveBeenCalledOnce()
+  })
+})
+
+describe('SlideToolbar — align and distribute (19E.0)', () => {
+  it('stays hidden until there is something to align against', () => {
+    const { unmount } = renderBar({ selectedCount: 1 })
+    expect(screen.queryByRole('button', { name: 'Align left' })).toBeNull()
+    unmount()
+    renderBar({ selectedCount: 2 })
+    expect(screen.getByRole('button', { name: 'Align left' })).toBeInTheDocument()
+  })
+
+  it('reports each edge it was asked for', () => {
+    renderBar({ selectedCount: 2 })
+    for (const name of [
+      'Align left',
+      'Align horizontal centres',
+      'Align right',
+      'Align top',
+      'Align vertical centres',
+      'Align bottom',
+    ]) {
+      fireEvent.click(screen.getByRole('button', { name }))
+    }
+    expect(handlers.onAlign.mock.calls.map(([e]) => e)).toEqual([
+      'left',
+      'hcenter',
+      'right',
+      'top',
+      'vcenter',
+      'bottom',
+    ])
+  })
+
+  it('disables distribution below three elements, and says why', () => {
+    const { unmount } = renderBar({ selectedCount: 2 })
+    const two = screen.getByRole('button', { name: 'Distribute horizontally' })
+    expect(two).toBeDisabled()
+    expect(two.getAttribute('title')).toContain('at least three')
+    unmount()
+    renderBar({ selectedCount: 3 })
+    fireEvent.click(screen.getByRole('button', { name: 'Distribute horizontally' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Distribute vertically' }))
+    expect(handlers.onDistribute.mock.calls.map(([a]) => a)).toEqual(['h', 'v'])
+  })
+})
+
+describe('SlideToolbar — status', () => {
+  it('reports the selection instead of the slide once something is selected', () => {
+    renderBar({ selectedCount: 3, slideIndex: 1, slideCount: 4 })
+    expect(screen.getByText(/3 selected/)).toBeInTheDocument()
+    expect(screen.queryByText(/Slide 2\/4/)).toBeNull()
+  })
+})
+
 describe('SlideToolbar — localisation', () => {
   it('switches to Italian, status line included', () => {
     useStore.setState({ locale: 'it' })
@@ -125,5 +212,12 @@ describe('SlideToolbar — localisation', () => {
     expect(screen.getByRole('button', { name: 'Aggiungi rettangolo' })).toBeInTheDocument()
     expect(screen.getByLabelText('Colore di sfondo della diapositiva')).toBeInTheDocument()
     expect(screen.getByText(/Diapositiva 1\/2/)).toBeInTheDocument()
+  })
+
+  it('translates the precision controls too', () => {
+    useStore.setState({ locale: 'it' })
+    renderBar({ selectedCount: 2 })
+    expect(screen.getByRole('button', { name: 'Aggancio' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Allinea a sinistra' })).toBeInTheDocument()
   })
 })
