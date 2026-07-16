@@ -9,12 +9,19 @@ import {
 
 /**
  * Shared, dependency-light slide rendering used by BOTH the presentation
- * workspace (thumbnails + read-only fallback) and the board presentation
- * card. Kept out of PresentationWorkspace so a board card can render a
- * slide without pulling the whole editor (and its lazy chunk) into the
+ * workspace (thumbnails + canvas content + read-only fallback) and the board
+ * presentation card. Kept out of PresentationWorkspace so a board card can
+ * render a slide without pulling the whole editor (and its lazy chunk) into the
  * board bundle — it only needs the model + these pure render helpers.
+ *
+ * `ElementContent` renders just the visual, filling its parent box (no
+ * position). `elementStyle` / `elementTransform` position and transform a
+ * wrapper. Splitting them lets the editor canvas apply selection outlines and
+ * the rotation/opacity transform exactly once (no double-transform), while
+ * thumbnails compose the two via `StaticElement`.
  */
 
+/** Absolute position + size + paint order for a wrapper box. */
 export function elementStyle(el: PresentElement): React.CSSProperties {
   return {
     position: 'absolute',
@@ -26,7 +33,16 @@ export function elementStyle(el: PresentElement): React.CSSProperties {
   }
 }
 
-export function StaticElement({
+/** Rotation + opacity, applied once on the positioned wrapper. */
+export function elementTransform(el: PresentElement): React.CSSProperties {
+  const style: React.CSSProperties = {}
+  if (el.rotation) style.transform = `rotate(${el.rotation}deg)`
+  if (el.opacity != null && el.opacity < 1) style.opacity = el.opacity
+  return style
+}
+
+/** The visual only — text / image / shape filling the parent box (100%). */
+export function ElementContent({
   el,
   themeText,
 }: {
@@ -37,7 +53,8 @@ export function StaticElement({
     return (
       <div
         style={{
-          ...elementStyle(el),
+          width: '100%',
+          height: '100%',
           fontSize: el.fontSize,
           fontWeight: el.bold ? 700 : 400,
           fontStyle: el.italic ? 'italic' : 'normal',
@@ -57,34 +74,46 @@ export function StaticElement({
     return (
       <img
         src={el.src}
-        alt=""
-        style={{ ...elementStyle(el), objectFit: 'fill' }}
+        alt={el.alt ?? ''}
+        style={{ width: '100%', height: '100%', objectFit: 'fill', display: 'block' }}
         draggable={false}
       />
     )
   }
-  const base = elementStyle(el)
   if (el.shape === 'line') {
     return (
-      <div
-        style={{
-          ...base,
-          height: 0,
-          top: el.y + el.h / 2,
-          borderTop: `${el.strokeWidth || 2}px solid ${el.stroke ?? '#888'}`,
-        }}
-      />
+      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center' }}>
+        <div style={{ width: '100%', borderTop: `${el.strokeWidth || 2}px solid ${el.stroke ?? '#888'}` }} />
+      </div>
     )
   }
   return (
     <div
       style={{
-        ...base,
+        width: '100%',
+        height: '100%',
         background: el.fill ?? 'transparent',
         border: el.stroke ? `${el.strokeWidth || 1}px solid ${el.stroke}` : 'none',
         borderRadius: el.shape === 'ellipse' ? '50%' : 6,
+        boxSizing: 'border-box',
       }}
     />
+  )
+}
+
+/** A positioned, transformed element (used by thumbnails / read-only render). */
+export function StaticElement({
+  el,
+  themeText,
+}: {
+  el: PresentElement
+  themeText: string
+}) {
+  if (el.hidden) return null
+  return (
+    <div style={{ ...elementStyle(el), ...elementTransform(el) }}>
+      <ElementContent el={el} themeText={themeText} />
+    </div>
   )
 }
 
@@ -117,6 +146,7 @@ export function SlideView({
         }}
       >
         {[...slide.elements]
+          .filter((el) => !el.hidden)
           .sort((a, b) => a.z - b.z)
           .map((el) => (
             <StaticElement key={el.id} el={el} themeText={t.text} />
