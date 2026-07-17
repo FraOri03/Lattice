@@ -3,6 +3,8 @@ import type { PhotoElementType } from '@/types/photo'
 /**
  * Preset catalogue for the Photo mode library sidebar. Sizes are real-world
  * centimeters; `props` are per-type defaults merged into the new element.
+ * `icon` names the top-down drawing in /Photoicons (see lib/photo/icons.ts);
+ * presets without one keep their vector symbol on the canvas.
  */
 export interface PhotoPreset {
   name: string
@@ -12,6 +14,7 @@ export interface PhotoPreset {
   height: number // cm
   color: string
   customSvgPath?: string
+  icon?: string
   props?: Record<string, unknown>
 }
 
@@ -34,6 +37,7 @@ export const PHOTO_PRESETS: PhotoPreset[] = [
     width: 35,
     height: 25,
     color: '#10b981',
+    icon: 'dslr camera',
     props: { sensor: 'Full Frame', focalLength: 50, cameraNumber: 'A', shotType: 'Medium' },
   },
   {
@@ -43,6 +47,7 @@ export const PHOTO_PRESETS: PhotoPreset[] = [
     width: 30,
     height: 20,
     color: '#10b981',
+    icon: 'mirrorless camera',
     props: { sensor: 'Full Frame', focalLength: 35, cameraNumber: 'B', shotType: 'Medium' },
   },
   {
@@ -52,6 +57,7 @@ export const PHOTO_PRESETS: PhotoPreset[] = [
     width: 45,
     height: 35,
     color: '#059669',
+    icon: 'cinema camera',
     props: { sensor: 'Super 35', focalLength: 85, cameraNumber: 'C', shotType: 'Close Up' },
   },
   {
@@ -61,6 +67,7 @@ export const PHOTO_PRESETS: PhotoPreset[] = [
     width: 40,
     height: 40,
     color: '#34d399',
+    icon: 'drone camera',
     props: { sensor: 'APS-C', focalLength: 24, cameraNumber: 'D', shotType: 'Extreme Wide' },
   },
   {
@@ -70,6 +77,7 @@ export const PHOTO_PRESETS: PhotoPreset[] = [
     width: 15,
     height: 12,
     color: '#10b981',
+    icon: 'action camera',
     props: { sensor: 'APS-C', focalLength: 16, cameraNumber: 'E', shotType: 'Wide' },
   },
   {
@@ -79,6 +87,7 @@ export const PHOTO_PRESETS: PhotoPreset[] = [
     width: 15,
     height: 15,
     color: '#10b981',
+    icon: '360 camera',
     props: { sensor: 'Full Frame', focalLength: 8, cameraNumber: 'F', shotType: 'Extreme Wide' },
   },
   {
@@ -89,6 +98,7 @@ export const PHOTO_PRESETS: PhotoPreset[] = [
     height: 60,
     color: '#6b7280',
     customSvgPath: 'dolly',
+    icon: 'dolly track',
   },
   {
     name: 'Slider',
@@ -98,6 +108,7 @@ export const PHOTO_PRESETS: PhotoPreset[] = [
     height: 15,
     color: '#4b5563',
     customSvgPath: 'slider',
+    icon: 'slider',
   },
   {
     name: 'Tripod',
@@ -107,6 +118,7 @@ export const PHOTO_PRESETS: PhotoPreset[] = [
     height: 80,
     color: '#374151',
     customSvgPath: 'tripod',
+    icon: 'tripod',
   },
 
   /* ---------------- lights ---------------- */
@@ -117,6 +129,7 @@ export const PHOTO_PRESETS: PhotoPreset[] = [
     width: 35,
     height: 35,
     color: '#f59e0b',
+    icon: 'fresnel light',
     props: { lightType: 'fresnel', intensity: 80, colorTemperature: 3200, beamAngle: 40 },
   },
   {
@@ -126,6 +139,7 @@ export const PHOTO_PRESETS: PhotoPreset[] = [
     width: 45,
     height: 45,
     color: '#fbbf24',
+    icon: 'led panel 1x1',
     props: { lightType: 'led_panel', intensity: 70, colorTemperature: 5600, beamAngle: 120 },
   },
   {
@@ -135,6 +149,7 @@ export const PHOTO_PRESETS: PhotoPreset[] = [
     width: 80,
     height: 60,
     color: '#fcd34d',
+    icon: 'softbox',
     props: { lightType: 'softbox', intensity: 90, colorTemperature: 5600, beamAngle: 90 },
   },
   {
@@ -144,6 +159,7 @@ export const PHOTO_PRESETS: PhotoPreset[] = [
     width: 140,
     height: 40,
     color: '#fcd34d',
+    icon: 'stripbox',
     props: { lightType: 'stripbox', intensity: 85, colorTemperature: 5600, beamAngle: 75 },
   },
   {
@@ -153,6 +169,7 @@ export const PHOTO_PRESETS: PhotoPreset[] = [
     width: 50,
     height: 50,
     color: '#f59e0b',
+    icon: 'beauty dish',
     props: { lightType: 'beauty_dish', intensity: 75, colorTemperature: 5600, beamAngle: 50 },
   },
   {
@@ -162,6 +179,7 @@ export const PHOTO_PRESETS: PhotoPreset[] = [
     width: 120,
     height: 10,
     color: '#3b82f6',
+    icon: 'tube light rgb',
     props: { lightType: 'tube_light', intensity: 60, colorTemperature: 6500, beamAngle: 180 },
   },
   {
@@ -171,6 +189,7 @@ export const PHOTO_PRESETS: PhotoPreset[] = [
     width: 30,
     height: 40,
     color: '#d97706',
+    icon: 'spotlight-profile',
     props: { lightType: 'spot', intensity: 95, colorTemperature: 3200, beamAngle: 15 },
   },
   {
@@ -180,6 +199,7 @@ export const PHOTO_PRESETS: PhotoPreset[] = [
     width: 100,
     height: 100,
     color: '#fef08a',
+    icon: 'sunlight directional',
     props: { lightType: 'sun', intensity: 100, colorTemperature: 5500, beamAngle: 25 },
   },
   {
@@ -189,6 +209,7 @@ export const PHOTO_PRESETS: PhotoPreset[] = [
     width: 100,
     height: 15,
     color: '#ffffff',
+    icon: 'bounce board white',
     props: { lightType: 'bounce', intensity: 20, colorTemperature: 5600, beamAngle: 120 },
   },
 
@@ -200,6 +221,7 @@ export const PHOTO_PRESETS: PhotoPreset[] = [
     width: 50,
     height: 45,
     color: '#ec4899',
+    icon: 'actor',
     props: { role: 'Actor', pose: 'standing', lookAngle: 90 },
   },
   {
@@ -209,6 +231,7 @@ export const PHOTO_PRESETS: PhotoPreset[] = [
     width: 45,
     height: 40,
     color: '#d946ef',
+    icon: 'model',
     props: { role: 'Model', pose: 'standing', lookAngle: 90 },
   },
   {
@@ -218,6 +241,7 @@ export const PHOTO_PRESETS: PhotoPreset[] = [
     width: 50,
     height: 45,
     color: '#f43f5e',
+    icon: 'extra',
     props: { role: 'Extra', pose: 'standing', lookAngle: 90 },
   },
   {
@@ -227,6 +251,7 @@ export const PHOTO_PRESETS: PhotoPreset[] = [
     width: 55,
     height: 50,
     color: '#3b82f6',
+    icon: 'photographer',
     props: { role: 'Photographer', pose: 'standing', lookAngle: 90 },
   },
   {
@@ -236,6 +261,7 @@ export const PHOTO_PRESETS: PhotoPreset[] = [
     width: 50,
     height: 45,
     color: '#06b6d4',
+    icon: 'director-assistant',
     props: { role: 'Assistant', pose: 'standing', lookAngle: 90 },
   },
 
@@ -275,6 +301,7 @@ export const PHOTO_PRESETS: PhotoPreset[] = [
     height: 150,
     color: '#ffffff',
     customSvgPath: 'cyclorama',
+    icon: 'cyclorama curved',
   },
   {
     name: 'Green screen backdrop',
@@ -284,6 +311,7 @@ export const PHOTO_PRESETS: PhotoPreset[] = [
     height: 20,
     color: '#22c55e',
     customSvgPath: 'backdrop',
+    icon: 'green screen backdorp',
   },
   {
     name: 'Black backdrop',
@@ -293,6 +321,7 @@ export const PHOTO_PRESETS: PhotoPreset[] = [
     height: 20,
     color: '#09090b',
     customSvgPath: 'backdrop',
+    icon: 'black backdrop',
   },
 
   /* ---------------- vehicles ---------------- */
@@ -304,6 +333,7 @@ export const PHOTO_PRESETS: PhotoPreset[] = [
     height: 180,
     color: '#ef4444',
     customSvgPath: 'car',
+    icon: 'car sedan',
   },
   {
     name: 'Motorcycle',
@@ -313,6 +343,7 @@ export const PHOTO_PRESETS: PhotoPreset[] = [
     height: 70,
     color: '#e11d48',
     customSvgPath: 'motorcycle',
+    icon: 'motorbike',
   },
   {
     name: 'Bicycle',
@@ -322,6 +353,7 @@ export const PHOTO_PRESETS: PhotoPreset[] = [
     height: 50,
     color: '#22c55e',
     customSvgPath: 'bicycle',
+    icon: 'bicycle',
   },
 
   /* ---------------- nature ---------------- */
@@ -333,6 +365,7 @@ export const PHOTO_PRESETS: PhotoPreset[] = [
     height: 180,
     color: '#15803d',
     customSvgPath: 'tree',
+    icon: 'tree large',
   },
   {
     name: 'Rock',
@@ -342,6 +375,7 @@ export const PHOTO_PRESETS: PhotoPreset[] = [
     height: 80,
     color: '#71717a',
     customSvgPath: 'rock',
+    icon: 'rock',
   },
 
   /* ---------------- furniture ---------------- */

@@ -35,6 +35,8 @@ export interface PhotoBaseElement {
   notes?: string
   /** preset symbol drawn on the canvas (wall, door, car, tree…) */
   customSvgPath?: string
+  /** top-down artwork in /Photoicons, by file name (see lib/photo/icons.ts) */
+  iconKey?: string
   category?: string
   width?: number // cm
   height?: number // cm

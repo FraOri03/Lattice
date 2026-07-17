@@ -4,6 +4,7 @@ import {
   computeLightArea,
   kelvinToColor,
 } from '@/lib/photo/lighting'
+import { photoIconBox, resolvePhotoIcon, type PhotoIcon } from '@/lib/photo/icons'
 import type {
   PhotoCameraElement,
   PhotoElement,
@@ -237,63 +238,110 @@ function PropShape({ el, selected }: { el: PhotoPropElement; selected: boolean }
 }
 
 /**
+ * The element's artwork (Photoicons), spun so the drawing's front matches
+ * the element's and fitted inside the footprint its vector symbol would
+ * have taken. Aspect ratio is preserved — the drawings are stylised, not
+ * technical, so they are never stretched to fit.
+ */
+function IconArt({ el, icon }: { el: PhotoElement; icon: PhotoIcon }) {
+  const box = photoIconBox(el)
+  // a ±90° correction turns the drawing on its side: swap the box so it
+  // still lands inside the element's footprint afterwards
+  const swap = Math.abs(icon.correction) % 180 === 90
+  const w = swap ? box.h : box.w
+  const h = swap ? box.w : box.h
+  return (
+    <g transform={`rotate(${icon.correction})`} opacity={el.opacity}>
+      <image
+        href={icon.url}
+        x={-w / 2}
+        y={-h / 2}
+        width={w}
+        height={h}
+        preserveAspectRatio="xMidYMid meet"
+      />
+    </g>
+  )
+}
+
+/** The camera's FOV wedge and focus line — framing intent, never occluded. */
+function CameraCone({ cam }: { cam: PhotoCameraElement }) {
+  return (
+    <g style={{ pointerEvents: 'none' }}>
+      <path
+        d={(() => {
+          const r = cam.targetDistance
+          const halfFov = ((cam.fov * Math.PI) / 180) / 2
+          const x1 = r * Math.sin(-halfFov)
+          const y1 = -r * Math.cos(halfFov)
+          const x2 = r * Math.sin(halfFov)
+          const y2 = -r * Math.cos(halfFov)
+          return `M 0 0 L ${x1} ${y1} A ${r} ${r} 0 0 1 ${x2} ${y2} Z`
+        })()}
+        fill="rgba(16, 185, 129, 0.12)"
+        stroke="#10b981"
+        strokeOpacity={0.3}
+        strokeWidth={1}
+      />
+      <line
+        x1={0}
+        y1={0}
+        x2={0}
+        y2={-cam.targetDistance}
+        stroke="#10b981"
+        strokeOpacity={0.6}
+        strokeWidth={1}
+        strokeDasharray="5,5"
+      />
+      <circle cx={0} cy={-cam.targetDistance} r={4} fill="#10b981" />
+    </g>
+  )
+}
+
+/**
  * The element's glyph in its LOCAL frame (the parent applies
- * translate/rotate). Light beams are NOT drawn here — they live in the
- * world-space LightingLayer so occluders can clip them.
+ * translate/rotate): the top-down artwork when the element has one, the
+ * schematic vector symbol otherwise. Either way the functional overlays —
+ * FOV wedge, camera letter, gaze arrow — are drawn on top, and light beams
+ * live in the world-space LightingLayer so occluders can clip them.
  */
 export function ElementGlyph({ el, selected }: { el: PhotoElement; selected: boolean }) {
   const glyphStroke = selected ? 'var(--accent)' : el.color
+  const icon = resolvePhotoIcon(el)
 
   if (el.type === 'camera') {
     const cam = el as PhotoCameraElement
     return (
       <>
-        {/* FOV wedge + focus line (framing intent, not light — unclipped) */}
-        <g style={{ pointerEvents: 'none' }}>
-          <path
-            d={(() => {
-              const r = cam.targetDistance
-              const halfFov = ((cam.fov * Math.PI) / 180) / 2
-              const x1 = r * Math.sin(-halfFov)
-              const y1 = -r * Math.cos(halfFov)
-              const x2 = r * Math.sin(halfFov)
-              const y2 = -r * Math.cos(halfFov)
-              return `M 0 0 L ${x1} ${y1} A ${r} ${r} 0 0 1 ${x2} ${y2} Z`
-            })()}
-            fill="rgba(16, 185, 129, 0.12)"
-            stroke="#10b981"
-            strokeOpacity={0.3}
-            strokeWidth={1}
-          />
-          <line
-            x1={0}
-            y1={0}
-            x2={0}
-            y2={-cam.targetDistance}
-            stroke="#10b981"
-            strokeOpacity={0.6}
-            strokeWidth={1}
-            strokeDasharray="5,5"
-          />
-          <circle cx={0} cy={-cam.targetDistance} r={4} fill="#10b981" />
-        </g>
-        <g opacity={el.opacity}>
-          <rect x={-8} y={-35} width={16} height={15} rx={2} style={{ fill: 'var(--panel)' }} stroke={glyphStroke} strokeWidth={2} />
-          <rect x={-18} y={-22} width={36} height={24} rx={4} style={{ fill: 'var(--panel)' }} stroke={glyphStroke} strokeWidth={3} />
-          <circle cx={-10} cy={-22} r={3} fill="#10b981" />
-          <circle cx={10} cy={-12} r={2} fill="#22c55e" />
-          <text
-            x={0}
-            y={-4}
-            style={{ fill: 'var(--ink)' }}
-            fontSize={10}
-            fontWeight="bold"
-            textAnchor="middle"
-            fontFamily="monospace"
-          >
-            {cam.cameraNumber || 'A'}
-          </text>
-        </g>
+        <CameraCone cam={cam} />
+        {icon ? (
+          <IconArt el={el} icon={icon} />
+        ) : (
+          <g opacity={el.opacity}>
+            <rect x={-8} y={-35} width={16} height={15} rx={2} style={{ fill: 'var(--panel)' }} stroke={glyphStroke} strokeWidth={2} />
+            <rect x={-18} y={-22} width={36} height={24} rx={4} style={{ fill: 'var(--panel)' }} stroke={glyphStroke} strokeWidth={3} />
+            <circle cx={-10} cy={-22} r={3} fill="#10b981" />
+            <circle cx={10} cy={-12} r={2} fill="#22c55e" />
+          </g>
+        )}
+        {/* the letter is how a plan is read on set — haloed so it survives
+            whatever it lands on */}
+        <text
+          x={0}
+          y={-3}
+          fontSize={11}
+          fontWeight="bold"
+          textAnchor="middle"
+          fontFamily="monospace"
+          style={{
+            fill: '#fff',
+            stroke: 'rgba(0,0,0,0.65)',
+            strokeWidth: 2.5,
+            paintOrder: 'stroke',
+          }}
+        >
+          {cam.cameraNumber || 'A'}
+        </text>
       </>
     )
   }
@@ -302,6 +350,7 @@ export function ElementGlyph({ el, selected }: { el: PhotoElement; selected: boo
     const light = el as PhotoLightElement
     const col = kelvinToColor(light.colorTemperature)
     const bulbStroke = selected ? 'var(--accent)' : '#fbbf24'
+    if (icon) return <IconArt el={el} icon={icon} />
     return (
       <g opacity={el.opacity}>
         {light.lightType === 'softbox' || light.lightType === 'stripbox' ? (
@@ -335,31 +384,44 @@ export function ElementGlyph({ el, selected }: { el: PhotoElement; selected: boo
   if (el.type === 'person') {
     const pers = el as PhotoPersonElement
     return (
-      <g opacity={el.opacity}>
-        <path
-          d="M -24 5 C -24 -15, 24 -15, 24 5 Z"
-          style={{ fill: 'var(--panel)' }}
-          stroke={glyphStroke}
-          strokeWidth={2.5}
-        />
-        <circle
-          cx={0}
-          cy={-4}
-          r={11}
-          style={{ fill: 'var(--panel)' }}
-          stroke={glyphStroke}
-          strokeWidth={2.5}
-        />
+      <>
+        {icon ? (
+          <IconArt el={el} icon={icon} />
+        ) : (
+          <g opacity={el.opacity}>
+            <path
+              d="M -24 5 C -24 -15, 24 -15, 24 5 Z"
+              style={{ fill: 'var(--panel)' }}
+              stroke={glyphStroke}
+              strokeWidth={2.5}
+            />
+            <circle
+              cx={0}
+              cy={-4}
+              r={11}
+              style={{ fill: 'var(--panel)' }}
+              stroke={glyphStroke}
+              strokeWidth={2.5}
+            />
+          </g>
+        )}
+        {/* gaze is its own property — the drawing shows the body, this shows
+            where the eyes go */}
         <polygon
-          points="-3,-15 0,-25 3,-15"
+          points={icon ? '-4,-28 0,-40 4,-28' : '-3,-15 0,-25 3,-15'}
           fill={el.color}
+          stroke="rgba(0,0,0,0.4)"
+          strokeWidth={icon ? 1 : 0}
           transform={`rotate(${pers.lookAngle - 90}, 0, -4)`}
         />
-      </g>
+      </>
     )
   }
 
-  if (isPropLike(el)) return <PropShape el={el} selected={selected} />
+  if (isPropLike(el)) {
+    if (icon) return <IconArt el={el} icon={icon} />
+    return <PropShape el={el} selected={selected} />
+  }
   return null
 }
 

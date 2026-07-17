@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { usePhotoStore } from '@/store/photoStore'
 import { PHOTO_CATEGORIES, PHOTO_PRESETS, type PhotoPreset } from '@/lib/photo/library'
+import { photoIcon } from '@/lib/photo/icons'
 import {
   IcBulb,
   IcCamera,
@@ -63,6 +64,7 @@ export function PhotoLibrary() {
       width: preset.width,
       height: preset.height,
       customSvgPath: preset.customSvgPath,
+      iconKey: preset.icon,
       ...preset.props,
     })
   }
@@ -135,19 +137,23 @@ export function PhotoLibrary() {
                       className="group flex cursor-pointer flex-col items-start rounded-lg border border-bord bg-panel2/50 p-1.5 text-left hover:border-accent"
                       title={`Add ${preset.name} to the set`}
                     >
-                      <div className="mb-1.5 flex h-10 w-full items-center justify-center rounded-md border border-bord bg-panel text-muted">
-                        {preset.type === 'camera' && (
+                      <div className="mb-1.5 flex h-14 w-full items-center justify-center rounded-md border border-bord bg-panel p-1 text-muted">
+                        {photoIcon(preset.icon) ? (
+                          <img
+                            src={photoIcon(preset.icon)!.url}
+                            alt=""
+                            className="max-h-full max-w-full object-contain"
+                            draggable={false}
+                          />
+                        ) : preset.type === 'camera' ? (
                           <IcCamera size={17} className="text-[#10b981]" />
-                        )}
-                        {preset.type === 'light' && (
+                        ) : preset.type === 'light' ? (
                           <IcBulb size={17} className="text-[#f59e0b]" />
-                        )}
-                        {preset.type === 'person' && (
+                        ) : preset.type === 'person' ? (
                           <IcUsers size={17} className="text-[#ec4899]" />
+                        ) : (
+                          <IcCube size={17} />
                         )}
-                        {preset.type !== 'camera' &&
-                          preset.type !== 'light' &&
-                          preset.type !== 'person' && <IcCube size={17} />}
                       </div>
                       <span className="w-full truncate text-[11px] font-semibold group-hover:text-ink">
                         {preset.name}
