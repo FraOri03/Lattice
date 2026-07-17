@@ -266,7 +266,7 @@ Off-screen and idle work is suspended (`src/lib/perf/`): an `IntersectionObserve
 A **Lattice-native Graph View inspired by Logseq's graph interaction
 principles** — an automatically generated **relationship browser**, placed
 immediately after Board in the top nav: **Board · Graph · Split · Document ·
-Sheet · Presentation · Code**. Open it with the tab, the command palette
+Sheet · Presentation · Code · Photo**. Open it with the tab, the command palette
 ("Open Graph view"), or **`G G`**.
 
 **Graph vs Board — kept distinct on purpose.** Board is a *manually arranged
@@ -329,6 +329,42 @@ Docs: `docs/graph-view-architecture.md`, `graph-view-data-model.md`,
 additive (`ViewMode` gains `graph`; store gains per-project `graphSettings`) —
 no data migration; Board/Split/Document/Sheet/Presentation/Code, palette,
 history, collaboration, Drive and GitHub are unchanged.
+
+## 15d · Photo mode — set & lighting planner
+
+A **top-down photographic set planner**, last in the top nav (**… · Code ·
+Photo**). Plan a shoot on a metric canvas: place cameras, lights, people and
+props from a categorised library, arrange them against backdrops, and read the
+resulting **2D light simulation** (cones, falloff and shadows recomputed from
+each fixture's type, power, spread and position).
+
+**What it adds.** A scene is a list of *shots*; each shot holds elements with
+position, rotation and per-type parameters, edited through the inspector and the
+timeline (shot list). Elements are drawn with the **Photoicons** top-down
+artwork. An **AI set designer** (`src/lib/photo/ai.ts`) can propose a setup from
+a prompt — it is **BYOK** (bring your own key) and degrades to an offline
+heuristic when no key is present, so the mode is fully usable without any
+network call. Scenes import/export as JSON.
+
+**Board integration.** A `photo` **card type** puts a live preview of the
+project's set on the board; double-clicking it opens Photo mode. The card
+carries **no payload** — it reads the project's scene — so it travels through the
+generic card path and needs no export-schema change.
+
+**State & collaboration.** Photo scenes live in a **separate store**
+(`src/store/photoStore.ts`) persisted to `localStorage` and keyed per project.
+They are deliberately *outside* the Yjs document, so Photo mode adds nothing to
+the CRDT payload and the `local`, `drive` and `realtime` (Yjs + Liveblocks)
+modes behave exactly as before. Board photo cards sync like any other card, and
+card creation is gated by the existing permission model (the canvas toolbar is
+hidden when read-only).
+
+**Known limitations.** The scene itself is **local-only**: it is not synced
+through Drive or Liveblocks and is not part of the vault export, so collaborators
+opening a shared board see the photo card but render their own local scene (use
+scene JSON export/import to hand a set over). Lighting is a **2D approximation**
+for planning, not a physically accurate render. The AI designer requires a
+user-supplied key for its non-heuristic path.
 
 ## 16 · Folder structure (source)
 ## Contributing

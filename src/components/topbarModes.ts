@@ -21,4 +21,5 @@ export const MODE_METAS: ModeMeta[] = [
   { mode: 'sheet', label: 'Sheet' },
   { mode: 'presentation', label: 'Presentation' },
   { mode: 'code', label: 'Code' },
+  { mode: 'photo', label: 'Photo' },
 ]

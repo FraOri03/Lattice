@@ -31,6 +31,7 @@ describe('top-bar order', () => {
       'sheet',
       'presentation',
       'code',
+      'photo',
     ])
   })
 })

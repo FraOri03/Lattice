@@ -205,6 +205,7 @@ function usePaletteItems(query: string, close: () => void): PaletteItem[] {
       ['sheet', 'Go to Sheet'],
       ['presentation', 'Go to Presentation'],
       ['code', 'Go to Code'],
+      ['photo', 'Go to Photo'],
     ]
     for (const [mode, label] of MODES) {
       actions.push([label, <IcBoard size={14} />, () => s.setViewMode(mode), 'mode'])

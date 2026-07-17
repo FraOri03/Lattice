@@ -140,6 +140,7 @@ const TYPE_NOUN: Record<CardData['type'], string> = {
   presentation: 'presentation',
   section: 'section',
   webembed: 'web embed',
+  photo: 'photo scene',
 }
 
 /** Human noun for a card type, e.g. "document". */

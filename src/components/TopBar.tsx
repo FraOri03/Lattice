@@ -15,6 +15,7 @@ import { useCollabMode } from '@/lib/collab/collabPresentation'
 import {
   IcAlert,
   IcBoard,
+  IcCamera,
   IcChevronRight,
   IcCloud,
   IcCloudOff,
@@ -45,9 +46,10 @@ const MODE_ICONS: Record<ViewMode, React.ReactNode> = {
   sheet: <IcTable size={13} />,
   presentation: <IcPresentation size={13} />,
   code: <IcCode size={13} />,
+  photo: <IcCamera size={13} />,
 }
 
-// order (Board · Graph · Split · Document · Sheet · Presentation · Code)
+// order (Board · Graph · Split · Document · Sheet · Presentation · Code · Photo)
 // comes from the shared MODE_METAS so it stays testable without a DOM
 const MODES = MODE_METAS.map((m) => ({ ...m, icon: MODE_ICONS[m.mode] }))
 

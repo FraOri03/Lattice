@@ -82,6 +82,7 @@ export const CARD_DEFAULTS: Record<CardType, { w: number; h: number; label: stri
   presentation: { w: 360, h: 260, label: 'Presentation' },
   section: { w: 640, h: 420, label: 'Section' },
   webembed: { w: 460, h: 340, label: 'Web embed' },
+  photo: { w: 380, h: 300, label: 'Photo scene' },
 }
 
 /** Header height of a collapsed section. */
