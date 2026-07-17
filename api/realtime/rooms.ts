@@ -9,17 +9,17 @@ import {
   stripEmail,
   type ApiRes,
   type RoomAcl,
-} from '../_lib/realtime'
+} from '../_lib/realtime.js'
 import {
   collabRoomId,
   contentRoomId,
   roomIdsForProject,
-} from '../../src/lib/collab/roleAccess'
+} from '../../src/lib/collab/roleAccess.js'
 import {
   assignableRoles,
   canManageRole,
-} from '../../src/lib/collab/permissions'
-import type { CollabRole } from '../../src/types/collab'
+} from '../../src/lib/collab/permissions.js'
+import type { CollabRole } from '../../src/types/collab.js'
 
 /**
  * POST /api/realtime/rooms — project room lifecycle + membership ACL.
