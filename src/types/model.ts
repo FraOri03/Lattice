@@ -315,6 +315,7 @@ export type CardType =
   | 'presentation' // renders a PresentationDocMeta (compact info or slide preview)
   | 'section' // Figma-like frame that groups cards (Phase 6)
   | 'webembed' // sandboxed website embed / link preview (Phase 6)
+  | 'photo' // live preview of the project's Photo-mode set (no payload)
 
 export type CardColor =
   | 'gray'
@@ -423,7 +424,7 @@ export interface Board {
  *  · sheet (spreadsheet workspace) · presentation (slide workspace,
  *  editor pending) · code (Monaco workspace)
  */
-export type ViewMode = 'board' | 'split' | 'doc' | 'sheet' | 'presentation' | 'code'
+export type ViewMode = 'board' | 'split' | 'doc' | 'sheet' | 'presentation' | 'code' | 'photo'
 export type Theme = 'dark' | 'light'
 
 /** A recently opened entity, newest first. */

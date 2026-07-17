@@ -12,6 +12,7 @@ import { RealtimeStatusChip } from '@/components/collab/RealtimeStatusChip'
 import { NotificationCenter } from '@/components/collab/NotificationCenter'
 import {
   IcBoard,
+  IcCamera,
   IcChevronRight,
   IcCloud,
   IcCloudOff,
@@ -40,6 +41,7 @@ const MODES: { mode: ViewMode; label: string; icon: React.ReactNode }[] = [
   { mode: 'sheet', label: 'Sheet', icon: <IcTable size={13} /> },
   { mode: 'presentation', label: 'Presentation', icon: <IcPresentation size={13} /> },
   { mode: 'code', label: 'Code', icon: <IcCode size={13} /> },
+  { mode: 'photo', label: 'Photo', icon: <IcCamera size={13} /> },
 ]
 
 function useOnline(): boolean {

@@ -440,3 +440,80 @@ export const IcDot = (p: P) => (
     <circle cx="12" cy="12" r="5" fill="currentColor" stroke="none" />
   </S>
 )
+
+/* ---------------- Photo mode (studio planner) ---------------- */
+
+export const IcCamera = (p: P) => (
+  <S {...p}>
+    <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z" />
+    <circle cx="12" cy="13" r="3.2" />
+  </S>
+)
+export const IcBulb = (p: P) => (
+  <S {...p}>
+    <path d="M15 14.5c.2-1 .8-1.8 1.6-2.6A5.8 5.8 0 0 0 18 8a6 6 0 1 0-12 0c0 1.4.5 2.6 1.4 3.9.8.8 1.4 1.6 1.6 2.6" />
+    <path d="M9 18h6M10 21.5h4" />
+  </S>
+)
+export const IcLayers = (p: P) => (
+  <S {...p}>
+    <path d="m12 2 8.5 4.5L12 11 3.5 6.5z" />
+    <path d="m3.5 12 8.5 4.5 8.5-4.5" />
+    <path d="m3.5 17.5 8.5 4.5 8.5-4.5" />
+  </S>
+)
+export const IcEyeOff = (p: P) => (
+  <S {...p}>
+    <path d="M10.6 5.2c.5-.1.9-.2 1.4-.2 6.5 0 10 7 10 7a15 15 0 0 1-1.8 2.7M6.5 6.5C3.8 8.3 2 12 2 12s3.5 7 10 7c1.4 0 2.7-.3 3.9-.8" />
+    <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+    <path d="m3 3 18 18" />
+  </S>
+)
+export const IcSparkles = (p: P) => (
+  <S {...p}>
+    <path d="m12 4 1.7 4.8a2 2 0 0 0 1.2 1.2L19.7 12l-4.8 1.7a2 2 0 0 0-1.2 1.2L12 19.7l-1.7-4.8a2 2 0 0 0-1.2-1.2L4.3 12l4.8-1.7a2 2 0 0 0 1.2-1.2z" />
+    <path d="M19 3v3M17.5 4.5h3M5 18v3M3.5 19.5h3" />
+  </S>
+)
+export const IcUndo = (p: P) => (
+  <S {...p}>
+    <path d="M9 14 4 9l5-5" />
+    <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
+  </S>
+)
+export const IcRedo = (p: P) => (
+  <S {...p}>
+    <path d="m15 14 5-5-5-5" />
+    <path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13" />
+  </S>
+)
+export const IcCursor = (p: P) => (
+  <S {...p}>
+    <path d="m3 3 7.1 17 2.5-7.4L20 10.1z" />
+  </S>
+)
+export const IcHand = (p: P) => (
+  <S {...p}>
+    <path d="M18 11V6.5a1.8 1.8 0 0 0-3.6 0V11" />
+    <path d="M14.4 10.5V4.8a1.8 1.8 0 0 0-3.6 0v5.2" />
+    <path d="M10.8 10V6.3a1.8 1.8 0 0 0-3.6 0V14" />
+    <path d="m7.2 14.5-1.9-1.9a1.9 1.9 0 0 0-2.7 2.7l4.8 5A7 7 0 0 0 12.5 22h1a7 7 0 0 0 7-7v-5" />
+  </S>
+)
+export const IcChevronUp = (p: P) => (
+  <S {...p}>
+    <path d="m6 15 6-6 6 6" />
+  </S>
+)
+export const IcCheckCircle = (p: P) => (
+  <S {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="m8.5 12.5 2.5 2.5 4.8-5.3" />
+  </S>
+)
+export const IcListChecks = (p: P) => (
+  <S {...p}>
+    <path d="m3 16.5 1.8 1.8 3.2-3.5M3 6.5l1.8 1.8L8 4.8" />
+    <path d="M12.5 6.5H21M12.5 17.5H21M12.5 12H21" />
+  </S>
+)

@@ -30,6 +30,7 @@ import { CollabPanel } from '@/components/collab/CollabPanel'
 import { ReadOnlyBanner } from '@/components/collab/ReadOnlyBanner'
 import {
   CodeModeWorkspace,
+  PhotoModeWorkspace,
   PresentationModeWorkspace,
   SheetModeWorkspace,
 } from '@/components/workspaces/ModeWorkspaces'
@@ -160,6 +161,7 @@ function Workspace() {
           {viewMode === 'sheet' && <SheetModeWorkspace />}
           {viewMode === 'presentation' && <PresentationModeWorkspace />}
           {viewMode === 'code' && <CodeModeWorkspace />}
+          {viewMode === 'photo' && <PhotoModeWorkspace />}
           {(viewMode === 'board' || viewMode === 'split') && (
             <>
               <BoardCanvas />

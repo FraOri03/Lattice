@@ -8,6 +8,7 @@ import { useCan } from '@/lib/collab/useCollab'
 import { toast } from '@/components/ui/Toaster'
 import { promptDialog } from '@/components/ui/ConfirmDialog'
 import {
+  IcCamera,
   IcCode,
   IcCube,
   IcDoc,
@@ -126,6 +127,12 @@ export function CanvasToolbar() {
       { key: 'video', label: 'Video', icon: <IcVideo size={16} />, onClick: () => insert('video') },
       { key: 'link', label: 'Link', icon: <IcLink size={16} />, onClick: () => insert('link') },
       { key: 'embed3d', label: '3D', icon: <IcCube size={16} />, onClick: () => insert('embed3d') },
+      {
+        key: 'photo',
+        label: 'Photo',
+        icon: <IcCamera size={16} />,
+        onClick: () => insert('photo'),
+      },
     ],
     mayComment
       ? [

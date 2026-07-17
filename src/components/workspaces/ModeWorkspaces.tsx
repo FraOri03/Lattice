@@ -11,6 +11,7 @@ const SpreadsheetWorkspace = lazy(() => import('@/components/sheet/SpreadsheetWo
 const PresentationWorkspace = lazy(
   () => import('@/components/present/PresentationWorkspace'),
 )
+const PhotoWorkspace = lazy(() => import('@/components/photo/PhotoWorkspace'))
 
 /**
  * Full-page workspaces behind the Phase 6 top navigation: Sheet,
@@ -175,6 +176,18 @@ export function CodeModeWorkspace() {
         onOpen={openCode}
       />
     </EmptyMode>
+  )
+}
+
+/**
+ * Photo mode: the project's studio/set scene always exists (it is seeded
+ * on first open), so unlike the other modes there is no empty state.
+ */
+export function PhotoModeWorkspace() {
+  return (
+    <Suspense fallback={<Loading label="Loading photo workspaceâ€¦" />}>
+      <PhotoWorkspace />
+    </Suspense>
   )
 }
 

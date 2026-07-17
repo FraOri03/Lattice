@@ -55,6 +55,7 @@ import { SheetCardNode } from './SheetCardNode'
 import { PresentationCardNode } from './PresentationCardNode'
 import { SectionNode } from './SectionNode'
 import { WebEmbedCardNode } from './WebEmbedCardNode'
+import { PhotoCardNode } from './PhotoCardNode'
 import { CanvasToolbar } from './CanvasToolbar'
 
 const nodeTypes = {
@@ -71,6 +72,7 @@ const nodeTypes = {
   presentation: PresentationCardNode,
   section: SectionNode,
   webembed: WebEmbedCardNode,
+  photo: PhotoCardNode,
 }
 
 const defaultEdgeOptions = {

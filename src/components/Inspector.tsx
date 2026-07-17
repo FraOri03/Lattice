@@ -33,6 +33,7 @@ const TYPE_LABEL: Record<CardData['type'], string> = {
   presentation: 'Presentation card',
   section: 'Section',
   webembed: 'Web embed card',
+  photo: 'Photo scene card',
 }
 
 function ColorRow({
