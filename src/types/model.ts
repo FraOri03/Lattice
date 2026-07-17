@@ -438,6 +438,8 @@ export type ViewMode =
   | 'code'
   | 'photo'
 export type Theme = 'dark' | 'light'
+/** UI language. English is the source locale; catalogs live in src/lib/i18n. */
+export type Locale = 'en' | 'it'
 
 /** A recently opened entity, newest first. */
 export interface RecentEntry {

@@ -20,6 +20,7 @@ import type {
   PresentationDocMeta,
   Project,
   RecentEntry,
+  Locale,
   RichDocMeta,
   SpreadsheetDocMeta,
   Theme,
@@ -28,6 +29,7 @@ import type {
   WebEmbed,
   Workspace,
 } from '@/types/model'
+import { detectLocale } from '@/lib/i18n/messages'
 import { nid } from '@/lib/id'
 import { blobToDataUrl } from '@/lib/media'
 import { storage } from '@/lib/storage/StorageProvider'
@@ -151,6 +153,7 @@ interface AppState {
   recents: RecentEntry[]
   viewMode: ViewMode
   theme: Theme
+  locale: Locale
   search: string
   tagFilter: string | null
   sidebarFilter: SidebarFilter
@@ -162,6 +165,7 @@ interface AppState {
   setSidebarFilter: (f: SidebarFilter) => void
   setViewMode: (m: ViewMode) => void
   setTheme: (t: Theme) => void
+  setLocale: (l: Locale) => void
   /** Merge + clamp a project's graph settings (creates defaults on first use). */
   setGraphSettings: (projectId: string, patch: Partial<GraphViewSettings>) => void
 
@@ -421,6 +425,7 @@ export const useStore = create<AppState>()(
       recents: [],
       viewMode: 'board',
       theme: 'dark',
+      locale: detectLocale(),
       search: '',
       tagFilter: null,
       sidebarFilter: 'all',
@@ -431,6 +436,7 @@ export const useStore = create<AppState>()(
       setSidebarFilter: (sidebarFilter) => set({ sidebarFilter }),
       setViewMode: (viewMode) => set({ viewMode }),
       setTheme: (theme) => set({ theme }),
+      setLocale: (locale) => set({ locale }),
       setGraphSettings: (projectId, patch) =>
         set((s) => {
           const current = decodeGraphSettings(s.graphSettings[projectId])
@@ -1726,6 +1732,7 @@ export const useStore = create<AppState>()(
         activePresentId: s.activePresentId,
         viewMode: s.viewMode,
         theme: s.theme,
+        locale: s.locale,
         graphSettings: s.graphSettings,
       }),
     },
