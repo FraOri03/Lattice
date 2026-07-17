@@ -68,30 +68,36 @@ body {
 }
 
 /* ---------- shared controls ---------- */
-.field {
-  @apply w-full rounded-md border border-bord bg-panel2 px-2 py-1.5 text-[13px] text-ink outline-none;
-}
-.field::placeholder {
-  color: var(--muted);
-}
-.field:focus {
-  border-color: var(--accent);
-}
-.btn {
-  @apply inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-md border border-bord bg-panel2 px-2.5 py-1.5 text-xs font-medium text-ink select-none;
-}
-.btn:hover {
-  border-color: var(--accent);
-}
-.icon-btn {
-  @apply flex h-7 w-7 flex-none cursor-pointer items-center justify-center rounded-md text-muted;
-}
-.icon-btn:hover {
-  background: var(--panel2);
-  color: var(--ink);
-}
-.insp-h {
-  @apply mt-4 mb-1.5 text-[10px] font-semibold tracking-widest text-muted uppercase;
+/* These live in @layer components (not unlayered) so per-instance Tailwind
+   utilities — e.g. `field w-28`, `icon-btn h-6 w-6` — can override the
+   @apply defaults. Unlayered rules beat the utilities layer at equal
+   specificity, which would otherwise pin every .field to w-full. */
+@layer components {
+  .field {
+    @apply w-full rounded-md border border-bord bg-panel2 px-2 py-1.5 text-[13px] text-ink outline-none;
+  }
+  .field::placeholder {
+    color: var(--muted);
+  }
+  .field:focus {
+    border-color: var(--accent);
+  }
+  .btn {
+    @apply inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-md border border-bord bg-panel2 px-2.5 py-1.5 text-xs font-medium text-ink select-none;
+  }
+  .btn:hover {
+    border-color: var(--accent);
+  }
+  .icon-btn {
+    @apply flex h-7 w-7 flex-none cursor-pointer items-center justify-center rounded-md text-muted;
+  }
+  .icon-btn:hover {
+    background: var(--panel2);
+    color: var(--ink);
+  }
+  .insp-h {
+    @apply mt-4 mb-1.5 text-[10px] font-semibold tracking-widest text-muted uppercase;
+  }
 }
 
 /* ---------- cards on the canvas ---------- */
