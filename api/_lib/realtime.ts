@@ -1,6 +1,6 @@
 import { Liveblocks } from '@liveblocks/node'
-import type { CollabRole } from '../../src/types/collab'
-import { contentRoomId } from '../../src/lib/collab/roleAccess'
+import type { CollabRole } from '../../src/types/collab.js'
+import { contentRoomId } from '../../src/lib/collab/roleAccess.js'
 
 /**
  * Shared helpers for the realtime endpoints (api/realtime/*).

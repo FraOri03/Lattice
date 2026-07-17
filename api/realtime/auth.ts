@@ -5,13 +5,13 @@ import {
   roleOf,
   sendError,
   type ApiRes,
-} from '../_lib/realtime'
+} from '../_lib/realtime.js'
 import {
   collabRoomId,
   contentRoomId,
   parseRoomId,
   permissionsForRole,
-} from '../../src/lib/collab/roleAccess'
+} from '../../src/lib/collab/roleAccess.js'
 
 /**
  * POST /api/realtime/auth — mint a Liveblocks access token.
