@@ -13,6 +13,7 @@ import {
   IcCloud,
   IcFolder,
   IcGithub,
+  IcGraph,
   IcHistory,
   IcKeyboard,
   IcMessage,
@@ -180,6 +181,7 @@ function usePaletteItems(query: string, close: () => void): PaletteItem[] {
       ['New code file', <FileKindIcon kind="code" size={14} />, () => s.openCode(s.createCode())],
       ['New board', <IcBoard size={14} />, () => s.addBoard()],
       ['New project', <IcPlus size={14} />, () => s.setActiveProject(s.createProject())],
+      ['Open Graph view', <IcGraph size={14} />, () => s.setViewMode('graph'), 'G G'],
       [
         s.theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme',
         s.theme === 'dark' ? <IcSun size={14} /> : <IcMoon size={14} />,

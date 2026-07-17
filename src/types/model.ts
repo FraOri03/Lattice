@@ -419,12 +419,24 @@ export interface Board {
 }
 
 /**
- * Top navigation modes (Phase 6):
- *  board · split (workspace + board side-by-side) · doc (rich text/notes)
- *  · sheet (spreadsheet workspace) · presentation (slide workspace,
- *  editor pending) · code (Monaco workspace)
+ * Top navigation modes:
+ *  board · graph (Phase 9.5 — automatic relationship browser, placed right
+ *  after Board) · split (workspace + board side-by-side) · doc (rich
+ *  text/notes) · sheet (spreadsheet workspace) · presentation (slide
+ *  workspace) · code (Monaco workspace).
+ *
+ * Note: the Document mode's internal value stays 'doc' (its persisted value
+ * and hundreds of call sites) while its visible label is "Document".
  */
-export type ViewMode = 'board' | 'split' | 'doc' | 'sheet' | 'presentation' | 'code' | 'photo'
+export type ViewMode =
+  | 'board'
+  | 'graph'
+  | 'split'
+  | 'doc'
+  | 'sheet'
+  | 'presentation'
+  | 'code'
+  | 'photo'
 export type Theme = 'dark' | 'light'
 
 /** A recently opened entity, newest first. */

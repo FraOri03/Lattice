@@ -1,6 +1,15 @@
 import { useState } from 'react'
 import { useCrdtStore, REALTIME_SETUP_INSTRUCTIONS } from '@/lib/crdt/crdtStore'
 import { ROLE_LABEL, type RealtimeStatus } from '@/types/collab'
+import {
+  IcAlert,
+  IcCheck,
+  IcCloudOff,
+  IcInfo,
+  IcLock,
+  IcRefresh,
+  IcWifiOff,
+} from '@/components/Icons'
 
 /**
  * RealtimeStatusChip — the top-bar truth about realtime collaboration.
@@ -9,21 +18,28 @@ import { ROLE_LABEL, type RealtimeStatus } from '@/types/collab'
  * says so and the popover explains how to set one up, instead of
  * pretending a connection exists. When connected it reports the
  * server-acknowledged role and any queued offline changes.
+ *
+ * A11Y-2: state is carried by an ICON (shape) + label text, never colour
+ * alone — statuses that share a colour (e.g. connecting vs sign-in, both
+ * amber) are still distinguishable, and the accessible name always spells
+ * the state out.
  */
+
+type IconCmp = (p: { size?: number; className?: string }) => React.ReactNode
 
 const STATUS_META: Record<
   RealtimeStatus,
-  { label: string; dot: string; pulse?: boolean }
+  { label: string; dot: string; Icon: IconCmp; pulse?: boolean }
 > = {
-  unconfigured: { label: 'Realtime off', dot: 'var(--muted)' },
-  'no-account': { label: 'Realtime: sign in', dot: '#ffa629' },
-  inactive: { label: 'Realtime idle', dot: 'var(--muted)' },
-  connecting: { label: 'Connecting…', dot: '#ffa629', pulse: true },
-  connected: { label: 'Live', dot: '#14ae5c' },
-  reconnecting: { label: 'Reconnecting…', dot: '#ffa629', pulse: true },
-  offline: { label: 'Offline', dot: 'var(--muted)' },
-  unauthorized: { label: 'No access', dot: '#f24822' },
-  error: { label: 'Realtime error', dot: '#f24822' },
+  unconfigured: { label: 'Realtime off', dot: 'var(--muted)', Icon: IcCloudOff },
+  'no-account': { label: 'Realtime: sign in', dot: '#ffa629', Icon: IcInfo },
+  inactive: { label: 'Realtime idle', dot: 'var(--muted)', Icon: IcCloudOff },
+  connecting: { label: 'Connecting…', dot: '#ffa629', Icon: IcRefresh, pulse: true },
+  connected: { label: 'Live', dot: '#14ae5c', Icon: IcCheck },
+  reconnecting: { label: 'Reconnecting…', dot: '#ffa629', Icon: IcRefresh, pulse: true },
+  offline: { label: 'Offline', dot: 'var(--muted)', Icon: IcWifiOff },
+  unauthorized: { label: 'No access', dot: '#f24822', Icon: IcLock },
+  error: { label: 'Realtime error', dot: '#f24822', Icon: IcAlert },
 }
 
 export function RealtimeStatusChip() {
@@ -33,6 +49,7 @@ export function RealtimeStatusChip() {
   const serverRole = useCrdtStore((s) => s.serverRole)
   const [open, setOpen] = useState(false)
   const meta = STATUS_META[status]
+  const Icon = meta.Icon
 
   return (
     <div className="relative">
@@ -44,10 +61,12 @@ export function RealtimeStatusChip() {
         title={detail ?? `Realtime collaboration: ${meta.label}`}
       >
         <span
-          className={`inline-block h-2 w-2 rounded-full ${meta.pulse ? 'animate-pulse' : ''}`}
-          style={{ background: meta.dot }}
+          className={meta.pulse ? 'flex animate-pulse' : 'flex'}
+          style={{ color: meta.dot }}
           aria-hidden
-        />
+        >
+          <Icon size={13} />
+        </span>
         <span className="hidden lg:inline">{meta.label}</span>
         {pendingUpdates > 0 && status !== 'connected' && (
           <span className="rounded-full bg-panel2 px-1.5 text-[9.5px] font-bold text-muted">
@@ -69,11 +88,9 @@ export function RealtimeStatusChip() {
             className="absolute right-0 z-50 mt-1.5 w-72 rounded-xl border border-bord bg-panel p-3 text-xs shadow-xl"
           >
             <div className="mb-1 flex items-center gap-2">
-              <span
-                className="inline-block h-2 w-2 rounded-full"
-                style={{ background: meta.dot }}
-                aria-hidden
-              />
+              <span style={{ color: meta.dot }} aria-hidden>
+                <Icon size={14} />
+              </span>
               <span className="font-semibold">{meta.label}</span>
               {serverRole && status === 'connected' && (
                 <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[10px] font-semibold text-accent">

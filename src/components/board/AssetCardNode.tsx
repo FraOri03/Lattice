@@ -7,7 +7,7 @@ import { plannedEditorFor } from '@/lib/registry/documents'
 import { conversionNoteForAsset } from '@/lib/convert/ConversionService'
 import { formatBytes } from '@/lib/media'
 import { KIND_ICONS, KIND_LABEL } from '@/components/assetKinds'
-import { ThreeDViewer } from '@/components/preview/ThreeDViewer'
+import { ThreeDViewer } from '@/components/preview/ThreeDViewerLazy'
 import { CardChrome } from './CardChrome'
 
 interface BodyProps {

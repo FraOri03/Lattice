@@ -20,7 +20,9 @@ Companion to [`ux-ui-audit-phase-8.md`](./ux-ui-audit-phase-8.md). Priorities: *
 
 ## P1 — High priority (before public beta)
 
-### P1.1 · Board canvas keyboard accessibility (LAT-2)
+> **Status:** P1.1–P1.5 shipped in Phase 9 (issues #8–#11). See [`accessibility.md`](accessibility.md), [`collaboration.md`](collaboration.md), [`navigation.md`](navigation.md), [`performance.md`](performance.md). P1.6 (responsive tiers) remains open.
+
+### P1.1 · Board canvas keyboard accessibility (LAT-2) — ✅ DONE (Phase 9)
 - **Rationale:** the core interaction surface is mouse-only; keyboard and screen-reader users are excluded (WCAG 2.1.1 — Critical).
 - **Dependencies:** none; interacts with LAT-15 (undo).
 - **Benefit:** the product becomes operable without a mouse; unblocks public-release accessibility.
@@ -28,7 +30,7 @@ Companion to [`ux-ui-audit-phase-8.md`](./ux-ui-audit-phase-8.md). Priorities: *
 - **Effort:** L.
 - **Acceptance:** Tab reaches cards (roving tabindex); arrows move a selected card; Enter opens; a keyboard-invokable "add card" menu exists; focus is always visible; DnD has a documented keyboard alternative.
 
-### P1.2 · Propagate realtime off-state to presence/Share (LAT-3, COL-1)
+### P1.2 · Propagate realtime off-state to presence/Share (LAT-3, COL-1) — ✅ DONE (Phase 9)
 - **Rationale:** presence avatars and Share are always shown, implying live remote collaboration even when `VITE_REALTIME_BACKEND` is unset — the one place the product's otherwise-excellent honesty leaks.
 - **Dependencies:** `hasRealtimeBackend`, `RealtimeStatusChip` state.
 - **Benefit:** users understand when "collaboration" means tabs+Drive vs true realtime.
@@ -36,7 +38,7 @@ Companion to [`ux-ui-audit-phase-8.md`](./ux-ui-audit-phase-8.md). Priorities: *
 - **Effort:** S.
 - **Acceptance:** when realtime is off, presence/Share surfaces carry a "local / Drive only" affordance; no UI implies remote realtime that isn't configured.
 
-### P1.3 · Lazy-load three.js (LAT-4, PERF-1)
+### P1.3 · Lazy-load three.js (LAT-4, PERF-1) — ✅ DONE (Phase 9)
 - **Rationale:** ~170 kB gz of three.js sits in the 700 kB main bundle though only 3D previews/cards use it.
 - **Dependencies:** 3D viewer (`ThreeDViewer`, `cards.tsx ThreeScene`).
 - **Benefit:** faster first paint for the common (no-3D) case.
@@ -44,7 +46,7 @@ Companion to [`ux-ui-audit-phase-8.md`](./ux-ui-audit-phase-8.md). Priorities: *
 - **Effort:** M.
 - **Acceptance:** main bundle drops ≈ 170 kB gz; 3D cards/preview load via a lazy chunk with a skeleton; no regression to 3D rendering.
 
-### P1.4 · Board virtualization + pause off-screen animation loops (LAT-5, PERF-2, BRD-3)
+### P1.4 · Board virtualization + pause off-screen animation loops (LAT-5, PERF-2, BRD-3) — ✅ DONE (Phase 9)
 - **Rationale:** every card mounts; 3D cards run continuous `requestAnimationFrame`/OrbitControls loops even off-screen — this made the renderer unresponsive during the audit (screenshot timeouts on a 7-card seed board with one 3D card).
 - **Dependencies:** P1.3 helps.
 - **Benefit:** large/rich boards stay interactive.
@@ -52,7 +54,7 @@ Companion to [`ux-ui-audit-phase-8.md`](./ux-ui-audit-phase-8.md). Priorities: *
 - **Effort:** L.
 - **Acceptance:** off-screen cards pause their loops (IntersectionObserver); a 100+ card board pans/zooms without stalling; CPU idle when the board is static.
 
-### P1.5 · Browser history / back-forward (LAT-6, NAV-1)
+### P1.5 · Browser history / back-forward (LAT-6, NAV-1) — ✅ DONE (Phase 9)
 - **Rationale:** the SPA has no router; Back exits the app instead of returning to the prior mode/entity.
 - **Dependencies:** interacts with LAT-7 (Split) and deep links (NAV-6).
 - **Benefit:** matches universal browser expectation; enables entity deep links.

@@ -56,6 +56,8 @@ import {
   refreshSectionChildren,
 } from '@/lib/board/sections'
 import { createWebEmbed } from '@/lib/web/WebEmbedService'
+import type { GraphViewSettings } from '@/lib/graph/graphTypes'
+import { decodeGraphSettings } from '@/lib/graph/GraphSettingsService'
 import {
   DEFAULT_PROJECT_ID,
   makeDefaultProject,
@@ -152,12 +154,16 @@ interface AppState {
   search: string
   tagFilter: string | null
   sidebarFilter: SidebarFilter
+  /** Graph View preferences, persisted per project (Phase 9.5). */
+  graphSettings: Record<string, GraphViewSettings>
 
   setSearch: (s: string) => void
   setTagFilter: (t: string | null) => void
   setSidebarFilter: (f: SidebarFilter) => void
   setViewMode: (m: ViewMode) => void
   setTheme: (t: Theme) => void
+  /** Merge + clamp a project's graph settings (creates defaults on first use). */
+  setGraphSettings: (projectId: string, patch: Partial<GraphViewSettings>) => void
 
   createWorkspace: (partial?: Partial<Workspace>) => string
   updateWorkspace: (id: string, patch: Partial<Omit<Workspace, 'id'>>) => void
@@ -170,6 +176,22 @@ interface AppState {
   updateProject: (id: string, patch: Partial<Omit<Project, 'id'>>) => void
   deleteProject: (id: string) => void
   setActiveProject: (id: string) => void
+  /**
+   * Restore navigable state from the URL / browser history (issue #10).
+   * Sets project, workspace, board, mode and the single open entity in one
+   * transaction, without the side effects of the open* helpers (no activity
+   * log, no mode remapping). Invalid ids are expected to be resolved away by
+   * the caller (navUrl.resolveNav) before this runs.
+   */
+  applyNav: (nav: {
+    projectId: string
+    mode: ViewMode
+    boardId?: string
+    entity?: {
+      kind: 'note' | 'doc' | 'code' | 'sheet' | 'present' | 'asset'
+      id: string
+    }
+  }) => void
 
   setActiveBoard: (id: string) => void
   addBoard: () => void
@@ -189,6 +211,10 @@ interface AppState {
   updateCardData: (id: string, patch: Partial<CardData>) => void
   resizeCard: (id: string, w: number, h: number) => void
   deleteCard: (id: string) => void
+  /** Offset the given cards by (dx, dy) in flow space — keyboard arrow move. */
+  nudgeCards: (ids: string[], dx: number, dy: number) => void
+  /** Select exactly one card (or clear); keyboard focus drives this. */
+  selectCard: (id: string | null) => void
   updateEdgeLabel: (id: string, label: string) => void
   deleteEdge: (id: string) => void
 
@@ -398,12 +424,19 @@ export const useStore = create<AppState>()(
       search: '',
       tagFilter: null,
       sidebarFilter: 'all',
+      graphSettings: {},
 
       setSearch: (search) => set({ search }),
       setTagFilter: (tagFilter) => set({ tagFilter }),
       setSidebarFilter: (sidebarFilter) => set({ sidebarFilter }),
       setViewMode: (viewMode) => set({ viewMode }),
       setTheme: (theme) => set({ theme }),
+      setGraphSettings: (projectId, patch) =>
+        set((s) => {
+          const current = decodeGraphSettings(s.graphSettings[projectId])
+          const next = decodeGraphSettings({ ...current, ...patch })
+          return { graphSettings: { ...s.graphSettings, [projectId]: next } }
+        }),
 
       /* ---------------- workspaces (Phase 8) ---------------- */
 
@@ -699,6 +732,52 @@ export const useStore = create<AppState>()(
         })
       },
 
+      applyNav: (nav) =>
+        set((s) => {
+          const project = s.projects[nav.projectId]
+          if (!project) return {} // unknown project: keep the current view
+          const workspace = Object.values(s.workspaces).find((ws) =>
+            ws.projectIds.includes(nav.projectId),
+          )
+          const boardId =
+            nav.boardId && s.boards[nav.boardId]?.projectId === nav.projectId
+              ? nav.boardId
+              : (s.boardOrder.find((b) => s.boards[b]?.projectId === nav.projectId) ??
+                s.activeBoardId)
+          const actives = {
+            activeNoteId: null as string | null,
+            activeAssetId: null as string | null,
+            activeDocId: null as string | null,
+            activeCodeId: null as string | null,
+            activeSheetId: null as string | null,
+            activePresentId: null as string | null,
+          }
+          const field = {
+            note: 'activeNoteId',
+            asset: 'activeAssetId',
+            doc: 'activeDocId',
+            code: 'activeCodeId',
+            sheet: 'activeSheetId',
+            present: 'activePresentId',
+          } as const
+          if (nav.entity) actives[field[nav.entity.kind]] = nav.entity.id
+          return {
+            activeWorkspaceId: workspace?.id ?? s.activeWorkspaceId,
+            activeProjectId: nav.projectId,
+            recentProjectIds: [
+              nav.projectId,
+              ...s.recentProjectIds.filter((p) => p !== nav.projectId),
+            ].slice(0, 8),
+            activeBoardId: boardId,
+            viewMode: nav.mode,
+            codeTabs:
+              nav.entity?.kind === 'code'
+                ? [...new Set([...s.codeTabs, nav.entity.id])]
+                : s.codeTabs,
+            ...actives,
+          }
+        }),
+
       /* ---------------- boards ---------------- */
 
       setActiveBoard: (id) =>
@@ -856,6 +935,34 @@ export const useStore = create<AppState>()(
           return patchBoard(s, board.id, {
             nodes: refreshSectionChildren(nodes.filter((n) => n.id !== id)),
             edges: board.edges.filter((e) => e.source !== id && e.target !== id),
+          })
+        }),
+
+      nudgeCards: (ids, dx, dy) =>
+        set((s) => {
+          const board = s.boards[s.activeBoardId]
+          const targets = new Set(ids)
+          return patchBoard(s, board.id, {
+            nodes: board.nodes.map((n) =>
+              targets.has(n.id)
+                ? { ...n, position: { x: n.position.x + dx, y: n.position.y + dy } }
+                : n,
+            ),
+          })
+        }),
+
+      selectCard: (id) =>
+        set((s) => {
+          const board = s.boards[s.activeBoardId]
+          return patchBoard(s, board.id, {
+            nodes: board.nodes.map((n) =>
+              (n.selected ?? false) === (n.id === id)
+                ? n
+                : { ...n, selected: n.id === id },
+            ),
+            edges: board.edges.some((e) => e.selected)
+              ? board.edges.map((e) => (e.selected ? { ...e, selected: false } : e))
+              : board.edges,
           })
         }),
 
@@ -1619,6 +1726,7 @@ export const useStore = create<AppState>()(
         activePresentId: s.activePresentId,
         viewMode: s.viewMode,
         theme: s.theme,
+        graphSettings: s.graphSettings,
       }),
     },
   ),

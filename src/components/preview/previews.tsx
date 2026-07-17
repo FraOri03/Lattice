@@ -7,7 +7,7 @@ import { RemoteConversionProvider } from '@/lib/convert/ConversionBackendProvide
 import { formatBytes } from '@/lib/media'
 import { KIND_ICONS, KIND_LABEL } from '@/components/assetKinds'
 import { ActionIcon } from '@/components/ActionIcons'
-import { ThreeDViewer } from './ThreeDViewer'
+import { ThreeDViewer } from './ThreeDViewerLazy'
 
 export interface PreviewProps {
   asset: AssetDoc

@@ -6,11 +6,14 @@ import { syncEngine } from '@/lib/sync/SyncEngine'
 import { useCollabStore } from '@/lib/collab/collabStore'
 import { useCan, useReadOnly } from '@/lib/collab/useCollab'
 import type { ViewMode } from '@/types/model'
+import { MODE_METAS } from '@/components/topbarModes'
 import { ProfileMenu } from '@/components/account/ProfileMenu'
 import { PresenceAvatars } from '@/components/collab/PresenceAvatars'
 import { RealtimeStatusChip } from '@/components/collab/RealtimeStatusChip'
 import { NotificationCenter } from '@/components/collab/NotificationCenter'
+import { useCollabMode } from '@/lib/collab/collabPresentation'
 import {
+  IcAlert,
   IcBoard,
   IcCamera,
   IcChevronRight,
@@ -19,6 +22,7 @@ import {
   IcCode,
   IcCommand,
   IcDoc,
+  IcGraph,
   IcHistory,
   IcMessage,
   IcMoon,
@@ -34,15 +38,20 @@ import {
   IcChevronDown,
 } from '@/components/Icons'
 
-const MODES: { mode: ViewMode; label: string; icon: React.ReactNode }[] = [
-  { mode: 'board', label: 'Board', icon: <IcBoard size={13} /> },
-  { mode: 'split', label: 'Split', icon: <IcSplit size={13} /> },
-  { mode: 'doc', label: 'Document', icon: <IcDoc size={13} /> },
-  { mode: 'sheet', label: 'Sheet', icon: <IcTable size={13} /> },
-  { mode: 'presentation', label: 'Presentation', icon: <IcPresentation size={13} /> },
-  { mode: 'code', label: 'Code', icon: <IcCode size={13} /> },
-  { mode: 'photo', label: 'Photo', icon: <IcCamera size={13} /> },
-]
+const MODE_ICONS: Record<ViewMode, React.ReactNode> = {
+  board: <IcBoard size={13} />,
+  graph: <IcGraph size={13} />,
+  split: <IcSplit size={13} />,
+  doc: <IcDoc size={13} />,
+  sheet: <IcTable size={13} />,
+  presentation: <IcPresentation size={13} />,
+  code: <IcCode size={13} />,
+  photo: <IcCamera size={13} />,
+}
+
+// order (Board · Graph · Split · Document · Sheet · Presentation · Code · Photo)
+// comes from the shared MODE_METAS so it stays testable without a DOM
+const MODES = MODE_METAS.map((m) => ({ ...m, icon: MODE_ICONS[m.mode] }))
 
 function useOnline(): boolean {
   const [online, setOnline] = useState(navigator.onLine)
@@ -89,9 +98,10 @@ function SyncIndicator() {
         <button
           className="flex cursor-pointer items-center gap-1.5 rounded-full border border-[#f24822]/40 bg-panel2 px-2 py-1 text-[10px] font-medium text-[#f24822]"
           title={`${sync.error ?? 'Google Drive is not connected'} — click for diagnostics`}
+          aria-label={`Drive sync error: ${sync.error ?? 'Google Drive is not connected'}. Click for diagnostics.`}
           onClick={() => setDriveDialogOpen(true)}
         >
-          <IcCloudOff size={12} /> Drive error
+          <IcAlert size={12} /> Drive error
         </button>
       )
     }
@@ -125,13 +135,15 @@ function SyncIndicator() {
     <button
       className={`flex cursor-pointer items-center gap-1.5 rounded-full border border-bord bg-panel2 px-2 py-1 text-[10px] font-medium ${color}`}
       title={sync.error ?? 'Google Drive sync — click to sync now'}
-      aria-label="Sync now"
+      aria-label={`Google Drive: ${label}${sync.status === 'error' ? ' — click for diagnostics' : ' — click to sync now'}`}
       onClick={() =>
         sync.status === 'error' ? setDriveDialogOpen(true) : void syncEngine.syncNow()
       }
     >
       {sync.status === 'syncing' ? (
         <IcRefresh size={12} className="animate-spin" />
+      ) : sync.status === 'error' ? (
+        <IcAlert size={12} />
       ) : (
         <IcCloud size={12} />
       )}
@@ -247,7 +259,14 @@ function ContextBreadcrumb() {
           <span className="max-w-28 truncate">{project.name}</span>
         </span>
       )}
-      {boardVisible && board ? (
+      {viewMode === 'graph' ? (
+        <>
+          <IcChevronRight size={11} className="flex-none text-muted" />
+          <span className="flex items-center gap-1.5 font-semibold">
+            <IcGraph size={13} /> Graph
+          </span>
+        </>
+      ) : boardVisible && board ? (
         <>
           <IcChevronRight size={11} className="flex-none text-muted" />
           <input
@@ -314,6 +333,7 @@ export function TopBar() {
   const setPaletteOpen = useUiStore((s) => s.setPaletteOpen)
   const setShareDialogOpen = useUiStore((s) => s.setShareDialogOpen)
   const mayCreate = useCan('content.create')
+  const collabMode = useCollabMode()
 
   return (
     <header className="flex h-11 flex-none items-center gap-2 border-b border-bord bg-panel px-3">
@@ -351,11 +371,20 @@ export function TopBar() {
       <button
         className="btn"
         onClick={() => setShareDialogOpen(true)}
-        title="Share — members, roles & invites"
-        aria-label="Share project"
+        title={
+          collabMode.isRealtime
+            ? 'Share — members, roles & invites · realtime multiplayer is active'
+            : `Share — members, roles & invites · collaboration reaches ${collabMode.scopeLabel}`
+        }
+        aria-label={`Share project — collaboration reaches ${collabMode.scopeLabel}`}
       >
         <IcUserPlus size={13} />
         <span className="hidden lg:inline">Share</span>
+        {!collabMode.isRealtime && (
+          <span className="hidden rounded bg-panel px-1 text-[9px] font-semibold text-muted xl:inline">
+            {collabMode.shortLabel}
+          </span>
+        )}
       </button>
       <PanelButtons />
       <button
