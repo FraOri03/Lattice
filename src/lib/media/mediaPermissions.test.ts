@@ -1,8 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { mediaCapabilitiesFor, publishableSources } from './mediaPermissions'
+import { mediaCapabilitiesFor } from './mediaPermissions'
 import { roleWritesContent } from '../collab/roleAccess'
 import { can } from '../collab/permissions'
 import type { CollabRole } from '../../types/collab'
+
+/**
+ * The shared matrix knows only abstract capabilities. Which LiveKit
+ * `TrackSource` values those map to is the endpoint's business and is asserted
+ * in api/realtime/media-token.grant.test.ts — keeping this suite (and the
+ * module it covers) free of any server-only import.
+ */
 
 const ROLES: CollabRole[] = ['owner', 'admin', 'editor', 'commenter', 'viewer']
 
@@ -26,7 +33,6 @@ describe('media capability matrix', () => {
         moderate: false,
       })
     }
-    expect(publishableSources(null)).toEqual([])
   })
 
   it('ties screen share to the content-writing roles', () => {
@@ -47,22 +53,21 @@ describe('media capability matrix', () => {
     const viewer = mediaCapabilitiesFor('viewer')
     expect(viewer.screenShare).toBe(false)
     expect(viewer.moderate).toBe(false)
-    expect(publishableSources('viewer')).toEqual(['microphone', 'camera'])
+    expect(viewer.audio).toBe(true)
+    expect(viewer.video).toBe(true)
   })
 
   it('gives a commenter no screen share (cannot contribute content)', () => {
-    expect(mediaCapabilitiesFor('commenter').screenShare).toBe(false)
-    expect(publishableSources('commenter')).toEqual(['microphone', 'camera'])
+    const commenter = mediaCapabilitiesFor('commenter')
+    expect(commenter.screenShare).toBe(false)
+    expect(commenter.moderate).toBe(false)
+    expect(commenter.audio).toBe(true)
+    expect(commenter.video).toBe(true)
   })
 
-  it('lets editors and above publish a screen share', () => {
+  it('lets editors and above screen share', () => {
     for (const role of ['owner', 'admin', 'editor'] as CollabRole[]) {
-      expect(publishableSources(role)).toEqual([
-        'microphone',
-        'camera',
-        'screen_share',
-        'screen_share_audio',
-      ])
+      expect(mediaCapabilitiesFor(role).screenShare).toBe(true)
     }
   })
 
