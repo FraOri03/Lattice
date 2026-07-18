@@ -88,6 +88,9 @@ export const CARD_DEFAULTS: Record<CardType, { w: number; h: number; label: stri
 /** Header height of a collapsed section. */
 export const SECTION_COLLAPSED_H = 40
 
+/** Offset of a duplicated card from its original, so the copy is visible. */
+export const DUPLICATE_OFFSET = 24
+
 const DEFAULT_EDGE = {
   type: 'default' as const,
   markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16 },
@@ -211,6 +214,13 @@ interface AppState {
   updateCardData: (id: string, patch: Partial<CardData>) => void
   resizeCard: (id: string, w: number, h: number) => void
   deleteCard: (id: string) => void
+  /**
+   * Copy a card in place. The copy points at the SAME entity (asset,
+   * document, note, deck…), so inserting the same image twice never stores
+   * its bytes twice; geometry, colour and card-local settings are
+   * independent. Returns the new card id, or null when the source is gone.
+   */
+  duplicateCard: (id: string) => string | null
   /** Offset the given cards by (dx, dy) in flow space — keyboard arrow move. */
   nudgeCards: (ids: string[], dx: number, dy: number) => void
   /** Select exactly one card (or clear); keyboard focus drives this. */
@@ -937,6 +947,62 @@ export const useStore = create<AppState>()(
             edges: board.edges.filter((e) => e.source !== id && e.target !== id),
           })
         }),
+
+      duplicateCard: (id) => {
+        const s = get()
+        const board = s.boards[s.activeBoardId]
+        const source = board?.nodes.find((n) => n.id === id)
+        if (!source) return null
+
+        // Entity references (assetId, docId, noteId, sheetId…) are copied
+        // verbatim: the copy is a second view onto the same stored entity,
+        // so nothing is re-imported and no blob is written twice. Only the
+        // payloads a card OWNS get a fresh identity.
+        const isSection = source.type === 'section' && !!source.data.section
+        const newId = isSection ? nid('section') : nid('card')
+        const data: CardData = { ...source.data }
+        if (isSection && data.section) {
+          // a section node's id IS its section id; the copy is an empty
+          // frame — the original keeps its cards
+          data.section = {
+            ...data.section,
+            id: newId,
+            x: data.section.x + DUPLICATE_OFFSET,
+            y: data.section.y + DUPLICATE_OFFSET,
+            childCardIds: [],
+          }
+        }
+        if (data.embed) {
+          const now = Date.now()
+          data.embed = { ...data.embed, id: nid('embed'), createdAt: now, updatedAt: now }
+        }
+
+        // drop React Flow's measurement/drag bookkeeping so the copy is
+        // measured fresh rather than inheriting the original's runtime state
+        const { measured: _measured, dragging: _dragging, ...rest } = source
+        const copy: BoardNode = {
+          ...rest,
+          id: newId,
+          position: {
+            x: source.position.x + DUPLICATE_OFFSET,
+            y: source.position.y + DUPLICATE_OFFSET,
+          },
+          selected: true,
+          data,
+        }
+
+        const others = board.nodes.map((n) => ({ ...n, selected: false }))
+        set(
+          patchBoard(s, board.id, {
+            // sections live at the START: rendered behind cards, and React
+            // Flow requires a parent to precede its children
+            nodes: refreshSectionChildren(
+              isSection ? [copy, ...others] : [...others, copy],
+            ),
+          }),
+        )
+        return newId
+      },
 
       nudgeCards: (ids, dx, dy) =>
         set((s) => {

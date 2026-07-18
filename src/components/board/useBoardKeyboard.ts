@@ -198,6 +198,31 @@ export function useBoardKeyboard({
           break
         }
 
+        case 'duplicate': {
+          // Same selection rule as delete: the selection, else the focused card.
+          const board = s.boards[s.activeBoardId]
+          const selectedIds = board.nodes.filter((n) => n.selected).map((n) => n.id)
+          const ids = selectedIds.length ? selectedIds : activeId ? [activeId] : []
+          if (!ids.length) break
+          e.preventDefault()
+          const copies = ids
+            .map((cardId) => s.duplicateCard(cardId))
+            .filter((cid): cid is string => !!cid)
+          if (!copies.length) break
+          const label =
+            ids.length === 1
+              ? (() => {
+                  const n = nodeById(ids[0])
+                  return n ? nameFor(n) : 'card'
+                })()
+              : `${copies.length} cards`
+          announce(`Duplicated ${label}`)
+          // focus the last copy so arrow-move acts on what was just created
+          const last = copies[copies.length - 1]
+          if (last) requestAnimationFrame(() => focusCard(last))
+          break
+        }
+
         case 'link-start': {
           if (!activeId) break
           e.preventDefault()
@@ -228,7 +253,7 @@ export function useBoardKeyboard({
         }
       }
     },
-    [readOnly, onOpenAddMenu, containerRef],
+    [readOnly, onOpenAddMenu, containerRef, focusCard],
   )
 
   return { onKeyDown, linkSourceId, focusCard }

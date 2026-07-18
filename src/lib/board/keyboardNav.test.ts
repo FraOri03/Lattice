@@ -131,12 +131,28 @@ describe('resolveBoardKey — creation / selection / move / open / link / delete
     expect(resolveBoardKey({ key: 'Escape' }, ctx())).toEqual({ kind: 'cancel' })
   })
 
+  it('duplicates on Ctrl/Cmd+D, from a selection or a focused card', () => {
+    expect(resolveBoardKey({ key: 'd', ctrl: true }, ctx())).toEqual({ kind: 'duplicate' })
+    expect(resolveBoardKey({ key: 'd', meta: true }, ctx())).toEqual({ kind: 'duplicate' })
+    expect(resolveBoardKey({ key: 'D', ctrl: true }, ctx())).toEqual({ kind: 'duplicate' })
+    expect(resolveBoardKey({ key: 'd', ctrl: true }, ctx({ hasActive: false }))).toEqual({
+      kind: 'duplicate',
+    })
+    // a bare "d" must stay available for typing / future shortcuts
+    expect(resolveBoardKey({ key: 'd' }, ctx())).toBeNull()
+    // and it never fires inside an editor
+    expect(
+      resolveBoardKey({ key: 'd', ctrl: true }, ctx({ editable: true })),
+    ).toBeNull()
+  })
+
   it('refuses mutating actions for read-only roles but still allows opening', () => {
     const ro = ctx({ readOnly: true })
     expect(resolveBoardKey({ key: 'ArrowRight' }, ro)).toBeNull()
     expect(resolveBoardKey({ key: 'Delete' }, ro)).toBeNull()
     expect(resolveBoardKey({ key: 'l' }, ro)).toBeNull()
     expect(resolveBoardKey({ key: 'a' }, ro)).toBeNull()
+    expect(resolveBoardKey({ key: 'd', ctrl: true }, ro)).toBeNull()
     expect(resolveBoardKey({ key: 'Enter' }, ro)).toEqual({ kind: 'open' })
   })
 

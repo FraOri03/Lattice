@@ -16,7 +16,7 @@ import { useCollabStore } from '@/lib/collab/collabStore'
 import { useMyRole, useOpenCommentCount, useReadOnly } from '@/lib/collab/useCollab'
 import { ROLE_LABEL } from '@/types/collab'
 import { confirmDialog } from '@/components/ui/ConfirmDialog'
-import { IcEdit, IcEye, IcMessage, IcTrash } from '@/components/Icons'
+import { IcCopy, IcEdit, IcEye, IcMessage, IcTrash } from '@/components/Icons'
 import { ActionIcon } from '@/components/ActionIcons'
 
 const TYPE_LABEL: Record<CardData['type'], string> = {
@@ -75,6 +75,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 function NodeInspector({ node }: { node: BoardNode }) {
   const updateCardData = useStore((s) => s.updateCardData)
   const deleteCard = useStore((s) => s.deleteCard)
+  const duplicateCard = useStore((s) => s.duplicateCard)
   const updateNote = useStore((s) => s.updateNote)
   const openNote = useStore((s) => s.openNote)
   const openAsset = useStore((s) => s.openAsset)
@@ -459,6 +460,15 @@ function NodeInspector({ node }: { node: BoardNode }) {
           </p>
         </>
       )}
+
+      <div className="insp-h">Actions</div>
+      <button
+        className="btn w-full"
+        title="Duplicate this card (Ctrl+D). The copy reuses the same file — nothing is stored twice."
+        onClick={() => duplicateCard(node.id)}
+      >
+        <IcCopy size={12} /> Duplicate card
+      </button>
 
       <div className="insp-h">Danger</div>
       <button

@@ -32,6 +32,7 @@ const GROUPS: { title: string; rows: [string, string][] }[] = [
       ['Drag header', 'Move card'],
       ['Shift + drag', 'Box-select cards'],
       ['Delete / Backspace', 'Delete selection'],
+      ['Ctrl/⌘ + D', 'Duplicate selection (reuses the same file)'],
       ['Double-click card', 'Open note/asset in editor'],
       ['Mouse wheel / pinch', 'Zoom canvas'],
       ['Paste URL', 'Create web embed card'],
