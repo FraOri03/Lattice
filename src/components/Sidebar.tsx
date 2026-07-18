@@ -18,6 +18,7 @@ import { ProjectSwitcher } from '@/components/projects/ProjectSwitcher'
 import { useCan } from '@/lib/collab/useCollab'
 import { toast } from '@/components/ui/Toaster'
 import { confirmDialog } from '@/components/ui/ConfirmDialog'
+import { assetRefsOf, describeAssetRefs } from '@/lib/assets/assetRefs'
 import {
   IcBoard,
   IcClock,
@@ -770,10 +771,17 @@ export function Sidebar() {
                     aria-label={`Delete asset ${a.name}`}
                     onClick={async (e) => {
                       e.stopPropagation()
+                      // One file can back many cards and documents, so say
+                      // exactly what would break before removing the binary.
+                      const used = describeAssetRefs(
+                        assetRefsOf(a.id, useStore.getState()),
+                      )
                       if (
                         await confirmDialog({
                           title: `Delete asset “${a.name}”?`,
-                          body: 'The file and its cards on all boards are removed from the vault.',
+                          body: used
+                            ? `This file is still used by ${used}. Deleting it removes the file and everything showing it.`
+                            : 'Nothing references this file — it will be removed from the vault.',
                           confirmLabel: 'Delete asset',
                           danger: true,
                         })
