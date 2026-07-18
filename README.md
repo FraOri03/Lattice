@@ -264,10 +264,14 @@ Off-screen and idle work is suspended (`src/lib/perf/`): an `IntersectionObserve
 ## 15c · Phase 9.5 — Project Graph View
 
 A **Lattice-native Graph View inspired by Logseq's graph interaction
-principles** — an automatically generated **relationship browser**, placed
-immediately after Board in the top nav: **Board · Graph · Split · Document ·
-Sheet · Presentation · Code · Photo**. Open it with the tab, the command palette
-("Open Graph view"), or **`G G`**.
+principles** — an automatically generated **relationship browser**. Graph is a
+**view of the content**, not a section: open it from the **Graph** tab in the
+top navigation, the command palette ("Open Graph view"), or **`G G`**. It can
+fill the single pane, or sit in the second pane beside an editor when Split is
+on. The top navigation is three clusters — **[Split]**, **[Board · Graph]** and
+**[Document · Sheet · Presentation · Code · Photo]** — where Graph is a view and
+Split a layout, so either can be active *together with* a section. Split leads
+on its own precisely because it applies on top of whatever else is selected.
 
 **Graph vs Board — kept distinct on purpose.** Board is a *manually arranged
 creative workspace* (you place cards; positions are content). Graph is an
@@ -327,8 +331,55 @@ Docs: `docs/graph-view-architecture.md`, `graph-view-data-model.md`,
 `graph-view-interactions.md`, `graph-view-accessibility.md`,
 `graph-view-performance.md`, `graph-view-licensing.md`. Settings/state are
 additive (`ViewMode` gains `graph`; store gains per-project `graphSettings`) —
-no data migration; Board/Split/Document/Sheet/Presentation/Code, palette,
-history, collaboration, Drive and GitHub are unchanged.
+no data migration; the sections, palette, history, collaboration, Drive and
+GitHub are unchanged.
+
+### Information architecture — sections, views and layouts
+
+The interface separates three things that a single `ViewMode` enum used to
+conflate:
+
+| Concept | What it is | Where it lives |
+|---|---|---|
+| **Section** | *what* you work on — Board, Document, Sheet, Presentation, Code, Photo | `viewMode` in `useStore`, chosen from the top navigation |
+| **View** | *how* the content is shown — the native editor, or the **Graph** | `viewMode === 'graph'` (primary pane) or the second pane |
+| **Layout** | one pane, or a **Split** with a resizable second pane | `src/store/workspaceLayoutStore.ts`, toggled by the **Split** tab |
+
+Split and Graph sit in the top navigation next to the sections, but they are
+**not** sections: they are a layout and a view, so they can be active *at the
+same time* as one (the Split tab and the Document tab are both pressed when you
+are editing a document beside the board). They also compose — "editor on the
+left, Graph on the right" is a normal state. Existing deep links keep working:
+`m=split` is still the URL token for the split layout, and a persisted
+`viewMode: 'split'` is migrated on load. See
+[docs/navigation.md](docs/navigation.md#split-is-a-layout-not-a-mode).
+
+### Project calls — audio, camera and screen share (LiveKit)
+
+A project can host a **call**, carried by LiveKit alongside — never inside —
+the existing collaboration stack. Liveblocks + Yjs keep owning CRDT content,
+presence, cursors, comments, roles and content permissions; LiveKit carries
+only microphone, camera and screen share.
+
+**Presence is not the call.** Having the project open puts you in presence;
+joining the call is always an explicit action, and the topbar keeps the two
+states distinct ("Join call" vs an "In call" chip). Once connected, a compact
+**call island** sits bottom-right — mic, camera, screen share, device picker,
+expand/collapse and leave — never a full-screen conference view. The call
+survives moving between sections, toggling Split and opening the Graph,
+because its provider is mounted above the workspace panes.
+
+**Microphone and camera are OFF when you join**, and the browser is not asked
+for device permission until you press a control.
+
+Access is server-enforced: `api/realtime/media-token.ts` verifies the Google
+identity, reads the role from the project ACL (never from the request body) and
+signs a LiveKit token scoped to that project's room with only the capabilities
+the role allows — so screen share is genuinely unavailable to a role that lacks
+it, not merely hidden. The matrix and its rationale are in
+[docs/collaboration.md](docs/collaboration.md). Without `VITE_LIVEKIT_URL`,
+`LIVEKIT_API_KEY`/`LIVEKIT_API_SECRET` and the realtime backend, calls are
+disabled with an explanation and nothing is attempted.
 
 ## 15d · Photo mode — set & lighting planner
 

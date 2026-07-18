@@ -20,6 +20,7 @@ import type {
   PresentationDocMeta,
   Project,
   RecentEntry,
+  Locale,
   RichDocMeta,
   SpreadsheetDocMeta,
   Theme,
@@ -28,6 +29,7 @@ import type {
   WebEmbed,
   Workspace,
 } from '@/types/model'
+import { detectLocale } from '@/lib/i18n/messages'
 import { nid } from '@/lib/id'
 import { blobToDataUrl } from '@/lib/media'
 import { storage } from '@/lib/storage/StorageProvider'
@@ -58,6 +60,7 @@ import {
 import { createWebEmbed } from '@/lib/web/WebEmbedService'
 import type { GraphViewSettings } from '@/lib/graph/graphTypes'
 import { decodeGraphSettings } from '@/lib/graph/GraphSettingsService'
+import { useWorkspaceLayoutStore } from './workspaceLayoutStore'
 import {
   DEFAULT_PROJECT_ID,
   makeDefaultProject,
@@ -95,16 +98,6 @@ const DEFAULT_EDGE = {
 
 /** Sidebar file-type filter. */
 export type SidebarFilter = 'all' | 'notes' | 'docs' | 'sheets' | 'code' | 'assets'
-
-/**
- * Which view mode an entity opens into. From the board we go to split
- * (entity + board side-by-side); in split we stay; in any full-page mode
- * we jump to the mode that matches the entity.
- */
-function modeAfterOpen(current: ViewMode, target: ViewMode): ViewMode {
-  if (current === 'board' || current === 'split') return 'split'
-  return target
-}
 
 function pushRecent(recents: RecentEntry[], entry: Omit<RecentEntry, 'at'>): RecentEntry[] {
   const next = [
@@ -151,6 +144,7 @@ interface AppState {
   recents: RecentEntry[]
   viewMode: ViewMode
   theme: Theme
+  locale: Locale
   search: string
   tagFilter: string | null
   sidebarFilter: SidebarFilter
@@ -162,6 +156,7 @@ interface AppState {
   setSidebarFilter: (f: SidebarFilter) => void
   setViewMode: (m: ViewMode) => void
   setTheme: (t: Theme) => void
+  setLocale: (l: Locale) => void
   /** Merge + clamp a project's graph settings (creates defaults on first use). */
   setGraphSettings: (projectId: string, patch: Partial<GraphViewSettings>) => void
 
@@ -186,6 +181,8 @@ interface AppState {
   applyNav: (nav: {
     projectId: string
     mode: ViewMode
+    /** whether the second (split) pane is open — the layout, not a section */
+    split?: boolean
     boardId?: string
     entity?: {
       kind: 'note' | 'doc' | 'code' | 'sheet' | 'present' | 'asset'
@@ -421,6 +418,7 @@ export const useStore = create<AppState>()(
       recents: [],
       viewMode: 'board',
       theme: 'dark',
+      locale: detectLocale(),
       search: '',
       tagFilter: null,
       sidebarFilter: 'all',
@@ -429,8 +427,16 @@ export const useStore = create<AppState>()(
       setSearch: (search) => set({ search }),
       setTagFilter: (tagFilter) => set({ tagFilter }),
       setSidebarFilter: (sidebarFilter) => set({ sidebarFilter }),
-      setViewMode: (viewMode) => set({ viewMode }),
+      setViewMode: (viewMode) => {
+        // Switching to a full section (or the graph view) is mutually
+        // exclusive with the split layout — this matches the pre-refactor
+        // enum where board/graph/split were a single value. Split is
+        // re-opened explicitly via the ViewModeIsland or openSplit().
+        useWorkspaceLayoutStore.getState().closeSplit()
+        set({ viewMode })
+      },
       setTheme: (theme) => set({ theme }),
+      setLocale: (locale) => set({ locale }),
       setGraphSettings: (projectId, patch) =>
         set((s) => {
           const current = decodeGraphSettings(s.graphSettings[projectId])
@@ -714,6 +720,8 @@ export const useStore = create<AppState>()(
         const containing = Object.values(s.workspaces).find((ws) =>
           ws.projectIds.includes(id),
         )
+        // a fresh project starts in a single pane
+        useWorkspaceLayoutStore.getState().closeSplit()
         set({
           activeWorkspaceId: containing?.id ?? s.activeWorkspaceId,
           activeProjectId: id,
@@ -728,11 +736,18 @@ export const useStore = create<AppState>()(
           activeSheetId: null,
           activePresentId: null,
           codeTabs: [],
-          viewMode: s.viewMode === 'split' ? 'board' : s.viewMode,
+          viewMode: s.viewMode,
         })
       },
 
-      applyNav: (nav) =>
+      applyNav: (nav) => {
+        // restore the split layout alongside the section (only for a valid
+        // project target; unknown projects keep the current view)
+        if (get().projects[nav.projectId]) {
+          const layout = useWorkspaceLayoutStore.getState()
+          if (nav.split) layout.openSplit({ secondary: 'board' })
+          else layout.closeSplit()
+        }
         set((s) => {
           const project = s.projects[nav.projectId]
           if (!project) return {} // unknown project: keep the current view
@@ -776,7 +791,8 @@ export const useStore = create<AppState>()(
                 : s.codeTabs,
             ...actives,
           }
-        }),
+        })
+      },
 
       /* ---------------- boards ---------------- */
 
@@ -1185,7 +1201,7 @@ export const useStore = create<AppState>()(
           activeDocId: null,
           activeCodeId: null,
           activeSheetId: null,
-          viewMode: modeAfterOpen(s.viewMode, 'doc'),
+          viewMode: 'doc',
           recents: pushRecent(s.recents, { kind: 'note', id }),
         })),
 
@@ -1268,7 +1284,7 @@ export const useStore = create<AppState>()(
           activeDocId: null,
           activeCodeId: null,
           activeSheetId: null,
-          viewMode: modeAfterOpen(s.viewMode, 'doc'),
+          viewMode: 'doc',
           recents: pushRecent(s.recents, { kind: 'asset', id }),
         })),
 
@@ -1352,7 +1368,7 @@ export const useStore = create<AppState>()(
           activeAssetId: null,
           activeCodeId: null,
           activeSheetId: null,
-          viewMode: modeAfterOpen(s.viewMode, 'doc'),
+          viewMode: 'doc',
           recents: pushRecent(s.recents, { kind: 'doc', id }),
         })),
 
@@ -1425,7 +1441,7 @@ export const useStore = create<AppState>()(
           activeAssetId: null,
           activeDocId: null,
           activeCodeId: null,
-          viewMode: modeAfterOpen(s.viewMode, 'sheet'),
+          viewMode: 'sheet',
           recents: pushRecent(s.recents, { kind: 'sheet', id }),
         })),
 
@@ -1493,7 +1509,9 @@ export const useStore = create<AppState>()(
         })
       },
 
-      openPresent: (id) =>
+      openPresent: (id) => {
+        // presentations render as a full-page section, never in a split pane
+        useWorkspaceLayoutStore.getState().closeSplit()
         set((s) => ({
           activePresentId: id,
           activeAssetId: null,
@@ -1502,7 +1520,8 @@ export const useStore = create<AppState>()(
           activeSheetId: null,
           viewMode: 'presentation',
           recents: pushRecent(s.recents, { kind: 'present', id }),
-        })),
+        }))
+      },
 
       closePresent: () => set({ activePresentId: null }),
 
@@ -1587,7 +1606,7 @@ export const useStore = create<AppState>()(
           activeDocId: null,
           activeSheetId: null,
           codeTabs: s.codeTabs.includes(id) ? s.codeTabs : [...s.codeTabs, id],
-          viewMode: modeAfterOpen(s.viewMode, 'code'),
+          viewMode: 'code',
           recents: pushRecent(s.recents, { kind: 'code', id }),
         })),
 
@@ -1670,7 +1689,7 @@ export const useStore = create<AppState>()(
     }),
     {
       name: 'lattice-vault-v1',
-      version: 2,
+      version: 3,
       migrate: (persisted, version) => {
         // v0 → v1: introduce projects; the default project adopts everything
         const s = persisted as Partial<AppState>
@@ -1699,6 +1718,24 @@ export const useStore = create<AppState>()(
           }
           s.activeWorkspaceId = PERSONAL_WORKSPACE_ID
         }
+        // v2 → v3 (call-and-toolbar IA refactor): `split` is no longer a
+        // ViewMode — it moved to workspaceLayoutStore. A persisted `split`
+        // degrades to the section it was pairing with the board: the open
+        // editor entity's Document section, or the Board when none was open.
+        // (The split layout itself is not restored — a safe, explicit
+        // degradation, matching how the layout store does not persist `split`.)
+        if (version < 3) {
+          const legacy = s as { viewMode?: string }
+          if (legacy.viewMode === 'split') {
+            const hasEntity =
+              !!s.activeNoteId ||
+              !!s.activeDocId ||
+              !!s.activeCodeId ||
+              !!s.activeSheetId ||
+              !!s.activeAssetId
+            s.viewMode = hasEntity ? 'doc' : 'board'
+          }
+        }
         return s as AppState
       },
       partialize: (s) => ({
@@ -1726,6 +1763,7 @@ export const useStore = create<AppState>()(
         activePresentId: s.activePresentId,
         viewMode: s.viewMode,
         theme: s.theme,
+        locale: s.locale,
         graphSettings: s.graphSettings,
       }),
     },

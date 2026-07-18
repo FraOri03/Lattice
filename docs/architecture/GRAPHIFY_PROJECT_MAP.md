@@ -18,7 +18,7 @@ Rigenerare con `npm run graph:build`. Interrogare con
 |---|---|
 | **File** | `src/main.tsx` → `src/App.tsx` |
 | **Responsabilità** | `main.tsx` monta `<App/>` in StrictMode, importa gli stili e (solo in DEV) espone `window.__lattice` / `__latticeDebug`. `App.tsx` compone provider, gate di login e workspace. |
-| **Routing** | **Nessun router.** La navigazione è lo stato `viewMode` in `useStore` (`doc` \| `split` \| `board` \| `sheet` \| `presentation` \| `code`), reso da switch condizionali in `Workspace()`. Unico ingresso URL: invite link via hash `…/#invite=<token>` (`App.tsx:93`). |
+| **Routing** | **Nessun router.** La navigazione è lo stato `viewMode` in `useStore` — la *sezione* (`board` \| `doc` \| `sheet` \| `presentation` \| `code` \| `photo`) più `graph`, che è una *vista* del contenuto. Il *layout* split vive separatamente in `useWorkspaceLayoutStore` (non è più un `ViewMode`). Reso da switch condizionali in `Workspace()` (`SectionContent` + i due pane). URL: deep link `?p&m&b&e` via `src/lib/nav/navUrl.ts` (`m=split` resta il token di compatibilità del layout) e invite link via hash `…/#invite=<token>`. |
 | **Layout** | `Workspace()`: `Sidebar` · (`TopBar` + `ReadOnlyBanner` + pane attivo) · `Inspector`/`CollabPanel`. Pane per modo in `components/workspaces/ModeWorkspaces.tsx`. |
 | **Provider globali** | `AccountProvider` (auth), `DialogHost` (`ui/ConfirmDialog`), `Toaster` (`ui/Toaster`) — montati in `App()`. |
 | **Estensione** | Nuovo modo = nuovo valore `viewMode` + ramo in `Workspace()` + voce in `ModeWorkspaces`. |

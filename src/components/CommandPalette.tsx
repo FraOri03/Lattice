@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '@/store/useStore'
+import { useWorkspaceLayoutStore } from '@/store/workspaceLayoutStore'
 import { useUiStore } from '@/store/useUiStore'
 import { useSyncStore } from '@/lib/sync/syncStore'
 import { syncEngine } from '@/lib/sync/SyncEngine'
@@ -20,6 +21,7 @@ import {
   IcMoon,
   IcPlus,
   IcSearch,
+  IcSplit,
   IcSun,
   IcUserPlus,
 } from '@/components/Icons'
@@ -183,6 +185,11 @@ function usePaletteItems(query: string, close: () => void): PaletteItem[] {
       ['New project', <IcPlus size={14} />, () => s.setActiveProject(s.createProject())],
       ['Open Graph view', <IcGraph size={14} />, () => s.setViewMode('graph'), 'G G'],
       [
+        'Toggle Split layout',
+        <IcSplit size={14} />,
+        () => useWorkspaceLayoutStore.getState().toggleSplit({ secondary: 'board' }),
+      ],
+      [
         s.theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme',
         s.theme === 'dark' ? <IcSun size={14} /> : <IcMoon size={14} />,
         () => s.setTheme(s.theme === 'dark' ? 'light' : 'dark'),
@@ -200,7 +207,6 @@ function usePaletteItems(query: string, close: () => void): PaletteItem[] {
     }
     const MODES: [ViewMode, string][] = [
       ['board', 'Go to Board'],
-      ['split', 'Go to Split'],
       ['doc', 'Go to Document'],
       ['sheet', 'Go to Sheet'],
       ['presentation', 'Go to Presentation'],
@@ -309,7 +315,7 @@ function usePaletteItems(query: string, close: () => void): PaletteItem[] {
             hint: `${b.nodes.length} cards`, section: 'boards',
             run: done(() => {
               s.setActiveBoard(b.id)
-              if (s.viewMode !== 'board' && s.viewMode !== 'split') s.setViewMode('board')
+              if (s.viewMode !== 'board') s.setViewMode('board')
             }),
           })
         }

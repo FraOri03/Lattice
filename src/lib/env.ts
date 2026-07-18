@@ -41,6 +41,17 @@ export const env = {
    */
   conversionApiUrl:
     (import.meta.env.VITE_CONVERSION_API_URL as string | undefined) ?? '',
+  /**
+   * LiveKit server URL for project calls (audio / camera / screen share).
+   * PUBLIC on purpose: the browser has to know where to connect, and the URL
+   * is not a credential — access is granted by the short-lived signed token
+   * minted by /api/realtime/media-token. LIVEKIT_API_KEY and
+   * LIVEKIT_API_SECRET stay server-only and are never prefixed with VITE_.
+   */
+  livekitUrl: (import.meta.env.VITE_LIVEKIT_URL as string | undefined) ?? '',
+  mediaTokenUrl:
+    (import.meta.env.VITE_MEDIA_TOKEN_URL as string | undefined) ||
+    '/api/realtime/media-token',
 } as const
 
 /** True when real Google OAuth is configured (otherwise the mock auth provider is used). */
@@ -54,3 +65,15 @@ export const hasRealtimeBackend = env.realtimeBackend === 'liveblocks'
 
 /** True when a remote conversion worker is configured for this build. */
 export const hasConversionBackend = env.conversionApiUrl.length > 0
+
+/**
+ * True when project calls can even be attempted by this build.
+ *
+ * Needs BOTH a LiveKit URL and the realtime backend: call access is authorized
+ * against the project ACL that lives in the Liveblocks room metadata, so
+ * without realtime there is no server-side membership to check. The client can
+ * only know about the public half of the configuration — if the server is
+ * missing its LiveKit key/secret the endpoint answers 501 and the UI reports
+ * that honestly rather than pretending a call is available.
+ */
+export const hasMediaCalls = env.livekitUrl.length > 0 && hasRealtimeBackend

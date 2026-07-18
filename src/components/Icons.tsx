@@ -526,3 +526,43 @@ export const IcListChecks = (p: P) => (
     <path d="M12.5 6.5H21M12.5 17.5H21M12.5 12H21" />
   </S>
 )
+
+/* ── project calls (LiveKit) ─────────────────────────────────────────────── */
+
+export const IcMic = (p: P) => (
+  <S {...p}>
+    <rect x="9" y="2.5" width="6" height="11" rx="3" />
+    <path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M9 21h6" />
+  </S>
+)
+/** Muted microphone — the slash is the shape cue, not just a colour change. */
+export const IcMicOff = (p: P) => (
+  <S {...p}>
+    <path d="M15 5.2V5.5a3 3 0 0 0-6 0v5.3M9 13.4a3 3 0 0 0 5.6-1.5" />
+    <path d="M5.5 11a6.5 6.5 0 0 0 9.6 5.7M18.5 11a6.4 6.4 0 0 1-.4 2.2" />
+    <path d="M12 17.5V21M9 21h6" />
+    <path d="m3.5 3.5 17 17" />
+  </S>
+)
+export const IcVideoOff = (p: P) => (
+  <S {...p}>
+    <path d="M14.5 10.5V8a2 2 0 0 0-2-2H6.8M4.2 6.2A2 2 0 0 0 3 8v8a2 2 0 0 0 2 2h7.5a2 2 0 0 0 2-2v-1.5" />
+    <path d="m21 8.5-4 3v1l4 3v-7Z" />
+    <path d="m3.5 3.5 17 17" />
+  </S>
+)
+export const IcScreenShare = (p: P) => (
+  <S {...p}>
+    <rect x="2.5" y="4" width="19" height="12.5" rx="2" />
+    <path d="M8.5 21h7" />
+    <path d="M12 12.5V7.5m0 0L9.6 9.9M12 7.5l2.4 2.4" />
+  </S>
+)
+/** Leave the call. */
+export const IcPhoneOff = (p: P) => (
+  <S {...p}>
+    <path d="M10.7 5.6 9.4 8.2l2.1 2.1M13.6 13.1l2.2 2.2 2.6-1.3 3.1 1.2v3.3c0 .9-.8 1.6-1.7 1.5a17 17 0 0 1-9.5-4.2" />
+    <path d="M6.6 10.4A17 17 0 0 1 2.2 3.7C2.1 2.8 2.8 2 3.7 2H7l1.2 3.1" />
+    <path d="m3.5 20.5 17-17" />
+  </S>
+)

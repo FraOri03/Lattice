@@ -9,13 +9,8 @@ import { useMyRole } from '@/lib/collab/useCollab'
 import { useCollabMode } from '@/lib/collab/collabPresentation'
 import { assignableRoles, can, canManageRole } from '@/lib/collab/permissions'
 import { currentIdentity, colorForUser } from '@/lib/collab/CollaborationProvider'
-import {
-  ROLE_DESCRIPTION,
-  ROLE_LABEL,
-  type CollabRole,
-  type ProjectInvite,
-  type ProjectMember,
-} from '@/types/collab'
+import { useI18n, useTimeAgo } from '@/lib/i18n'
+import { type CollabRole, type ProjectInvite, type ProjectMember } from '@/types/collab'
 import { toast } from '@/components/ui/Toaster'
 import { confirmDialog } from '@/components/ui/ConfirmDialog'
 import {
@@ -36,15 +31,6 @@ import {
  * active project. Opened from the top bar "Share" button.
  */
 
-function timeAgo(ts: number | undefined): string {
-  if (!ts) return 'never'
-  const s = Math.floor((Date.now() - ts) / 1000)
-  if (s < 60) return 'just now'
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`
-  if (s < 86400) return `${Math.floor(s / 3600)}h ago`
-  return `${Math.floor(s / 86400)}d ago`
-}
-
 function MemberAvatar({ member }: { member: ProjectMember }) {
   return (
     <span
@@ -63,38 +49,41 @@ function MemberAvatar({ member }: { member: ProjectMember }) {
 function MemberRow({ member, projectId }: { member: ProjectMember; projectId: string }) {
   const myRole = useMyRole()
   const identity = currentIdentity()
+  const t = useI18n()
+  const timeAgo = useTimeAgo()
   const isSelf = member.userId === identity.userId
   const manageable = !isSelf && canManageRole(myRole, member.role)
+  const displayName = member.name || member.email
 
   return (
     <div className="flex items-center gap-2.5 rounded-lg px-2 py-2 hover:bg-panel2/50">
       <MemberAvatar member={member} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5 text-[12.5px] font-medium">
-          <span className="truncate">{member.name || member.email}</span>
-          {isSelf && <span className="text-[10px] text-muted">(you)</span>}
+          <span className="truncate">{displayName}</span>
+          {isSelf && <span className="text-[10px] text-muted">{t.share.you}</span>}
         </div>
         <div className="truncate text-[11px] text-muted">
           {member.email}
-          {member.lastActiveAt ? ` · active ${timeAgo(member.lastActiveAt)}` : ''}
+          {member.lastActiveAt ? ` · ${t.share.activeAgo(timeAgo(member.lastActiveAt))}` : ''}
         </div>
       </div>
       {member.role === 'owner' || !manageable ? (
         <span className="rounded-full border border-bord px-2 py-0.5 text-[10.5px] font-medium text-muted">
-          {ROLE_LABEL[member.role]}
+          {t.roles[member.role]}
         </span>
       ) : (
         <select
           className="field h-7 w-28 flex-none cursor-pointer px-1.5 py-0 text-[11.5px]"
           value={member.role}
-          aria-label={`Role for ${member.name || member.email}`}
+          aria-label={t.share.roleForAria(displayName)}
           onChange={(e) =>
             membersService.changeRole(projectId, member.userId, e.target.value as CollabRole)
           }
         >
           {assignableRoles(myRole).map((r) => (
             <option key={r} value={r}>
-              {ROLE_LABEL[r]}
+              {t.roles[r]}
             </option>
           ))}
         </select>
@@ -102,14 +91,14 @@ function MemberRow({ member, projectId }: { member: ProjectMember; projectId: st
       {manageable && (
         <button
           className="icon-btn h-6 w-6"
-          aria-label={`Remove ${member.name || member.email}`}
-          title="Remove from project"
+          aria-label={t.share.removeAria(displayName)}
+          title={t.share.removeFromProject}
           onClick={async () => {
             if (
               await confirmDialog({
-                title: `Remove ${member.name || member.email}?`,
-                body: 'They lose access to this project. Their comments and activity are kept.',
-                confirmLabel: 'Remove',
+                title: t.share.removeTitle(displayName),
+                body: t.share.removeBody,
+                confirmLabel: t.share.remove,
                 danger: true,
               })
             )
@@ -122,14 +111,14 @@ function MemberRow({ member, projectId }: { member: ProjectMember; projectId: st
       {myRole === 'owner' && !isSelf && member.role !== 'owner' && (
         <button
           className="icon-btn h-6 w-6"
-          title="Transfer ownership to this member"
-          aria-label={`Transfer ownership to ${member.name || member.email}`}
+          title={t.share.transferToMember}
+          aria-label={t.share.transferTitleFor(displayName)}
           onClick={async () => {
             if (
               await confirmDialog({
-                title: 'Transfer ownership?',
-                body: `${member.name || member.email} becomes the owner; you become an admin. This cannot be undone by you.`,
-                confirmLabel: 'Transfer',
+                title: t.share.transferTitle,
+                body: t.share.transferBody(displayName),
+                confirmLabel: t.share.transfer,
                 danger: true,
               })
             )
@@ -144,9 +133,11 @@ function MemberRow({ member, projectId }: { member: ProjectMember; projectId: st
 }
 
 function InviteRow({ invite, projectId }: { invite: ProjectInvite; projectId: string }) {
+  const t = useI18n()
+  const timeAgo = useTimeAgo()
   const copyLink = () => {
     void navigator.clipboard.writeText(inviteService.linkFor(invite))
-    toast.success('Invite link copied', 'Send it to the invitee yourself — Lattice has no email backend.')
+    toast.success(t.share.copiedTitle, t.share.copiedBody)
   }
   return (
     <div className="flex items-center gap-2.5 rounded-lg px-2 py-2 hover:bg-panel2/50">
@@ -156,20 +147,23 @@ function InviteRow({ invite, projectId }: { invite: ProjectInvite; projectId: st
       <div className="min-w-0 flex-1">
         <div className="truncate text-[12.5px] font-medium">{invite.email}</div>
         <div className="text-[11px] text-muted">
-          {ROLE_LABEL[invite.role]} · invited {timeAgo(invite.createdAt)}
-          {invite.resentAt ? ` · resent ${timeAgo(invite.resentAt)}` : ''}
+          {t.share.invitedLine(
+            t.roles[invite.role],
+            timeAgo(invite.createdAt),
+            invite.resentAt ? timeAgo(invite.resentAt) : null,
+          )}
         </div>
       </div>
       <span className="rounded-full bg-[#ffa629]/15 px-2 py-0.5 text-[10px] font-medium text-[#ffa629]">
-        pending
+        {t.share.pending}
       </span>
-      <button className="icon-btn h-6 w-6" title="Copy invite link" aria-label="Copy invite link" onClick={copyLink}>
+      <button className="icon-btn h-6 w-6" title={t.share.copyLink} aria-label={t.share.copyLink} onClick={copyLink}>
         <IcCopy size={12} />
       </button>
       <button
         className="icon-btn h-6 w-6"
-        title="Resend (refreshes the invite; copy the link again)"
-        aria-label="Resend invite"
+        title={t.share.resendTitle}
+        aria-label={t.share.resendAria}
         onClick={() => {
           inviteService.resend(projectId, invite.id)
           copyLink()
@@ -179,19 +173,19 @@ function InviteRow({ invite, projectId }: { invite: ProjectInvite; projectId: st
       </button>
       <button
         className="icon-btn h-6 w-6"
-        title="Simulate acceptance (adds a mock member for testing roles)"
-        aria-label="Simulate invite acceptance"
+        title={t.share.simulateTitle}
+        aria-label={t.share.simulateAria}
         onClick={() => {
           inviteService.acceptAsMock(invite)
-          toast.success(`${invite.email} joined (simulated)`)
+          toast.success(t.share.simulateJoined(invite.email))
         }}
       >
         <IcCheck size={12} />
       </button>
       <button
         className="icon-btn h-6 w-6"
-        title="Revoke invite"
-        aria-label="Revoke invite"
+        title={t.share.revoke}
+        aria-label={t.share.revoke}
         onClick={() => inviteService.revoke(projectId, invite.id)}
       >
         <IcX size={12} />
@@ -204,14 +198,12 @@ function SettingsTab() {
   const viewAsRole = useCollabStore((s) => s.viewAsRole)
   const setViewAsRole = useCollabStore((s) => s.setViewAsRole)
   const providers = collabHub.activeProviders()
+  const t = useI18n()
 
   return (
     <div className="max-h-96 overflow-y-auto pr-1">
-      <div className="insp-h !mt-1">Preview as role</div>
-      <p className="mb-2 text-[11px] leading-relaxed text-muted">
-        See the project the way a member with a different role sees it — read-only
-        boards, hidden actions, comment-only access. Owner only; affects only you.
-      </p>
+      <div className="insp-h !mt-1">{t.share.previewAsRole}</div>
+      <p className="mb-2 text-[11px] leading-relaxed text-muted">{t.share.previewAsRoleBody}</p>
       <div className="flex flex-wrap gap-1.5">
         {([null, 'admin', 'editor', 'commenter', 'viewer'] as const).map((r) => (
           <button
@@ -223,23 +215,24 @@ function SettingsTab() {
                 : 'border-bord text-muted hover:text-ink'
             }`}
           >
-            {r ? ROLE_LABEL[r] : 'Owner (me)'}
+            {r ? t.roles[r] : t.share.ownerMe}
           </button>
         ))}
       </div>
 
-      <div className="insp-h">Collaboration transport</div>
-      <p className="mb-2 text-[11px] leading-relaxed text-muted">
-        Lattice never fakes realtime. What each available transport really delivers:
-      </p>
+      <div className="insp-h">{t.share.transport}</div>
+      <p className="mb-2 text-[11px] leading-relaxed text-muted">{t.share.transportBody}</p>
       {providers.map((p) => (
         <div key={p.id} className="mb-1.5 rounded-lg border border-bord p-2.5">
           <div className="flex items-center gap-2 text-[12px] font-semibold">
             {p.label}
             <span className="rounded-full bg-[#14ae5c]/15 px-1.5 py-0.5 text-[9.5px] font-medium text-[#14ae5c]">
-              active
+              {t.share.active}
             </span>
           </div>
+          {/* Capability sentence is built from provider enum values (scope,
+              latency, …) that originate outside these three components — a
+              later i18n slice; kept in English for now. */}
           <div className="mt-1 text-[11px] text-muted">
             scope: {p.capabilities.scope} · latency: {p.capabilities.latency} ·{' '}
             {p.capabilities.liveCursors ? 'live cursors' : 'no live cursors'} ·{' '}
@@ -255,34 +248,23 @@ function SettingsTab() {
       ))}
       {!providers.some((p) => p.id === 'realtime') && (
         <div className="rounded-lg border border-dashed border-bord p-2.5">
-          <div className="text-[12px] font-semibold text-muted">
-            Cross-device realtime: not configured
-          </div>
+          <div className="text-[12px] font-semibold text-muted">{t.share.realtimeNotConfigured}</div>
           <div className="mt-1 text-[11px] leading-relaxed text-muted">
-            Tabs of this browser already co-edit via CRDT; other devices sync
-            through Google Drive. For live cross-device collaboration set
-            VITE_REALTIME_BACKEND=liveblocks + LIVEBLOCKS_SECRET_KEY and sign in
-            with Google — the status chip in the top bar has the full checklist.
+            {t.share.realtimeNotConfiguredBody}
           </div>
         </div>
       )}
 
-      <div className="insp-h">Public links</div>
+      <div className="insp-h">{t.share.publicLinks}</div>
       <div className="rounded-lg border border-dashed border-bord p-2.5 text-[11px] leading-relaxed text-muted">
-        Sharing with people is role-based and server-enforced: invite them
-        above and the realtime backend rejects anything their role does not
-        allow. Truly public no-login links need an anonymous read-only
-        viewer, which is not built yet — until then, share a copy instead:
-        documents export to HTML/PDF/DOCX, presentations to PDF/PPTX, and
-        the whole vault to a .lattice.json file. Nothing is ever exposed
-        publicly by default.
+        {t.share.publicLinksBody}
       </div>
 
-      <div className="insp-h">Roles</div>
-      {(Object.keys(ROLE_LABEL) as CollabRole[]).map((r) => (
+      <div className="insp-h">{t.share.rolesHeading}</div>
+      {(Object.keys(t.roles) as CollabRole[]).map((r) => (
         <div key={r} className="mb-1 flex gap-2 text-[11px]">
-          <span className="w-20 flex-none font-medium">{ROLE_LABEL[r]}</span>
-          <span className="text-muted">{ROLE_DESCRIPTION[r]}</span>
+          <span className="w-20 flex-none font-medium">{t.roles[r]}</span>
+          <span className="text-muted">{t.roleDesc[r]}</span>
         </div>
       ))}
     </div>
@@ -298,6 +280,7 @@ export function ShareDialog() {
   const invites = useCollabStore((s) => s.invites[projectId]) ?? []
   const myRole = useMyRole()
   const mode = useCollabMode()
+  const t = useI18n()
   const [tab, setTab] = useState<'members' | 'settings'>('members')
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<CollabRole>('editor')
@@ -311,15 +294,12 @@ export function ShareDialog() {
   const sendInvite = () => {
     const invite = inviteService.create(projectId, email, role)
     if (!invite) {
-      toast.error('Invalid email address')
+      toast.error(t.share.invalidEmail)
       return
     }
     setEmail('')
     void navigator.clipboard.writeText(inviteService.linkFor(invite))
-    toast.success(
-      `Invite created for ${invite.email}`,
-      'Link copied — send it yourself. It works wherever this project’s data is reachable (same browser, or same Drive).',
-    )
+    toast.success(t.share.inviteCreated(invite.email), t.share.inviteCreatedBody)
   }
 
   return (
@@ -337,33 +317,37 @@ export function ShareDialog() {
         <div className="flex items-center gap-2.5">
           <span className="text-lg">{project.icon}</span>
           <div className="min-w-0 flex-1">
-            <div className="text-[14px] font-bold">Share “{project.name}”</div>
+            <div className="text-[14px] font-bold">{t.share.title(project.name)}</div>
             <div className="text-[11px] text-muted">
-              You are {ROLE_LABEL[myRole].toLowerCase()} · {activeMembers.length} member
-              {activeMembers.length !== 1 ? 's' : ''}
-              {pendingInvites.length ? ` · ${pendingInvites.length} pending` : ''}
+              {t.share.subtitle(
+                t.roles[myRole].toLowerCase(),
+                activeMembers.length,
+                pendingInvites.length,
+              )}
             </div>
           </div>
           <div className="flex rounded-lg border border-bord bg-panel2 p-0.5">
-            {(['members', 'settings'] as const).map((t) => (
+            {(['members', 'settings'] as const).map((tabKey) => (
               <button
-                key={t}
-                onClick={() => setTab(t)}
-                className={`cursor-pointer rounded-md px-2.5 py-1 text-xs font-medium capitalize ${
-                  tab === t ? 'bg-panel text-ink shadow-sm' : 'text-muted hover:text-ink'
+                key={tabKey}
+                onClick={() => setTab(tabKey)}
+                className={`cursor-pointer rounded-md px-2.5 py-1 text-xs font-medium ${
+                  tab === tabKey ? 'bg-panel text-ink shadow-sm' : 'text-muted hover:text-ink'
                 }`}
               >
-                {t}
+                {tabKey === 'members' ? t.share.tabMembers : t.share.tabSettings}
               </button>
             ))}
           </div>
-          <button className="icon-btn" aria-label="Close share dialog" onClick={() => setOpen(false)}>
+          <button className="icon-btn" aria-label={t.share.close} onClick={() => setOpen(false)}>
             <IcX size={14} />
           </button>
         </div>
 
         {/* One honest banner about what "collaborate" means right now — the
-            same source of truth the top-bar chip and presence badge use. */}
+            same source of truth the top-bar chip and presence badge use.
+            The blurb (mode.description / scopeLabel) still comes from
+            collabPresentation and is a later i18n slice. */}
         <div
           className={`mt-3 flex items-start gap-2 rounded-lg border px-3 py-2 text-[11px] leading-relaxed ${
             mode.isRealtime
@@ -378,9 +362,7 @@ export function ShareDialog() {
           )}
           <span>
             <span className="font-semibold">
-              {mode.isRealtime
-                ? 'Realtime multiplayer'
-                : `Collaboration scope: ${mode.scopeLabel}`}
+              {mode.isRealtime ? t.share.bannerRealtime : t.share.bannerScope(mode.scopeLabel)}
             </span>{' '}
             — {mode.description}
           </span>
@@ -393,10 +375,10 @@ export function ShareDialog() {
               <div className="mt-3 flex gap-2">
                 <input
                   className="field flex-1"
-                  placeholder="Invite by email…"
+                  placeholder={t.share.invitePlaceholder}
                   type="email"
                   value={email}
-                  aria-label="Invitee email"
+                  aria-label={t.share.inviteeEmail}
                   onChange={(e) => setEmail(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') sendInvite()
@@ -405,22 +387,22 @@ export function ShareDialog() {
                 <select
                   className="field h-auto w-28 flex-none cursor-pointer text-[12px]"
                   value={role}
-                  aria-label="Role for the invitee"
+                  aria-label={t.share.inviteeRole}
                   onChange={(e) => setRole(e.target.value as CollabRole)}
                 >
                   {assignableRoles(myRole).map((r) => (
                     <option key={r} value={r}>
-                      {ROLE_LABEL[r]}
+                      {t.roles[r]}
                     </option>
                   ))}
                 </select>
                 <button className="btn" onClick={sendInvite} disabled={!email.trim()}>
-                  <IcUserPlus size={13} /> Invite
+                  <IcUserPlus size={13} /> {t.share.invite}
                 </button>
               </div>
             ) : (
               <div className="mt-3 flex items-center gap-2 rounded-lg bg-panel2 px-3 py-2 text-[11.5px] text-muted">
-                <IcInfo size={13} /> Your role can’t manage members.
+                <IcInfo size={13} /> {t.share.cannotManage}
               </div>
             )}
 
@@ -438,11 +420,7 @@ export function ShareDialog() {
 
             <div className="mt-2 flex items-start gap-2 rounded-lg bg-panel2 px-3 py-2 text-[10.5px] leading-relaxed text-muted">
               <IcEye size={12} className="mt-0.5 flex-none" />
-              <span>
-                Invites work wherever this project’s data is reachable (see the
-                collaboration scope above). “Simulate acceptance” (✓) creates a mock
-                member so you can test roles offline.
-              </span>
+              <span>{t.share.footerNote}</span>
             </div>
           </>
         ) : (

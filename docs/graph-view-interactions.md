@@ -2,8 +2,11 @@
 
 ## Entering Graph
 
-- Top navigation: **Board · Graph · Split · Document · Sheet · Presentation ·
-  Code** — Graph sits immediately after Board.
+- **Graph tab** in the top navigation, next to Board. Graph is a *view* of the
+  content, not a section: it toggles on top of whatever section you are in, and
+  the tab is a toggle (`aria-pressed`), not a section selector. With **Split**
+  on, Graph occupies the *second* pane, so "editor on the left, Graph on the
+  right" is a normal state.
 - Command palette: **Open Graph view** (`Ctrl/Cmd K` → "graph").
 - Keyboard: **`G G`** (press G twice within 500 ms; ignored while typing).
 - Browser history: Graph is a first-class navigable mode in the unified URL
