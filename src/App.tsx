@@ -39,6 +39,8 @@ import {
   SheetModeWorkspace,
 } from '@/components/workspaces/ModeWorkspaces'
 import { SplitResizer } from '@/components/shell/SplitResizer'
+import { CallProvider } from '@/components/call/CallProvider'
+import { CallIsland } from '@/components/call/CallIsland'
 
 /** Graph mode is lazily loaded: the renderer, worker client and layout code
  * stay out of the main bundle until the user opens Graph. */
@@ -265,6 +267,7 @@ function Workspace() {
           ) : (
             <SectionContent viewMode={viewMode} />
           )}
+          <CallIsland />
           <CollabPanel />
         </div>
       </div>
@@ -281,7 +284,14 @@ function Workspace() {
 function Gate() {
   const { account, loginSkipped } = useAccount()
   if (!account && !loginSkipped) return <LoginScreen />
-  return <Workspace />
+  // The call provider sits ABOVE the workspace: switching section, toggling
+  // Split or opening the Graph re-renders the panes, but never remounts the
+  // LiveKit room, so a call survives navigation.
+  return (
+    <CallProvider>
+      <Workspace />
+    </CallProvider>
+  )
 }
 
 export default function App() {

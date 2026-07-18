@@ -7,6 +7,7 @@ import { syncEngine } from '@/lib/sync/SyncEngine'
 import { useCollabStore } from '@/lib/collab/collabStore'
 import { useReadOnly } from '@/lib/collab/useCollab'
 import { SectionTabs } from '@/components/shell/SectionTabs'
+import { JoinCallButton } from '@/components/call/JoinCallButton'
 import { ProfileMenu } from '@/components/account/ProfileMenu'
 import { PresenceAvatars } from '@/components/collab/PresenceAvatars'
 import { RealtimeStatusChip } from '@/components/collab/RealtimeStatusChip'
@@ -268,8 +269,11 @@ export function TopBar() {
 
       <div className="flex-1" />
 
+      {/* presence (who is in the project) and the call (who is talking) are
+          deliberately adjacent but distinct states */}
       <PresenceAvatars />
       <RealtimeStatusChip />
+      <JoinCallButton />
       <NotificationCenter />
       <button
         className="btn"
