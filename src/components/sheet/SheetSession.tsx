@@ -34,6 +34,7 @@ import {
 } from '@/lib/sheet/sheetModel'
 import {
   evaluateSheet,
+  translateFormula,
   withComputedCache,
   type ComputedCell,
 } from '@/lib/sheet/FormulaEngine'
@@ -96,7 +97,14 @@ export interface SheetSessionValue {
   renameSheetTab: (i: number, name: string) => void
   deleteSheetTab: (i: number) => void
   /** rectangle of raw editable texts → cells starting at the active cell */
-  pasteMatrix: (rows: string[][]) => void
+  /**
+   * Write a block of text cells at the selection. `origin` is the top-left
+   * of the block as it was COPIED: when present, formulas are translated
+   * by the paste offset so relative references follow the copy. It is
+   * omitted for text pasted from outside the app, which has no coordinates
+   * to translate against.
+   */
+  pasteMatrix: (rows: string[][], origin?: { r: number; c: number }) => void
 }
 
 const SheetSessionContext = createContext<SheetSessionValue | null>(null)
@@ -298,8 +306,11 @@ export function SheetSessionProvider({
         updateBody((b) => deleteSheet(b, i))
         setSheetIndexRaw((cur) => Math.max(0, cur > i ? cur - 1 : Math.min(cur, body.sheets.length - 2)))
       },
-      pasteMatrix: (rows) => {
+      pasteMatrix: (rows, origin) => {
         const start = selection.anchor
+        // how far the block travelled; relative references follow it
+        const dRow = origin ? start.r - origin.r : 0
+        const dCol = origin ? start.c - origin.c : 0
         updateBody((b) => {
           let next = b
           for (let dr = 0; dr < rows.length; dr++) {
@@ -308,7 +319,16 @@ export function SheetSessionProvider({
               const c = start.c + dc
               if (r >= next.sheets[si].rows || c >= next.sheets[si].cols) continue
               const prev = next.sheets[si].cells[cellKey(r, c)]
-              const parsed = parseCellInput(rows[dr][dc])
+              let parsed = parseCellInput(rows[dr][dc])
+              if (parsed?.f !== undefined && (dRow || dCol)) {
+                parsed = {
+                  ...parsed,
+                  f: translateFormula(parsed.f, dRow, dCol, {
+                    rows: next.sheets[si].rows,
+                    cols: next.sheets[si].cols,
+                  }),
+                }
+              }
               let cell: CellData | null
               if (!parsed) cell = prev?.s ? { s: prev.s } : null
               else cell = prev?.s ? { ...parsed, s: prev.s } : parsed

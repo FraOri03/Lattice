@@ -98,6 +98,8 @@ export function SpreadsheetEditor() {
   const [scroll, setScroll] = useState({ top: 0, left: 0 })
   const [view, setView] = useState({ w: 800, h: 500 })
   const dragging = useRef(false)
+  /** top-left + text of the last in-app copy, for formula translation */
+  const lastCopy = useRef<{ r: number; c: number; text: string } | null>(null)
 
   const colOffsets = useMemo(
     () => buildOffsets(sheet.cols, sheet.colW, DEFAULT_COL_W),
@@ -196,7 +198,11 @@ export function SpreadsheetEditor() {
       for (let c = b; c <= x; c++) row.push(editableTextOf(sheet.cells[cellKey(r, c)]))
       lines.push(row.join('\t'))
     }
-    void navigator.clipboard?.writeText(lines.join('\n')).catch(() => {})
+    const text = lines.join('\n')
+    // remember where the block came from: the clipboard only carries text,
+    // so this is what lets paste translate relative references
+    lastCopy.current = { r: a, c: b, text }
+    void navigator.clipboard?.writeText(text).catch(() => {})
   }, [selection, sheet.cells])
 
   const onPaste = (e: React.ClipboardEvent) => {
@@ -205,7 +211,11 @@ export function SpreadsheetEditor() {
     if (!text) return
     e.preventDefault()
     const rows = text.replace(/\r/g, '').replace(/\n$/, '').split('\n').map((l) => l.split('\t'))
-    pasteMatrix(rows)
+    // only OUR own copy has coordinates to translate against; text from
+    // another app is pasted verbatim
+    const copied = lastCopy.current
+    const origin = copied && copied.text === text ? { r: copied.r, c: copied.c } : undefined
+    pasteMatrix(rows, origin)
   }
 
   /* ---------------- keyboard ---------------- */
