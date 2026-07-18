@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { useStore } from '@/store/useStore'
 import { useWorkspaceLayoutStore } from '@/store/workspaceLayoutStore'
@@ -86,5 +86,32 @@ describe('SectionTabs', () => {
     useStore.setState({ viewMode: 'presentation' })
     render(<SectionTabs />)
     expect(splitTab()).toBeDisabled()
+  })
+
+  // The i18n slice localised the old eight-tab tablist; this branch replaced it,
+  // so these guard that the translations survived the restructure.
+  describe('localisation', () => {
+    afterEach(() => useStore.setState({ locale: 'en' }))
+
+    it('renders English labels by default', () => {
+      useStore.setState({ locale: 'en' })
+      render(<SectionTabs />)
+      for (const label of ['Split', 'Board', 'Graph', 'Document', 'Sheet']) {
+        expect(screen.getByText(label)).toBeInTheDocument()
+      }
+    })
+
+    it('switches every tab — layout, view and sections — to Italian', () => {
+      useStore.setState({ locale: 'it' })
+      render(<SectionTabs />)
+      for (const label of ['Diviso', 'Grafo', 'Documento', 'Foglio', 'Codice']) {
+        expect(screen.getByText(label)).toBeInTheDocument()
+      }
+      // and the accessible names follow the locale too
+      expect(
+        screen.getByRole('button', { name: 'Sezione Documento' }),
+      ).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Vista Diviso' })).toBeInTheDocument()
+    })
   })
 })
