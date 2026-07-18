@@ -66,6 +66,25 @@ _Tracked in [#10](https://github.com/FraOri03/Lattice/issues/10)._
   chrome behaviour, substantially reduced by the toolbar regroup (14 flat controls → 5
   grouped ones) but not eliminated.
 
+## Project calls (LiveKit)
+
+- **Requires configuration, and says so.** Without `VITE_LIVEKIT_URL` +
+  `LIVEKIT_API_KEY`/`LIVEKIT_API_SECRET` **and** the realtime backend (the ACL
+  the call is authorized against), "Join call" is disabled with an explanation.
+  Nothing is simulated.
+- **First implementation.** Join/leave, mic, camera, screen share, a compact
+  island with a filmstrip and a device picker. **Not** implemented: recording,
+  telephony/dial-in, in-call chat, background blur, breakout rooms.
+- **Screen share does not become a Board card.** A seam exists for a future
+  "open screen share in a split pane"; it is not built.
+- **The call belongs to one project.** Switching project leaves the call
+  instead of keeping you in a room you can no longer see.
+- **Token lifetime is 2h.** A call running longer than that needs a rejoin;
+  automatic token refresh is not implemented.
+- **Not verified against a live LiveKit server.** The unconfigured path was
+  exercised in the browser and the configured path is covered by tests with
+  mocked dependencies, but no real call has been placed from this branch.
+
 ## Board tools
 
 - **No drawing/shape/pen tools, no Frames, no Groups, and no Dev Mode.** The board toolbar

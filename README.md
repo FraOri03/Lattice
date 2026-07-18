@@ -353,6 +353,33 @@ left, Graph on the right" is a normal state. Existing deep links keep working:
 `viewMode: 'split'` is migrated on load. See
 [docs/navigation.md](docs/navigation.md#split-is-a-layout-not-a-mode).
 
+### Project calls — audio, camera and screen share (LiveKit)
+
+A project can host a **call**, carried by LiveKit alongside — never inside —
+the existing collaboration stack. Liveblocks + Yjs keep owning CRDT content,
+presence, cursors, comments, roles and content permissions; LiveKit carries
+only microphone, camera and screen share.
+
+**Presence is not the call.** Having the project open puts you in presence;
+joining the call is always an explicit action, and the topbar keeps the two
+states distinct ("Join call" vs an "In call" chip). Once connected, a compact
+**call island** sits bottom-right — mic, camera, screen share, device picker,
+expand/collapse and leave — never a full-screen conference view. The call
+survives moving between sections, toggling Split and opening the Graph,
+because its provider is mounted above the workspace panes.
+
+**Microphone and camera are OFF when you join**, and the browser is not asked
+for device permission until you press a control.
+
+Access is server-enforced: `api/realtime/media-token.ts` verifies the Google
+identity, reads the role from the project ACL (never from the request body) and
+signs a LiveKit token scoped to that project's room with only the capabilities
+the role allows — so screen share is genuinely unavailable to a role that lacks
+it, not merely hidden. The matrix and its rationale are in
+[docs/collaboration.md](docs/collaboration.md). Without `VITE_LIVEKIT_URL`,
+`LIVEKIT_API_KEY`/`LIVEKIT_API_SECRET` and the realtime backend, calls are
+disabled with an explanation and nothing is attempted.
+
 ## 15d · Photo mode — set & lighting planner
 
 A **top-down photographic set planner**, last in the top nav (**… · Code ·
