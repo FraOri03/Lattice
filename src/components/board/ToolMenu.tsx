@@ -20,10 +20,13 @@ export function ToolMenu({
   items,
   groupLabel,
   defaultKey,
+  openOnEvent,
 }: {
   items: ToolMenuItem[]
   groupLabel: string
   defaultKey?: string
+  /** Window event that also opens this menu (the board's `A` shortcut). */
+  openOnEvent?: string
 }) {
   const [activeKey, setActiveKey] = useState(defaultKey ?? items[0]?.key)
   const [open, setOpen] = useState(false)
@@ -44,6 +47,14 @@ export function ToolMenu({
     window.addEventListener('mousedown', onDown)
     return () => window.removeEventListener('mousedown', onDown)
   }, [open])
+
+  // keyboard entry point from the canvas (the `A` shortcut)
+  useEffect(() => {
+    if (!openOnEvent) return
+    const onOpen = () => setOpen(true)
+    window.addEventListener(openOnEvent, onOpen)
+    return () => window.removeEventListener(openOnEvent, onOpen)
+  }, [openOnEvent])
 
   if (!active) return null
 

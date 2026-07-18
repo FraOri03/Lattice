@@ -25,6 +25,7 @@ import {
 import { ActionIcon } from '@/components/ActionIcons'
 import { ToolbarDivider } from '@/components/ui/ToolbarDivider'
 import { ToolMenu, type ToolMenuItem } from './ToolMenu'
+import { announceCardInserted, OPEN_CREATE_MENU_EVENT } from './boardToolEvents'
 
 /**
  * Figma-style board toolbar: the real, existing tools grouped by operating
@@ -53,7 +54,14 @@ export function CanvasToolbar() {
     return { x: p.x - 150 + Math.random() * 40, y: p.y - 100 + Math.random() * 40 }
   }
 
-  const insert = (type: CardType) => addCard(type, centerPos())
+  /** Insert and hand the new card to the canvas so it can focus + announce it. */
+  const inserted = (id: string, label: string) => {
+    if (id) announceCardInserted(id, label)
+    return id
+  }
+
+  const insert = (type: CardType, label: string) =>
+    inserted(addCard(type, centerPos()), label)
 
   /** All file pickers route through the universal ImportService. */
   const importAndPlace = async (list: FileList | null) => {
@@ -76,19 +84,23 @@ export function CanvasToolbar() {
       if (!url) return
       const res = addWebEmbedCard(url, centerPos())
       if (!res.cardId) toast.error('Could not embed that URL', res.reason)
+      else inserted(res.cardId, 'web embed')
     })
   }
 
   // Creation — document entities that can really be created from the board
   const createItems: ToolMenuItem[] = [
-    { key: 'note', label: 'Note', icon: <IcNote size={16} />, onRun: () => insert('note') },
+    { key: 'note', label: 'Note', icon: <IcNote size={16} />, onRun: () => insert('note', 'note') },
     {
       key: 'richdoc',
       label: 'Document',
       icon: <IcDoc size={16} />,
       onRun: () => {
         const docId = useStore.getState().createDoc()
-        addCard('richdoc', centerPos(), { docId, mode: 'compact', color: 'blue' })
+        inserted(
+          addCard('richdoc', centerPos(), { docId, mode: 'compact', color: 'blue' }),
+          'document',
+        )
       },
     },
     {
@@ -97,7 +109,10 @@ export function CanvasToolbar() {
       icon: <IcTable size={16} />,
       onRun: () => {
         const sheetId = useStore.getState().createSheetDoc()
-        addCard('sheet', centerPos(), { sheetId, mode: 'compact', color: 'green' })
+        inserted(
+          addCard('sheet', centerPos(), { sheetId, mode: 'compact', color: 'green' }),
+          'spreadsheet',
+        )
       },
     },
     {
@@ -106,7 +121,10 @@ export function CanvasToolbar() {
       icon: <IcPresentation size={16} />,
       onRun: () => {
         const presentId = useStore.getState().createPresentDoc()
-        addCard('presentation', centerPos(), { presentId, mode: 'compact', color: 'orange' })
+        inserted(
+          addCard('presentation', centerPos(), { presentId, mode: 'compact', color: 'orange' }),
+          'presentation',
+        )
       },
     },
     {
@@ -115,7 +133,10 @@ export function CanvasToolbar() {
       icon: <IcCode size={16} />,
       onRun: () => {
         const codeId = useStore.getState().createCode()
-        addCard('code', centerPos(), { codeId, mode: 'compact', color: 'purple' })
+        inserted(
+          addCard('code', centerPos(), { codeId, mode: 'compact', color: 'purple' }),
+          'code',
+        )
       },
     },
   ]
@@ -123,10 +144,10 @@ export function CanvasToolbar() {
   // Media — image / video / 3D / photo / link cards
   const mediaItems: ToolMenuItem[] = [
     { key: 'image', label: 'Image', icon: <IcImage size={16} />, onRun: () => imageInput.current?.click() },
-    { key: 'video', label: 'Video', icon: <IcVideo size={16} />, onRun: () => insert('video') },
-    { key: 'embed3d', label: '3D', icon: <IcCube size={16} />, onRun: () => insert('embed3d') },
-    { key: 'photo', label: 'Photo', icon: <IcCamera size={16} />, onRun: () => insert('photo') },
-    { key: 'link', label: 'Link', icon: <IcLink size={16} />, onRun: () => insert('link') },
+    { key: 'video', label: 'Video', icon: <IcVideo size={16} />, onRun: () => insert('video', 'video') },
+    { key: 'embed3d', label: '3D', icon: <IcCube size={16} />, onRun: () => insert('embed3d', '3D embed') },
+    { key: 'photo', label: 'Photo', icon: <IcCamera size={16} />, onRun: () => insert('photo', 'photo') },
+    { key: 'link', label: 'Link', icon: <IcLink size={16} />, onRun: () => insert('link', 'link') },
   ]
 
   // More — the less-frequent external actions
@@ -150,7 +171,7 @@ export function CanvasToolbar() {
       <button
         type="button"
         className="flex cursor-pointer flex-col items-center gap-0.5 rounded-lg px-3 py-1.5 text-muted hover:bg-panel2 hover:text-ink"
-        onClick={() => addSection(centerPos())}
+        onClick={() => inserted(addSection(centerPos()), 'section')}
         aria-label="Add section"
         title="Add section — a labelled group on the board"
       >
@@ -160,8 +181,13 @@ export function CanvasToolbar() {
 
       <ToolbarDivider />
 
-      {/* Creation */}
-      <ToolMenu groupLabel="Create a card" items={createItems} defaultKey="note" />
+      {/* Creation — also the target of the board's `A` shortcut */}
+      <ToolMenu
+        groupLabel="Create a card"
+        items={createItems}
+        defaultKey="note"
+        openOnEvent={OPEN_CREATE_MENU_EVENT}
+      />
       <ToolMenu groupLabel="Add media" items={mediaItems} defaultKey="image" />
 
       {/* Annotation */}
