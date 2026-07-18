@@ -5,6 +5,7 @@
  * asset surface that actually owns the entity.
  */
 import { useStore } from '@/store/useStore'
+import { useWorkspaceLayoutStore } from '@/store/workspaceLayoutStore'
 import type { LatticeGraphNode } from './graphTypes'
 
 export type GraphNavResult =
@@ -28,7 +29,12 @@ export function navigateToNode(
   const s = useStore.getState()
   const id = node.entityId
   const finishSplit = () => {
-    if (opts.split && SPLITTABLE.has(node.kind)) s.setViewMode('split')
+    // Split is a layout now: open the second pane (Board) next to the editor
+    // entity we just opened. `openSplit` runs AFTER the open* call, which set
+    // the section without touching the layout.
+    if (opts.split && SPLITTABLE.has(node.kind)) {
+      useWorkspaceLayoutStore.getState().openSplit({ secondary: 'board' })
+    }
   }
 
   switch (node.kind) {
@@ -51,9 +57,11 @@ export function navigateToNode(
       finishSplit()
       return { kind: 'opened', mode: opts.split ? 'split' : 'code' }
     case 'board':
+      // a board node has no editor entity to pair with, so it always opens
+      // full — the split layout pairs an EDITOR with the board, not vice versa
       s.setActiveBoard(id)
-      s.setViewMode(opts.split ? 'split' : 'board')
-      return { kind: 'opened', mode: opts.split ? 'split' : 'board' }
+      s.setViewMode('board')
+      return { kind: 'opened', mode: 'board' }
     case 'asset':
     case 'pdf':
     case 'image':

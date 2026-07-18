@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { useStore } from '@/store/useStore'
-import { MODE_METAS } from '@/components/topbarModes'
+import { useWorkspaceLayoutStore } from '@/store/workspaceLayoutStore'
+import { SECTION_METAS } from '@/types/workspace'
 import { snapshotFromState } from '../graphSource'
 import { extractGraph, nodeId } from '../GraphBuilder'
 import { navigateToNode } from '../GraphNavigationService'
@@ -18,17 +19,16 @@ function graphNode(kind: LatticeGraphNode['kind'], entityId: string): LatticeGra
   return { id: nodeId(kind, entityId), entityId, projectId: 'p', kind, label: 'x' }
 }
 
-describe('top-bar order', () => {
-  it('places Graph immediately after Board', () => {
-    expect(MODE_METAS[0].mode).toBe('board')
-    expect(MODE_METAS[1].mode).toBe('graph')
-    // and the rest of the required order follows
-    expect(MODE_METAS.map((m) => m.mode)).toEqual([
+describe('section switcher order', () => {
+  it('lists real sections, without Split (a layout) or Graph (a view)', () => {
+    const sections = SECTION_METAS.map((m) => m.section)
+    expect(sections[0]).toBe('board')
+    expect(sections).not.toContain('split')
+    expect(sections).not.toContain('graph')
+    expect(sections).toEqual([
       'board',
-      'graph',
-      'split',
-      'doc',
-      'sheet',
+      'document',
+      'spreadsheet',
       'presentation',
       'code',
       'photo',
@@ -54,6 +54,7 @@ describe('snapshot project scoping', () => {
 
 describe('navigation to native workspaces', () => {
   beforeEach(() => {
+    useWorkspaceLayoutStore.getState().closeSplit()
     useStore.setState({ viewMode: 'graph' })
   })
 
@@ -77,8 +78,10 @@ describe('navigation to native workspaces', () => {
   it('opens a splittable entity beside the graph when requested', () => {
     const id = useStore.getState().createDoc({ title: 'Split doc' })
     navigateToNode(graphNode('document', id), { split: true })
-    expect(useStore.getState().viewMode).toBe('split')
+    // the section is the Document; the split is now a layout, not a ViewMode
+    expect(useStore.getState().viewMode).toBe('doc')
     expect(useStore.getState().activeDocId).toBe(id)
+    expect(useWorkspaceLayoutStore.getState().split).toBe(true)
   })
 
   it('treats a tag node as a focus-local request, not a navigation', () => {

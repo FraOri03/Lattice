@@ -108,6 +108,49 @@ describe('resolveNav — validation and safe degradation', () => {
   })
 })
 
+describe('split layout — URL back-compatibility', () => {
+  it('serializes the split layout as the legacy m=split token', () => {
+    const nav: NavState = {
+      projectId: 'proj_a',
+      mode: 'doc',
+      split: true,
+      boardId: 'board_a1',
+      entity: { kind: 'doc', id: 'doc_1' },
+    }
+    const search = serializeNav(nav)
+    expect(search).toContain('m=split')
+    expect(search).not.toContain('m=doc')
+  })
+
+  it('resolves a legacy m=split link into the split flag + the entity section', () => {
+    const nav = resolveNav(
+      parseNav('?p=proj_a&m=split&b=board_a1&e=doc.doc_1'),
+      snapshot(),
+    )
+    expect(nav.split).toBe(true)
+    expect(nav.mode).toBe('doc') // section derived from the open entity
+    expect(nav.entity).toEqual({ kind: 'doc', id: 'doc_1' })
+  })
+
+  it('resolves m=split with no entity to the Board, still split', () => {
+    const nav = resolveNav(parseNav('?p=proj_a&m=split'), snapshot())
+    expect(nav.split).toBe(true)
+    expect(nav.mode).toBe('board')
+  })
+
+  it('keeps graph as a mode (not a split)', () => {
+    const nav = resolveNav(parseNav('?p=proj_a&m=graph'), snapshot())
+    expect(nav.mode).toBe('graph')
+    expect(nav.split).toBeUndefined()
+  })
+
+  it('navKey distinguishes a split from its underlying section', () => {
+    const single: NavState = { projectId: 'p', mode: 'doc', boardId: 'b1' }
+    const split: NavState = { projectId: 'p', mode: 'doc', split: true, boardId: 'b1' }
+    expect(navKey(single)).not.toBe(navKey(split))
+  })
+})
+
 describe('popstate restoration path (parse → resolve)', () => {
   it('rebuilds a valid nav from a URL search string', () => {
     const nav = resolveNav(parseNav('?p=proj_a&m=doc&e=doc.doc_1'), snapshot())

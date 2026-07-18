@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { useStore } from '@/store/useStore'
 import { useUiStore } from '@/store/useUiStore'
+import { useWorkspaceLayoutStore } from '@/store/workspaceLayoutStore'
 import { useSyncStore } from '@/lib/sync/syncStore'
 import { syncEngine } from '@/lib/sync/SyncEngine'
 import { useCollabStore } from '@/lib/collab/collabStore'
 import { useCan, useReadOnly } from '@/lib/collab/useCollab'
-import type { ViewMode } from '@/types/model'
-import { MODE_METAS } from '@/components/topbarModes'
+import { SectionSwitcher } from '@/components/shell/SectionSwitcher'
 import { ProfileMenu } from '@/components/account/ProfileMenu'
 import { PresenceAvatars } from '@/components/collab/PresenceAvatars'
 import { RealtimeStatusChip } from '@/components/collab/RealtimeStatusChip'
@@ -15,7 +15,6 @@ import { useCollabMode } from '@/lib/collab/collabPresentation'
 import {
   IcAlert,
   IcBoard,
-  IcCamera,
   IcChevronRight,
   IcCloud,
   IcCloudOff,
@@ -30,28 +29,12 @@ import {
   IcPlus,
   IcPresentation,
   IcRefresh,
-  IcSplit,
   IcSun,
   IcTable,
   IcUserPlus,
   IcWifiOff,
   IcChevronDown,
 } from '@/components/Icons'
-
-const MODE_ICONS: Record<ViewMode, React.ReactNode> = {
-  board: <IcBoard size={13} />,
-  graph: <IcGraph size={13} />,
-  split: <IcSplit size={13} />,
-  doc: <IcDoc size={13} />,
-  sheet: <IcTable size={13} />,
-  presentation: <IcPresentation size={13} />,
-  code: <IcCode size={13} />,
-  photo: <IcCamera size={13} />,
-}
-
-// order (Board · Graph · Split · Document · Sheet · Presentation · Code · Photo)
-// comes from the shared MODE_METAS so it stays testable without a DOM
-const MODES = MODE_METAS.map((m) => ({ ...m, icon: MODE_ICONS[m.mode] }))
 
 function useOnline(): boolean {
   const [online, setOnline] = useState(navigator.onLine)
@@ -227,9 +210,12 @@ function ContextBreadcrumb() {
   const activeSheetId = useStore((s) => s.activeSheetId)
   const activeNoteId = useStore((s) => s.activeNoteId)
   const activeAssetId = useStore((s) => s.activeAssetId)
+  const split = useWorkspaceLayoutStore((s) => s.split)
+  const secondaryContent = useWorkspaceLayoutStore((s) => s.secondaryContent)
   const readOnly = useReadOnly()
 
-  const boardVisible = viewMode === 'board' || viewMode === 'split'
+  const boardVisible =
+    viewMode === 'board' || (split && secondaryContent === 'board')
 
   let entity: string | null = null
   if (activeAssetId && assets[activeAssetId]) entity = assets[activeAssetId].name
@@ -326,8 +312,6 @@ function PanelButtons() {
 }
 
 export function TopBar() {
-  const viewMode = useStore((s) => s.viewMode)
-  const setViewMode = useStore((s) => s.setViewMode)
   const theme = useStore((s) => s.theme)
   const setTheme = useStore((s) => s.setTheme)
   const setPaletteOpen = useUiStore((s) => s.setPaletteOpen)
@@ -342,26 +326,9 @@ export function TopBar() {
 
       <div className="flex-1" />
 
-      <div className="flex rounded-lg border border-bord bg-panel2 p-0.5" role="tablist" aria-label="View mode">
-        {MODES.map(({ mode, label, icon }) => (
-          <button
-            key={mode}
-            onClick={() => setViewMode(mode)}
-            role="tab"
-            aria-selected={viewMode === mode}
-            aria-label={`${label} view`}
-            title={`${label} view`}
-            className={`flex cursor-pointer items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium ${
-              viewMode === mode
-                ? 'bg-panel text-ink shadow-sm'
-                : 'text-muted hover:text-ink'
-            }`}
-          >
-            {icon}
-            <span className="hidden xl:inline">{label}</span>
-          </button>
-        ))}
-      </div>
+      {/* Centre: the current section + a dropdown to switch. Split and Graph
+          are NOT here — they live in the ViewModeIsland. */}
+      <SectionSwitcher />
 
       <div className="flex-1" />
 
