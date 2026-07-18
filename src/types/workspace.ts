@@ -103,7 +103,7 @@ export interface SectionMeta {
 export const SECTION_METAS: SectionMeta[] = [
   { section: 'board', mode: 'board', label: 'Board' },
   { section: 'document', mode: 'doc', label: 'Document' },
-  { section: 'spreadsheet', mode: 'sheet', label: 'Spreadsheet' },
+  { section: 'spreadsheet', mode: 'sheet', label: 'Sheet' },
   { section: 'presentation', mode: 'presentation', label: 'Presentation' },
   { section: 'code', mode: 'code', label: 'Code' },
   { section: 'photo', mode: 'photo', label: 'Photo' },

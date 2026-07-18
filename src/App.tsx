@@ -38,7 +38,6 @@ import {
   PresentationModeWorkspace,
   SheetModeWorkspace,
 } from '@/components/workspaces/ModeWorkspaces'
-import { ViewModeIsland } from '@/components/shell/ViewModeIsland'
 import { SplitResizer } from '@/components/shell/SplitResizer'
 
 /** Graph mode is lazily loaded: the renderer, worker client and layout code
@@ -266,7 +265,6 @@ function Workspace() {
           ) : (
             <SectionContent viewMode={viewMode} />
           )}
-          <ViewModeIsland />
           <CollabPanel />
         </div>
       </div>

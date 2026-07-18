@@ -1,12 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useStore } from '@/store/useStore'
 import { useUiStore } from '@/store/useUiStore'
 import { useWorkspaceLayoutStore } from '@/store/workspaceLayoutStore'
 import { useSyncStore } from '@/lib/sync/syncStore'
 import { syncEngine } from '@/lib/sync/SyncEngine'
 import { useCollabStore } from '@/lib/collab/collabStore'
-import { useCan, useReadOnly } from '@/lib/collab/useCollab'
-import { SectionSwitcher } from '@/components/shell/SectionSwitcher'
+import { useReadOnly } from '@/lib/collab/useCollab'
+import { SectionTabs } from '@/components/shell/SectionTabs'
 import { ProfileMenu } from '@/components/account/ProfileMenu'
 import { PresenceAvatars } from '@/components/collab/PresenceAvatars'
 import { RealtimeStatusChip } from '@/components/collab/RealtimeStatusChip'
@@ -14,26 +14,18 @@ import { NotificationCenter } from '@/components/collab/NotificationCenter'
 import { useCollabMode } from '@/lib/collab/collabPresentation'
 import {
   IcAlert,
-  IcBoard,
   IcChevronRight,
   IcCloud,
   IcCloudOff,
-  IcCode,
   IcCommand,
-  IcDoc,
   IcGraph,
   IcHistory,
   IcMessage,
   IcMoon,
-  IcNote,
-  IcPlus,
-  IcPresentation,
   IcRefresh,
   IcSun,
-  IcTable,
   IcUserPlus,
   IcWifiOff,
-  IcChevronDown,
 } from '@/components/Icons'
 
 function useOnline(): boolean {
@@ -132,61 +124,6 @@ function SyncIndicator() {
       )}
       {label}
     </button>
-  )
-}
-
-/** "+ New" dropdown: quick create for every document kind. */
-function QuickCreate() {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-  const s = useStore
-
-  useEffect(() => {
-    if (!open) return
-    const close = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false)
-    }
-    window.addEventListener('mousedown', close)
-    return () => window.removeEventListener('mousedown', close)
-  }, [open])
-
-  const entries: { label: string; icon: React.ReactNode; run: () => void }[] = [
-    { label: 'Note', icon: <IcNote size={13} />, run: () => s.getState().openNote(s.getState().createNote()) },
-    { label: 'Document', icon: <IcDoc size={13} />, run: () => s.getState().openDoc(s.getState().createDoc()) },
-    { label: 'Spreadsheet', icon: <IcTable size={13} />, run: () => s.getState().openSheet(s.getState().createSheetDoc()) },
-    { label: 'Presentation', icon: <IcPresentation size={13} />, run: () => s.getState().openPresent(s.getState().createPresentDoc()) },
-    { label: 'Code file', icon: <IcCode size={13} />, run: () => s.getState().openCode(s.getState().createCode()) },
-    { label: 'Board', icon: <IcBoard size={13} />, run: () => s.getState().addBoard() },
-  ]
-
-  return (
-    <div className="relative" ref={ref}>
-      <button
-        className="btn"
-        onClick={() => setOpen((v) => !v)}
-        title="Quick create"
-        aria-label="Create new item"
-        aria-expanded={open}
-      >
-        <IcPlus size={13} /> New <IcChevronDown size={11} />
-      </button>
-      {open && (
-        <div className="absolute top-9 left-0 z-50 w-44 rounded-xl border border-bord bg-panel p-1 shadow-xl">
-          {entries.map((e) => (
-            <button
-              key={e.label}
-              className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[12px] text-muted hover:bg-panel2 hover:text-ink"
-              onClick={() => {
-                setOpen(false)
-                e.run()
-              }}
-            >
-              {e.icon} {e.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
   )
 }
 
@@ -316,19 +253,18 @@ export function TopBar() {
   const setTheme = useStore((s) => s.setTheme)
   const setPaletteOpen = useUiStore((s) => s.setPaletteOpen)
   const setShareDialogOpen = useUiStore((s) => s.setShareDialogOpen)
-  const mayCreate = useCan('content.create')
   const collabMode = useCollabMode()
 
   return (
     <header className="flex h-11 flex-none items-center gap-2 border-b border-bord bg-panel px-3">
-      {mayCreate && <QuickCreate />}
       <ContextBreadcrumb />
 
       <div className="flex-1" />
 
-      {/* Centre: the current section + a dropdown to switch. Split and Graph
-          are NOT here — they live in the ViewModeIsland. */}
-      <SectionSwitcher />
+      {/* Centre: [Board · Graph] and [Split · Document · Sheet · Presentation ·
+          Code · Photo]. Split stays a layout and Graph a view underneath — see
+          SectionTabs. */}
+      <SectionTabs />
 
       <div className="flex-1" />
 
