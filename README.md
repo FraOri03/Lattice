@@ -264,10 +264,13 @@ Off-screen and idle work is suspended (`src/lib/perf/`): an `IntersectionObserve
 ## 15c · Phase 9.5 — Project Graph View
 
 A **Lattice-native Graph View inspired by Logseq's graph interaction
-principles** — an automatically generated **relationship browser**, placed
-immediately after Board in the top nav: **Board · Graph · Split · Document ·
-Sheet · Presentation · Code · Photo**. Open it with the tab, the command palette
-("Open Graph view"), or **`G G`**.
+principles** — an automatically generated **relationship browser**. Graph is a
+**view of the content**, not a section: open it from the **View Mode Island**
+(top-right of the work area), the command palette ("Open Graph view"), or
+**`G G`**. It can fill the single pane, or sit in the second pane beside an
+editor when Split is on. The sections themselves live in the topbar's
+**SectionSwitcher**: **Board · Document · Spreadsheet · Presentation · Code ·
+Photo**.
 
 **Graph vs Board — kept distinct on purpose.** Board is a *manually arranged
 creative workspace* (you place cards; positions are content). Graph is an
@@ -327,8 +330,26 @@ Docs: `docs/graph-view-architecture.md`, `graph-view-data-model.md`,
 `graph-view-interactions.md`, `graph-view-accessibility.md`,
 `graph-view-performance.md`, `graph-view-licensing.md`. Settings/state are
 additive (`ViewMode` gains `graph`; store gains per-project `graphSettings`) —
-no data migration; Board/Split/Document/Sheet/Presentation/Code, palette,
-history, collaboration, Drive and GitHub are unchanged.
+no data migration; the sections, palette, history, collaboration, Drive and
+GitHub are unchanged.
+
+### Information architecture — sections, views and layouts
+
+The interface separates three things that a single `ViewMode` enum used to
+conflate:
+
+| Concept | What it is | Where it lives |
+|---|---|---|
+| **Section** | *what* you work on — Board, Document, Spreadsheet, Presentation, Code, Photo | `viewMode` in `useStore`, chosen via the topbar **SectionSwitcher** |
+| **View** | *how* the content is shown — the native editor, or the **Graph** | `viewMode === 'graph'` (primary pane) or the second pane |
+| **Layout** | one pane, or a **Split** with a resizable second pane | `src/store/workspaceLayoutStore.ts`, toggled in the **View Mode Island** |
+
+Split and Graph are therefore **not** sections and never appear in the
+SectionSwitcher; they live in the View Mode Island at the top-right of the work
+area, and they compose — "editor on the left, Graph on the right" is a normal
+state. Existing deep links keep working: `m=split` is still the URL token for
+the split layout, and a persisted `viewMode: 'split'` is migrated on load. See
+[docs/navigation.md](docs/navigation.md#split-is-a-layout-not-a-mode).
 
 ## 15d · Photo mode — set & lighting planner
 

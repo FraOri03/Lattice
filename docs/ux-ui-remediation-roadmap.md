@@ -74,8 +74,9 @@ Companion to [`ux-ui-audit-phase-8.md`](./ux-ui-audit-phase-8.md). Priorities: *
 
 ## P2 — Medium priority (before broader adoption)
 
-### P2.1 · Demote Split from mode to layout toggle (LAT-7, NAV-2, IA-1)
+### P2.1 · Demote Split from mode to layout toggle (LAT-7, NAV-2, IA-1) — ✅ **DONE**
 - Rationale: Split is a layout, not a peer mode; it confuses the "what is a mode" model. Benefit: simpler IA. Risk: low-medium (touches nav + `modeAfterOpen`). Effort: M. Acceptance: Split is a toggle on Board/Doc; opening an entity no longer implies a distinct mode.
+- **Shipped** (branch `feat/call-and-toolbar-ia`): `split` was removed from `ViewMode` and now lives in `src/store/workspaceLayoutStore.ts`; `modeAfterOpen` is gone, so opening an entity switches section only and never implies a layout. `Graph` became a content *view* (single pane, or the second pane alongside an editor). A new `ViewModeIsland` owns Split + Graph, and a `SectionSwitcher` replaced the eight-tab top nav. Legacy `m=split` deep links and persisted `viewMode: 'split'` are migrated — see [navigation.md](navigation.md#split-is-a-layout-not-a-mode).
 
 ### P2.2 · Auto-hide Workspaces for single-workspace accounts (LAT-8, IA-2)
 - Rationale: Workspaces are organizational-only and add a nesting level with no access boundary for solo users. Benefit: shallower IA. Risk: low. Effort: S. Acceptance: the workspace breadcrumb/switcher only appears when ≥ 2 workspaces exist.

@@ -48,11 +48,30 @@ _Tracked in [#11](https://github.com/FraOri03/Lattice/issues/11)._
 _Tracked in [#10](https://github.com/FraOri03/Lattice/issues/10)._
 
 - **No browser back/forward** — the SPA has no router; the Back button exits the app.
-- **"Board" is overloaded** (a mode, a surface, and — via Split — a layout); Split behaves
-  like a layout but is presented as a peer mode.
+- ~~**"Board" is overloaded** … Split behaves like a layout but is presented as a peer
+  mode.~~ **Fixed** (`LAT-7`/`NAV-2`/`IA-1`): Split is now a layout toggle in
+  `workspaceLayoutStore` and Graph is a content view; neither is a section. See
+  [navigation.md](navigation.md#split-is-a-layout-not-a-mode).
 - **Workspaces add a nesting level** (`Workspace → Project → Mode → Entity → Card`) without
   enforcement — they should auto-hide for single-workspace accounts.
 - No per-entity shareable deep link (only the `#invite=` hash).
+- **The secondary pane's content is not deep-linkable.** A restored `m=split` link always
+  opens the Board beside the primary pane; "editor + Graph" is transient view state.
+- **Split pairs the primary section with the Board or the Graph only** — there is no
+  arbitrary pane-to-pane composition, and Presentation/Photo are full-page sections where
+  the Split control is disabled.
+- **Vertical (stacked) split is modelled but not exposed.** `workspaceLayoutStore.direction`
+  and the resizer both handle it; no UI control switches to it yet.
+- **The bottom toolbar can still overlap the minimap at ≤1280 px.** Pre-existing board
+  chrome behaviour, substantially reduced by the toolbar regroup (14 flat controls → 5
+  grouped ones) but not eliminated.
+
+## Board tools
+
+- **No drawing/shape/pen tools, no Frames, no Groups, and no Dev Mode.** The board toolbar
+  creates cards and sections; pan/zoom are React Flow's own controls. The toolbar is
+  grouped by category (Structure · Create · Media · Annotate · More) but deliberately does
+  **not** advertise tool families the product does not implement.
 
 ## Cloud, sync & collaboration
 
