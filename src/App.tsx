@@ -15,8 +15,8 @@ import { Sidebar } from '@/components/Sidebar'
 import { TopBar } from '@/components/TopBar'
 import { Inspector } from '@/components/Inspector'
 import { DocumentInspector } from '@/components/DocumentInspector'
-import { CodeInspector } from '@/components/code/CodeInspector'
 import { DocumentView } from '@/components/DocumentView'
+import { documentPaneFor } from '@/lib/nav/activePane'
 import { BoardCanvas } from '@/components/board/BoardCanvas'
 import { LoginScreen } from '@/components/account/LoginScreen'
 import { GithubDialog } from '@/components/github/GithubDialog'
@@ -161,6 +161,7 @@ function Workspace() {
   const activeDocId = useStore((s) => s.activeDocId)
   const activeCodeId = useStore((s) => s.activeCodeId)
   const activeAssetId = useStore((s) => s.activeAssetId)
+  const activeSheetId = useStore((s) => s.activeSheetId)
 
   useCollaboration()
   useGlobalShortcuts()
@@ -170,10 +171,19 @@ function Workspace() {
     document.documentElement.dataset.theme = theme
   }, [theme])
 
-  // Document mode: sidebar (tree) · editor · matching inspector
-  const codeWorkspace = viewMode === 'doc' && !!activeCodeId && !activeAssetId
+  // Document mode: sidebar (tree) · editor · matching inspector. The
+  // inspector follows whatever DocumentView actually mounts, so the two can
+  // never disagree — docking the document inspector next to a spreadsheet
+  // is what made the two views look stacked. Code files and spreadsheets
+  // are owned by their own modes and never render here.
   const docWorkspace =
-    viewMode === 'doc' && !!activeDocId && !activeAssetId && !activeCodeId
+    viewMode === 'doc' &&
+    documentPaneFor(viewMode, {
+      activeAssetId,
+      activeCodeId,
+      activeSheetId,
+      activeDocId,
+    }) === 'doc'
 
   return (
     <div className="flex h-full">
@@ -183,7 +193,6 @@ function Workspace() {
         <ReadOnlyBanner />
         <div className="flex min-h-0 flex-1">
           {(viewMode === 'doc' || viewMode === 'split') && <DocumentView />}
-          {codeWorkspace && <CodeInspector />}
           {docWorkspace && <DocumentInspector />}
           {viewMode === 'sheet' && <SheetModeWorkspace />}
           {viewMode === 'presentation' && <PresentationModeWorkspace />}
