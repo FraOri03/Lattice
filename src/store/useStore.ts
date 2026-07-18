@@ -16,6 +16,8 @@ import type {
   CardData,
   CardType,
   CodeDocMeta,
+  Folder,
+  FolderCategory,
   NoteDoc,
   PresentationDocMeta,
   Project,
@@ -56,6 +58,14 @@ import {
   refreshSectionChildren,
 } from '@/lib/board/sections'
 import { createWebEmbed } from '@/lib/web/WebEmbedService'
+import {
+  fileInto,
+  foldersOf,
+  nextFolderOrder,
+  unfileFrom,
+  uniqueFolderName,
+  type FoldableItem,
+} from '@/lib/sidebar/folders'
 import type { GraphViewSettings } from '@/lib/graph/graphTypes'
 import { decodeGraphSettings } from '@/lib/graph/GraphSettingsService'
 import {
@@ -90,6 +100,17 @@ export const SECTION_COLLAPSED_H = 40
 
 /** Offset of a duplicated card from its original, so the copy is visible. */
 export const DUPLICATE_OFFSET = 24
+
+/** Which state slice holds the items of each sidebar category. */
+const FOLDER_RECORD_KEY = {
+  boards: 'boards',
+  docs: 'docs',
+  sheets: 'sheetDocs',
+  presentations: 'presentDocs',
+  code: 'codeDocs',
+  notes: 'notes',
+  assets: 'assets',
+} as const satisfies Record<FolderCategory, keyof AppState>
 
 const DEFAULT_EDGE = {
   type: 'default' as const,
@@ -159,6 +180,10 @@ interface AppState {
   sidebarFilter: SidebarFilter
   /** Graph View preferences, persisted per project (Phase 9.5). */
   graphSettings: Record<string, GraphViewSettings>
+  /** user folders inside the sidebar categories, keyed by id */
+  folders: Record<string, Folder>
+  /** sidebar categories the user collapsed */
+  collapsedCategories: FolderCategory[]
 
   setSearch: (s: string) => void
   setTagFilter: (t: string | null) => void
@@ -167,6 +192,22 @@ interface AppState {
   setTheme: (t: Theme) => void
   /** Merge + clamp a project's graph settings (creates defaults on first use). */
   setGraphSettings: (projectId: string, patch: Partial<GraphViewSettings>) => void
+
+  createFolder: (category: FolderCategory, name?: string) => string
+  renameFolder: (id: string, name: string) => void
+  /**
+   * Remove a folder. Its items are NEVER deleted: they lose the pointer and
+   * reappear as unfiled, so a mis-click can only ever cost the grouping.
+   */
+  deleteFolder: (id: string) => void
+  toggleFolderCollapsed: (id: string) => void
+  toggleCategoryCollapsed: (category: FolderCategory) => void
+  /** File an item into a folder, or out of every folder with null. */
+  moveToFolder: (
+    category: FolderCategory,
+    itemId: string,
+    folderId: string | null,
+  ) => void
 
   createWorkspace: (partial?: Partial<Workspace>) => string
   updateWorkspace: (id: string, patch: Partial<Omit<Workspace, 'id'>>) => void
@@ -435,12 +476,92 @@ export const useStore = create<AppState>()(
       tagFilter: null,
       sidebarFilter: 'all',
       graphSettings: {},
+      folders: {},
+      collapsedCategories: [],
 
       setSearch: (search) => set({ search }),
       setTagFilter: (tagFilter) => set({ tagFilter }),
       setSidebarFilter: (sidebarFilter) => set({ sidebarFilter }),
       setViewMode: (viewMode) => set({ viewMode }),
       setTheme: (theme) => set({ theme }),
+      createFolder: (category, name = 'New folder') => {
+        const s = get()
+        const id = nid('folder')
+        const siblings = foldersOf(s.folders, category, s.activeProjectId)
+        const now = Date.now()
+        const folder: Folder = {
+          id,
+          name: uniqueFolderName(name, siblings),
+          category,
+          projectId: s.activeProjectId,
+          order: nextFolderOrder(siblings),
+          collapsed: false,
+          createdAt: now,
+          updatedAt: now,
+        }
+        set({ folders: { ...s.folders, [id]: folder } })
+        return id
+      },
+
+      renameFolder: (id, name) =>
+        set((s) => {
+          const folder = s.folders[id]
+          if (!folder) return {}
+          const siblings = foldersOf(s.folders, folder.category, folder.projectId).filter(
+            (f) => f.id !== id,
+          )
+          return {
+            folders: {
+              ...s.folders,
+              [id]: {
+                ...folder,
+                name: uniqueFolderName(name, siblings),
+                updatedAt: Date.now(),
+              },
+            },
+          }
+        }),
+
+      deleteFolder: (id) =>
+        set((s) => {
+          const folder = s.folders[id]
+          if (!folder) return {}
+          const folders = { ...s.folders }
+          delete folders[id]
+          // the items outlive the folder — only the pointer goes
+          const key = FOLDER_RECORD_KEY[folder.category]
+          const records = s[key] as Record<string, FoldableItem>
+          const next = unfileFrom(records, [id])
+          return { folders, ...(next === records ? {} : { [key]: next }) } as Partial<AppState>
+        }),
+
+      toggleFolderCollapsed: (id) =>
+        set((s) => {
+          const folder = s.folders[id]
+          if (!folder) return {}
+          return {
+            folders: { ...s.folders, [id]: { ...folder, collapsed: !folder.collapsed } },
+          }
+        }),
+
+      toggleCategoryCollapsed: (category) =>
+        set((s) => ({
+          collapsedCategories: s.collapsedCategories.includes(category)
+            ? s.collapsedCategories.filter((c) => c !== category)
+            : [...s.collapsedCategories, category],
+        })),
+
+      moveToFolder: (category, itemId, folderId) =>
+        set((s) => {
+          const key = FOLDER_RECORD_KEY[category]
+          // the record maps have different value types but all carry the
+          // optional folderId, so the move is expressed once over the
+          // structural minimum and re-attached to the right slice
+          const records = s[key] as Record<string, FoldableItem>
+          const next = fileInto(records, itemId, folderId)
+          return (next === records ? {} : { [key]: next }) as Partial<AppState>
+        }),
+
       setGraphSettings: (projectId, patch) =>
         set((s) => {
           const current = decodeGraphSettings(s.graphSettings[projectId])
@@ -1736,7 +1857,7 @@ export const useStore = create<AppState>()(
     }),
     {
       name: 'lattice-vault-v1',
-      version: 2,
+      version: 3,
       migrate: (persisted, version) => {
         // v0 → v1: introduce projects; the default project adopts everything
         const s = persisted as Partial<AppState>
@@ -1764,6 +1885,12 @@ export const useStore = create<AppState>()(
             ),
           }
           s.activeWorkspaceId = PERSONAL_WORKSPACE_ID
+        }
+        // v2 → v3: sidebar folders. Nothing to rewrite — membership lives
+        // on the item, so every existing entity already reads as unfiled.
+        if (version < 3) {
+          s.folders = s.folders ?? {}
+          s.collapsedCategories = s.collapsedCategories ?? []
         }
         return s as AppState
       },
@@ -1793,6 +1920,8 @@ export const useStore = create<AppState>()(
         viewMode: s.viewMode,
         theme: s.theme,
         graphSettings: s.graphSettings,
+        folders: s.folders,
+        collapsedCategories: s.collapsedCategories,
       }),
     },
   ),
