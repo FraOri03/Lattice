@@ -3,12 +3,15 @@
  *
  * Supports Excel-style expressions over the current sheet:
  *   - literals: numbers, "strings" ("" escapes a quote), TRUE/FALSE
- *   - references: A1, $B$2 ($ anchors are accepted and ignored)
+ *   - references: A1, $A$1, A$1, $A1. Anchors do not change what a
+ *     reference EVALUATES to — A1 and $A$1 read the same cell — they
+ *     decide what happens when the formula is copied, which is what
+ *     translateFormula() implements
  *   - ranges: A1:B10 (as function arguments)
  *   - operators: + - * / ^ (right-assoc) · unary ± · % postfix · & concat
  *     · comparisons = <> < > <= >=
- *   - functions (registry, extensible): SUM AVERAGE MIN MAX COUNT COUNTA
- *     IF ROUND ABS SQRT
+ *   - functions (registry, extensible): math, statistical, logical, text
+ *     and date/time families — see FUNCTIONS below
  *
  * Errors surface as Excel-style codes (#DIV/0!, #CYCLE!, #NAME?, #VALUE!,
  * #REF!, #ERROR!). Evaluation is recursive over cell dependencies with
@@ -17,7 +20,7 @@
  */
 
 import type { CellData, SheetData } from './sheetModel'
-import { cellKey, colIndex } from './sheetModel'
+import { cellKey, colIndex, colName } from './sheetModel'
 
 export type Scalar = number | string | boolean | null
 
@@ -421,7 +424,262 @@ export const FUNCTIONS: Record<string, SheetFunction> = {
     if (n < 0) err('#NUM!')
     return Math.sqrt(n)
   },
+
+  /* -------- math -------- */
+  POWER: (a) => (arity(a, 2), num(a, 0) ** num(a, 1)),
+  MOD: (a) => {
+    arity(a, 2)
+    const d = num(a, 1)
+    if (d === 0) err('#DIV/0!')
+    // Excel's MOD follows the sign of the divisor, unlike JS %
+    return num(a, 0) - d * Math.floor(num(a, 0) / d)
+  },
+  INT: (a) => (arity(a, 1), Math.floor(num(a, 0))),
+  TRUNC: (a) => (arity(a, 1, 2), truncate(num(a, 0), a.length > 1 ? num(a, 1) : 0)),
+  SIGN: (a) => (arity(a, 1), Math.sign(num(a, 0))),
+  EXP: (a) => (arity(a, 1), Math.exp(num(a, 0))),
+  LN: (a) => {
+    arity(a, 1)
+    const n = num(a, 0)
+    if (n <= 0) err('#NUM!')
+    return Math.log(n)
+  },
+  LOG10: (a) => {
+    arity(a, 1)
+    const n = num(a, 0)
+    if (n <= 0) err('#NUM!')
+    return Math.log10(n)
+  },
+  PI: (a) => (arity(a, 0), Math.PI),
+  ROUNDUP: (a) => (arity(a, 1, 2), roundAway(num(a, 0), a.length > 1 ? num(a, 1) : 0, 'up')),
+  ROUNDDOWN: (a) =>
+    (arity(a, 1, 2), roundAway(num(a, 0), a.length > 1 ? num(a, 1) : 0, 'down')),
+  PRODUCT: (a) => {
+    let p = 1
+    let seen = false
+    for (const n of numbers(a)) {
+      p *= n
+      seen = true
+    }
+    return seen ? p : 0
+  },
+
+  /* -------- statistical -------- */
+  MEDIAN: (a) => {
+    const xs = [...numbers(a)].sort((x, y) => x - y)
+    if (!xs.length) err('#NUM!')
+    const mid = xs.length >> 1
+    return xs.length % 2 ? xs[mid] : (xs[mid - 1] + xs[mid]) / 2
+  },
+  STDEV: (a) => Math.sqrt(variance(a, 'sample')),
+  STDEVP: (a) => Math.sqrt(variance(a, 'population')),
+  VAR: (a) => variance(a, 'sample'),
+  VARP: (a) => variance(a, 'population'),
+  COUNTBLANK: (a) => {
+    let n = 0
+    for (const v of scalars(a)) if (v === null || v === '') n++
+    return n
+  },
+  COUNTIF: (a) => {
+    arity(a, 2)
+    const criteria = one(a, 1)
+    let n = 0
+    for (const v of scalars([a[0]])) if (matchesCriteria(v, criteria)) n++
+    return n
+  },
+  SUMIF: (a) => {
+    arity(a, 2, 3)
+    const criteria = one(a, 1)
+    const tested = Array.isArray(a[0]) ? a[0] : [a[0] as Scalar]
+    // the optional third range is summed in place of the tested one
+    const summed = a.length > 2 ? (Array.isArray(a[2]) ? a[2] : [a[2] as Scalar]) : tested
+    let sum = 0
+    for (let i = 0; i < tested.length; i++) {
+      if (!matchesCriteria(tested[i], criteria)) continue
+      const v = summed[i]
+      if (typeof v === 'number') sum += v
+      else if (typeof v === 'boolean') sum += v ? 1 : 0
+    }
+    return sum
+  },
+
+  /* -------- logical -------- */
+  AND: (a) => {
+    let seen = false
+    for (const v of scalars(a)) {
+      seen = true
+      if (!truthy(v)) return false
+    }
+    if (!seen) err('#VALUE!')
+    return true
+  },
+  OR: (a) => {
+    let seen = false
+    for (const v of scalars(a)) {
+      seen = true
+      if (truthy(v)) return true
+    }
+    if (!seen) err('#VALUE!')
+    return false
+  },
+  NOT: (a) => (arity(a, 1), !truthy(one(a, 0))),
+  XOR: (a) => {
+    let odd = false
+    for (const v of scalars(a)) if (truthy(v)) odd = !odd
+    return odd
+  },
+  // IFERROR is evaluated lazily in evalNode — it must be able to catch an
+  // error raised while computing its first argument, which eager
+  // evaluation would have already propagated.
+  IFERROR: (a) => (arity(a, 2), one(a, 0)),
+
+  /* -------- text -------- */
+  CONCAT: (a) => {
+    let s = ''
+    for (const v of scalars(a)) s += toText(v)
+    return s
+  },
+  CONCATENATE: (a) => {
+    let s = ''
+    for (const v of scalars(a)) s += toText(v)
+    return s
+  },
+  LEN: (a) => (arity(a, 1), text(a, 0).length),
+  UPPER: (a) => (arity(a, 1), text(a, 0).toUpperCase()),
+  LOWER: (a) => (arity(a, 1), text(a, 0).toLowerCase()),
+  TRIM: (a) => (arity(a, 1), text(a, 0).trim().replace(/\s+/g, ' ')),
+  LEFT: (a) => (arity(a, 1, 2), text(a, 0).slice(0, countArg(a, 1))),
+  RIGHT: (a) => {
+    arity(a, 1, 2)
+    const n = countArg(a, 1)
+    return n === 0 ? '' : text(a, 0).slice(-n)
+  },
+  MID: (a) => {
+    arity(a, 3)
+    const start = Math.trunc(num(a, 1))
+    if (start < 1) err('#VALUE!')
+    const len = Math.trunc(num(a, 2))
+    if (len < 0) err('#VALUE!')
+    return text(a, 0).slice(start - 1, start - 1 + len)
+  },
+  SUBSTITUTE: (a) => {
+    arity(a, 3)
+    const find = text(a, 1)
+    if (find === '') return text(a, 0)
+    return text(a, 0).split(find).join(text(a, 2))
+  },
+  TEXT: (a) => (arity(a, 1, 2), text(a, 0)),
+
+  /* -------- date / time -------- */
+  // Serial numbers follow the spreadsheet convention (1 = 1900-01-01), so
+  // arithmetic on dates works; a date NUMBER FORMAT is a separate concern.
+  TODAY: (a) => {
+    arity(a, 0)
+    const now = new Date()
+    return dateToSerial(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()))
+  },
+  NOW: (a) => {
+    arity(a, 0)
+    const now = new Date()
+    return (
+      dateToSerial(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())) +
+      (now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds()) / 86_400
+    )
+  },
+  DATE: (a) => (arity(a, 3), dateToSerial(Date.UTC(num(a, 0), num(a, 1) - 1, num(a, 2)))),
+  YEAR: (a) => (arity(a, 1), serialToDate(num(a, 0)).getUTCFullYear()),
+  MONTH: (a) => (arity(a, 1), serialToDate(num(a, 0)).getUTCMonth() + 1),
+  DAY: (a) => (arity(a, 1), serialToDate(num(a, 0)).getUTCDate()),
 }
+
+/* ---------------- function helpers ---------------- */
+
+function arity(args: Arg[], min: number, max = min): void {
+  if (args.length < min || args.length > max) err('#VALUE!')
+}
+
+/** A single scalar argument; ranges are rejected. */
+function one(args: Arg[], i: number): Scalar {
+  const v = args[i]
+  if (Array.isArray(v)) err('#VALUE!')
+  return (v ?? null) as Scalar
+}
+
+const num = (args: Arg[], i: number): number => toNumber(one(args, i))
+const text = (args: Arg[], i: number): string => toText(one(args, i))
+
+/** Optional character count for LEFT/RIGHT: defaults to 1, never negative. */
+function countArg(args: Arg[], i: number): number {
+  const n = args.length > i ? Math.trunc(num(args, i)) : 1
+  if (n < 0) err('#VALUE!')
+  return n
+}
+
+function truthy(v: Scalar): boolean {
+  if (typeof v === 'boolean') return v
+  if (typeof v === 'number') return v !== 0
+  if (v === null || v === '') return false
+  const upper = v.toUpperCase()
+  if (upper === 'TRUE') return true
+  if (upper === 'FALSE') return false
+  return true
+}
+
+function truncate(n: number, digits: number): number {
+  const f = 10 ** Math.trunc(digits)
+  return Math.trunc(n * f) / f
+}
+
+function roundAway(n: number, digits: number, dir: 'up' | 'down'): number {
+  const f = 10 ** Math.trunc(digits)
+  const scaled = n * f
+  const rounded = dir === 'up' ? Math.ceil(Math.abs(scaled)) : Math.floor(Math.abs(scaled))
+  return (Math.sign(scaled) * rounded) / f
+}
+
+function variance(args: Arg[], kind: 'sample' | 'population'): number {
+  const xs = [...numbers(args)]
+  const n = xs.length
+  if (n === 0 || (kind === 'sample' && n < 2)) err('#DIV/0!')
+  const mean = xs.reduce((s, x) => s + x, 0) / n
+  const ss = xs.reduce((s, x) => s + (x - mean) ** 2, 0)
+  return ss / (kind === 'sample' ? n - 1 : n)
+}
+
+/** Excel-style criteria: ">5", "<=3", "<>x", or a plain value to match. */
+function matchesCriteria(v: Scalar, criteria: Scalar): boolean {
+  if (typeof criteria === 'string') {
+    const m = /^(<=|>=|<>|<|>|=)\s*(.*)$/.exec(criteria.trim())
+    if (m) {
+      const raw = m[2].trim()
+      const rhs: Scalar =
+        raw === '' ? null : raw !== '' && !Number.isNaN(Number(raw)) ? Number(raw) : raw
+      const cmp = compare(v, rhs)
+      switch (m[1]) {
+        case '=':
+          return cmp === 0
+        case '<>':
+          return cmp !== 0
+        case '<':
+          return cmp < 0
+        case '>':
+          return cmp > 0
+        case '<=':
+          return cmp <= 0
+        case '>=':
+          return cmp >= 0
+      }
+    }
+  }
+  return compare(v, criteria) === 0
+}
+
+/** 1 = 1900-01-01, matching the spreadsheet serial-date convention. */
+const SERIAL_EPOCH_UTC = Date.UTC(1899, 11, 30)
+const DAY_MS = 86_400_000
+const dateToSerial = (utcMs: number): number => (utcMs - SERIAL_EPOCH_UTC) / DAY_MS
+const serialToDate = (serial: number): Date =>
+  new Date(SERIAL_EPOCH_UTC + Math.round(serial * DAY_MS))
 
 function evalNode(node: Node, getCell: GetCellValue): Arg {
   switch (node.k) {
@@ -494,6 +752,23 @@ function evalNode(node: Node, getCell: GetCellValue): Arg {
       }
     }
     case 'call': {
+      // IFERROR must run before its argument's error escapes, so it is the
+      // one function evaluated lazily. #CYCLE! is deliberately NOT caught:
+      // masking a circular reference would hide a broken sheet.
+      if (node.name === 'IFERROR') {
+        if (node.args.length !== 2) err('#VALUE!')
+        try {
+          const v = evalNode(node.args[0], getCell)
+          if (Array.isArray(v)) err('#VALUE!')
+          return v
+        } catch (e) {
+          if (e instanceof FormulaError && e.code === '#CYCLE!') throw e
+          if (!(e instanceof FormulaError)) throw e
+          const fallback = evalNode(node.args[1], getCell)
+          if (Array.isArray(fallback)) err('#VALUE!')
+          return fallback
+        }
+      }
       const fn = FUNCTIONS[node.name]
       if (!fn) err('#NAME?')
       return fn(node.args.map((a) => evalNode(a, getCell)))
@@ -518,6 +793,93 @@ export function evaluateFormula(formula: string, getCell: GetCellValue): Scalar 
   const v = evalNode(node, getCell)
   if (Array.isArray(v)) err('#VALUE!')
   return v as Scalar
+}
+
+/* ---------------- reference translation (copy / fill) ---------------- */
+
+/** A reference at the current scan position, with its $ anchors captured. */
+const REF_AT_RE = /^(\$?)([A-Za-z]{1,3})(\$?)(\d+)(?![A-Za-z0-9_(])/
+/** An identifier (function name, TRUE/FALSE) — copied through untouched. */
+const IDENT_AT_RE = /^[A-Za-z_][A-Za-z0-9_.]*/
+
+export interface TranslateBounds {
+  rows: number
+  cols: number
+}
+
+/**
+ * Rewrite a formula as if it had been copied by (dr, dc) cells.
+ *
+ * This is where $ earns its keep: a relative reference follows the copy,
+ * an anchored one stays put, and a mixed one moves on a single axis. So
+ * copying `=A1*$B$1` one column right yields `=B1*$B$1`, which is the
+ * behaviour that makes a rate or total column usable.
+ *
+ * Works on the source TEXT rather than the parsed tree so that spacing,
+ * casing and argument separators survive a copy untouched. String
+ * literals are stepped over so "A1" inside text is never rewritten, and
+ * identifiers are consumed whole so a name like MYVAL_A1 cannot have its
+ * tail mistaken for a reference. A reference pushed off the grid becomes
+ * #REF!, exactly as it would in Excel.
+ */
+export function translateFormula(
+  formula: string,
+  dr: number,
+  dc: number,
+  bounds?: TranslateBounds,
+): string {
+  if (!dr && !dc) return formula
+  let out = ''
+  let i = 0
+  while (i < formula.length) {
+    const ch = formula[i]
+
+    if (ch === '"') {
+      // copy the literal verbatim, honouring the "" escape
+      out += ch
+      let j = i + 1
+      while (j < formula.length) {
+        out += formula[j]
+        if (formula[j] === '"') {
+          if (formula[j + 1] === '"') {
+            out += formula[j + 1]
+            j += 2
+            continue
+          }
+          j++
+          break
+        }
+        j++
+      }
+      i = j
+      continue
+    }
+
+    const ref = REF_AT_RE.exec(formula.slice(i))
+    if (ref) {
+      const [whole, colAnchor, colLetters, rowAnchor, rowDigits] = ref
+      const c = colIndex(colLetters) + (colAnchor ? 0 : dc)
+      const r = Number(rowDigits) - 1 + (rowAnchor ? 0 : dr)
+      const offGrid =
+        r < 0 || c < 0 || (bounds ? r >= bounds.rows || c >= bounds.cols : false)
+      out += offGrid ? '#REF!' : `${colAnchor}${colName(c)}${rowAnchor}${r + 1}`
+      i += whole.length
+      continue
+    }
+
+    // not a reference: take any identifier whole so its tail can't be
+    // re-read as one on the next pass
+    const ident = IDENT_AT_RE.exec(formula.slice(i))
+    if (ident) {
+      out += ident[0]
+      i += ident[0].length
+      continue
+    }
+
+    out += ch
+    i++
+  }
+  return out
 }
 
 export interface ComputedCell {
