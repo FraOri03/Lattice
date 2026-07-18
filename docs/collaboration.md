@@ -81,6 +81,12 @@ Role → media capability is a single shared module,
 `src/lib/media/mediaPermissions.ts`, imported verbatim by the UI and by
 `api/realtime/media-token.ts` — the same pattern as `roleAccess.ts`.
 
+That module speaks only in *abstract* capabilities (join / audio / video /
+screenShare / moderate) and stays dependency-free, because it ships in the
+client bundle. Turning a capability into LiveKit's `TrackSource` enum requires
+`livekit-server-sdk`, which is server-only, so that mapping lives in the
+endpoint alone.
+
 | Role | join | mic | camera | screen share | moderate |
 |---|---|---|---|---|---|
 | owner | ✅ | ✅ | ✅ | ✅ | ✅ |
@@ -133,5 +139,9 @@ collision with the Liveblocks namespace), `src/lib/media/mediaPermissions.test.t
 (the matrix, cross-checked against the content matrix; viewer and commenter get
 no unauthorised capability), `api/realtime/media-token.test.ts` (identity and
 role never taken from the body, 401/403/501 paths, secret hygiene — all
-dependencies mocked), and `src/components/call/CallProvider.test.tsx`
+dependencies mocked), `api/realtime/media-token.grant.test.ts` (the grant is
+signed by the *real* LiveKit SDK and the JWT decoded, so a `canPublishSources`
+LiveKit would reject cannot pass while the signer is stubbed — it runs under
+`@vitest-environment node`, since jsdom cannot sign), and
+`src/components/call/CallProvider.test.tsx`
 (joining turns on no device; an unconfigured deployment attempts nothing).

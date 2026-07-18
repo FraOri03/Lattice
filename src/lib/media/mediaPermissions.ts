@@ -7,6 +7,13 @@ import type { CollabRole } from '../../types/collab'
  * ever *predict* what the server will grant; the LiveKit token is the real
  * enforcement boundary.
  *
+ * This module speaks only in *abstract* capabilities (audio / video /
+ * screenShare / moderate / join) and must stay dependency-free and
+ * browser-safe: it is bundled into the client. Translating a capability into
+ * LiveKit's `TrackSource` enum needs livekit-server-sdk, which is server-only,
+ * so that mapping lives in the endpoint (api/realtime/media-token.ts) and
+ * deliberately does not exist here.
+ *
  * HOW THIS WAS DERIVED (not copied blindly from the brief):
  *
  * - `join` / `audio` / `video` — every project member, viewers included.
@@ -67,20 +74,4 @@ export function mediaCapabilitiesFor(
 ): MediaCapabilities {
   if (!role || !(role in MATRIX)) return { ...NONE }
   return { ...MATRIX[role] }
-}
-
-/** LiveKit source names this role may publish (drives `canPublishSources`). */
-export type MediaSource =
-  | 'microphone'
-  | 'camera'
-  | 'screen_share'
-  | 'screen_share_audio'
-
-export function publishableSources(role: CollabRole | null | undefined): MediaSource[] {
-  const caps = mediaCapabilitiesFor(role)
-  const sources: MediaSource[] = []
-  if (caps.audio) sources.push('microphone')
-  if (caps.video) sources.push('camera')
-  if (caps.screenShare) sources.push('screen_share', 'screen_share_audio')
-  return sources
 }

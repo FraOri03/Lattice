@@ -1,4 +1,4 @@
-import { AccessToken } from 'livekit-server-sdk'
+import { AccessToken, TrackSource } from 'livekit-server-sdk'
 import {
   liveblocksClient,
   loadAcl,
@@ -10,7 +10,7 @@ import {
 import { isValidProjectId, mediaRoomId } from '../../src/lib/media/mediaRoomId.js'
 import {
   mediaCapabilitiesFor,
-  publishableSources,
+  type MediaCapabilities,
 } from '../../src/lib/media/mediaPermissions.js'
 
 /**
@@ -44,6 +44,25 @@ interface Req {
 
 /** Long enough for a working session; the client re-requests when it expires. */
 const TOKEN_TTL = '2h'
+
+/**
+ * Abstract capabilities → the LiveKit sources they authorise.
+ *
+ * Server-only on purpose. `TrackSource` is a numeric protobuf enum, and the SDK
+ * maps it to the wire strings itself (`trackSourceToString`); passing those
+ * strings in instead throws `Cannot convert TrackSource microphone to string`.
+ * The enum can only come from livekit-server-sdk, which must never reach the
+ * client bundle — hence this lives here and not in the shared matrix.
+ */
+function publishableSources(capabilities: MediaCapabilities): TrackSource[] {
+  const sources: TrackSource[] = []
+  if (capabilities.audio) sources.push(TrackSource.MICROPHONE)
+  if (capabilities.video) sources.push(TrackSource.CAMERA)
+  if (capabilities.screenShare) {
+    sources.push(TrackSource.SCREEN_SHARE, TrackSource.SCREEN_SHARE_AUDIO)
+  }
+  return sources
+}
 
 export default async function handler(req: Req, res: ApiRes): Promise<void> {
   res.setHeader('Cache-Control', 'no-store')
@@ -119,7 +138,7 @@ export default async function handler(req: Req, res: ApiRes): Promise<void> {
     canPublish: capabilities.audio || capabilities.video || capabilities.screenShare,
     // the real screen-share boundary: a role without it simply cannot publish
     // that source, whatever the client tries
-    canPublishSources: publishableSources(role),
+    canPublishSources: publishableSources(capabilities),
     canPublishData: true,
     canUpdateOwnMetadata: true,
     roomAdmin: capabilities.moderate,

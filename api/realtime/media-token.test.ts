@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { TrackSource } from 'livekit-server-sdk'
 
 /**
  * Guards /api/realtime/media-token — the only place a browser can obtain the
@@ -8,6 +9,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
  *
  * The Liveblocks SDK, the LiveKit signer and Google's token endpoints are all
  * mocked, so the suite runs offline and no real credential is ever needed.
+ *
+ * Only the *signer* is stubbed: the mock keeps the module's real exports, so
+ * `TrackSource` below is the genuine protobuf enum rather than a stand-in that
+ * could agree with a wrong implementation. Because a stubbed `toJwt` never
+ * serialises the grant, media-token.grant.test.ts signs one for real.
  */
 
 const getRoom = vi.fn()
@@ -21,7 +27,8 @@ vi.mock('@liveblocks/node', () => ({
   },
 }))
 
-vi.mock('livekit-server-sdk', () => ({
+vi.mock('livekit-server-sdk', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('livekit-server-sdk')>()),
   AccessToken: class {
     constructor(...args: unknown[]) {
       accessTokenCtor(...args)
@@ -145,10 +152,10 @@ describe('authorized members', () => {
     mockGoogle({ email: 'ada@example.com' })
     await callMediaToken({ projectId: 'proj_1', googleToken: 'ya29.valid' })
     expect(lastGrant().canPublishSources).toEqual([
-      'microphone',
-      'camera',
-      'screen_share',
-      'screen_share_audio',
+      TrackSource.MICROPHONE,
+      TrackSource.CAMERA,
+      TrackSource.SCREEN_SHARE,
+      TrackSource.SCREEN_SHARE_AUDIO,
     ])
     expect(lastGrant().roomAdmin).toBe(false)
   })
@@ -172,7 +179,10 @@ describe('role is derived, never declared', () => {
     })
     // the ACL wins: still a viewer, still no screen share, still no moderation
     expect(sent.body).toMatchObject({ role: 'viewer' })
-    expect(lastGrant().canPublishSources).toEqual(['microphone', 'camera'])
+    expect(lastGrant().canPublishSources).toEqual([
+      TrackSource.MICROPHONE,
+      TrackSource.CAMERA,
+    ])
     expect(lastGrant().roomAdmin).toBe(false)
   })
 
@@ -194,15 +204,18 @@ describe('role is derived, never declared', () => {
   it('denies a viewer the screen-share source', async () => {
     mockGoogle({ email: 'viv@example.com' })
     await callMediaToken({ projectId: 'proj_1', googleToken: 'ya29.valid' })
-    const sources = lastGrant().canPublishSources as string[]
-    expect(sources).not.toContain('screen_share')
-    expect(sources).not.toContain('screen_share_audio')
+    const sources = lastGrant().canPublishSources as TrackSource[]
+    expect(sources).not.toContain(TrackSource.SCREEN_SHARE)
+    expect(sources).not.toContain(TrackSource.SCREEN_SHARE_AUDIO)
   })
 
   it('denies a commenter the screen-share source', async () => {
     mockGoogle({ email: 'sam@example.com' })
     await callMediaToken({ projectId: 'proj_1', googleToken: 'ya29.valid' })
-    expect(lastGrant().canPublishSources).toEqual(['microphone', 'camera'])
+    expect(lastGrant().canPublishSources).toEqual([
+      TrackSource.MICROPHONE,
+      TrackSource.CAMERA,
+    ])
   })
 })
 

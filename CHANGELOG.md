@@ -19,6 +19,14 @@ All notable changes to Lattice are recorded here. The format follows
   entry point. Added `ROADMAP.md`, `CONTRIBUTING.md`, this changelog, issue/PR templates,
   and light documentation CI.
 
+### Fixed
+
+- **Project calls could not start** — `POST /api/realtime/media-token` answered `500`
+  (`TypeError: Cannot convert TrackSource microphone to string`). The LiveKit grant passed
+  wire strings where `livekit-server-sdk` requires its numeric `TrackSource` enum, so
+  signing the token threw. The capability → `TrackSource` mapping now lives in the
+  endpoint, keeping the shared permission matrix dependency-free and browser-safe.
+
 ## [0.8.0] — 2026-07-11 — Phase 8 & 8.5
 
 ### Added
