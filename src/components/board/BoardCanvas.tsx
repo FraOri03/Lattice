@@ -427,7 +427,12 @@ function Canvas() {
               : 'var(--bord)'
           }
         />
-        <Controls />
+        {/* bottom-left belongs to BoardAddMenu and the full-width
+            CanvasToolbar, which painted over "Fit view" / "Toggle
+            interactivity" (every React Flow panel shares z-index 5, so DOM
+            order won). Stacked above the minimap instead — see the
+            .react-flow__controls rules in styles/index.css. */}
+        <Controls position="bottom-right" />
         {!readOnly && (
           <Panel position="bottom-center">
             <CanvasToolbar />

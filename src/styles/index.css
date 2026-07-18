@@ -183,6 +183,35 @@ body {
   fill: var(--bg);
 }
 
+/* ---------- board zoom controls ---------- */
+/*
+ * Every React Flow panel shares z-index 5, so the last one in the DOM wins.
+ * The bottom edge already belongs to the full-width CanvasToolbar and to
+ * BoardAddMenu, which painted over the lower half of the default
+ * bottom-left control column and left "Fit view" / "Toggle interactivity"
+ * unclickable. The controls now sit bottom-right, lifted above the minimap.
+ *
+ * Colours come from the app tokens rather than React Flow's generic greys,
+ * so hover/disabled contrast follows the active theme (its own dark palette
+ * only applies under .react-flow.dark, which drifts from ours).
+ */
+.react-flow__controls {
+  --xy-controls-button-background-color: var(--panel);
+  --xy-controls-button-background-color-hover: var(--panel2);
+  --xy-controls-button-color: var(--ink);
+  --xy-controls-button-color-hover: var(--accent);
+  --xy-controls-button-border-color: var(--bord);
+  border: 1px solid var(--bord);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+/* Offset tied to the minimap actually being rendered (150px + its 15px
+   panel margin), so the controls fall back to the corner without it. */
+.react-flow:has(.react-flow__minimap) .react-flow__controls.bottom.right {
+  bottom: 165px;
+}
+
 /* ---------- markdown ---------- */
 .md {
   line-height: 1.55;
