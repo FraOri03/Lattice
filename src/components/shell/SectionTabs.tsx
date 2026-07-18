@@ -3,6 +3,7 @@ import { useStore } from '@/store/useStore'
 import { useWorkspaceLayoutStore } from '@/store/workspaceLayoutStore'
 import type { ViewMode } from '@/types/model'
 import { SECTION_METAS, type WorkspaceSection } from '@/types/workspace'
+import { useI18n } from '@/lib/i18n'
 import {
   IcBoard,
   IcCamera,
@@ -46,6 +47,7 @@ export function SectionTabs() {
   const setSecondaryContent = useWorkspaceLayoutStore((s) => s.setSecondaryContent)
   const graphReturnMode = useWorkspaceLayoutStore((s) => s.graphReturnMode)
   const setGraphReturnMode = useWorkspaceLayoutStore((s) => s.setGraphReturnMode)
+  const t = useI18n()
 
   // remember the section the graph is layered over, so leaving Graph goes back
   useEffect(() => {
@@ -83,21 +85,25 @@ export function SectionTabs() {
   const rest = SECTION_METAS.slice(1)
 
   return (
-    <div className="flex items-center gap-2" role="group" aria-label="Sections and view modes">
+    <div
+      className="flex items-center gap-2"
+      role="group"
+      aria-label={t.topbar.viewModeGroup}
+    >
       <Cluster>
         <Tab
           icon={<IcSplit size={13} />}
-          label="Split"
+          label={t.modes.split}
           active={split}
           disabled={!canSplit}
           onClick={onToggleSplit}
-          ariaLabel="Split view"
+          ariaLabel={t.topbar.viewSuffix(t.modes.split)}
           title={
             !canSplit
-              ? 'Split view is not available for this section'
+              ? t.topbar.splitUnavailable
               : split
-                ? 'Split view — close the second pane'
-                : 'Split view — open a second pane beside the current one'
+                ? t.topbar.splitClose
+                : t.topbar.splitOpen
           }
         />
       </Cluster>
@@ -106,18 +112,18 @@ export function SectionTabs() {
         <SectionTab meta={board} active={viewMode === board.mode} onSelect={setViewMode} />
         <Tab
           icon={<IcGraph size={13} />}
-          label="Graph"
+          label={t.modes.graph}
           active={graphActive}
           onClick={onToggleGraph}
-          ariaLabel="Graph view"
+          ariaLabel={t.topbar.viewSuffix(t.modes.graph)}
           title={
             graphActive
               ? split
-                ? 'Graph view — hide it from the second pane'
-                : 'Graph view — back to the section'
+                ? t.topbar.graphCloseInPane
+                : t.topbar.graphClose
               : split
-                ? 'Graph view — show the relationship browser in the second pane'
-                : 'Graph view — browse relationships instead of the editor'
+                ? t.topbar.graphOpenInPane
+                : t.topbar.graphOpen
           }
         />
       </Cluster>
@@ -151,14 +157,18 @@ function SectionTab({
   active: boolean
   onSelect: (mode: ViewMode) => void
 }) {
+  const t = useI18n()
+  // SECTION_METAS.label stays the untranslated source of truth (and keeps the
+  // list testable without a DOM); the visible label is localised here.
+  const label = t.modes[meta.mode]
   return (
     <Tab
       icon={SECTION_ICONS[meta.section]}
-      label={meta.label}
+      label={label}
       active={active}
       onClick={() => onSelect(meta.mode)}
-      ariaLabel={`${meta.label} section`}
-      title={`${meta.label} section`}
+      ariaLabel={t.topbar.sectionAria(label)}
+      title={t.topbar.sectionAria(label)}
     />
   )
 }

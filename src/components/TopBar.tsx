@@ -13,6 +13,7 @@ import { PresenceAvatars } from '@/components/collab/PresenceAvatars'
 import { RealtimeStatusChip } from '@/components/collab/RealtimeStatusChip'
 import { NotificationCenter } from '@/components/collab/NotificationCenter'
 import { useCollabMode } from '@/lib/collab/collabPresentation'
+import { useI18n } from '@/lib/i18n'
 import {
   IcAlert,
   IcChevronRight,
@@ -48,15 +49,16 @@ function useOnline(): boolean {
 function SyncIndicator() {
   const sync = useSyncStore()
   const online = useOnline()
+  const t = useI18n()
   const setDriveDialogOpen = useUiStore((s) => s.setDriveDialogOpen)
 
   if (!online) {
     return (
       <span
         className="flex items-center gap-1.5 rounded-full border border-bord bg-panel2 px-2 py-1 text-[10px] font-medium text-[#ffa629]"
-        title="You are offline — changes stay local and sync when you reconnect"
+        title={t.syncChip.offlineTitle}
       >
-        <IcWifiOff size={12} /> Offline
+        <IcWifiOff size={12} /> {t.syncChip.offline}
       </span>
     )
   }
@@ -65,29 +67,30 @@ function SyncIndicator() {
     if (sync.status === 'connecting') {
       return (
         <span className="flex items-center gap-1.5 rounded-full border border-bord bg-panel2 px-2 py-1 text-[10px] font-medium text-muted">
-          <IcRefresh size={12} className="animate-spin" /> Connecting…
+          <IcRefresh size={12} className="animate-spin" /> {t.syncChip.connecting}
         </span>
       )
     }
     if (sync.status === 'error') {
+      const err = sync.error ?? t.syncChip.driveNotConnected
       return (
         <button
           className="flex cursor-pointer items-center gap-1.5 rounded-full border border-[#f24822]/40 bg-panel2 px-2 py-1 text-[10px] font-medium text-[#f24822]"
-          title={`${sync.error ?? 'Google Drive is not connected'} — click for diagnostics`}
-          aria-label={`Drive sync error: ${sync.error ?? 'Google Drive is not connected'}. Click for diagnostics.`}
+          title={t.syncChip.driveErrorTitle(err)}
+          aria-label={t.syncChip.driveErrorAria(err)}
           onClick={() => setDriveDialogOpen(true)}
         >
-          <IcAlert size={12} /> Drive error
+          <IcAlert size={12} /> {t.syncChip.driveError}
         </button>
       )
     }
     return (
       <button
         className="flex cursor-pointer items-center gap-1.5 rounded-full border border-bord bg-panel2 px-2 py-1 text-[10px] font-medium text-muted"
-        title="Cloud sync is off — click to connect Google Drive"
+        title={t.syncChip.localTitle}
         onClick={() => setDriveDialogOpen(true)}
       >
-        <IcCloudOff size={12} /> Local
+        <IcCloudOff size={12} /> {t.syncChip.local}
       </button>
     )
   }
@@ -99,19 +102,19 @@ function SyncIndicator() {
         : 'text-muted'
   const label =
     sync.status === 'syncing'
-      ? 'Syncing…'
+      ? t.syncChip.syncing
       : sync.status === 'synced'
-        ? 'Synced'
+        ? t.syncChip.synced
         : sync.status === 'error'
-          ? 'Sync error'
+          ? t.syncChip.syncError
           : sync.pendingChanges > 0
-            ? `${sync.pendingChanges} pending`
-            : 'Drive'
+            ? t.syncChip.pending(sync.pendingChanges)
+            : t.syncChip.drive
   return (
     <button
       className={`flex cursor-pointer items-center gap-1.5 rounded-full border border-bord bg-panel2 px-2 py-1 text-[10px] font-medium ${color}`}
-      title={sync.error ?? 'Google Drive sync — click to sync now'}
-      aria-label={`Google Drive: ${label}${sync.status === 'error' ? ' — click for diagnostics' : ' — click to sync now'}`}
+      title={sync.error ?? t.syncChip.driveTitle}
+      aria-label={t.syncChip.driveAria(label, sync.status === 'error')}
       onClick={() =>
         sync.status === 'error' ? setDriveDialogOpen(true) : void syncEngine.syncNow()
       }
@@ -151,6 +154,7 @@ function ContextBreadcrumb() {
   const split = useWorkspaceLayoutStore((s) => s.split)
   const secondaryContent = useWorkspaceLayoutStore((s) => s.secondaryContent)
   const readOnly = useReadOnly()
+  const t = useI18n()
 
   const boardVisible =
     viewMode === 'board' || (split && secondaryContent === 'board')
@@ -169,7 +173,7 @@ function ContextBreadcrumb() {
         <>
           <span
             className="hidden min-w-0 items-center gap-1 font-medium text-muted lg:flex"
-            title={`Workspace: ${workspace.name}`}
+            title={t.topbar.workspaceTitle(workspace.name)}
           >
             <span aria-hidden>{workspace.icon}</span>
             <span className="max-w-24 truncate">{workspace.name}</span>
@@ -187,7 +191,7 @@ function ContextBreadcrumb() {
         <>
           <IcChevronRight size={11} className="flex-none text-muted" />
           <span className="flex items-center gap-1.5 font-semibold">
-            <IcGraph size={13} /> Graph
+            <IcGraph size={13} /> {t.topbar.graph}
           </span>
         </>
       ) : boardVisible && board ? (
@@ -198,8 +202,8 @@ function ContextBreadcrumb() {
             value={board.name}
             disabled={readOnly}
             onChange={(e) => renameBoard(board.id, e.target.value)}
-            aria-label="Board name"
-            title={readOnly ? 'Read-only — your role cannot rename boards' : 'Rename board'}
+            aria-label={t.topbar.boardName}
+            title={readOnly ? t.topbar.renameBoardReadOnly : t.topbar.renameBoard}
           />
         </>
       ) : entity ? (
@@ -220,14 +224,15 @@ function PanelButtons() {
   const setPanel = useCollabStore((s) => s.setPanel)
   const projectId = useStore((s) => s.activeProjectId)
   const comments = useCollabStore((s) => s.comments[projectId])
-  const openCount = comments?.filter((t) => !t.resolved).length ?? 0
+  const openCount = comments?.filter((c) => !c.resolved).length ?? 0
+  const t = useI18n()
 
   return (
     <>
       <button
         className={`icon-btn relative ${panel === 'comments' ? 'bg-panel2 !text-accent' : ''}`}
-        title="Comments"
-        aria-label={`Comments${openCount ? ` (${openCount} open)` : ''}`}
+        title={t.topbar.comments}
+        aria-label={openCount ? t.topbar.commentsOpenAria(openCount) : t.topbar.comments}
         onClick={() => setPanel(panel === 'comments' ? null : 'comments')}
       >
         <IcMessage size={15} />
@@ -239,8 +244,8 @@ function PanelButtons() {
       </button>
       <button
         className={`icon-btn ${panel === 'versions' || panel === 'activity' ? 'bg-panel2 !text-accent' : ''}`}
-        title="Version history & activity"
-        aria-label="Version history and activity"
+        title={t.topbar.versionHistory}
+        aria-label={t.topbar.versionHistoryAria}
         onClick={() => setPanel(panel === 'versions' ? null : 'versions')}
       >
         <IcHistory size={15} />
@@ -255,6 +260,7 @@ export function TopBar() {
   const setPaletteOpen = useUiStore((s) => s.setPaletteOpen)
   const setShareDialogOpen = useUiStore((s) => s.setShareDialogOpen)
   const collabMode = useCollabMode()
+  const t = useI18n()
 
   return (
     <header className="flex h-11 flex-none items-center gap-2 border-b border-bord bg-panel px-3">
@@ -262,7 +268,7 @@ export function TopBar() {
 
       <div className="flex-1" />
 
-      {/* Centre: [Board · Graph] and [Split · Document · Sheet · Presentation ·
+      {/* Centre: [Split] · [Board · Graph] · [Document · Sheet · Presentation ·
           Code · Photo]. Split stays a layout and Graph a view underneath — see
           SectionTabs. */}
       <SectionTabs />
@@ -280,13 +286,13 @@ export function TopBar() {
         onClick={() => setShareDialogOpen(true)}
         title={
           collabMode.isRealtime
-            ? 'Share — members, roles & invites · realtime multiplayer is active'
-            : `Share — members, roles & invites · collaboration reaches ${collabMode.scopeLabel}`
+            ? t.topbar.shareTitleRealtime
+            : t.topbar.shareTitleScope(collabMode.scopeLabel)
         }
-        aria-label={`Share project — collaboration reaches ${collabMode.scopeLabel}`}
+        aria-label={t.topbar.shareAria(collabMode.scopeLabel)}
       >
         <IcUserPlus size={13} />
-        <span className="hidden lg:inline">Share</span>
+        <span className="hidden lg:inline">{t.topbar.share}</span>
         {!collabMode.isRealtime && (
           <span className="hidden rounded bg-panel px-1 text-[9px] font-semibold text-muted xl:inline">
             {collabMode.shortLabel}
@@ -297,8 +303,8 @@ export function TopBar() {
       <button
         className="btn hidden md:inline-flex"
         onClick={() => setPaletteOpen(true)}
-        title="Command palette"
-        aria-label="Open command palette"
+        title={t.topbar.commandPalette}
+        aria-label={t.topbar.openCommandPalette}
       >
         <IcCommand size={12} />
         <kbd className="text-[10px] text-muted">Ctrl K</kbd>
@@ -307,8 +313,8 @@ export function TopBar() {
       <button
         className="icon-btn"
         onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-        title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
-        aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+        title={theme === 'dark' ? t.topbar.themeToLight : t.topbar.themeToDark}
+        aria-label={theme === 'dark' ? t.topbar.themeToLight : t.topbar.themeToDark}
       >
         {theme === 'dark' ? <IcSun size={15} /> : <IcMoon size={15} />}
       </button>
