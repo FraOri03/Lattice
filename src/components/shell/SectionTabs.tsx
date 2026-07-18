@@ -24,8 +24,11 @@ const SECTION_ICONS: Record<WorkspaceSection, React.ReactNode> = {
 }
 
 /**
- * The top navigation: two segmented clusters — [Board · Graph] and
- * [Split · Document · Sheet · Presentation · Code · Photo].
+ * The top navigation: three segmented clusters —
+ * [Split] · [Board · Graph] · [Document · Sheet · Presentation · Code · Photo].
+ *
+ * Split leads on its own because it is the odd one out: a LAYOUT that applies
+ * on top of whatever else is selected, rather than a thing you select.
  *
  * Presentation only. Underneath, the three concepts stay separated (see
  * src/types/workspace.ts): the sections drive `viewMode`, Graph is a content
@@ -82,6 +85,24 @@ export function SectionTabs() {
   return (
     <div className="flex items-center gap-2" role="group" aria-label="Sections and view modes">
       <Cluster>
+        <Tab
+          icon={<IcSplit size={13} />}
+          label="Split"
+          active={split}
+          disabled={!canSplit}
+          onClick={onToggleSplit}
+          ariaLabel="Split view"
+          title={
+            !canSplit
+              ? 'Split view is not available for this section'
+              : split
+                ? 'Split view — close the second pane'
+                : 'Split view — open a second pane beside the current one'
+          }
+        />
+      </Cluster>
+
+      <Cluster>
         <SectionTab meta={board} active={viewMode === board.mode} onSelect={setViewMode} />
         <Tab
           icon={<IcGraph size={13} />}
@@ -102,21 +123,6 @@ export function SectionTabs() {
       </Cluster>
 
       <Cluster>
-        <Tab
-          icon={<IcSplit size={13} />}
-          label="Split"
-          active={split}
-          disabled={!canSplit}
-          onClick={onToggleSplit}
-          ariaLabel="Split view"
-          title={
-            !canSplit
-              ? 'Split view is not available for this section'
-              : split
-                ? 'Split view — close the second pane'
-                : 'Split view — open a second pane beside the current one'
-          }
-        />
         {rest.map((meta) => (
           <SectionTab
             key={meta.section}

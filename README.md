@@ -268,9 +268,10 @@ principles** — an automatically generated **relationship browser**. Graph is a
 **view of the content**, not a section: open it from the **Graph** tab in the
 top navigation, the command palette ("Open Graph view"), or **`G G`**. It can
 fill the single pane, or sit in the second pane beside an editor when Split is
-on. The top navigation is two clusters — **[Board · Graph]** and
-**[Split · Document · Sheet · Presentation · Code · Photo]** — where Graph is a
-view and Split a layout, so either can be active *together with* a section.
+on. The top navigation is three clusters — **[Split]**, **[Board · Graph]** and
+**[Document · Sheet · Presentation · Code · Photo]** — where Graph is a view and
+Split a layout, so either can be active *together with* a section. Split leads
+on its own precisely because it applies on top of whatever else is selected.
 
 **Graph vs Board — kept distinct on purpose.** Board is a *manually arranged
 creative workspace* (you place cards; positions are content). Graph is an
