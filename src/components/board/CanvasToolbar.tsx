@@ -24,8 +24,15 @@ import {
 } from '@/components/Icons'
 import { ActionIcon } from '@/components/ActionIcons'
 import { ToolbarDivider } from '@/components/ui/ToolbarDivider'
+import { ToolMenu, type ToolMenuItem } from './ToolMenu'
 
-/** Floating Figma-style toolbar for inserting cards at the viewport center. */
+/**
+ * Figma-style board toolbar: the real, existing tools grouped by operating
+ * category. Categories that this product does not have (drawing/pen, shapes,
+ * frames, groups, a dev/inspect mode) are intentionally NOT invented here — a
+ * menu only ever offers tools that actually work. Each family is a compact
+ * split menu (see ToolMenu) so the bar stays short.
+ */
 export function CanvasToolbar() {
   const { screenToFlowPosition } = useReactFlow()
   const addCard = useStore((s) => s.addCard)
@@ -58,154 +65,132 @@ export function CanvasToolbar() {
     }
   }
 
-  interface ToolItem {
-    key: string
-    label: string
-    icon: React.ReactNode
-    onClick: () => void
-    active?: boolean
+  const promptWebEmbed = () => {
+    void promptDialog({
+      title: 'Embed a webpage',
+      body: 'Only http(s) URLs are allowed. Sites that refuse framing fall back to a link preview.',
+      label: 'URL',
+      placeholder: 'https://…',
+      confirmLabel: 'Embed',
+    }).then((url) => {
+      if (!url) return
+      const res = addWebEmbedCard(url, centerPos())
+      if (!res.cardId) toast.error('Could not embed that URL', res.reason)
+    })
   }
 
-  // tools grouped by purpose: structure · creation · annotation · external
-  const groups: ToolItem[][] = [
-    [
-      {
-        key: 'section',
-        label: 'Section',
-        icon: <IcSection size={16} />,
-        onClick: () => addSection(centerPos()),
+  // Creation — document entities that can really be created from the board
+  const createItems: ToolMenuItem[] = [
+    { key: 'note', label: 'Note', icon: <IcNote size={16} />, onRun: () => insert('note') },
+    {
+      key: 'richdoc',
+      label: 'Document',
+      icon: <IcDoc size={16} />,
+      onRun: () => {
+        const docId = useStore.getState().createDoc()
+        addCard('richdoc', centerPos(), { docId, mode: 'compact', color: 'blue' })
       },
-    ],
-    [
-      { key: 'note', label: 'Note', icon: <IcNote size={16} />, onClick: () => insert('note') },
-      {
-        key: 'richdoc',
-        label: 'Doc',
-        icon: <IcDoc size={16} />,
-        onClick: () => {
-          const docId = useStore.getState().createDoc()
-          addCard('richdoc', centerPos(), { docId, mode: 'compact', color: 'blue' })
-        },
+    },
+    {
+      key: 'sheet',
+      label: 'Spreadsheet',
+      icon: <IcTable size={16} />,
+      onRun: () => {
+        const sheetId = useStore.getState().createSheetDoc()
+        addCard('sheet', centerPos(), { sheetId, mode: 'compact', color: 'green' })
       },
-      {
-        key: 'sheet',
-        label: 'Sheet',
-        icon: <IcTable size={16} />,
-        onClick: () => {
-          const sheetId = useStore.getState().createSheetDoc()
-          addCard('sheet', centerPos(), { sheetId, mode: 'compact', color: 'green' })
-        },
+    },
+    {
+      key: 'presentation',
+      label: 'Presentation',
+      icon: <IcPresentation size={16} />,
+      onRun: () => {
+        const presentId = useStore.getState().createPresentDoc()
+        addCard('presentation', centerPos(), { presentId, mode: 'compact', color: 'orange' })
       },
-      {
-        key: 'code',
-        label: 'Code',
-        icon: <IcCode size={16} />,
-        onClick: () => {
-          const codeId = useStore.getState().createCode()
-          addCard('code', centerPos(), { codeId, mode: 'compact', color: 'purple' })
-        },
+    },
+    {
+      key: 'code',
+      label: 'Code',
+      icon: <IcCode size={16} />,
+      onRun: () => {
+        const codeId = useStore.getState().createCode()
+        addCard('code', centerPos(), { codeId, mode: 'compact', color: 'purple' })
       },
-      {
-        key: 'presentation',
-        label: 'Deck',
-        icon: <IcPresentation size={16} />,
-        onClick: () => {
-          const presentId = useStore.getState().createPresentDoc()
-          addCard('presentation', centerPos(), {
-            presentId,
-            mode: 'compact',
-            color: 'orange',
-          })
-        },
-      },
-      {
-        key: 'image',
-        label: 'Image',
-        icon: <IcImage size={16} />,
-        onClick: () => imageInput.current?.click(),
-      },
-      { key: 'video', label: 'Video', icon: <IcVideo size={16} />, onClick: () => insert('video') },
-      { key: 'link', label: 'Link', icon: <IcLink size={16} />, onClick: () => insert('link') },
-      { key: 'embed3d', label: '3D', icon: <IcCube size={16} />, onClick: () => insert('embed3d') },
-      {
-        key: 'photo',
-        label: 'Photo',
-        icon: <IcCamera size={16} />,
-        onClick: () => insert('photo'),
-      },
-    ],
-    mayComment
-      ? [
-          {
-            key: 'comment',
-            label: 'Comment',
-            icon: <IcMessage size={16} />,
-            onClick: () => setCommentMode(!commentMode),
-            active: commentMode,
-          },
-        ]
-      : [],
-    [
-      {
-        key: 'web',
-        label: 'Web',
-        icon: <IcGlobe size={16} />,
-        onClick: () => {
-          void promptDialog({
-            title: 'Embed a webpage',
-            body: 'Only http(s) URLs are allowed. Sites that refuse framing fall back to a link preview.',
-            label: 'URL',
-            placeholder: 'https://…',
-            confirmLabel: 'Embed',
-          }).then((url) => {
-            if (!url) return
-            const res = addWebEmbedCard(url, centerPos())
-            if (!res.cardId) toast.error('Could not embed that URL', res.reason)
-          })
-        },
-      },
-      {
-        key: 'import',
-        label: 'Import',
-        icon: <ActionIcon.Import size={16} />,
-        onClick: () => importInput.current?.click(),
-      },
-    ],
+    },
   ]
-  const visibleGroups = groups.filter((g) => g.length > 0)
+
+  // Media — image / video / 3D / photo / link cards
+  const mediaItems: ToolMenuItem[] = [
+    { key: 'image', label: 'Image', icon: <IcImage size={16} />, onRun: () => imageInput.current?.click() },
+    { key: 'video', label: 'Video', icon: <IcVideo size={16} />, onRun: () => insert('video') },
+    { key: 'embed3d', label: '3D', icon: <IcCube size={16} />, onRun: () => insert('embed3d') },
+    { key: 'photo', label: 'Photo', icon: <IcCamera size={16} />, onRun: () => insert('photo') },
+    { key: 'link', label: 'Link', icon: <IcLink size={16} />, onRun: () => insert('link') },
+  ]
+
+  // More — the less-frequent external actions
+  const moreItems: ToolMenuItem[] = [
+    { key: 'web', label: 'Web embed', icon: <IcGlobe size={16} />, onRun: promptWebEmbed },
+    {
+      key: 'import',
+      label: 'Import',
+      icon: <ActionIcon.Import size={16} />,
+      onRun: () => importInput.current?.click(),
+    },
+  ]
 
   return (
-    <div className="flex items-center gap-1 rounded-xl border border-bord bg-panel p-1 shadow-lg">
-      {visibleGroups.flatMap((group, gi) => [
-        ...(gi > 0 ? [<ToolbarDivider key={`div-${gi}`} />] : []),
-        ...group.map((item) => (
-        <button
-          key={item.key}
-          className={`flex cursor-pointer flex-col items-center gap-0.5 rounded-lg px-3 py-1.5 ${
-            item.active
-              ? 'bg-accent/15 text-accent'
-              : 'text-muted hover:bg-panel2 hover:text-ink'
-          }`}
-          onClick={item.onClick}
-          aria-label={
-            item.key === 'comment'
-              ? 'Comment tool — click to pin, drag to mark an area'
-              : `Add ${item.label.toLowerCase()} card`
-          }
-          aria-pressed={item.key === 'comment' ? !!item.active : undefined}
-          title={
-            item.key === 'import'
-              ? 'Import any file — PDF, Office, media, 3D…'
-              : item.key === 'comment'
-                ? 'Comment (C) — click to pin, drag to comment on an area'
-                : `Add ${item.label.toLowerCase()} card`
-          }
-        >
-          {item.icon}
-          <span className="text-[10px] font-medium">{item.label}</span>
-        </button>
-        )),
-      ])}
+    <div
+      className="flex items-center gap-1 rounded-xl border border-bord bg-panel p-1 shadow-lg"
+      role="toolbar"
+      aria-label="Board tools"
+    >
+      {/* Structure */}
+      <button
+        type="button"
+        className="flex cursor-pointer flex-col items-center gap-0.5 rounded-lg px-3 py-1.5 text-muted hover:bg-panel2 hover:text-ink"
+        onClick={() => addSection(centerPos())}
+        aria-label="Add section"
+        title="Add section — a labelled group on the board"
+      >
+        <IcSection size={16} />
+        <span className="text-[10px] font-medium">Section</span>
+      </button>
+
+      <ToolbarDivider />
+
+      {/* Creation */}
+      <ToolMenu groupLabel="Create a card" items={createItems} defaultKey="note" />
+      <ToolMenu groupLabel="Add media" items={mediaItems} defaultKey="image" />
+
+      {/* Annotation */}
+      {mayComment && (
+        <>
+          <ToolbarDivider />
+          <button
+            type="button"
+            className={`flex cursor-pointer flex-col items-center gap-0.5 rounded-lg px-3 py-1.5 ${
+              commentMode
+                ? 'bg-accent/15 text-accent'
+                : 'text-muted hover:bg-panel2 hover:text-ink'
+            }`}
+            onClick={() => setCommentMode(!commentMode)}
+            aria-label="Comment tool — click to pin, drag to mark an area"
+            aria-pressed={commentMode}
+            title="Comment (C) — click to pin, drag to comment on an area"
+          >
+            <IcMessage size={16} />
+            <span className="text-[10px] font-medium">Comment</span>
+          </button>
+        </>
+      )}
+
+      <ToolbarDivider />
+
+      {/* More */}
+      <ToolMenu groupLabel="More — import & embed" items={moreItems} defaultKey="web" />
+
       <input
         ref={imageInput}
         type="file"
