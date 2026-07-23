@@ -15,11 +15,39 @@ import {
   formatValue,
   type CellData,
 } from '@/lib/sheet/sheetModel'
-import { rectOf, useSheetSession, type CellPos } from './SheetSession'
+import { rectOf, useSheetSession, type CellPos, type Rect } from './SheetSession'
 
 const HDR_W = 44
 const HDR_H = 24
 const OVERSCAN = 3
+/** side of the draggable fill handle, in px */
+const FILL_HANDLE = 8
+
+/**
+ * Target rectangle for a fill drag: the source extended toward the hovered
+ * cell along the axis it travelled furthest, so dragging the corner down
+ * fills a column and dragging it sideways fills a row. Null when the hover
+ * has not left the source (nothing to fill).
+ */
+function fillTargetRect(src: Rect, hover: CellPos): Rect | null {
+  const vExt = Math.max(hover.r - src.r2, src.r1 - hover.r, 0)
+  const hExt = Math.max(hover.c - src.c2, src.c1 - hover.c, 0)
+  if (!vExt && !hExt) return null
+  if (vExt >= hExt) {
+    return {
+      r1: Math.min(hover.r, src.r1),
+      r2: Math.max(hover.r, src.r2),
+      c1: src.c1,
+      c2: src.c2,
+    }
+  }
+  return {
+    r1: src.r1,
+    r2: src.r2,
+    c1: Math.min(hover.c, src.c1),
+    c2: Math.max(hover.c, src.c2),
+  }
+}
 
 /** prefix sums: offsets[i] = top/left of line i; offsets[n] = total size */
 function buildOffsets(
@@ -91,6 +119,7 @@ export function SpreadsheetEditor() {
     setColWidth,
     setRowHeight,
     pasteMatrix,
+    fillRange,
   } = session
   const display = useDisplay()
 
@@ -100,6 +129,10 @@ export function SpreadsheetEditor() {
   const dragging = useRef(false)
   /** top-left + text of the last in-app copy, for formula translation */
   const lastCopy = useRef<{ r: number; c: number; text: string } | null>(null)
+  /** fill-handle drag: the source rect being dragged, or null when idle */
+  const filling = useRef<{ r1: number; c1: number; r2: number; c2: number } | null>(null)
+  /** live preview rectangle while the fill handle is dragged */
+  const [fillTo, setFillTo] = useState<CellPos | null>(null)
 
   const colOffsets = useMemo(
     () => buildOffsets(sheet.cols, sheet.colW, DEFAULT_COL_W),
@@ -159,7 +192,35 @@ export function SpreadsheetEditor() {
   }
 
   const cellMouseEnter = (pos: CellPos) => {
-    if (dragging.current) select({ anchor: selection.anchor, focus: pos })
+    if (filling.current) {
+      fillToRef.current = pos
+      setFillTo(pos)
+    } else if (dragging.current) {
+      select({ anchor: selection.anchor, focus: pos })
+    }
+  }
+
+  const fillToRef = useRef<CellPos | null>(null)
+
+  /** Start a fill-handle drag from the current selection rectangle. */
+  const startFill = (e: React.MouseEvent) => {
+    if (readOnly) return
+    e.preventDefault()
+    e.stopPropagation()
+    filling.current = { ...rect }
+    fillToRef.current = null
+    setFillTo(null)
+    const onUp = () => {
+      window.removeEventListener('mouseup', onUp)
+      const src = filling.current
+      const to = fillToRef.current
+      filling.current = null
+      setFillTo(null)
+      if (!src || !to) return
+      const target = fillTargetRect(src, to)
+      if (target) fillRange(src, target)
+    }
+    window.addEventListener('mouseup', onUp)
   }
 
   const editValue = useRef('')
@@ -451,6 +512,36 @@ export function SpreadsheetEditor() {
         </div>
         <div className="sheet-cells" style={{ width: totalW, height: totalH }}>
           {cells}
+          {!readOnly && !editing && (
+            <div
+              className="sheet-fill-handle"
+              style={{
+                left: colOffsets[rect.c2 + 1] - FILL_HANDLE / 2,
+                top: rowOffsets[rect.r2 + 1] - FILL_HANDLE / 2,
+                width: FILL_HANDLE,
+                height: FILL_HANDLE,
+              }}
+              onMouseDown={startFill}
+              title="Drag to fill — formulas adjust their references"
+            />
+          )}
+          {fillTo &&
+            filling.current &&
+            (() => {
+              const t = fillTargetRect(filling.current, fillTo)
+              if (!t) return null
+              return (
+                <div
+                  className="sheet-fill-preview"
+                  style={{
+                    left: colOffsets[t.c1],
+                    top: rowOffsets[t.r1],
+                    width: colOffsets[t.c2 + 1] - colOffsets[t.c1],
+                    height: rowOffsets[t.r2 + 1] - rowOffsets[t.r1],
+                  }}
+                />
+              )
+            })()}
           {editing && (
             <input
               key={`${editing.pos.r}:${editing.pos.c}`}

@@ -733,6 +733,23 @@ body {
   outline: none;
   box-shadow: var(--shadow);
 }
+/* fill handle: the small square at the selection's bottom-right corner */
+.sheet-fill-handle {
+  position: absolute;
+  z-index: 3;
+  background: var(--accent);
+  border: 1px solid var(--panel);
+  border-radius: 1px;
+  cursor: crosshair;
+}
+/* dashed outline previewing where a fill drag will land */
+.sheet-fill-preview {
+  position: absolute;
+  z-index: 3;
+  pointer-events: none;
+  outline: 2px dashed var(--accent);
+  outline-offset: -2px;
+}
 .sheet-tab {
   display: flex;
   align-items: center;

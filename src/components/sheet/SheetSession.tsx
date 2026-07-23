@@ -38,6 +38,7 @@ import {
   withComputedCache,
   type ComputedCell,
 } from '@/lib/sheet/FormulaEngine'
+import { computeFill } from '@/lib/sheet/fill'
 import { awareness } from '@/lib/crdt/AwarenessService'
 
 export interface CellPos {
@@ -105,6 +106,11 @@ export interface SheetSessionValue {
    * to translate against.
    */
   pasteMatrix: (rows: string[][], origin?: { r: number; c: number }) => void
+  /**
+   * Fill-handle drag: tile `source` into `target` (which extends source
+   * along one axis), translating formulas by how far each cell moved.
+   */
+  fillRange: (source: Rect, target: Rect) => void
 }
 
 const SheetSessionContext = createContext<SheetSessionValue | null>(null)
@@ -342,6 +348,42 @@ export function SheetSessionProvider({
           c: start.c + Math.max(...rows.map((r) => r.length), 1) - 1,
         })
         setSelection({ anchor: start, focus: end })
+      },
+      fillRange: (source, target) => {
+        const sheetNow = body.sheets[si]
+        const src = {
+          r1: Math.min(source.r1, source.r2),
+          c1: Math.min(source.c1, source.c2),
+          r2: Math.max(source.r1, source.r2),
+          c2: Math.max(source.c1, source.c2),
+        }
+        const tgt = {
+          r1: Math.max(0, Math.min(target.r1, target.r2)),
+          c1: Math.max(0, Math.min(target.c1, target.c2)),
+          r2: Math.min(sheetNow.rows - 1, Math.max(target.r1, target.r2)),
+          c2: Math.min(sheetNow.cols - 1, Math.max(target.c1, target.c2)),
+        }
+        const writes = computeFill(sheetNow.cells, src, tgt, {
+          rows: sheetNow.rows,
+          cols: sheetNow.cols,
+        })
+        if (!writes.length) return
+        updateBody((b) => {
+          let next = b
+          for (const w of writes) {
+            const prev = next.sheets[si].cells[cellKey(w.r, w.c)]
+            // keep the target cell's own styling; only the content fills
+            let cell = w.cell
+            if (cell && prev?.s) cell = { ...cell, s: prev.s }
+            else if (!cell && prev?.s) cell = { s: prev.s }
+            next = setCell(next, si, w.r, w.c, cell)
+          }
+          return next
+        })
+        setSelection({
+          anchor: { r: tgt.r1, c: tgt.c1 },
+          focus: { r: tgt.r2, c: tgt.c2 },
+        })
       },
     }
   }, [
