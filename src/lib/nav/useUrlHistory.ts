@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useStore } from '@/store/useStore'
+import { useWorkspaceLayoutStore } from '@/store/workspaceLayoutStore'
 import {
   navKey,
   parseNav,
@@ -37,6 +38,7 @@ function currentNav(): NavState {
   return {
     projectId: s.activeProjectId,
     mode: s.viewMode,
+    split: useWorkspaceLayoutStore.getState().split || undefined,
     boardId: s.activeBoardId,
     entity,
   }
@@ -93,16 +95,24 @@ export function useUrlHistory() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // 2) genuine navigation → push a history entry (deduped by navKey)
+  // 2) genuine navigation → push a history entry (deduped by navKey).
+  // Both the section/entity store and the layout (split) store can change the
+  // navigable identity, so both are watched.
   useEffect(() => {
-    return useStore.subscribe(() => {
+    const onChange = () => {
       if (applyingRef.current) return
       const nav = currentNav()
       const key = navKey(nav)
       if (key === lastKeyRef.current) return
       lastKeyRef.current = key
       history.pushState(history.state, '', urlFor(nav))
-    })
+    }
+    const unsubStore = useStore.subscribe(onChange)
+    const unsubLayout = useWorkspaceLayoutStore.subscribe(onChange)
+    return () => {
+      unsubStore()
+      unsubLayout()
+    }
   }, [])
 
   // 3) Back / Forward → apply the URL's state to the store

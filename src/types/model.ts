@@ -481,25 +481,32 @@ export interface Board {
 }
 
 /**
- * Top navigation modes:
- *  board · graph (Phase 9.5 — automatic relationship browser, placed right
- *  after Board) · split (workspace + board side-by-side) · doc (rich
- *  text/notes) · sheet (spreadsheet workspace) · presentation (slide
- *  workspace) · code (Monaco workspace).
+ * The active workspace SECTION (plus `graph`, which is a view of content).
  *
- * Note: the Document mode's internal value stays 'doc' (its persisted value
+ *  board · doc (rich text/notes) · sheet (spreadsheet workspace) ·
+ *  presentation (slide workspace) · code (Monaco workspace) · photo, and
+ *  graph (Phase 9.5 — the automatic relationship browser shown as an
+ *  alternative VIEW of the content).
+ *
+ * `split` is NO LONGER a ViewMode: it is a pane-layout toggle owned by
+ * `workspaceLayoutStore` (call-and-toolbar IA refactor). `graph` is kept here
+ * because the primary pane can render the graph, but the UI presents it as a
+ * ContentView, never as a section — see src/types/workspace.ts.
+ *
+ * Note: the Document section's internal value stays 'doc' (its persisted value
  * and hundreds of call sites) while its visible label is "Document".
  */
 export type ViewMode =
   | 'board'
   | 'graph'
-  | 'split'
   | 'doc'
   | 'sheet'
   | 'presentation'
   | 'code'
   | 'photo'
 export type Theme = 'dark' | 'light'
+/** UI language. English is the source locale; catalogs live in src/lib/i18n. */
+export type Locale = 'en' | 'it'
 
 /** A recently opened entity, newest first. */
 export interface RecentEntry {

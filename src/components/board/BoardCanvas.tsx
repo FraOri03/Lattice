@@ -57,7 +57,12 @@ import { SectionNode } from './SectionNode'
 import { WebEmbedCardNode } from './WebEmbedCardNode'
 import { PhotoCardNode } from './PhotoCardNode'
 import { CanvasToolbar } from './CanvasToolbar'
-import { BoardAddMenu } from './BoardAddMenu'
+import {
+  CARD_INSERTED_EVENT,
+  OPEN_CREATE_MENU_EVENT,
+  focusBoardCard,
+  type CardInsertedDetail,
+} from './boardToolEvents'
 import { useBoardKeyboard } from './useBoardKeyboard'
 import { cardAccessibleName, isEditableTarget } from '@/lib/board/keyboardNav'
 import { announce } from '@/lib/a11y/announcer'
@@ -148,12 +153,36 @@ function Canvas() {
   // delete / link / add; React Flow keeps nodes Tab-focusable but its own
   // key handling is off (disableKeyboardA11y) so nothing double-fires.
   const containerRef = useRef<HTMLDivElement>(null)
-  const [addMenuOpen, setAddMenuOpen] = useState(false)
-  const { onKeyDown, linkSourceId, focusCard } = useBoardKeyboard({
+  const { onKeyDown, linkSourceId } = useBoardKeyboard({
     containerRef,
     readOnly,
-    onOpenAddMenu: () => setAddMenuOpen(true),
+    // `A` opens the toolbar's Create menu (the separate Add-card menu is gone)
+    onOpenAddMenu: () => window.dispatchEvent(new Event(OPEN_CREATE_MENU_EVENT)),
   })
+
+  // a card inserted from the toolbar takes focus and is announced (A11Y-1).
+  // React Flow mounts the node asynchronously, so retry for a few frames
+  // instead of firing once and silently missing it.
+  useEffect(() => {
+    const onInserted = (e: Event) => {
+      const detail = (e as CustomEvent<CardInsertedDetail>).detail
+      if (!detail?.id) return
+      announce(`Added ${detail.label} card`)
+      // Retry until focus is on THIS node: React Flow mounts it asynchronously
+      // and then re-renders it once (the new card is inserted selected), which
+      // can drop a focus that landed too early.
+      // timers rather than rAF: a background/hidden tab never runs rAF, and a
+      // card inserted from the command palette should still take focus.
+      let tries = 0
+      const tryFocus = () => {
+        if (focusBoardCard(detail.id)) return
+        if (++tries < 10) setTimeout(tryFocus, 40)
+      }
+      setTimeout(tryFocus, 0)
+    }
+    window.addEventListener(CARD_INSERTED_EVENT, onInserted)
+    return () => window.removeEventListener(CARD_INSERTED_EVENT, onInserted)
+  }, [])
 
   // one authoritative drag at a time: a node a peer is actively dragging
   // cannot be grabbed here until they release it
@@ -436,19 +465,6 @@ function Canvas() {
         {!readOnly && (
           <Panel position="bottom-center">
             <CanvasToolbar />
-          </Panel>
-        )}
-        {!readOnly && (
-          <Panel position="bottom-left">
-            <BoardAddMenu
-              open={addMenuOpen}
-              onOpenChange={setAddMenuOpen}
-              onInserted={(id, label) => {
-                // move focus onto the freshly inserted card
-                requestAnimationFrame(() => focusCard(id))
-                announce(`Added ${label} card`)
-              }}
-            />
           </Panel>
         )}
         <BoardPresenceLayer boardId={board.id} />

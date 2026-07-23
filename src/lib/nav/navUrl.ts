@@ -16,19 +16,37 @@ export type NavEntityKind = 'note' | 'doc' | 'code' | 'sheet' | 'present' | 'ass
 export interface NavState {
   projectId: string
   mode: ViewMode
+  /**
+   * Whether the split (second pane) layout is open. This is the LAYOUT, not a
+   * section. For URL back-compatibility it is still serialized as the legacy
+   * `m=split` token, so links shared before the IA refactor keep resolving.
+   */
+  split?: boolean
   boardId?: string
   entity?: { kind: NavEntityKind; id: string }
 }
 
+/** Legacy/compat URL token for the split layout (pre-IA-refactor deep links). */
+const SPLIT_TOKEN = 'split'
+
 const MODES: readonly ViewMode[] = [
   'board',
   'graph',
-  'split',
   'doc',
   'sheet',
   'presentation',
   'code',
 ]
+
+/** Section an entity kind opens into — used to rebuild a `m=split` deep link. */
+const ENTITY_MODE: Record<NavEntityKind, ViewMode> = {
+  note: 'doc',
+  doc: 'doc',
+  code: 'code',
+  sheet: 'sheet',
+  present: 'presentation',
+  asset: 'doc',
+}
 const ENTITY_KINDS: readonly NavEntityKind[] = [
   'note',
   'doc',
@@ -82,7 +100,9 @@ export function serializeNav(nav: NavState | null): string {
   if (!nav?.projectId) return ''
   const q = new URLSearchParams()
   q.set('p', nav.projectId)
-  q.set('m', nav.mode)
+  // split is a layout, serialized as the legacy `m=split` token so pre-refactor
+  // links keep resolving; otherwise the section is the mode
+  q.set('m', nav.split ? SPLIT_TOKEN : nav.mode)
   if (nav.boardId) q.set('b', nav.boardId)
   if (nav.entity) q.set('e', `${nav.entity.kind}.${nav.entity.id}`)
   return `?${q.toString()}`
@@ -94,7 +114,7 @@ export function navKey(nav: NavState | null): string {
   if (!nav) return ''
   return [
     nav.projectId,
-    nav.mode,
+    nav.split ? SPLIT_TOKEN : nav.mode,
     nav.boardId ?? '',
     nav.entity ? `${nav.entity.kind}:${nav.entity.id}` : '',
   ].join('|')
@@ -124,7 +144,6 @@ export function resolveNav(raw: RawNav, snap: NavSnapshot): NavState {
     raw.projectId && snap.hasProject(raw.projectId)
       ? raw.projectId
       : snap.fallbackProjectId
-  const mode: ViewMode = isViewMode(raw.mode) ? raw.mode : 'board'
   const boardId =
     raw.boardId && snap.boardBelongsTo(raw.boardId, projectId)
       ? raw.boardId
@@ -137,5 +156,15 @@ export function resolveNav(raw: RawNav, snap: NavSnapshot): NavState {
   ) {
     entity = { kind: raw.entityKind, id: raw.entityId }
   }
-  return { projectId, mode, boardId, entity }
+  // `m=split` is the layout, not a section: turn it into the split flag and
+  // derive the underlying section from the open entity (or the Board).
+  const split = raw.mode === SPLIT_TOKEN
+  const mode: ViewMode = split
+    ? entity
+      ? ENTITY_MODE[entity.kind]
+      : 'board'
+    : isViewMode(raw.mode)
+      ? raw.mode
+      : 'board'
+  return { projectId, mode, split: split || undefined, boardId, entity }
 }

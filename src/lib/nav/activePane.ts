@@ -11,11 +11,12 @@ import type { ViewMode } from '@/types/model'
  * reconciled the ids, so `viewMode: 'doc'` still resolved to the sheet
  * while App.tsx docked the *document* inspector next to it.
  *
- * The rule is therefore positional, not stateful: a mode may only host the
- * entity kinds it owns. Split is the "entity + board" layout and may host
- * anything; the full-page Document mode hosts only document-like entities,
- * because code files and spreadsheets have dedicated modes ('code' and
- * 'sheet') that already render them with their own inspectors.
+ * The rule is therefore positional, not stateful: a section may only host
+ * the entity kinds it owns. The Document section hosts document-like
+ * entities only, because code files and spreadsheets have dedicated
+ * sections ('code' and 'sheet') that already render them with their own
+ * inspectors. (Split is a LAYOUT, not a section: each of its two panes
+ * renders a real section, so it needs no special case here.)
  *
  * Keeping the ids untouched is deliberate: switching modes preserves which
  * entity each mode had open, and nothing can overlap because exactly one
@@ -38,24 +39,27 @@ const PANE_ORDER: { pane: DocumentPane; key: keyof ActiveEntityIds }[] = [
   { pane: 'doc', key: 'activeDocId' },
 ]
 
-/** Panes owned by a dedicated full-page mode, so Document must not host them. */
-const OWNED_BY_OTHER_MODE: DocumentPane[] = ['code', 'sheet']
+/** Panes owned by a dedicated section, so Document must not host them. */
+const OWNED_BY_OTHER_SECTION: DocumentPane[] = ['code', 'sheet']
 
-function canHost(mode: ViewMode, pane: DocumentPane): boolean {
-  if (mode === 'split') return true
-  return !OWNED_BY_OTHER_MODE.includes(pane)
+function canHost(pane: DocumentPane): boolean {
+  return !OWNED_BY_OTHER_SECTION.includes(pane)
 }
 
 /**
- * The single pane the Document column shows for a mode. Callers pass ids
- * they have already validated (a dangling id must arrive as null), so the
- * result always corresponds to an entity that can actually be rendered.
- * Falls back to 'note', which covers both the active note and the
- * "nothing open" empty state.
+ * The single pane the Document column shows. Callers pass ids they have
+ * already validated (a dangling id must arrive as null), so the result
+ * always corresponds to an entity that can actually be rendered. Falls back
+ * to 'note', which covers both the active note and the "nothing open"
+ * empty state.
+ *
+ * `mode` is accepted so callers read declaratively at the call site and so
+ * a future section with different hosting rules has somewhere to hook in.
  */
 export function documentPaneFor(mode: ViewMode, ids: ActiveEntityIds): DocumentPane {
+  if (mode !== 'doc') return 'note'
   for (const { pane, key } of PANE_ORDER) {
-    if (ids[key] && canHost(mode, pane)) return pane
+    if (ids[key] && canHost(pane)) return pane
   }
   return 'note'
 }

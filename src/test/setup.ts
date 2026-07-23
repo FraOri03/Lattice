@@ -10,7 +10,15 @@ import { cleanup } from '@testing-library/react'
  * shims stay intentionally inert (no fake timers, no cloud, no flakiness).
  */
 
-if (!window.matchMedia) {
+/**
+ * Server-side suites (api/**) opt into `@vitest-environment node`, where there
+ * is no DOM to shim — jsdom's cross-realm typed arrays break `jose`, so a
+ * LiveKit token cannot be signed under jsdom at all. Guard the shims rather
+ * than force those files back into a browser environment they never touch.
+ */
+const hasDom = typeof window !== 'undefined'
+
+if (hasDom && !window.matchMedia) {
   window.matchMedia = ((query: string) => ({
     matches: false,
     media: query,
@@ -41,5 +49,5 @@ if (!('IntersectionObserver' in globalThis)) {
 }
 
 afterEach(() => {
-  cleanup()
+  if (hasDom) cleanup()
 })

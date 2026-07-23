@@ -4,6 +4,9 @@ import { useSyncStore } from '@/lib/sync/syncStore'
 import { syncEngine } from '@/lib/sync/SyncEngine'
 import { githubProvider } from '@/lib/github/GithubCodeProvider'
 import { useUiStore } from '@/store/useUiStore'
+import { useStore } from '@/store/useStore'
+import { useI18n, useLocale, useTimeAgo } from '@/lib/i18n'
+import type { Locale } from '@/types/model'
 import { env } from '@/lib/env'
 import {
   IcCheck,
@@ -16,29 +19,12 @@ import {
   IcX,
 } from '@/components/Icons'
 
-function timeAgo(ts: number | null): string {
-  if (!ts) return 'never'
-  const s = Math.floor((Date.now() - ts) / 1000)
-  if (s < 10) return 'just now'
-  if (s < 60) return `${s}s ago`
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`
-  return `${Math.floor(s / 3600)}h ago`
-}
-
-const SYNC_LABEL: Record<string, string> = {
-  idle: 'Waiting for changes',
-  connecting: 'Connecting to Drive…',
-  syncing: 'Syncing…',
-  synced: 'Up to date',
-  offline: 'Offline — will resume',
-  error: 'Sync error',
-  disabled: 'Cloud sync off',
-}
-
 /** Avatar button + account dropdown: profile, connected services, sync. */
 export function ProfileMenu() {
   const { account, authKind, signIn, signOut } = useAccount()
   const sync = useSyncStore()
+  const t = useI18n()
+  const timeAgo = useTimeAgo()
   const setGithubDialogOpen = useUiStore((s) => s.setGithubDialogOpen)
   const setDriveDialogOpen = useUiStore((s) => s.setDriveDialogOpen)
   const [open, setOpen] = useState(false)
@@ -56,8 +42,8 @@ export function ProfileMenu() {
 
   if (!account) {
     return (
-      <button className="btn" onClick={() => void signIn()} title="Sign in">
-        <IcUser size={13} /> Sign in
+      <button className="btn" onClick={() => void signIn()} title={t.profile.signInTitle}>
+        <IcUser size={13} /> {t.profile.signIn}
       </button>
     )
   }
@@ -69,7 +55,7 @@ export function ProfileMenu() {
       <button
         className="flex h-7 w-7 cursor-pointer items-center justify-center overflow-hidden rounded-full border border-bord bg-panel2 hover:border-accent"
         onClick={() => setOpen((v) => !v)}
-        title={`${account.name} — account`}
+        title={t.profile.accountTitle(account.name)}
       >
         {account.avatarUrl ? (
           <img src={account.avatarUrl} alt={account.name} className="h-full w-full object-cover" />
@@ -96,26 +82,26 @@ export function ProfileMenu() {
               <div className="truncate text-[11px] text-muted">{account.email}</div>
               {authKind === 'mock' && (
                 <div className="mt-0.5 inline-block rounded bg-panel2 px-1.5 py-0.5 text-[9px] font-semibold tracking-wider text-[#ffa629] uppercase">
-                  local-only account
+                  {t.profile.localOnlyAccount}
                 </div>
               )}
             </div>
           </div>
 
           {/* connected services */}
-          <div className="insp-h !mt-3">Connected services</div>
+          <div className="insp-h !mt-3">{t.profile.connectedServices}</div>
           <ServiceRow
             icon={<IcDrive size={13} />}
             name="Google Drive"
             connected={driveConnected}
             detail={
               driveConnected
-                ? `folder “${env.driveAppFolder}”`
+                ? t.profile.driveFolder(env.driveAppFolder)
                 : authKind === 'mock'
-                  ? 'needs OAuth setup'
+                  ? t.profile.driveNeedsOAuth
                   : sync.status === 'connecting'
-                    ? 'connecting…'
-                    : 'not connected'
+                    ? t.profile.driveConnecting
+                    : t.profile.driveNotConnected
             }
             action={
               <button
@@ -125,7 +111,7 @@ export function ProfileMenu() {
                   setDriveDialogOpen(true)
                 }}
               >
-                {driveConnected ? 'Manage' : 'Connect'}
+                {driveConnected ? t.profile.manage : t.profile.connect}
               </button>
             }
           />
@@ -133,7 +119,7 @@ export function ProfileMenu() {
             icon={<IcGithub size={13} />}
             name="GitHub"
             connected={githubProvider.isConnected()}
-            detail={githubUser ? `@${githubUser.login} · code sync` : 'code sync only'}
+            detail={githubUser ? t.profile.githubDetail(githubUser.login) : t.profile.githubCodeOnly}
             action={
               <button
                 className="cursor-pointer text-[11px] text-accent hover:underline"
@@ -142,13 +128,13 @@ export function ProfileMenu() {
                   setGithubDialogOpen(true)
                 }}
               >
-                {githubProvider.isConnected() ? 'Manage' : 'Connect'}
+                {githubProvider.isConnected() ? t.profile.manage : t.profile.connect}
               </button>
             }
           />
 
           {/* cloud sync */}
-          <div className="insp-h">Cloud sync</div>
+          <div className="insp-h">{t.profile.cloudSync}</div>
           <div className="flex items-center gap-2 rounded-md bg-panel2 px-2 py-1.5">
             <IcCloud
               size={13}
@@ -161,17 +147,17 @@ export function ProfileMenu() {
               }
             />
             <div className="min-w-0 flex-1">
-              <div className="text-[12px]">{SYNC_LABEL[sync.status]}</div>
+              <div className="text-[12px]">{t.profile.status[sync.status]}</div>
               <div className="text-[10px] text-muted">
                 {sync.status === 'error' && sync.error
                   ? sync.error
-                  : `last sync ${timeAgo(sync.lastSyncAt)}${sync.pendingChanges ? ` · ${sync.pendingChanges} pending` : ''}`}
+                  : t.profile.lastSync(timeAgo(sync.lastSyncAt), sync.pendingChanges)}
               </div>
             </div>
             {driveConnected && (
               <button
                 className="icon-btn h-6 w-6"
-                title="Sync now"
+                title={t.profile.syncNow}
                 onClick={() => void syncEngine.syncNow()}
               >
                 <IcRefresh size={12} />
@@ -185,16 +171,19 @@ export function ProfileMenu() {
                   setDriveDialogOpen(true)
                 }}
               >
-                Fix
+                {t.profile.fix}
               </button>
             )}
           </div>
           {sync.conflicts.length > 0 && (
             <div className="mt-1.5 rounded-md border border-[#ffa629]/40 bg-[#ffa629]/10 px-2 py-1.5 text-[11px] text-muted">
-              {sync.conflicts.length} conflict{sync.conflicts.length > 1 ? 's' : ''} resolved
-              (newest won; older copies kept on Drive)
+              {t.profile.conflicts(sync.conflicts.length)}
             </div>
           )}
+
+          {/* language */}
+          <div className="insp-h">{t.profile.language}</div>
+          <LanguageSwitch />
 
           {/* footer */}
           <div className="mt-3 flex items-center justify-between border-t border-bord pt-2.5">
@@ -208,11 +197,38 @@ export function ProfileMenu() {
                 void signOut()
               }}
             >
-              <IcLogOut size={12} /> Sign out
+              <IcLogOut size={12} /> {t.profile.signOut}
             </button>
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+/** English ⇄ Italian segmented control, mirrored on the persisted `locale`. */
+function LanguageSwitch() {
+  const t = useI18n()
+  const locale = useLocale()
+  const setLocale = useStore((s) => s.setLocale)
+  const options: { value: Locale; label: string }[] = [
+    { value: 'en', label: t.profile.english },
+    { value: 'it', label: t.profile.italian },
+  ]
+  return (
+    <div className="flex rounded-md border border-bord bg-panel2 p-0.5">
+      {options.map((o) => (
+        <button
+          key={o.value}
+          onClick={() => setLocale(o.value)}
+          aria-pressed={locale === o.value}
+          className={`flex-1 cursor-pointer rounded px-2 py-1 text-[12px] font-medium ${
+            locale === o.value ? 'bg-panel text-ink shadow-sm' : 'text-muted hover:text-ink'
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
     </div>
   )
 }
@@ -230,6 +246,7 @@ function ServiceRow({
   detail: string
   action?: React.ReactNode
 }) {
+  const t = useI18n()
   return (
     <div className="flex items-center gap-2 px-1 py-1">
       <span className="text-muted">{icon}</span>
@@ -240,7 +257,7 @@ function ServiceRow({
         }`}
       >
         {connected ? <IcCheck size={9} /> : <IcX size={9} />}
-        {connected ? 'connected' : 'off'}
+        {connected ? t.profile.connected : t.profile.off}
       </span>
       <span className="min-w-0 flex-1 truncate text-right text-[10px] text-muted">
         {detail}

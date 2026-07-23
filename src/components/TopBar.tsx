@@ -1,57 +1,34 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useStore } from '@/store/useStore'
 import { useUiStore } from '@/store/useUiStore'
+import { useWorkspaceLayoutStore } from '@/store/workspaceLayoutStore'
 import { useSyncStore } from '@/lib/sync/syncStore'
 import { syncEngine } from '@/lib/sync/SyncEngine'
 import { useCollabStore } from '@/lib/collab/collabStore'
-import { useCan, useReadOnly } from '@/lib/collab/useCollab'
-import type { ViewMode } from '@/types/model'
-import { MODE_METAS } from '@/components/topbarModes'
+import { useReadOnly } from '@/lib/collab/useCollab'
+import { SectionTabs } from '@/components/shell/SectionTabs'
+import { JoinCallButton } from '@/components/call/JoinCallButton'
 import { ProfileMenu } from '@/components/account/ProfileMenu'
 import { PresenceAvatars } from '@/components/collab/PresenceAvatars'
 import { RealtimeStatusChip } from '@/components/collab/RealtimeStatusChip'
 import { NotificationCenter } from '@/components/collab/NotificationCenter'
 import { useCollabMode } from '@/lib/collab/collabPresentation'
+import { useI18n } from '@/lib/i18n'
 import {
   IcAlert,
-  IcBoard,
-  IcCamera,
   IcChevronRight,
   IcCloud,
   IcCloudOff,
-  IcCode,
   IcCommand,
-  IcDoc,
   IcGraph,
   IcHistory,
   IcMessage,
   IcMoon,
-  IcNote,
-  IcPlus,
-  IcPresentation,
   IcRefresh,
-  IcSplit,
   IcSun,
-  IcTable,
   IcUserPlus,
   IcWifiOff,
-  IcChevronDown,
 } from '@/components/Icons'
-
-const MODE_ICONS: Record<ViewMode, React.ReactNode> = {
-  board: <IcBoard size={13} />,
-  graph: <IcGraph size={13} />,
-  split: <IcSplit size={13} />,
-  doc: <IcDoc size={13} />,
-  sheet: <IcTable size={13} />,
-  presentation: <IcPresentation size={13} />,
-  code: <IcCode size={13} />,
-  photo: <IcCamera size={13} />,
-}
-
-// order (Board · Graph · Split · Document · Sheet · Presentation · Code · Photo)
-// comes from the shared MODE_METAS so it stays testable without a DOM
-const MODES = MODE_METAS.map((m) => ({ ...m, icon: MODE_ICONS[m.mode] }))
 
 function useOnline(): boolean {
   const [online, setOnline] = useState(navigator.onLine)
@@ -72,15 +49,16 @@ function useOnline(): boolean {
 function SyncIndicator() {
   const sync = useSyncStore()
   const online = useOnline()
+  const t = useI18n()
   const setDriveDialogOpen = useUiStore((s) => s.setDriveDialogOpen)
 
   if (!online) {
     return (
       <span
         className="flex items-center gap-1.5 rounded-full border border-bord bg-panel2 px-2 py-1 text-[10px] font-medium text-[#ffa629]"
-        title="You are offline — changes stay local and sync when you reconnect"
+        title={t.syncChip.offlineTitle}
       >
-        <IcWifiOff size={12} /> Offline
+        <IcWifiOff size={12} /> {t.syncChip.offline}
       </span>
     )
   }
@@ -89,29 +67,30 @@ function SyncIndicator() {
     if (sync.status === 'connecting') {
       return (
         <span className="flex items-center gap-1.5 rounded-full border border-bord bg-panel2 px-2 py-1 text-[10px] font-medium text-muted">
-          <IcRefresh size={12} className="animate-spin" /> Connecting…
+          <IcRefresh size={12} className="animate-spin" /> {t.syncChip.connecting}
         </span>
       )
     }
     if (sync.status === 'error') {
+      const err = sync.error ?? t.syncChip.driveNotConnected
       return (
         <button
           className="flex cursor-pointer items-center gap-1.5 rounded-full border border-[#f24822]/40 bg-panel2 px-2 py-1 text-[10px] font-medium text-[#f24822]"
-          title={`${sync.error ?? 'Google Drive is not connected'} — click for diagnostics`}
-          aria-label={`Drive sync error: ${sync.error ?? 'Google Drive is not connected'}. Click for diagnostics.`}
+          title={t.syncChip.driveErrorTitle(err)}
+          aria-label={t.syncChip.driveErrorAria(err)}
           onClick={() => setDriveDialogOpen(true)}
         >
-          <IcAlert size={12} /> Drive error
+          <IcAlert size={12} /> {t.syncChip.driveError}
         </button>
       )
     }
     return (
       <button
         className="flex cursor-pointer items-center gap-1.5 rounded-full border border-bord bg-panel2 px-2 py-1 text-[10px] font-medium text-muted"
-        title="Cloud sync is off — click to connect Google Drive"
+        title={t.syncChip.localTitle}
         onClick={() => setDriveDialogOpen(true)}
       >
-        <IcCloudOff size={12} /> Local
+        <IcCloudOff size={12} /> {t.syncChip.local}
       </button>
     )
   }
@@ -123,19 +102,19 @@ function SyncIndicator() {
         : 'text-muted'
   const label =
     sync.status === 'syncing'
-      ? 'Syncing…'
+      ? t.syncChip.syncing
       : sync.status === 'synced'
-        ? 'Synced'
+        ? t.syncChip.synced
         : sync.status === 'error'
-          ? 'Sync error'
+          ? t.syncChip.syncError
           : sync.pendingChanges > 0
-            ? `${sync.pendingChanges} pending`
-            : 'Drive'
+            ? t.syncChip.pending(sync.pendingChanges)
+            : t.syncChip.drive
   return (
     <button
       className={`flex cursor-pointer items-center gap-1.5 rounded-full border border-bord bg-panel2 px-2 py-1 text-[10px] font-medium ${color}`}
-      title={sync.error ?? 'Google Drive sync — click to sync now'}
-      aria-label={`Google Drive: ${label}${sync.status === 'error' ? ' — click for diagnostics' : ' — click to sync now'}`}
+      title={sync.error ?? t.syncChip.driveTitle}
+      aria-label={t.syncChip.driveAria(label, sync.status === 'error')}
       onClick={() =>
         sync.status === 'error' ? setDriveDialogOpen(true) : void syncEngine.syncNow()
       }
@@ -149,61 +128,6 @@ function SyncIndicator() {
       )}
       {label}
     </button>
-  )
-}
-
-/** "+ New" dropdown: quick create for every document kind. */
-function QuickCreate() {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-  const s = useStore
-
-  useEffect(() => {
-    if (!open) return
-    const close = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false)
-    }
-    window.addEventListener('mousedown', close)
-    return () => window.removeEventListener('mousedown', close)
-  }, [open])
-
-  const entries: { label: string; icon: React.ReactNode; run: () => void }[] = [
-    { label: 'Note', icon: <IcNote size={13} />, run: () => s.getState().openNote(s.getState().createNote()) },
-    { label: 'Document', icon: <IcDoc size={13} />, run: () => s.getState().openDoc(s.getState().createDoc()) },
-    { label: 'Spreadsheet', icon: <IcTable size={13} />, run: () => s.getState().openSheet(s.getState().createSheetDoc()) },
-    { label: 'Presentation', icon: <IcPresentation size={13} />, run: () => s.getState().openPresent(s.getState().createPresentDoc()) },
-    { label: 'Code file', icon: <IcCode size={13} />, run: () => s.getState().openCode(s.getState().createCode()) },
-    { label: 'Board', icon: <IcBoard size={13} />, run: () => s.getState().addBoard() },
-  ]
-
-  return (
-    <div className="relative" ref={ref}>
-      <button
-        className="btn"
-        onClick={() => setOpen((v) => !v)}
-        title="Quick create"
-        aria-label="Create new item"
-        aria-expanded={open}
-      >
-        <IcPlus size={13} /> New <IcChevronDown size={11} />
-      </button>
-      {open && (
-        <div className="absolute top-9 left-0 z-50 w-44 rounded-xl border border-bord bg-panel p-1 shadow-xl">
-          {entries.map((e) => (
-            <button
-              key={e.label}
-              className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[12px] text-muted hover:bg-panel2 hover:text-ink"
-              onClick={() => {
-                setOpen(false)
-                e.run()
-              }}
-            >
-              {e.icon} {e.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
   )
 }
 
@@ -227,9 +151,13 @@ function ContextBreadcrumb() {
   const activeSheetId = useStore((s) => s.activeSheetId)
   const activeNoteId = useStore((s) => s.activeNoteId)
   const activeAssetId = useStore((s) => s.activeAssetId)
+  const split = useWorkspaceLayoutStore((s) => s.split)
+  const secondaryContent = useWorkspaceLayoutStore((s) => s.secondaryContent)
   const readOnly = useReadOnly()
+  const t = useI18n()
 
-  const boardVisible = viewMode === 'board' || viewMode === 'split'
+  const boardVisible =
+    viewMode === 'board' || (split && secondaryContent === 'board')
 
   let entity: string | null = null
   if (activeAssetId && assets[activeAssetId]) entity = assets[activeAssetId].name
@@ -245,7 +173,7 @@ function ContextBreadcrumb() {
         <>
           <span
             className="hidden min-w-0 items-center gap-1 font-medium text-muted lg:flex"
-            title={`Workspace: ${workspace.name}`}
+            title={t.topbar.workspaceTitle(workspace.name)}
           >
             <span aria-hidden>{workspace.icon}</span>
             <span className="max-w-24 truncate">{workspace.name}</span>
@@ -263,7 +191,7 @@ function ContextBreadcrumb() {
         <>
           <IcChevronRight size={11} className="flex-none text-muted" />
           <span className="flex items-center gap-1.5 font-semibold">
-            <IcGraph size={13} /> Graph
+            <IcGraph size={13} /> {t.topbar.graph}
           </span>
         </>
       ) : boardVisible && board ? (
@@ -274,8 +202,8 @@ function ContextBreadcrumb() {
             value={board.name}
             disabled={readOnly}
             onChange={(e) => renameBoard(board.id, e.target.value)}
-            aria-label="Board name"
-            title={readOnly ? 'Read-only — your role cannot rename boards' : 'Rename board'}
+            aria-label={t.topbar.boardName}
+            title={readOnly ? t.topbar.renameBoardReadOnly : t.topbar.renameBoard}
           />
         </>
       ) : entity ? (
@@ -296,14 +224,15 @@ function PanelButtons() {
   const setPanel = useCollabStore((s) => s.setPanel)
   const projectId = useStore((s) => s.activeProjectId)
   const comments = useCollabStore((s) => s.comments[projectId])
-  const openCount = comments?.filter((t) => !t.resolved).length ?? 0
+  const openCount = comments?.filter((c) => !c.resolved).length ?? 0
+  const t = useI18n()
 
   return (
     <>
       <button
         className={`icon-btn relative ${panel === 'comments' ? 'bg-panel2 !text-accent' : ''}`}
-        title="Comments"
-        aria-label={`Comments${openCount ? ` (${openCount} open)` : ''}`}
+        title={t.topbar.comments}
+        aria-label={openCount ? t.topbar.commentsOpenAria(openCount) : t.topbar.comments}
         onClick={() => setPanel(panel === 'comments' ? null : 'comments')}
       >
         <IcMessage size={15} />
@@ -315,8 +244,8 @@ function PanelButtons() {
       </button>
       <button
         className={`icon-btn ${panel === 'versions' || panel === 'activity' ? 'bg-panel2 !text-accent' : ''}`}
-        title="Version history & activity"
-        aria-label="Version history and activity"
+        title={t.topbar.versionHistory}
+        aria-label={t.topbar.versionHistoryAria}
         onClick={() => setPanel(panel === 'versions' ? null : 'versions')}
       >
         <IcHistory size={15} />
@@ -326,60 +255,44 @@ function PanelButtons() {
 }
 
 export function TopBar() {
-  const viewMode = useStore((s) => s.viewMode)
-  const setViewMode = useStore((s) => s.setViewMode)
   const theme = useStore((s) => s.theme)
   const setTheme = useStore((s) => s.setTheme)
   const setPaletteOpen = useUiStore((s) => s.setPaletteOpen)
   const setShareDialogOpen = useUiStore((s) => s.setShareDialogOpen)
-  const mayCreate = useCan('content.create')
   const collabMode = useCollabMode()
+  const t = useI18n()
 
   return (
     <header className="flex h-11 flex-none items-center gap-2 border-b border-bord bg-panel px-3">
-      {mayCreate && <QuickCreate />}
       <ContextBreadcrumb />
 
       <div className="flex-1" />
 
-      <div className="flex rounded-lg border border-bord bg-panel2 p-0.5" role="tablist" aria-label="View mode">
-        {MODES.map(({ mode, label, icon }) => (
-          <button
-            key={mode}
-            onClick={() => setViewMode(mode)}
-            role="tab"
-            aria-selected={viewMode === mode}
-            aria-label={`${label} view`}
-            title={`${label} view`}
-            className={`flex cursor-pointer items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium ${
-              viewMode === mode
-                ? 'bg-panel text-ink shadow-sm'
-                : 'text-muted hover:text-ink'
-            }`}
-          >
-            {icon}
-            <span className="hidden xl:inline">{label}</span>
-          </button>
-        ))}
-      </div>
+      {/* Centre: [Split] · [Board · Graph] · [Document · Sheet · Presentation ·
+          Code · Photo]. Split stays a layout and Graph a view underneath — see
+          SectionTabs. */}
+      <SectionTabs />
 
       <div className="flex-1" />
 
+      {/* presence (who is in the project) and the call (who is talking) are
+          deliberately adjacent but distinct states */}
       <PresenceAvatars />
       <RealtimeStatusChip />
+      <JoinCallButton />
       <NotificationCenter />
       <button
         className="btn"
         onClick={() => setShareDialogOpen(true)}
         title={
           collabMode.isRealtime
-            ? 'Share — members, roles & invites · realtime multiplayer is active'
-            : `Share — members, roles & invites · collaboration reaches ${collabMode.scopeLabel}`
+            ? t.topbar.shareTitleRealtime
+            : t.topbar.shareTitleScope(collabMode.scopeLabel)
         }
-        aria-label={`Share project — collaboration reaches ${collabMode.scopeLabel}`}
+        aria-label={t.topbar.shareAria(collabMode.scopeLabel)}
       >
         <IcUserPlus size={13} />
-        <span className="hidden lg:inline">Share</span>
+        <span className="hidden lg:inline">{t.topbar.share}</span>
         {!collabMode.isRealtime && (
           <span className="hidden rounded bg-panel px-1 text-[9px] font-semibold text-muted xl:inline">
             {collabMode.shortLabel}
@@ -390,8 +303,8 @@ export function TopBar() {
       <button
         className="btn hidden md:inline-flex"
         onClick={() => setPaletteOpen(true)}
-        title="Command palette"
-        aria-label="Open command palette"
+        title={t.topbar.commandPalette}
+        aria-label={t.topbar.openCommandPalette}
       >
         <IcCommand size={12} />
         <kbd className="text-[10px] text-muted">Ctrl K</kbd>
@@ -400,8 +313,8 @@ export function TopBar() {
       <button
         className="icon-btn"
         onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-        title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
-        aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+        title={theme === 'dark' ? t.topbar.themeToLight : t.topbar.themeToDark}
+        aria-label={theme === 'dark' ? t.topbar.themeToLight : t.topbar.themeToDark}
       >
         {theme === 'dark' ? <IcSun size={15} /> : <IcMoon size={15} />}
       </button>

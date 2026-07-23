@@ -22,4 +22,4 @@ New and changed capabilities from the Phase 9 P1 pass (issues #8–#11). The ful
 
 ## Scope
 
-Only the **High/Critical** rilievi of issues #8–#11 were implemented. The Medium/Low items in those issues — Split-as-mode demotion, Workspace auto-hide, responsive tiers, identity-vs-storage copy, sub-24px targets, etc. — were intentionally left for their own tickets, except where a minimal technical change was needed to complete a High+ requirement.
+Only the **High/Critical** rilievi of issues #8–#11 were implemented. The Medium/Low items in those issues — Workspace auto-hide, responsive tiers, identity-vs-storage copy, sub-24px targets, etc. — were intentionally left for their own tickets, except where a minimal technical change was needed to complete a High+ requirement. (**Split-as-mode demotion has since shipped** on `feat/call-and-toolbar-ia`: Split is a layout toggle and Graph a content view — see [navigation.md](navigation.md#split-is-a-layout-not-a-mode).)

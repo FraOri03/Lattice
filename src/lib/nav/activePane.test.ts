@@ -42,38 +42,32 @@ describe('documentPaneFor', () => {
     })
   })
 
-  describe('Split mode', () => {
-    it('may host a spreadsheet — it is the entity + board layout', () => {
-      expect(documentPaneFor('split', { activeSheetId: 'sheet_1' })).toBe('sheet')
-    })
-
-    it('may host a code file', () => {
-      expect(documentPaneFor('split', { activeCodeId: 'code_1' })).toBe('code')
-    })
-
-    it('keeps the full priority order', () => {
-      expect(
-        documentPaneFor('split', {
-          activeCodeId: 'code_1',
-          activeSheetId: 'sheet_1',
-          activeDocId: 'doc_1',
-        }),
-      ).toBe('code')
+  describe('other sections', () => {
+    // Split is a LAYOUT now, not a section: each pane renders a real
+    // section, so there is no mode that has to host everything.
+    it('never mounts an entity pane outside the Document section', () => {
+      const ids = {
+        activeAssetId: 'asset_1',
+        activeCodeId: 'code_1',
+        activeSheetId: 'sheet_1',
+        activeDocId: 'doc_1',
+      }
+      for (const mode of ['board', 'sheet', 'code', 'graph', 'presentation', 'photo'] as const) {
+        expect(documentPaneFor(mode, ids)).toBe('note')
+      }
     })
   })
 
   it('resolves to a single pane for every combination of open entities', () => {
-    // whatever is open, a mode may only ever mount one pane — this is the
-    // property that makes graphical overlap impossible
+    // whatever is open, a section may only ever mount one pane — this is
+    // the property that makes graphical overlap impossible
     const ids = {
       activeAssetId: 'asset_1',
       activeCodeId: 'code_1',
       activeSheetId: 'sheet_1',
       activeDocId: 'doc_1',
     }
-    for (const mode of ['doc', 'split'] as const) {
-      const pane = documentPaneFor(mode, ids)
-      expect(['asset', 'code', 'sheet', 'doc', 'note']).toContain(pane)
-    }
+    const pane = documentPaneFor('doc', ids)
+    expect(['asset', 'code', 'sheet', 'doc', 'note']).toContain(pane)
   })
 })

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '@/store/useStore'
+import { useWorkspaceLayoutStore } from '@/store/workspaceLayoutStore'
 import { useCollabStore } from '@/lib/collab/collabStore'
 import { commentService } from '@/lib/collab/CommentService'
 import { focusAreaOnBoard } from './CommentAreas'
@@ -346,6 +347,8 @@ function ThreadCard({
 export function CommentsPanel() {
   const projectId = useStore((s) => s.activeProjectId)
   const viewMode = useStore((s) => s.viewMode)
+  const split = useWorkspaceLayoutStore((s) => s.split)
+  const secondaryContent = useWorkspaceLayoutStore((s) => s.secondaryContent)
   const activeBoardId = useStore((s) => s.activeBoardId)
   const activeDocId = useStore((s) => s.activeDocId)
   const activeCodeId = useStore((s) => s.activeCodeId)
@@ -381,7 +384,7 @@ export function CommentsPanel() {
     if (activeCodeId) return { type: 'code', id: activeCodeId, label: 'this code file' }
     if (activeSheetId) return { type: 'sheet', id: activeSheetId, label: 'this sheet' }
     if (activeAssetId) return { type: 'asset', id: activeAssetId, label: 'this asset' }
-    if (viewMode === 'board' || viewMode === 'split') {
+    if (viewMode === 'board' || (split && secondaryContent === 'board')) {
       const board = boards[activeBoardId]
       if (!board) return null
       const selected = board.nodes.find((n) => n.selected)
@@ -396,7 +399,17 @@ export function CommentsPanel() {
       return { type: 'board', id: activeBoardId, label: `board “${board.name}”` }
     }
     return null
-  }, [activeDocId, activeCodeId, activeSheetId, activeAssetId, viewMode, boards, activeBoardId])
+  }, [
+    activeDocId,
+    activeCodeId,
+    activeSheetId,
+    activeAssetId,
+    viewMode,
+    split,
+    secondaryContent,
+    boards,
+    activeBoardId,
+  ])
 
   const send = () => {
     if (!target || !draft.trim()) return
