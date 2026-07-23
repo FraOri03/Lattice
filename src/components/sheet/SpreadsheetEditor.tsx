@@ -15,11 +15,39 @@ import {
   formatValue,
   type CellData,
 } from '@/lib/sheet/sheetModel'
-import { rectOf, useSheetSession, type CellPos } from './SheetSession'
+import { rectOf, useSheetSession, type CellPos, type Rect } from './SheetSession'
 
 const HDR_W = 44
 const HDR_H = 24
 const OVERSCAN = 3
+/** side of the draggable fill handle, in px */
+const FILL_HANDLE = 8
+
+/**
+ * Target rectangle for a fill drag: the source extended toward the hovered
+ * cell along the axis it travelled furthest, so dragging the corner down
+ * fills a column and dragging it sideways fills a row. Null when the hover
+ * has not left the source (nothing to fill).
+ */
+function fillTargetRect(src: Rect, hover: CellPos): Rect | null {
+  const vExt = Math.max(hover.r - src.r2, src.r1 - hover.r, 0)
+  const hExt = Math.max(hover.c - src.c2, src.c1 - hover.c, 0)
+  if (!vExt && !hExt) return null
+  if (vExt >= hExt) {
+    return {
+      r1: Math.min(hover.r, src.r1),
+      r2: Math.max(hover.r, src.r2),
+      c1: src.c1,
+      c2: src.c2,
+    }
+  }
+  return {
+    r1: src.r1,
+    r2: src.r2,
+    c1: Math.min(hover.c, src.c1),
+    c2: Math.max(hover.c, src.c2),
+  }
+}
 
 /** prefix sums: offsets[i] = top/left of line i; offsets[n] = total size */
 function buildOffsets(
@@ -60,7 +88,7 @@ function useDisplay() {
         value = cell.v ?? null
       }
       return {
-        text: formatValue(value, cell.s?.fmt),
+        text: formatValue(value, cell.s?.fmt, cell.s),
         error: false,
         num: typeof value === 'number',
       }
@@ -91,6 +119,10 @@ export function SpreadsheetEditor() {
     setColWidth,
     setRowHeight,
     pasteMatrix,
+    fillRange,
+    copySelection,
+    cutSelection,
+    pasteOriginFor,
   } = session
   const display = useDisplay()
 
@@ -98,6 +130,10 @@ export function SpreadsheetEditor() {
   const [scroll, setScroll] = useState({ top: 0, left: 0 })
   const [view, setView] = useState({ w: 800, h: 500 })
   const dragging = useRef(false)
+  /** fill-handle drag: the source rect being dragged, or null when idle */
+  const filling = useRef<{ r1: number; c1: number; r2: number; c2: number } | null>(null)
+  /** live preview rectangle while the fill handle is dragged */
+  const [fillTo, setFillTo] = useState<CellPos | null>(null)
 
   const colOffsets = useMemo(
     () => buildOffsets(sheet.cols, sheet.colW, DEFAULT_COL_W),
@@ -157,7 +193,35 @@ export function SpreadsheetEditor() {
   }
 
   const cellMouseEnter = (pos: CellPos) => {
-    if (dragging.current) select({ anchor: selection.anchor, focus: pos })
+    if (filling.current) {
+      fillToRef.current = pos
+      setFillTo(pos)
+    } else if (dragging.current) {
+      select({ anchor: selection.anchor, focus: pos })
+    }
+  }
+
+  const fillToRef = useRef<CellPos | null>(null)
+
+  /** Start a fill-handle drag from the current selection rectangle. */
+  const startFill = (e: React.MouseEvent) => {
+    if (readOnly) return
+    e.preventDefault()
+    e.stopPropagation()
+    filling.current = { ...rect }
+    fillToRef.current = null
+    setFillTo(null)
+    const onUp = () => {
+      window.removeEventListener('mouseup', onUp)
+      const src = filling.current
+      const to = fillToRef.current
+      filling.current = null
+      setFillTo(null)
+      if (!src || !to) return
+      const target = fillTargetRect(src, to)
+      if (target) fillRange(src, target)
+    }
+    window.addEventListener('mouseup', onUp)
   }
 
   const editValue = useRef('')
@@ -187,17 +251,8 @@ export function SpreadsheetEditor() {
   }
 
   /* ---------------- clipboard ---------------- */
-
-  const copySelection = useCallback(() => {
-    const { r1: a, c1: b, r2: y, c2: x } = rectOf(selection)
-    const lines: string[] = []
-    for (let r = a; r <= y; r++) {
-      const row: string[] = []
-      for (let c = b; c <= x; c++) row.push(editableTextOf(sheet.cells[cellKey(r, c)]))
-      lines.push(row.join('\t'))
-    }
-    void navigator.clipboard?.writeText(lines.join('\n')).catch(() => {})
-  }, [selection, sheet.cells])
+  // copy/cut origin tracking lives in the session, so the toolbar's clipboard
+  // buttons and the grid share one source of truth for paste translation.
 
   const onPaste = (e: React.ClipboardEvent) => {
     if (editing || readOnly) return
@@ -205,7 +260,9 @@ export function SpreadsheetEditor() {
     if (!text) return
     e.preventDefault()
     const rows = text.replace(/\r/g, '').replace(/\n$/, '').split('\n').map((l) => l.split('\t'))
-    pasteMatrix(rows)
+    // only OUR own copy has coordinates to translate against; text from
+    // another app is pasted verbatim
+    pasteMatrix(rows, pasteOriginFor(text))
   }
 
   /* ---------------- keyboard ---------------- */
@@ -258,8 +315,7 @@ export function SpreadsheetEditor() {
         return
       }
       if (k === 'x' && !readOnly) {
-        copySelection()
-        clearSelection()
+        cutSelection()
         e.preventDefault()
         return
       }
@@ -270,6 +326,11 @@ export function SpreadsheetEditor() {
       }
       if (k === 'i' && !readOnly) {
         applyStyle({ i: !sheet.cells[cellKey(active.r, active.c)]?.s?.i })
+        e.preventDefault()
+        return
+      }
+      if (k === 'u' && !readOnly) {
+        applyStyle({ u: !sheet.cells[cellKey(active.r, active.c)]?.s?.u })
         e.preventDefault()
         return
       }
@@ -387,8 +448,31 @@ export function SpreadsheetEditor() {
       }
       if (s?.b) style.fontWeight = 700
       if (s?.i) style.fontStyle = 'italic'
+      if (s?.u) style.textDecoration = 'underline'
       if (s?.color) style.color = s.color
       if (s?.bg) style.background = s.bg
+      if (s?.ff) style.fontFamily = s.ff
+      if (s?.fs) style.fontSize = s.fs
+      if (s?.wrap) {
+        style.whiteSpace = 'normal'
+        style.wordBreak = 'break-word'
+      }
+      if (s?.bd) {
+        // explicit borders sit on top of the default grid lines
+        const line = '1px solid var(--ink)'
+        if (s.bd.t) style.borderTop = line
+        if (s.bd.r) style.borderRight = line
+        if (s.bd.b) style.borderBottom = line
+        if (s.bd.l) style.borderLeft = line
+      }
+      if (s?.valign) {
+        // vertical align needs the cell to be a flex column; the horizontal
+        // alignment then rides on the text node via textAlign, unchanged
+        style.display = 'flex'
+        style.flexDirection = 'column'
+        style.justifyContent =
+          s.valign === 'top' ? 'flex-start' : s.valign === 'bottom' ? 'flex-end' : 'center'
+      }
       cells.push(
         <div
           key={key}
@@ -441,6 +525,36 @@ export function SpreadsheetEditor() {
         </div>
         <div className="sheet-cells" style={{ width: totalW, height: totalH }}>
           {cells}
+          {!readOnly && !editing && (
+            <div
+              className="sheet-fill-handle"
+              style={{
+                left: colOffsets[rect.c2 + 1] - FILL_HANDLE / 2,
+                top: rowOffsets[rect.r2 + 1] - FILL_HANDLE / 2,
+                width: FILL_HANDLE,
+                height: FILL_HANDLE,
+              }}
+              onMouseDown={startFill}
+              title="Drag to fill — formulas adjust their references"
+            />
+          )}
+          {fillTo &&
+            filling.current &&
+            (() => {
+              const t = fillTargetRect(filling.current, fillTo)
+              if (!t) return null
+              return (
+                <div
+                  className="sheet-fill-preview"
+                  style={{
+                    left: colOffsets[t.c1],
+                    top: rowOffsets[t.r1],
+                    width: colOffsets[t.c2 + 1] - colOffsets[t.c1],
+                    height: rowOffsets[t.r2 + 1] - rowOffsets[t.r1],
+                  }}
+                />
+              )
+            })()}
           {editing && (
             <input
               key={`${editing.pos.r}:${editing.pos.c}`}

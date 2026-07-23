@@ -16,6 +16,8 @@ import type {
   CardData,
   CardType,
   CodeDocMeta,
+  Folder,
+  FolderCategory,
   NoteDoc,
   PresentationDocMeta,
   Project,
@@ -58,6 +60,14 @@ import {
   refreshSectionChildren,
 } from '@/lib/board/sections'
 import { createWebEmbed } from '@/lib/web/WebEmbedService'
+import {
+  fileInto,
+  foldersOf,
+  nextFolderOrder,
+  unfileFrom,
+  uniqueFolderName,
+  type FoldableItem,
+} from '@/lib/sidebar/folders'
 import type { GraphViewSettings } from '@/lib/graph/graphTypes'
 import { decodeGraphSettings } from '@/lib/graph/GraphSettingsService'
 import { useWorkspaceLayoutStore } from './workspaceLayoutStore'
@@ -90,6 +100,20 @@ export const CARD_DEFAULTS: Record<CardType, { w: number; h: number; label: stri
 
 /** Header height of a collapsed section. */
 export const SECTION_COLLAPSED_H = 40
+
+/** Offset of a duplicated card from its original, so the copy is visible. */
+export const DUPLICATE_OFFSET = 24
+
+/** Which state slice holds the items of each sidebar category. */
+const FOLDER_RECORD_KEY = {
+  boards: 'boards',
+  docs: 'docs',
+  sheets: 'sheetDocs',
+  presentations: 'presentDocs',
+  code: 'codeDocs',
+  notes: 'notes',
+  assets: 'assets',
+} as const satisfies Record<FolderCategory, keyof AppState>
 
 const DEFAULT_EDGE = {
   type: 'default' as const,
@@ -150,6 +174,10 @@ interface AppState {
   sidebarFilter: SidebarFilter
   /** Graph View preferences, persisted per project (Phase 9.5). */
   graphSettings: Record<string, GraphViewSettings>
+  /** user folders inside the sidebar categories, keyed by id */
+  folders: Record<string, Folder>
+  /** sidebar categories the user collapsed */
+  collapsedCategories: FolderCategory[]
 
   setSearch: (s: string) => void
   setTagFilter: (t: string | null) => void
@@ -159,6 +187,22 @@ interface AppState {
   setLocale: (l: Locale) => void
   /** Merge + clamp a project's graph settings (creates defaults on first use). */
   setGraphSettings: (projectId: string, patch: Partial<GraphViewSettings>) => void
+
+  createFolder: (category: FolderCategory, name?: string) => string
+  renameFolder: (id: string, name: string) => void
+  /**
+   * Remove a folder. Its items are NEVER deleted: they lose the pointer and
+   * reappear as unfiled, so a mis-click can only ever cost the grouping.
+   */
+  deleteFolder: (id: string) => void
+  toggleFolderCollapsed: (id: string) => void
+  toggleCategoryCollapsed: (category: FolderCategory) => void
+  /** File an item into a folder, or out of every folder with null. */
+  moveToFolder: (
+    category: FolderCategory,
+    itemId: string,
+    folderId: string | null,
+  ) => void
 
   createWorkspace: (partial?: Partial<Workspace>) => string
   updateWorkspace: (id: string, patch: Partial<Omit<Workspace, 'id'>>) => void
@@ -208,6 +252,13 @@ interface AppState {
   updateCardData: (id: string, patch: Partial<CardData>) => void
   resizeCard: (id: string, w: number, h: number) => void
   deleteCard: (id: string) => void
+  /**
+   * Copy a card in place. The copy points at the SAME entity (asset,
+   * document, note, deck…), so inserting the same image twice never stores
+   * its bytes twice; geometry, colour and card-local settings are
+   * independent. Returns the new card id, or null when the source is gone.
+   */
+  duplicateCard: (id: string) => string | null
   /** Offset the given cards by (dx, dy) in flow space — keyboard arrow move. */
   nudgeCards: (ids: string[], dx: number, dy: number) => void
   /** Select exactly one card (or clear); keyboard focus drives this. */
@@ -423,6 +474,8 @@ export const useStore = create<AppState>()(
       tagFilter: null,
       sidebarFilter: 'all',
       graphSettings: {},
+      folders: {},
+      collapsedCategories: [],
 
       setSearch: (search) => set({ search }),
       setTagFilter: (tagFilter) => set({ tagFilter }),
@@ -437,6 +490,85 @@ export const useStore = create<AppState>()(
       },
       setTheme: (theme) => set({ theme }),
       setLocale: (locale) => set({ locale }),
+
+      createFolder: (category, name = 'New folder') => {
+        const s = get()
+        const id = nid('folder')
+        const siblings = foldersOf(s.folders, category, s.activeProjectId)
+        const now = Date.now()
+        const folder: Folder = {
+          id,
+          name: uniqueFolderName(name, siblings),
+          category,
+          projectId: s.activeProjectId,
+          order: nextFolderOrder(siblings),
+          collapsed: false,
+          createdAt: now,
+          updatedAt: now,
+        }
+        set({ folders: { ...s.folders, [id]: folder } })
+        return id
+      },
+
+      renameFolder: (id, name) =>
+        set((s) => {
+          const folder = s.folders[id]
+          if (!folder) return {}
+          const siblings = foldersOf(s.folders, folder.category, folder.projectId).filter(
+            (f) => f.id !== id,
+          )
+          return {
+            folders: {
+              ...s.folders,
+              [id]: {
+                ...folder,
+                name: uniqueFolderName(name, siblings),
+                updatedAt: Date.now(),
+              },
+            },
+          }
+        }),
+
+      deleteFolder: (id) =>
+        set((s) => {
+          const folder = s.folders[id]
+          if (!folder) return {}
+          const folders = { ...s.folders }
+          delete folders[id]
+          // the items outlive the folder — only the pointer goes
+          const key = FOLDER_RECORD_KEY[folder.category]
+          const records = s[key] as Record<string, FoldableItem>
+          const next = unfileFrom(records, [id])
+          return { folders, ...(next === records ? {} : { [key]: next }) } as Partial<AppState>
+        }),
+
+      toggleFolderCollapsed: (id) =>
+        set((s) => {
+          const folder = s.folders[id]
+          if (!folder) return {}
+          return {
+            folders: { ...s.folders, [id]: { ...folder, collapsed: !folder.collapsed } },
+          }
+        }),
+
+      toggleCategoryCollapsed: (category) =>
+        set((s) => ({
+          collapsedCategories: s.collapsedCategories.includes(category)
+            ? s.collapsedCategories.filter((c) => c !== category)
+            : [...s.collapsedCategories, category],
+        })),
+
+      moveToFolder: (category, itemId, folderId) =>
+        set((s) => {
+          const key = FOLDER_RECORD_KEY[category]
+          // the record maps have different value types but all carry the
+          // optional folderId, so the move is expressed once over the
+          // structural minimum and re-attached to the right slice
+          const records = s[key] as Record<string, FoldableItem>
+          const next = fileInto(records, itemId, folderId)
+          return (next === records ? {} : { [key]: next }) as Partial<AppState>
+        }),
+
       setGraphSettings: (projectId, patch) =>
         set((s) => {
           const current = decodeGraphSettings(s.graphSettings[projectId])
@@ -953,6 +1085,62 @@ export const useStore = create<AppState>()(
             edges: board.edges.filter((e) => e.source !== id && e.target !== id),
           })
         }),
+
+      duplicateCard: (id) => {
+        const s = get()
+        const board = s.boards[s.activeBoardId]
+        const source = board?.nodes.find((n) => n.id === id)
+        if (!source) return null
+
+        // Entity references (assetId, docId, noteId, sheetId…) are copied
+        // verbatim: the copy is a second view onto the same stored entity,
+        // so nothing is re-imported and no blob is written twice. Only the
+        // payloads a card OWNS get a fresh identity.
+        const isSection = source.type === 'section' && !!source.data.section
+        const newId = isSection ? nid('section') : nid('card')
+        const data: CardData = { ...source.data }
+        if (isSection && data.section) {
+          // a section node's id IS its section id; the copy is an empty
+          // frame — the original keeps its cards
+          data.section = {
+            ...data.section,
+            id: newId,
+            x: data.section.x + DUPLICATE_OFFSET,
+            y: data.section.y + DUPLICATE_OFFSET,
+            childCardIds: [],
+          }
+        }
+        if (data.embed) {
+          const now = Date.now()
+          data.embed = { ...data.embed, id: nid('embed'), createdAt: now, updatedAt: now }
+        }
+
+        // drop React Flow's measurement/drag bookkeeping so the copy is
+        // measured fresh rather than inheriting the original's runtime state
+        const { measured: _measured, dragging: _dragging, ...rest } = source
+        const copy: BoardNode = {
+          ...rest,
+          id: newId,
+          position: {
+            x: source.position.x + DUPLICATE_OFFSET,
+            y: source.position.y + DUPLICATE_OFFSET,
+          },
+          selected: true,
+          data,
+        }
+
+        const others = board.nodes.map((n) => ({ ...n, selected: false }))
+        set(
+          patchBoard(s, board.id, {
+            // sections live at the START: rendered behind cards, and React
+            // Flow requires a parent to precede its children
+            nodes: refreshSectionChildren(
+              isSection ? [copy, ...others] : [...others, copy],
+            ),
+          }),
+        )
+        return newId
+      },
 
       nudgeCards: (ids, dx, dy) =>
         set((s) => {
@@ -1689,7 +1877,7 @@ export const useStore = create<AppState>()(
     }),
     {
       name: 'lattice-vault-v1',
-      version: 3,
+      version: 4,
       migrate: (persisted, version) => {
         // v0 → v1: introduce projects; the default project adopts everything
         const s = persisted as Partial<AppState>
@@ -1736,6 +1924,14 @@ export const useStore = create<AppState>()(
             s.viewMode = hasEntity ? 'doc' : 'board'
           }
         }
+        // v3 → v4: sidebar folders. Nothing to rewrite — membership lives on
+        // the item, so every existing entity already reads as unfiled. This
+        // takes v4 because v3 was already shipped for the split degradation
+        // above; reusing it would skip these keys for anyone already on v3.
+        if (version < 4) {
+          s.folders = s.folders ?? {}
+          s.collapsedCategories = s.collapsedCategories ?? []
+        }
         return s as AppState
       },
       partialize: (s) => ({
@@ -1765,6 +1961,8 @@ export const useStore = create<AppState>()(
         theme: s.theme,
         locale: s.locale,
         graphSettings: s.graphSettings,
+        folders: s.folders,
+        collapsedCategories: s.collapsedCategories,
       }),
     },
   ),

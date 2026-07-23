@@ -80,6 +80,101 @@ describe('board keyboard-driven actions', () => {
   })
 })
 
+describe('duplicateCard — a copy shares the file', () => {
+  beforeEach(resetBoard)
+
+  it('points the copy at the same asset instead of copying the bytes', () => {
+    const s = useStore.getState()
+    const original = s.addCard('asset', { x: 0, y: 0 }, { assetId: 'asset_1' })
+    const copy = useStore.getState().duplicateCard(original)
+    expect(copy).toBeTruthy()
+    const nodes = board().nodes
+    expect(nodes).toHaveLength(2)
+    // same asset id on both cards — one blob, two views
+    expect(nodes.map((n) => n.data.assetId)).toEqual(['asset_1', 'asset_1'])
+    expect(copy).not.toBe(original)
+  })
+
+  it('offsets the copy so it does not hide the original', () => {
+    const original = useStore
+      .getState()
+      .addCard('asset', { x: 100, y: 50 }, { assetId: 'asset_1' })
+    const copy = useStore.getState().duplicateCard(original)!
+    const node = board().nodes.find((n) => n.id === copy)!
+    expect(node.position).toEqual({ x: 124, y: 74 })
+  })
+
+  it('gives the copy independent geometry and styling', () => {
+    const original = useStore
+      .getState()
+      .addCard('asset', { x: 0, y: 0 }, { assetId: 'asset_1' })
+    const copy = useStore.getState().duplicateCard(original)!
+    useStore.getState().resizeCard(copy, 500, 400)
+    useStore.getState().updateCardData(copy, { color: 'red', caption: 'copy only' })
+
+    const originalNode = board().nodes.find((n) => n.id === original)!
+    const copyNode = board().nodes.find((n) => n.id === copy)!
+    expect(copyNode.width).toBe(500)
+    expect(originalNode.width).not.toBe(500)
+    expect(copyNode.data.color).toBe('red')
+    expect(originalNode.data.color).toBe('gray')
+    expect(originalNode.data.caption).toBeUndefined()
+    // …while still sharing the underlying file
+    expect(copyNode.data.assetId).toBe(originalNode.data.assetId)
+  })
+
+  it('selects the copy and deselects everything else', () => {
+    const original = useStore
+      .getState()
+      .addCard('asset', { x: 0, y: 0 }, { assetId: 'asset_1' })
+    const copy = useStore.getState().duplicateCard(original)!
+    const selected = board().nodes.filter((n) => n.selected)
+    expect(selected).toHaveLength(1)
+    expect(selected[0].id).toBe(copy)
+  })
+
+  it('shares the entity for every reference-backed card type', () => {
+    // images, video, audio and attachments all arrive as `asset` cards, and
+    // documents/sheets/decks reference their entity the same way
+    for (const [type, data] of [
+      ['asset', { assetId: 'asset_1' }],
+      ['richdoc', { docId: 'doc_1' }],
+      ['sheet', { sheetId: 'sheet_1' }],
+      ['code', { codeId: 'code_1' }],
+      ['presentation', { presentId: 'pres_1' }],
+    ] as const) {
+      resetBoard()
+      const original = useStore.getState().addCard(type, { x: 0, y: 0 }, data)
+      const copy = useStore.getState().duplicateCard(original)!
+      const copyNode = board().nodes.find((n) => n.id === copy)!
+      expect(copyNode.data).toMatchObject(data)
+    }
+  })
+
+  it('gives a duplicated section a fresh identity and no children', () => {
+    const s = useStore.getState()
+    const sectionId = s.addSection({ x: 0, y: 0 }, 'Group')
+    const child = useStore.getState().addCard('asset', { x: 20, y: 20 }, { assetId: 'a1' })
+    useStore.getState().attachCardToSection(child, sectionId)
+
+    const copy = useStore.getState().duplicateCard(sectionId)!
+    expect(copy).not.toBe(sectionId)
+    const copyNode = board().nodes.find((n) => n.id === copy)!
+    // a section node's id IS its section id
+    expect(copyNode.data.section?.id).toBe(copy)
+    // the copy is an empty frame; the original keeps its card
+    expect(copyNode.data.section?.childCardIds).toEqual([])
+    const originalNode = board().nodes.find((n) => n.id === sectionId)!
+    expect(originalNode.data.section?.childCardIds).toEqual([child])
+    // sections must precede their children for React Flow
+    expect(board().nodes[0].type).toBe('section')
+  })
+
+  it('returns null for a card that no longer exists', () => {
+    expect(useStore.getState().duplicateCard('card_missing')).toBeNull()
+  })
+})
+
 describe('applyNav — URL/history restore', () => {
   it('restores project, mode and the single open entity', () => {
     const s = useStore.getState()

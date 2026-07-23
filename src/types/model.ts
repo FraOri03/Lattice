@@ -10,6 +10,8 @@ export interface NoteDoc {
   updatedAt: number
   /** owning project (Phase 6); entities without one belong to the default project */
   projectId?: string
+  /** sidebar folder inside its category; unset = unfiled */
+  folderId?: string
 }
 
 /* ---------------- projects (Phase 6) ---------------- */
@@ -85,6 +87,54 @@ export interface Workspace {
   archived: boolean
   /** the automatically created personal workspace (undeletable) */
   personal: boolean
+  createdAt: number
+  updatedAt: number
+}
+
+/* ---------------- sidebar folders ---------------- */
+
+/**
+ * The sidebar sections that can hold user folders. These mirror the
+ * existing type-based grouping — folders live INSIDE a category, so an
+ * item never changes type by being filed.
+ */
+export type FolderCategory =
+  | 'boards'
+  | 'docs'
+  | 'sheets'
+  | 'presentations'
+  | 'code'
+  | 'notes'
+  | 'assets'
+
+export const FOLDER_CATEGORIES: FolderCategory[] = [
+  'boards',
+  'docs',
+  'sheets',
+  'presentations',
+  'code',
+  'notes',
+  'assets',
+]
+
+/**
+ * A user-created folder inside one sidebar category, scoped to a project.
+ *
+ * Membership is stored on the ITEM (`folderId`), exactly like `projectId`
+ * already is: an item with no folderId is simply unfiled, which is what
+ * every pre-folder vault looks like, so the feature needs no data rewrite.
+ * Deleting a folder therefore only has to clear that pointer — the items
+ * survive as unfiled unless the user explicitly asks otherwise.
+ */
+export interface Folder {
+  id: string
+  name: string
+  category: FolderCategory
+  projectId?: string
+  /** sort position within its category, ascending */
+  order: number
+  /** collapsed in the sidebar; persisted so it survives a refresh */
+  collapsed: boolean
   createdAt: number
   updatedAt: number
 }
@@ -176,6 +226,8 @@ export interface AssetDoc {
   assetPath: string // e.g. assets/asset_x1y2.pdf
   importPath: string // e.g. imports/report.pdf
   projectId?: string
+  /** sidebar folder inside its category; unset = unfiled */
+  folderId?: string
   /** companion files for multi-file formats (GLTF+BIN+textures, OBJ+MTL) */
   bundle?: AssetBundleInfo
 }
@@ -213,6 +265,8 @@ export interface RichDocMeta {
   /** open extension point for plugins / future fields */
   metadata: Record<string, unknown>
   projectId?: string
+  /** sidebar folder inside its category; unset = unfiled */
+  folderId?: string
 }
 
 /** Card display mode for rich document / code cards on boards. */
@@ -243,6 +297,8 @@ export interface CodeDocMeta {
   tags: string[]
   metadata: Record<string, unknown>
   projectId?: string
+  /** sidebar folder inside its category; unset = unfiled */
+  folderId?: string
 }
 
 /* ---------------- spreadsheet documents ---------------- */
@@ -273,6 +329,8 @@ export interface SpreadsheetDocMeta {
   /** open extension point for plugins / future fields */
   metadata: Record<string, unknown>
   projectId?: string
+  /** sidebar folder inside its category; unset = unfiled */
+  folderId?: string
 }
 
 /* ---------------- presentations (Phase 8) ---------------- */
@@ -297,6 +355,8 @@ export interface PresentationDocMeta {
   tags: string[]
   metadata: Record<string, unknown>
   projectId?: string
+  /** sidebar folder inside its category; unset = unfiled */
+  folderId?: string
 }
 
 /* ---------------- board cards ---------------- */
@@ -416,6 +476,8 @@ export interface Board {
   nodes: BoardNode[]
   edges: Edge[]
   projectId?: string
+  /** sidebar folder inside its category; unset = unfiled */
+  folderId?: string
 }
 
 /**

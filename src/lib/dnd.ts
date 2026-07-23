@@ -5,3 +5,5 @@ export const DOC_DRAG_MIME = 'application/x-lattice-doc'
 export const CODE_DRAG_MIME = 'application/x-lattice-code'
 export const SHEET_DRAG_MIME = 'application/x-lattice-sheet'
 export const PRESENT_DRAG_MIME = 'application/x-lattice-present'
+/** Boards are draggable between sidebar folders (never onto the canvas). */
+export const BOARD_DRAG_MIME = 'application/x-lattice-board'

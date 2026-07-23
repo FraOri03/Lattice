@@ -7,19 +7,52 @@
  */
 
 /** Number display format for a cell. */
-export type NumFmt = 'general' | 'number' | 'integer' | 'percent' | 'currency'
+export type NumFmt =
+  | 'general'
+  | 'number'
+  | 'integer'
+  | 'percent'
+  | 'currency'
+  | 'date'
+  | 'time'
+  | 'datetime'
+
+/** Which sides of a cell draw an explicit border. */
+export interface CellBorders {
+  t?: boolean
+  r?: boolean
+  b?: boolean
+  l?: boolean
+}
 
 export interface CellStyle {
   /** bold */
   b?: boolean
   /** italic */
   i?: boolean
+  /** underline */
+  u?: boolean
   /** text color (css) */
   color?: string
   /** fill color (css) */
   bg?: string
+  /** horizontal alignment */
   align?: 'left' | 'center' | 'right'
+  /** vertical alignment */
+  valign?: 'top' | 'middle' | 'bottom'
+  /** wrap long text onto multiple lines */
+  wrap?: boolean
+  /** font family (css font-family value) */
+  ff?: string
+  /** font size in px */
+  fs?: number
   fmt?: NumFmt
+  /** decimal places for number/percent/currency (overrides the default 2) */
+  dec?: number
+  /** thousands grouping for the number format */
+  thou?: boolean
+  /** explicit borders; absent means only the default grid lines */
+  bd?: CellBorders
 }
 
 export interface CellData {
@@ -155,18 +188,62 @@ const nf = {
     currency: 'EUR',
   }),
   general: new Intl.NumberFormat(undefined, { maximumFractionDigits: 10 }),
+  date: null,
+  time: null,
+  datetime: null,
 }
 
-/** Format a raw display value using the cell's number format. */
+/* serial-date helpers, matching the FormulaEngine epoch (1899-12-30). Kept
+   inline so sheetModel stays free of a cycle with the engine. */
+const SERIAL_EPOCH_UTC = Date.UTC(1899, 11, 30)
+const DAY_MS = 86_400_000
+const serialToDate = (serial: number): Date =>
+  new Date(SERIAL_EPOCH_UTC + Math.round(serial * DAY_MS))
+const pad2 = (n: number): string => String(n).padStart(2, '0')
+
+/** Number formatter honouring a decimals override and thousands toggle. */
+function numberFormatter(base: NumFmt, dec?: number, thou?: boolean): Intl.NumberFormat {
+  const opts: Intl.NumberFormatOptions = { useGrouping: thou ?? true }
+  if (base === 'percent') opts.style = 'percent'
+  if (base === 'currency') {
+    opts.style = 'currency'
+    opts.currency = 'EUR'
+  }
+  const digits = dec ?? (base === 'integer' ? 0 : 2)
+  opts.minimumFractionDigits = digits
+  opts.maximumFractionDigits = digits
+  return new Intl.NumberFormat(undefined, opts)
+}
+
+/**
+ * Format a raw display value using the cell's number format. The simple
+ * two-argument form is kept for callers that only know the format id;
+ * date/time/decimals/thousands need the full style, so pass it as the
+ * optional third argument (formatCell does).
+ */
 export function formatValue(
   value: string | number | boolean | null,
   fmt: NumFmt = 'general',
+  style?: CellStyle,
 ): string {
   if (value === null || value === undefined) return ''
   if (typeof value === 'boolean') return value ? 'TRUE' : 'FALSE'
   if (typeof value === 'number') {
     if (!Number.isFinite(value)) return '#NUM!'
-    return nf[fmt].format(value)
+    if (fmt === 'date' || fmt === 'time' || fmt === 'datetime') {
+      const d = serialToDate(value)
+      const date = `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`
+      const frac = value - Math.floor(value)
+      const secs = Math.round(frac * 86_400)
+      const time = `${pad2(Math.floor(secs / 3600) % 24)}:${pad2(Math.floor(secs / 60) % 60)}:${pad2(secs % 60)}`
+      return fmt === 'date' ? date : fmt === 'time' ? time : `${date} ${time}`
+    }
+    if (fmt === 'general') return nf.general.format(value)
+    if ((style?.dec === undefined && !style?.thou) || fmt === 'integer') {
+      // fast path: the shared formatter covers the default cases
+      if (style?.dec === undefined && style?.thou === undefined) return nf[fmt]!.format(value)
+    }
+    return numberFormatter(fmt, style?.dec, style?.thou).format(value)
   }
   return value
 }
@@ -174,7 +251,7 @@ export function formatValue(
 export function formatCell(cell: CellData | undefined): string {
   const v = displayValueOf(cell)
   if (typeof v === 'string' && v.startsWith('#')) return v // error codes as-is
-  return formatValue(v, cell?.s?.fmt)
+  return formatValue(v, cell?.s?.fmt, cell?.s)
 }
 
 /**

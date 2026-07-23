@@ -189,6 +189,35 @@ body {
   fill: var(--bg);
 }
 
+/* ---------- board zoom controls ---------- */
+/*
+ * Every React Flow panel shares z-index 5, so the last one in the DOM wins.
+ * The bottom edge already belongs to the full-width CanvasToolbar and to
+ * BoardAddMenu, which painted over the lower half of the default
+ * bottom-left control column and left "Fit view" / "Toggle interactivity"
+ * unclickable. The controls now sit bottom-right, lifted above the minimap.
+ *
+ * Colours come from the app tokens rather than React Flow's generic greys,
+ * so hover/disabled contrast follows the active theme (its own dark palette
+ * only applies under .react-flow.dark, which drifts from ours).
+ */
+.react-flow__controls {
+  --xy-controls-button-background-color: var(--panel);
+  --xy-controls-button-background-color-hover: var(--panel2);
+  --xy-controls-button-color: var(--ink);
+  --xy-controls-button-color-hover: var(--accent);
+  --xy-controls-button-border-color: var(--bord);
+  border: 1px solid var(--bord);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+/* Offset tied to the minimap actually being rendered (150px + its 15px
+   panel margin), so the controls fall back to the corner without it. */
+.react-flow:has(.react-flow__minimap) .react-flow__controls.bottom.right {
+  bottom: 165px;
+}
+
 /* ---------- markdown ---------- */
 .md {
   line-height: 1.55;
@@ -548,6 +577,61 @@ body {
   opacity: 0.4;
   cursor: default;
 }
+/* categorised spreadsheet toolbar: labelled clusters that wrap to width */
+.sheet-toolbar {
+  gap: 0;
+  align-items: stretch;
+  row-gap: 4px;
+  /* groups wrap to width; if a single group is wider than a very narrow
+     pane, scroll rather than clip so every control stays reachable */
+  overflow-x: auto;
+}
+.tb-group {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 0 7px;
+  border-right: 1px solid var(--bord);
+}
+.tb-group:last-of-type {
+  border-right: none;
+}
+.tb-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.tb-cat {
+  font-size: 8.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  line-height: 1;
+}
+/*
+ * Toolbar selects get their own class rather than reusing .field: .field is
+ * unlayered, so it outranks Tailwind utilities and its 13px text + 6px
+ * vertical padding clipped inside the 24px toolbar row.
+ */
+.tbsel {
+  height: 24px;
+  padding: 0 4px;
+  border: 1px solid var(--bord);
+  border-radius: 6px;
+  background: var(--panel2);
+  color: var(--ink);
+  font-size: 11px;
+  line-height: 1;
+  outline: none;
+  cursor: pointer;
+}
+.tbsel:hover {
+  border-color: var(--accent);
+}
+.tbsel:focus-visible {
+  border-color: var(--accent);
+}
 .bubble-menu,
 .block-menu {
   display: flex;
@@ -709,6 +793,23 @@ body {
   font-family: inherit;
   outline: none;
   box-shadow: var(--shadow);
+}
+/* fill handle: the small square at the selection's bottom-right corner */
+.sheet-fill-handle {
+  position: absolute;
+  z-index: 3;
+  background: var(--accent);
+  border: 1px solid var(--panel);
+  border-radius: 1px;
+  cursor: crosshair;
+}
+/* dashed outline previewing where a fill drag will land */
+.sheet-fill-preview {
+  position: absolute;
+  z-index: 3;
+  pointer-events: none;
+  outline: 2px dashed var(--accent);
+  outline-offset: -2px;
 }
 .sheet-tab {
   display: flex;
