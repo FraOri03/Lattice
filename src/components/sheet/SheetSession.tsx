@@ -18,6 +18,7 @@ import {
   deleteCol,
   deleteRow,
   deleteSheet,
+  editableTextOf,
   insertCol,
   insertRow,
   normalizeBody,
@@ -111,6 +112,15 @@ export interface SheetSessionValue {
    * along one axis), translating formulas by how far each cell moved.
    */
   fillRange: (source: Rect, target: Rect) => void
+  /** Copy the selection to the clipboard (TSV) and remember its origin. */
+  copySelection: () => void
+  /** Copy the selection, then clear it (cut). */
+  cutSelection: () => void
+  /**
+   * The copy origin for `text` if it matches this session's last copy, so a
+   * paste of our own block translates formulas; undefined for foreign text.
+   */
+  pasteOriginFor: (text: string) => { r: number; c: number } | undefined
 }
 
 const SheetSessionContext = createContext<SheetSessionValue | null>(null)
@@ -152,6 +162,8 @@ export function SheetSessionProvider({
 
   const saveTimer = useRef<number | undefined>(undefined)
   const pending = useRef<SpreadsheetBody | null>(null)
+  /** top-left + text of the last in-app copy, shared by grid and toolbar */
+  const copyOrigin = useRef<{ r: number; c: number; text: string } | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -269,7 +281,7 @@ export function SheetSessionProvider({
       })
     }
 
-    return {
+    const api: SheetSessionValue = {
       sheetId,
       meta,
       body,
@@ -385,7 +397,30 @@ export function SheetSessionProvider({
           focus: { r: tgt.r2, c: tgt.c2 },
         })
       },
+      copySelection: () => {
+        const r = rectOf(selection)
+        const lines: string[] = []
+        for (let row = r.r1; row <= r.r2; row++) {
+          const cols: string[] = []
+          for (let col = r.c1; col <= r.c2; col++) {
+            cols.push(editableTextOf(sheet.cells[cellKey(row, col)]))
+          }
+          lines.push(cols.join('\t'))
+        }
+        const text = lines.join('\n')
+        copyOrigin.current = { r: r.r1, c: r.c1, text }
+        void navigator.clipboard?.writeText(text).catch(() => {})
+      },
+      cutSelection: () => {
+        api.copySelection()
+        api.clearSelection()
+      },
+      pasteOriginFor: (text) => {
+        const o = copyOrigin.current
+        return o && o.text === text ? { r: o.r, c: o.c } : undefined
+      },
     }
+    return api
   }, [
     meta,
     body,

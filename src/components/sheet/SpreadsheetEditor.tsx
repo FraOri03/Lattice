@@ -88,7 +88,7 @@ function useDisplay() {
         value = cell.v ?? null
       }
       return {
-        text: formatValue(value, cell.s?.fmt),
+        text: formatValue(value, cell.s?.fmt, cell.s),
         error: false,
         num: typeof value === 'number',
       }
@@ -120,6 +120,9 @@ export function SpreadsheetEditor() {
     setRowHeight,
     pasteMatrix,
     fillRange,
+    copySelection,
+    cutSelection,
+    pasteOriginFor,
   } = session
   const display = useDisplay()
 
@@ -127,8 +130,6 @@ export function SpreadsheetEditor() {
   const [scroll, setScroll] = useState({ top: 0, left: 0 })
   const [view, setView] = useState({ w: 800, h: 500 })
   const dragging = useRef(false)
-  /** top-left + text of the last in-app copy, for formula translation */
-  const lastCopy = useRef<{ r: number; c: number; text: string } | null>(null)
   /** fill-handle drag: the source rect being dragged, or null when idle */
   const filling = useRef<{ r1: number; c1: number; r2: number; c2: number } | null>(null)
   /** live preview rectangle while the fill handle is dragged */
@@ -250,21 +251,8 @@ export function SpreadsheetEditor() {
   }
 
   /* ---------------- clipboard ---------------- */
-
-  const copySelection = useCallback(() => {
-    const { r1: a, c1: b, r2: y, c2: x } = rectOf(selection)
-    const lines: string[] = []
-    for (let r = a; r <= y; r++) {
-      const row: string[] = []
-      for (let c = b; c <= x; c++) row.push(editableTextOf(sheet.cells[cellKey(r, c)]))
-      lines.push(row.join('\t'))
-    }
-    const text = lines.join('\n')
-    // remember where the block came from: the clipboard only carries text,
-    // so this is what lets paste translate relative references
-    lastCopy.current = { r: a, c: b, text }
-    void navigator.clipboard?.writeText(text).catch(() => {})
-  }, [selection, sheet.cells])
+  // copy/cut origin tracking lives in the session, so the toolbar's clipboard
+  // buttons and the grid share one source of truth for paste translation.
 
   const onPaste = (e: React.ClipboardEvent) => {
     if (editing || readOnly) return
@@ -274,9 +262,7 @@ export function SpreadsheetEditor() {
     const rows = text.replace(/\r/g, '').replace(/\n$/, '').split('\n').map((l) => l.split('\t'))
     // only OUR own copy has coordinates to translate against; text from
     // another app is pasted verbatim
-    const copied = lastCopy.current
-    const origin = copied && copied.text === text ? { r: copied.r, c: copied.c } : undefined
-    pasteMatrix(rows, origin)
+    pasteMatrix(rows, pasteOriginFor(text))
   }
 
   /* ---------------- keyboard ---------------- */
@@ -329,8 +315,7 @@ export function SpreadsheetEditor() {
         return
       }
       if (k === 'x' && !readOnly) {
-        copySelection()
-        clearSelection()
+        cutSelection()
         e.preventDefault()
         return
       }
@@ -341,6 +326,11 @@ export function SpreadsheetEditor() {
       }
       if (k === 'i' && !readOnly) {
         applyStyle({ i: !sheet.cells[cellKey(active.r, active.c)]?.s?.i })
+        e.preventDefault()
+        return
+      }
+      if (k === 'u' && !readOnly) {
+        applyStyle({ u: !sheet.cells[cellKey(active.r, active.c)]?.s?.u })
         e.preventDefault()
         return
       }
@@ -458,8 +448,23 @@ export function SpreadsheetEditor() {
       }
       if (s?.b) style.fontWeight = 700
       if (s?.i) style.fontStyle = 'italic'
+      if (s?.u) style.textDecoration = 'underline'
       if (s?.color) style.color = s.color
       if (s?.bg) style.background = s.bg
+      if (s?.ff) style.fontFamily = s.ff
+      if (s?.fs) style.fontSize = s.fs
+      if (s?.wrap) {
+        style.whiteSpace = 'normal'
+        style.wordBreak = 'break-word'
+      }
+      if (s?.valign) {
+        // vertical align needs the cell to be a flex column; the horizontal
+        // alignment then rides on the text node via textAlign, unchanged
+        style.display = 'flex'
+        style.flexDirection = 'column'
+        style.justifyContent =
+          s.valign === 'top' ? 'flex-start' : s.valign === 'bottom' ? 'flex-end' : 'center'
+      }
       cells.push(
         <div
           key={key}

@@ -29,6 +29,9 @@ const NUMFMT_TO_Z: Record<NumFmt, string | undefined> = {
   general: undefined,
   number: '#,##0.00',
   integer: '#,##0',
+  date: 'yyyy-mm-dd',
+  time: 'hh:mm:ss',
+  datetime: 'yyyy-mm-dd hh:mm:ss',
   percent: '0.00%',
   currency: '#,##0.00 "€"',
 }

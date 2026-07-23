@@ -571,6 +571,38 @@ body {
   opacity: 0.4;
   cursor: default;
 }
+/* categorised spreadsheet toolbar: labelled clusters that wrap to width */
+.sheet-toolbar {
+  gap: 0;
+  align-items: stretch;
+  row-gap: 4px;
+  /* groups wrap to width; if a single group is wider than a very narrow
+     pane, scroll rather than clip so every control stays reachable */
+  overflow-x: auto;
+}
+.tb-group {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 0 7px;
+  border-right: 1px solid var(--bord);
+}
+.tb-group:last-of-type {
+  border-right: none;
+}
+.tb-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.tb-cat {
+  font-size: 8.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  line-height: 1;
+}
 .bubble-menu,
 .block-menu {
   display: flex;
