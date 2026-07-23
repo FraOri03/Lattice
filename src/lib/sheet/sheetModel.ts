@@ -17,6 +17,14 @@ export type NumFmt =
   | 'time'
   | 'datetime'
 
+/** Which sides of a cell draw an explicit border. */
+export interface CellBorders {
+  t?: boolean
+  r?: boolean
+  b?: boolean
+  l?: boolean
+}
+
 export interface CellStyle {
   /** bold */
   b?: boolean
@@ -43,6 +51,8 @@ export interface CellStyle {
   dec?: number
   /** thousands grouping for the number format */
   thou?: boolean
+  /** explicit borders; absent means only the default grid lines */
+  bd?: CellBorders
 }
 
 export interface CellData {

@@ -457,6 +457,14 @@ export function SpreadsheetEditor() {
         style.whiteSpace = 'normal'
         style.wordBreak = 'break-word'
       }
+      if (s?.bd) {
+        // explicit borders sit on top of the default grid lines
+        const line = '1px solid var(--ink)'
+        if (s.bd.t) style.borderTop = line
+        if (s.bd.r) style.borderRight = line
+        if (s.bd.b) style.borderBottom = line
+        if (s.bd.l) style.borderLeft = line
+      }
       if (s?.valign) {
         // vertical align needs the cell to be a flex column; the horizontal
         // alignment then rides on the text node via textAlign, unchanged

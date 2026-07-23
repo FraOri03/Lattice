@@ -40,6 +40,7 @@ import {
   type ComputedCell,
 } from '@/lib/sheet/FormulaEngine'
 import { computeFill } from '@/lib/sheet/fill'
+import { computeBorders, type BorderKind } from '@/lib/sheet/borders'
 import {
   findReplaceInRange,
   removeDuplicateRows,
@@ -138,6 +139,8 @@ export interface SheetSessionValue {
   removeDuplicates: () => number
   /** Replace text across the selection; returns how many cells changed. */
   findReplace: (find: string, replace: string, opts?: FindReplaceOptions) => number
+  /** Draw borders over the selection ('all' | 'outline' | 'none'). */
+  applyBorders: (kind: BorderKind) => void
 }
 
 const SheetSessionContext = createContext<SheetSessionValue | null>(null)
@@ -476,6 +479,28 @@ export function SheetSessionProvider({
         )
         if (removed) applyWrites(writes)
         return removed
+      },
+      applyBorders: (kind) => {
+        const r = rectOf(selection)
+        const patches = computeBorders(r, kind)
+        updateBody((b) => {
+          let next = b
+          for (const p of patches) {
+            const prev = next.sheets[si].cells[cellKey(p.r, p.c)]
+            const style = { ...(prev?.s ?? {}) }
+            if (p.bd) style.bd = p.bd
+            else delete style.bd
+            const hasStyle = Object.keys(style).length > 0
+            // a border-only cell still needs a record to carry the style
+            const cell = prev
+              ? { ...prev, s: hasStyle ? style : undefined }
+              : hasStyle
+                ? { s: style }
+                : null
+            next = setCell(next, si, p.r, p.c, cell)
+          }
+          return next
+        })
       },
       findReplace: (find, replace, opts) => {
         const target = dataTarget()

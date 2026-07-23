@@ -3,6 +3,7 @@ import { cellKey, type CellStyle, type NumFmt } from '@/lib/sheet/sheetModel'
 import { IcAlignCenter, IcAlignLeft, IcAlignRight, IcSearch } from '@/components/Icons'
 import { SheetPeerChips } from '@/components/collab/EntityPresence'
 import { toast } from '@/components/ui/Toaster'
+import type { BorderKind } from '@/lib/sheet/borders'
 import { rectOf, useSheetSession } from './SheetSession'
 
 const NUM_FMTS: { id: NumFmt; label: string }[] = [
@@ -191,6 +192,7 @@ export function SpreadsheetToolbar() {
     sortSelection,
     removeDuplicates,
     findReplace,
+    applyBorders,
   } = useSheetSession()
   if (readOnly) return null
 
@@ -288,6 +290,20 @@ export function SpreadsheetToolbar() {
           onPick={(bg) => applyStyle({ bg })}
           onClear={() => applyStyle({ bg: undefined })}
         />
+        <select
+          className="field h-6 w-20 cursor-pointer px-1 py-0 text-[11px]"
+          title="Borders"
+          value=""
+          onChange={(e) => {
+            if (e.target.value) applyBorders(e.target.value as BorderKind)
+            e.target.value = ''
+          }}
+        >
+          <option value="">Borders…</option>
+          <option value="all">All borders</option>
+          <option value="outline">Outline</option>
+          <option value="none">No border</option>
+        </select>
       </Group>
 
       <Group label="Alignment">
