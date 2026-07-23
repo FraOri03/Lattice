@@ -2,7 +2,7 @@ import type { FC } from 'react'
 import type { NodeProps } from '@xyflow/react'
 import type { AssetDoc, AssetKind, BoardNode } from '@/types/model'
 import { useStore } from '@/store/useStore'
-import { useAssetUrl } from '@/lib/assets/AssetRegistry'
+import { useAssetBinary } from '@/lib/assets/AssetRegistry'
 import { plannedEditorFor } from '@/lib/registry/documents'
 import { conversionNoteForAsset } from '@/lib/convert/ConversionService'
 import { formatBytes } from '@/lib/media'
@@ -109,7 +109,7 @@ const cardBodyRegistry: Record<AssetKind, FC<BodyProps>> = {
 
 export function AssetCardNode({ data, selected }: NodeProps<BoardNode>) {
   const asset = useStore((s) => (data.assetId ? s.assets[data.assetId] : undefined))
-  const url = useAssetUrl(asset?.id)
+  const { url, state } = useAssetBinary(asset?.id)
   const openAsset = useStore((s) => s.openAsset)
 
   if (!asset) {
@@ -129,6 +129,31 @@ export function AssetCardNode({ data, selected }: NodeProps<BoardNode>) {
 
   const Icon = KIND_ICONS[asset.kind]
   const Body = cardBodyRegistry[asset.kind]
+
+  // The metadata reached this device but the bytes did not — the usual cause is
+  // that someone else added the file: binaries are local-first and mirrored to
+  // their owner's own Drive, so they do not travel with the board. Say it
+  // plainly instead of rendering an empty frame.
+  if (state === 'absent') {
+    return (
+      <CardChrome
+        data={data}
+        selected={selected}
+        icon={<Icon size={13} />}
+        title={asset.name}
+        minWidth={180}
+        minHeight={90}
+      >
+        <div
+          className="placeholder"
+          title="This file's contents are not stored on this device. Ask whoever added it to share the original, or open the project on the device it was added from."
+        >
+          Not available on this device
+        </div>
+      </CardChrome>
+    )
+  }
+
   return (
     <CardChrome
       data={data}

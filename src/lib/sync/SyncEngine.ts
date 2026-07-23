@@ -70,6 +70,12 @@ interface SyncMeta {
 
 const META_KEY = 'lattice-sync-meta'
 const PUSH_DEBOUNCE_MS = 10_000
+/**
+ * How often an open session re-checks Drive. Without this a second device (or a
+ * second tab left open) only ever saw the state it pulled at start-up, which
+ * reads as "sync is not reactive": changes appeared only after a reload.
+ */
+const PULL_INTERVAL_MS = 60_000
 
 function loadMeta(): SyncMeta {
   try {
@@ -86,6 +92,7 @@ class SyncEngine {
   private meta: SyncMeta = loadMeta()
   private unsubscribe: (() => void) | null = null
   private pushTimer: ReturnType<typeof setTimeout> | null = null
+  private pullTimer: ReturnType<typeof setInterval> | null = null
   private running = false
   private busy = false
 
@@ -157,6 +164,13 @@ class SyncEngine {
     })
     window.addEventListener('online', this.onOnline)
     window.addEventListener('offline', this.onOffline)
+    // Leaving the tab must not lose a pending upload: the push debounce is 10s,
+    // so a card added and the tab closed right after would never reach Drive.
+    document.addEventListener('visibilitychange', this.onVisibilityChange)
+    // and an open session keeps checking for remote changes
+    this.pullTimer = setInterval(() => {
+      if (document.visibilityState === 'visible') void this.syncNow()
+    }, PULL_INTERVAL_MS)
 
     void this.syncNow()
   }
@@ -168,9 +182,12 @@ class SyncEngine {
     this.unsubscribe?.()
     this.unsubscribe = null
     if (this.pushTimer) clearTimeout(this.pushTimer)
+    if (this.pullTimer) clearInterval(this.pullTimer)
+    this.pullTimer = null
     window.removeEventListener('online', this.retryStart)
     window.removeEventListener('online', this.onOnline)
     window.removeEventListener('offline', this.onOffline)
+    document.removeEventListener('visibilitychange', this.onVisibilityChange)
     this.drive = null
     useSyncStore.getState().setProvider('none')
     useSyncStore.getState().setStatus('disabled')
@@ -183,6 +200,25 @@ class SyncEngine {
 
   private onOffline = () => {
     useSyncStore.getState().setStatus('offline')
+  }
+
+  /**
+   * Hiding the tab is the last reliable moment to upload: `beforeunload` is not
+   * honoured on mobile and in-flight requests are killed on close, while
+   * `visibilitychange → hidden` fires early enough (tab switch, minimise, app
+   * switch) for the push to finish. Coming back re-checks Drive.
+   */
+  private onVisibilityChange = () => {
+    if (!this.running) return
+    if (document.visibilityState === 'hidden') {
+      if (this.pushTimer) {
+        clearTimeout(this.pushTimer)
+        this.pushTimer = null
+      }
+      void this.push()
+    } else {
+      void this.syncNow()
+    }
   }
 
   private schedulePush(delay = PUSH_DEBOUNCE_MS) {

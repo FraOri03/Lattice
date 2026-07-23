@@ -558,6 +558,13 @@ export const IcScreenShare = (p: P) => (
     <path d="M12 12.5V7.5m0 0L9.6 9.9M12 7.5l2.4 2.4" />
   </S>
 )
+/** Shrink the enlarged call stage back to the filmstrip. */
+export const IcMinimize = (p: P) => (
+  <S {...p}>
+    <path d="M9.5 4.5v5h-5M14.5 19.5v-5h5" />
+    <path d="m3.5 3.5 6 6M20.5 20.5l-6-6" />
+  </S>
+)
 /** Leave the call. */
 export const IcPhoneOff = (p: P) => (
   <S {...p}>

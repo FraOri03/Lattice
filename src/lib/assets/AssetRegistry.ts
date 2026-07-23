@@ -38,30 +38,60 @@ export function releaseAllAssetUrls(): void {
   urlCache.clear()
 }
 
+/**
+ * Whether an asset's BINARY is available on this device.
+ *
+ *  - `loading` — still being read out of local storage
+ *  - `ready`   — an object URL is available
+ *  - `absent`  — the metadata exists but the bytes do not. This is a normal
+ *    state, not a corruption: binaries live in local storage and are mirrored
+ *    to the owner's own Drive, so a card created by someone else arrives
+ *    without its bytes. Surfaces should say so rather than render a blank box.
+ */
+export type AssetBinaryState = 'loading' | 'ready' | 'absent'
+
 /** React hook: object URL for an asset's binary, or undefined while loading. */
 export function useAssetUrl(id?: string): string | undefined {
+  return useAssetBinary(id).url
+}
+
+/** Like `useAssetUrl`, but also reports WHY there is no url. */
+export function useAssetBinary(id?: string): {
+  url: string | undefined
+  state: AssetBinaryState
+} {
   const [url, setUrl] = useState<string | undefined>(() =>
     id ? urlCache.get(id) : undefined,
   )
+  const [state, setState] = useState<AssetBinaryState>(() =>
+    id ? (urlCache.has(id) ? 'ready' : 'loading') : 'absent',
+  )
+
   useEffect(() => {
     if (!id) {
       setUrl(undefined)
+      setState('absent')
       return
     }
     const cached = urlCache.get(id)
     if (cached) {
       setUrl(cached)
+      setState('ready')
       return
     }
     let alive = true
+    setState('loading')
     void getAssetUrl(id).then((u) => {
-      if (alive) setUrl(u)
+      if (!alive) return
+      setUrl(u)
+      setState(u ? 'ready' : 'absent')
     })
     return () => {
       alive = false
     }
   }, [id])
-  return url
+
+  return { url, state }
 }
 
 export async function downloadAsset(asset: AssetDoc): Promise<void> {
