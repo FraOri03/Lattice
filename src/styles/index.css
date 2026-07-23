@@ -603,6 +603,29 @@ body {
   color: var(--muted);
   line-height: 1;
 }
+/*
+ * Toolbar selects get their own class rather than reusing .field: .field is
+ * unlayered, so it outranks Tailwind utilities and its 13px text + 6px
+ * vertical padding clipped inside the 24px toolbar row.
+ */
+.tbsel {
+  height: 24px;
+  padding: 0 4px;
+  border: 1px solid var(--bord);
+  border-radius: 6px;
+  background: var(--panel2);
+  color: var(--ink);
+  font-size: 11px;
+  line-height: 1;
+  outline: none;
+  cursor: pointer;
+}
+.tbsel:hover {
+  border-color: var(--accent);
+}
+.tbsel:focus-visible {
+  border-color: var(--accent);
+}
 .bubble-menu,
 .block-menu {
   display: flex;
