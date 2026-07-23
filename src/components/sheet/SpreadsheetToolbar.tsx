@@ -1,7 +1,8 @@
-import { useRef, type ReactNode } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import { cellKey, type CellStyle, type NumFmt } from '@/lib/sheet/sheetModel'
-import { IcAlignCenter, IcAlignLeft, IcAlignRight } from '@/components/Icons'
+import { IcAlignCenter, IcAlignLeft, IcAlignRight, IcSearch } from '@/components/Icons'
 import { SheetPeerChips } from '@/components/collab/EntityPresence'
+import { toast } from '@/components/ui/Toaster'
 import { rectOf, useSheetSession } from './SheetSession'
 
 const NUM_FMTS: { id: NumFmt; label: string }[] = [
@@ -40,6 +41,81 @@ function Group({ label, children }: { label: string; children: ReactNode }) {
       <div className="tb-row">{children}</div>
       <div className="tb-cat">{label}</div>
     </div>
+  )
+}
+
+/**
+ * Find & replace over the current selection (or the used range when a
+ * single cell is selected). Kept as a small popover so the toolbar stays
+ * one row tall; the result count is reported rather than left silent.
+ */
+function FindReplace({
+  onReplace,
+}: {
+  onReplace: (find: string, replace: string, matchCase: boolean) => number
+}) {
+  const [open, setOpen] = useState(false)
+  const [find, setFind] = useState('')
+  const [replace, setReplace] = useState('')
+  const [matchCase, setMatchCase] = useState(false)
+
+  return (
+    <span className="relative">
+      <button
+        className={`tbtn ${open ? 'is-active' : ''}`}
+        title="Find & replace"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <IcSearch size={13} />
+      </button>
+      {open && (
+        <div className="absolute top-7 left-0 z-30 w-56 rounded-lg border border-bord bg-panel p-2 shadow-xl">
+          <input
+            className="field mb-1.5"
+            placeholder="Find"
+            value={find}
+            autoFocus
+            onChange={(e) => setFind(e.target.value)}
+            aria-label="Find text"
+          />
+          <input
+            className="field mb-1.5"
+            placeholder="Replace with"
+            value={replace}
+            onChange={(e) => setReplace(e.target.value)}
+            aria-label="Replace with"
+          />
+          <label className="mb-2 flex cursor-pointer items-center gap-1.5 text-[11px] text-muted">
+            <input
+              type="checkbox"
+              checked={matchCase}
+              onChange={(e) => setMatchCase(e.target.checked)}
+            />
+            Match case
+          </label>
+          <div className="flex gap-1.5">
+            <button
+              className="btn flex-1"
+              disabled={!find}
+              onClick={() => {
+                const n = onReplace(find, replace, matchCase)
+                toast.success(
+                  n ? `Replaced in ${n} cell${n === 1 ? '' : 's'}` : 'Nothing to replace',
+                  n ? undefined : `No cell matched “${find}”.`,
+                )
+                setOpen(false)
+              }}
+            >
+              Replace all
+            </button>
+            <button className="btn" onClick={() => setOpen(false)}>
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+    </span>
   )
 }
 
@@ -112,6 +188,9 @@ export function SpreadsheetToolbar() {
     cutSelection,
     pasteMatrix,
     pasteOriginFor,
+    sortSelection,
+    removeDuplicates,
+    findReplace,
   } = useSheetSession()
   if (readOnly) return null
 
@@ -341,6 +420,39 @@ export function SpreadsheetToolbar() {
         >
           − Col
         </button>
+      </Group>
+
+      <Group label="Data">
+        <button
+          className="tbtn"
+          title="Sort ascending by the active column (whole table when one cell is selected)"
+          onClick={() => sortSelection('asc')}
+        >
+          <span className="text-[11px] leading-none">A→Z</span>
+        </button>
+        <button
+          className="tbtn"
+          title="Sort descending by the active column"
+          onClick={() => sortSelection('desc')}
+        >
+          <span className="text-[11px] leading-none">Z→A</span>
+        </button>
+        <button
+          className="tbtn px-1.5"
+          title="Remove duplicate rows"
+          onClick={() => {
+            const n = removeDuplicates()
+            toast.success(
+              n ? `Removed ${n} duplicate row${n === 1 ? '' : 's'}` : 'No duplicates found',
+              n ? undefined : 'Every row in the range is unique.',
+            )
+          }}
+        >
+          Dedupe
+        </button>
+        <FindReplace
+          onReplace={(find, replace, matchCase) => findReplace(find, replace, { matchCase })}
+        />
       </Group>
 
       <SheetPeerChips sheetId={sheetId} />

@@ -40,6 +40,13 @@ import {
   type ComputedCell,
 } from '@/lib/sheet/FormulaEngine'
 import { computeFill } from '@/lib/sheet/fill'
+import {
+  findReplaceInRange,
+  removeDuplicateRows,
+  sortRows,
+  usedRange,
+  type FindReplaceOptions,
+} from '@/lib/sheet/dataOps'
 import { awareness } from '@/lib/crdt/AwarenessService'
 
 export interface CellPos {
@@ -121,6 +128,16 @@ export interface SheetSessionValue {
    * paste of our own block translates formulas; undefined for foreign text.
    */
   pasteOriginFor: (text: string) => { r: number; c: number } | undefined
+  /**
+   * Data operations over the selection. With a single cell selected they
+   * act on the sheet's used range instead, since sorting one cell is
+   * meaningless. Formulas travel with the rows they belong to.
+   */
+  sortSelection: (dir: 'asc' | 'desc') => void
+  /** Drop duplicate rows; returns how many were removed. */
+  removeDuplicates: () => number
+  /** Replace text across the selection; returns how many cells changed. */
+  findReplace: (find: string, replace: string, opts?: FindReplaceOptions) => number
 }
 
 const SheetSessionContext = createContext<SheetSessionValue | null>(null)
@@ -281,6 +298,30 @@ export function SheetSessionProvider({
       })
     }
 
+    /**
+     * What a data operation acts on: the selection when it spans more than
+     * one cell, otherwise the sheet's used range — sorting a single cell
+     * would be a no-op, and "sort my table" is the obvious intent.
+     */
+    const dataTarget = () => {
+      const sel = rectOf(selection)
+      const single = sel.r1 === sel.r2 && sel.c1 === sel.c2
+      const target = single ? usedRange(sheet.cells) : sel
+      if (!target) return null
+      const byCol = Math.min(Math.max(selection.anchor.c, target.c1), target.c2)
+      return { rect: target, byCol, bounds: { rows: sheet.rows, cols: sheet.cols } }
+    }
+
+    /** Apply computed cell writes as one body update. */
+    const applyWrites = (writes: { r: number; c: number; cell: CellData | null }[]) => {
+      if (!writes.length) return
+      updateBody((b) => {
+        let next = b
+        for (const w of writes) next = setCell(next, si, w.r, w.c, w.cell)
+        return next
+      })
+    }
+
     const api: SheetSessionValue = {
       sheetId,
       meta,
@@ -418,6 +459,36 @@ export function SheetSessionProvider({
       pasteOriginFor: (text) => {
         const o = copyOrigin.current
         return o && o.text === text ? { r: o.r, c: o.c } : undefined
+      },
+      sortSelection: (dir) => {
+        const target = dataTarget()
+        if (!target) return
+        const writes = sortRows(sheet.cells, target.rect, target.byCol, dir, target.bounds)
+        applyWrites(writes)
+      },
+      removeDuplicates: () => {
+        const target = dataTarget()
+        if (!target) return 0
+        const { writes, removed } = removeDuplicateRows(
+          sheet.cells,
+          target.rect,
+          target.bounds,
+        )
+        if (removed) applyWrites(writes)
+        return removed
+      },
+      findReplace: (find, replace, opts) => {
+        const target = dataTarget()
+        if (!target) return 0
+        const { writes, count } = findReplaceInRange(
+          sheet.cells,
+          target.rect,
+          find,
+          replace,
+          opts,
+        )
+        if (count) applyWrites(writes)
+        return count
       },
     }
     return api
