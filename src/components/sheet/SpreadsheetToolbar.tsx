@@ -232,7 +232,7 @@ export function SpreadsheetToolbar() {
 
       <Group label="Font">
         <select
-          className="tbsel w-20"
+          className="field h-6 w-20 cursor-pointer px-1 py-0 text-[11px]"
           title="Font family"
           value={style?.ff ?? ''}
           onChange={(e) => applyStyle({ ff: e.target.value || undefined })}
@@ -244,7 +244,7 @@ export function SpreadsheetToolbar() {
           ))}
         </select>
         <select
-          className="tbsel w-12"
+          className="field h-6 w-12 cursor-pointer px-1 py-0 text-[11px]"
           title="Font size"
           value={style?.fs ?? 12}
           onChange={(e) => applyStyle({ fs: Number(e.target.value) })}
@@ -291,7 +291,7 @@ export function SpreadsheetToolbar() {
           onClear={() => applyStyle({ bg: undefined })}
         />
         <select
-          className="tbsel w-24"
+          className="field h-6 w-24 cursor-pointer px-1 py-0 text-[11px]"
           title="Borders"
           value=""
           onChange={(e) => {
@@ -350,7 +350,7 @@ export function SpreadsheetToolbar() {
 
       <Group label="Numbers">
         <select
-          className="tbsel w-24"
+          className="field h-6 w-24 cursor-pointer px-1 py-0 text-[11px]"
           value={style?.fmt ?? 'general'}
           title="Number format"
           onChange={(e) => {
@@ -381,7 +381,7 @@ export function SpreadsheetToolbar() {
 
       <Group label="Styles">
         <select
-          className="tbsel w-24"
+          className="field h-6 w-24 cursor-pointer px-1 py-0 text-[11px]"
           title="Cell style"
           value=""
           onChange={(e) => {
