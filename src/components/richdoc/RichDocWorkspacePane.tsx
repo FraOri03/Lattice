@@ -4,6 +4,7 @@ import { useCollabStore } from '@/lib/collab/collabStore'
 import { useOpenCommentCount, usePeers, useReadOnly } from '@/lib/collab/useCollab'
 import { IcDoc, IcHistory, IcMessage, IcX } from '@/components/Icons'
 import { RichTextEditor } from './RichTextEditor'
+import { PageSetupMenu } from './PageSetupMenu'
 
 /**
  * Center pane of the document workspace: title bar + full editor.
@@ -43,6 +44,7 @@ export function RichDocWorkspacePane({ doc }: { doc: RichDocMeta }) {
         <span className="flex-none text-[11px] text-muted">
           {doc.wordCount} words
         </span>
+        <PageSetupMenu doc={doc} disabled={readOnly} />
         <button
           className="icon-btn relative"
           title="Comments on this document"

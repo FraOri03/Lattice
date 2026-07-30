@@ -338,6 +338,54 @@ body {
   padding: 10px 12px;
   font-size: 12.5px;
 }
+
+/*
+ * Paged mode: one continuous white sheet of page WIDTH on a grey backdrop,
+ * with the margins as padding and dashed page-break lines every printable
+ * height. A contenteditable cannot be reflowed into separate DOM pages
+ * live, so this is the honest on-screen indicator — the real pagination is
+ * done by the print/PDF engine via the @page rule (see lib/richdoc/
+ * pageSetup). Geometry comes from the --page-* custom properties the editor
+ * sets inline.
+ */
+.richdoc-paged {
+  background: var(--panel2);
+  padding: 24px 0 40vh;
+}
+.richdoc-paged .ProseMirror {
+  max-width: none;
+  width: var(--page-w);
+  margin: 0 auto;
+  /* left/right margins as padding; the page-break lines add the vertical
+     rhythm, so top/bottom padding matches one page margin */
+  padding: var(--page-margin);
+  font-size: 14px;
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+  border: 1px solid var(--bord);
+  border-radius: 2px;
+  /* dashed rule at every page boundary: a 1px line at the end of each
+     printable-height band, starting below the top margin */
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent calc(var(--page-content-h) - 1px),
+    var(--bord) calc(var(--page-content-h) - 1px),
+    var(--bord) var(--page-content-h)
+  );
+  background-position: left var(--page-margin);
+  background-repeat: repeat-y;
+  background-size: 100% var(--page-content-h);
+}
+/* keep blocks whole across a page break on screen, mirroring print */
+.richdoc-paged .ProseMirror table,
+.richdoc-paged .ProseMirror img,
+.richdoc-paged .ProseMirror pre,
+.richdoc-paged .ProseMirror blockquote,
+.richdoc-paged .ProseMirror .callout {
+  break-inside: avoid;
+}
 .richdoc .ProseMirror > * + * {
   margin-top: 0.45em;
 }

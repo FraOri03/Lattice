@@ -5,6 +5,7 @@ import { EMPTY_DOC } from '@/lib/richdoc/docjson'
 import { baseExtensions } from '@/components/richdoc/extensions'
 import { DocxAdapter, OdtAdapter, RtfAdapter } from '@/lib/convert/ConversionService'
 import { downloadBlob, downloadText, slugify } from '@/lib/download'
+import { pageSetupOf, printPageCss } from '@/lib/richdoc/pageSetup'
 
 export type ExportFormat = 'html' | 'markdown' | 'odt' | 'rtf' | 'docx' | 'pdf'
 
@@ -62,6 +63,7 @@ code{font-family:ui-monospace,monospace}
 .callout-warning{border-left-color:#ffa629}.callout-danger{border-left-color:#f24822}.callout-success{border-left-color:#14ae5c}
 .wikilink{color:#0d99ff;border-bottom:1px dashed #0d99ff}
 img{max-width:100%}
+${printPageCss(pageSetupOf(meta.page))}
 </style>
 </head>
 <body>
@@ -90,7 +92,7 @@ ${inner}
       return
     }
     case 'pdf': {
-      exportHtmlViaPrint(meta.title, generateHTML(body, baseExtensions))
+      exportHtmlViaPrint(meta.title, generateHTML(body, baseExtensions), meta)
       return
     }
   }
@@ -101,27 +103,34 @@ ${inner}
  * is the honest browser-native pipeline: layout is done by the real HTML
  * renderer and the user picks "Save as PDF".
  */
-function exportHtmlViaPrint(title: string, innerHtml: string): void {
+function exportHtmlViaPrint(title: string, innerHtml: string, meta: RichDocMeta): void {
   const win = window.open('', '_blank', 'width=900,height=700')
   if (!win) {
     throw new ExportNotReadyError(
       'The print window was blocked. Allow popups for this site and retry.',
     )
   }
+  const setup = pageSetupOf(meta.page)
+  // paged docs print edge-to-edge on the @page margin; continuous keeps a
+  // comfortable reading column
+  const bodyRule =
+    setup.mode === 'paged'
+      ? 'body{margin:0;font-family:ui-sans-serif,system-ui,sans-serif;line-height:1.6;color:#1f1f24}'
+      : 'body{max-width:760px;margin:2rem auto;padding:0 1rem;font-family:ui-sans-serif,system-ui,sans-serif;line-height:1.6;color:#1f1f24}'
   win.document.write(`<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <title>${escapeHtml(title)}</title>
 <style>
-body{max-width:760px;margin:2rem auto;padding:0 1rem;font-family:ui-sans-serif,system-ui,sans-serif;line-height:1.6;color:#1f1f24}
+${bodyRule}
 table{border-collapse:collapse}th,td{border:1px solid #ccc;padding:6px 10px}
 blockquote{border-left:3px solid #0d99ff;margin:1em 0;padding:.2em 1em;color:#555}
 pre{background:#f4f4f6;border:1px solid #e2e2e6;border-radius:8px;padding:12px;overflow-x:auto}
 code{font-family:ui-monospace,monospace}
 .callout{border:1px solid #e2e2e6;border-left:4px solid #0d99ff;border-radius:8px;padding:.4em 1em;margin:1em 0}
 img{max-width:100%}
-@media print { body { margin: 0 } }
+${printPageCss(setup)}
 </style>
 </head>
 <body>

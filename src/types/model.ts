@@ -239,6 +239,26 @@ export interface OutlineItem {
   text: string
 }
 
+/* ---------------- document page layout (Phase: A4) ---------------- */
+
+/**
+ * How the Document editor lays the body out:
+ *  - continuous: one uninfinite vertical surface (the original behaviour,
+ *    best for reading on screen)
+ *  - paged: A4/Letter sheets with margins, visual page separation and
+ *    break indicators, so the on-screen shape matches the printed/exported
+ *    output
+ */
+export type PageMode = 'continuous' | 'paged'
+export type PageSize = 'a4' | 'letter'
+export type PageMargin = 'normal' | 'narrow' | 'wide'
+
+export interface PageSetup {
+  mode: PageMode
+  size: PageSize
+  margin: PageMargin
+}
+
 /**
  * Metadata for a rich text document (RichTextDocument). The Tiptap JSON
  * body is NOT here — it lives in the StorageProvider's document store and
@@ -267,6 +287,8 @@ export interface RichDocMeta {
   projectId?: string
   /** sidebar folder inside its category; unset = unfiled */
   folderId?: string
+  /** page layout; absent means continuous (the historical default) */
+  page?: PageSetup
 }
 
 /** Card display mode for rich document / code cards on boards. */
