@@ -191,14 +191,22 @@ configured, tabs of one browser still co-edit through a BroadcastChannel Yjs rel
 ```
 /Lattice
   /projects/<project-id>
-    project.json          # project + all entity metadata (incl. boards & notes)
-    /documents/<id>.json  # rich document bodies (Tiptap JSON)
+    project.json                 # project + all entity metadata (incl. boards & notes)
+    /documents/<id>.json         # rich document bodies (Tiptap JSON, source of truth)
+    /documents-readable/<title>.html  # human-readable HTML mirror of each document
     /spreadsheets/<id>.json
     /code/<id>.<ext>      # code sources as real text files
     /assets/<id>.<ext>    # imported binaries
     collab.json           # durable collaboration state (DrivePolling provider)
   /data                   # flat area used by the raw StorageProvider interface
 ```
+
+`/documents-readable` exists purely so Drive's own file list shows something a
+human can open — the JSON under `/documents` stays the one internal source of
+truth. Each HTML file is found by a persistent Drive file id (never by name),
+so a Lattice-side rename updates it in place; `SyncEngine.pull()` never reads
+this folder, so it cannot itself trigger a sync. Details in
+[integrations.md](integrations.md#google-sign-in--drive).
 
 ## Serverless functions (`api/`)
 

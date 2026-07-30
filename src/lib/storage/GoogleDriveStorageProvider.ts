@@ -9,12 +9,13 @@ import { env } from '@/lib/env'
  * under one app folder in the user's Drive:
  *
  *   /Lattice
- *     /projects/<project-id>/project.json     project + entity metadata
- *     /projects/<project-id>/documents/…      rich document bodies (JSON)
- *     /projects/<project-id>/code/…           code file sources
- *     /projects/<project-id>/spreadsheets/…   workbook bodies (JSON)
- *     /projects/<project-id>/boards/…         (reserved: boards ship inside project.json today)
- *     /projects/<project-id>/assets/…         imported binaries
+ *     /projects/<project-id>/project.json           project + entity metadata
+ *     /projects/<project-id>/documents/…            rich document bodies (JSON, source of truth)
+ *     /projects/<project-id>/documents-readable/…   human-readable HTML mirror of each document
+ *     /projects/<project-id>/code/…                 code file sources
+ *     /projects/<project-id>/spreadsheets/…         workbook bodies (JSON)
+ *     /projects/<project-id>/boards/…               (reserved: boards ship inside project.json today)
+ *     /projects/<project-id>/assets/…               imported binaries
  *
  * Uses the drive.file OAuth scope: Lattice can only see files it created
  * — it never gets access to the rest of the user's Drive.
@@ -228,9 +229,43 @@ export class GoogleDriveStorageProvider implements StorageProvider {
     return files
   }
 
+  /** Shared multipart-upload mechanics for create (POST) and update (PATCH). */
+  private async multipartUpload(
+    url: string,
+    method: 'POST' | 'PATCH',
+    metadata: Record<string, unknown>,
+    content: Blob | string,
+    contentType: string,
+  ): Promise<{ id: string }> {
+    const boundary = `lattice-${Math.random().toString(36).slice(2)}`
+    const blob = typeof content === 'string' ? new Blob([content], { type: contentType }) : content
+    const body = new Blob(
+      [
+        `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n`,
+        JSON.stringify(metadata),
+        `\r\n--${boundary}\r\nContent-Type: ${contentType}\r\n\r\n`,
+        blob,
+        `\r\n--${boundary}--`,
+      ],
+      { type: `multipart/related; boundary=${boundary}` },
+    )
+    const res = await this.request(url, {
+      method,
+      headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
+      body,
+    })
+    return (await res.json()) as { id: string }
+  }
+
   /**
-   * Create-or-update a file (multipart upload). appProperties carries the
-   * sync version id so pulls can compare without downloading content.
+   * Create-or-update a file (multipart upload), identified by NAME within
+   * its folder. appProperties carries the sync version id so pulls can
+   * compare without downloading content.
+   *
+   * Name-keyed identity is right for the vault's own bodies (their Drive
+   * filename is a stable id, e.g. `<docId>.json`, never renamed by the
+   * user) but wrong for a companion file whose name follows a human title —
+   * see createFile/updateFileById/findFileByAppProperty for that case.
    */
   async putFile(
     path: string[],
@@ -249,30 +284,83 @@ export class GoogleDriveStorageProvider implements StorageProvider {
     const metadata: Record<string, unknown> = fileId
       ? { name, appProperties }
       : { name, parents: [folderId], appProperties }
-
-    const boundary = `lattice-${Math.random().toString(36).slice(2)}`
-    const blob = typeof content === 'string' ? new Blob([content], { type: contentType }) : content
-    const body = new Blob(
-      [
-        `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n`,
-        JSON.stringify(metadata),
-        `\r\n--${boundary}\r\nContent-Type: ${contentType}\r\n\r\n`,
-        blob,
-        `\r\n--${boundary}--`,
-      ],
-      { type: `multipart/related; boundary=${boundary}` },
-    )
     const url = fileId
       ? `${UPLOAD}/files/${fileId}?uploadType=multipart&fields=id`
       : `${UPLOAD}/files?uploadType=multipart&fields=id`
-    const res = await this.request(url, {
-      method: fileId ? 'PATCH' : 'POST',
-      headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
-      body,
-    })
-    const id = ((await res.json()) as { id: string }).id
+    const { id } = await this.multipartUpload(
+      url,
+      fileId ? 'PATCH' : 'POST',
+      metadata,
+      content,
+      contentType,
+    )
     this.fileIdCache.set(cacheKey, id)
     return id
+  }
+
+  /**
+   * Always creates a new file — for callers that already confirmed (e.g.
+   * via findFileByAppProperty) that none exists yet.
+   */
+  async createFile(
+    path: string[],
+    name: string,
+    content: Blob | string,
+    contentType: string,
+    appProperties?: Record<string, string>,
+  ): Promise<string> {
+    const folderId = await this.ensurePath(path)
+    const { id } = await this.multipartUpload(
+      `${UPLOAD}/files?uploadType=multipart&fields=id`,
+      'POST',
+      { name, parents: [folderId], appProperties },
+      content,
+      contentType,
+    )
+    return id
+  }
+
+  /**
+   * Update an existing file's content/name/appProperties by its KNOWN Drive
+   * id — no name lookup, so a Lattice-side rename updates the SAME file
+   * (Drive's `name` field changes in place) instead of leaving a stale
+   * copy behind and creating a new one under the new name.
+   */
+  async updateFileById(
+    fileId: string,
+    name: string,
+    content: Blob | string,
+    contentType: string,
+    appProperties?: Record<string, string>,
+  ): Promise<void> {
+    await this.multipartUpload(
+      `${UPLOAD}/files/${fileId}?uploadType=multipart&fields=id`,
+      'PATCH',
+      { name, appProperties },
+      content,
+      contentType,
+    )
+  }
+
+  /**
+   * Find a file inside `path` carrying a given (key, value) app property.
+   * This is the identity check a DERIVED file (one keyed by a human title
+   * rather than a stable id) uses before creating itself, so a second
+   * device — with no local cache of the file's id — still finds the one
+   * already on Drive instead of duplicating it.
+   */
+  async findFileByAppProperty(
+    path: string[],
+    key: string,
+    value: string,
+  ): Promise<DriveFileMeta | null> {
+    const folderId = await this.ensurePath(path)
+    const query = `'${q(folderId)}' in parents and trashed = false and appProperties has { key='${q(key)}' and value='${q(value)}' }`
+    const res = await this.request(
+      `${API}/files?q=${encodeURIComponent(query)}&fields=files(id,name,mimeType,modifiedTime,appProperties)&pageSize=1`,
+    )
+    const data = (await res.json()) as { files: DriveFileMeta[] }
+    return data.files[0] ?? null
   }
 
   async downloadJson<T = unknown>(fileId: string): Promise<T> {

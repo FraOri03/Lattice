@@ -48,6 +48,15 @@ mock account** so the UI works in development; cloud sync stays disabled.
   prior remote versions.
 - **Deletions never propagate automatically** in either direction; remote deletes go to
   Drive's trash (recoverable) and only from explicit user actions.
+- Rich documents also get a **readable HTML companion** next to their JSON body
+  (`/documents-readable/<title>.html`), because a raw Tiptap JSON file is opaque in
+  Drive's own file browser. The JSON stays the one internal source of truth — the HTML
+  is purely derived and is never read back by `pull()`. It shares the JSON body's dirty
+  check (only re-synced when the document actually changed), is found by a persistent
+  Drive file id rather than by name (a Lattice-side rename updates it in place instead
+  of duplicating it, and a companion created on one device is found — never
+  re-created — by another), and, matching the "deletions never propagate" policy above,
+  is **not** auto-trashed when the local document is deleted.
 
 Drive layout is documented in [architecture.md](architecture.md#cloud-storage-layout-google-drive).
 

@@ -1,3 +1,4 @@
+import type { JSONContent } from '@tiptap/core'
 import { useStore } from '@/store/useStore'
 import { storage } from '@/lib/storage/StorageProvider'
 import {
@@ -6,6 +7,7 @@ import {
   describeDriveError,
 } from '@/lib/storage/GoogleDriveStorageProvider'
 import { authService } from '@/lib/auth/AuthService'
+import { buildStandaloneHtml, companionFileName } from '@/lib/export/ExportService'
 import { useSyncStore } from './syncStore'
 import { describeConflict, isConflict, resolveVersions } from './ConflictResolver'
 import type {
@@ -25,11 +27,12 @@ import type {
  * Google Drive.
  *
  * Layout on Drive (see GoogleDriveStorageProvider):
- *   /Lattice/projects/<id>/project.json      project + all entity metadata
- *   /Lattice/projects/<id>/documents/…       rich doc bodies
- *   /Lattice/projects/<id>/code/…            code sources
- *   /Lattice/projects/<id>/spreadsheets/…    workbook bodies
- *   /Lattice/projects/<id>/assets/…          binaries
+ *   /Lattice/projects/<id>/project.json           project + all entity metadata
+ *   /Lattice/projects/<id>/documents/…            rich doc bodies (JSON, source of truth)
+ *   /Lattice/projects/<id>/documents-readable/…   human-readable HTML mirror of each doc
+ *   /Lattice/projects/<id>/code/…                 code sources
+ *   /Lattice/projects/<id>/spreadsheets/…         workbook bodies
+ *   /Lattice/projects/<id>/assets/…               binaries
  *
  * Behavior:
  *  - push: debounced after local changes; only entities newer than their
@@ -39,6 +42,15 @@ import type {
  *    backed up to Drive as <id>.conflict-<ts>.json before being replaced
  *  - deletions NEVER propagate automatically in either direction
  *  - offline: engine idles and resumes on the browser 'online' event
+ *
+ * Readable companions (documents-readable/<title>.html): every rich
+ * document JSON push also updates a plain-HTML mirror, so Drive's own
+ * file list shows something a human can actually open — the JSON stays
+ * the one internal source of truth, this is purely derived. It rides the
+ * SAME dirty check as the JSON body (only writes when the doc actually
+ * changed), is found by a persistent Drive file id — never by name, so a
+ * Lattice-side rename updates it in place instead of duplicating it — and
+ * pull() never reads this folder, so it cannot itself trigger a sync.
  *
  * Phase 7 (realtime collaboration) will replace timestamps with an
  * operation log; the store subscription + provider seams stay.
@@ -66,6 +78,12 @@ interface SyncMeta {
   bodyPush: Record<string, number>
   /** asset ids whose binaries are already on Drive */
   uploadedAssets: string[]
+  /**
+   * rich-doc id → Drive file id of its readable HTML companion. A local
+   * fast-path cache only — findFileByAppProperty is the cross-device
+   * source of truth for a fresh browser that has never pushed this doc.
+   */
+  docCompanions: Record<string, string>
 }
 
 const META_KEY = 'lattice-sync-meta'
@@ -74,11 +92,25 @@ const PUSH_DEBOUNCE_MS = 10_000
 function loadMeta(): SyncMeta {
   try {
     const raw = localStorage.getItem(META_KEY)
-    if (raw) return { projectPush: {}, bodyPush: {}, uploadedAssets: [], ...JSON.parse(raw) }
+    if (raw) {
+      return {
+        projectPush: {},
+        bodyPush: {},
+        uploadedAssets: [],
+        docCompanions: {},
+        ...JSON.parse(raw),
+      }
+    }
   } catch {
     /* corrupted meta → resync from scratch (uploads are idempotent) */
   }
-  return { lastSyncAt: null, projectPush: {}, bodyPush: {}, uploadedAssets: [] }
+  return {
+    lastSyncAt: null,
+    projectPush: {},
+    bodyPush: {},
+    uploadedAssets: [],
+    docCompanions: {},
+  }
 }
 
 class SyncEngine {
@@ -371,6 +403,13 @@ class SyncEngine {
       )
       this.meta.bodyPush[job.id] = job.updatedAt
       this.saveMeta()
+
+      // readable companion — rich documents only; rides this same dirty
+      // check, so it re-syncs exactly when (and only when) the doc did
+      if (job.folder === 'documents') {
+        const docMeta = s.docs[job.id]
+        if (docMeta) await this.syncCompanion(projectId, docMeta, body as JSONContent)
+      }
     }
 
     // asset binaries — immutable after import, so one upload each
@@ -388,6 +427,49 @@ class SyncEngine {
       this.meta.uploadedAssets.push(asset.id)
       this.saveMeta()
     }
+  }
+
+  /**
+   * Write or update a rich document's readable HTML companion so Drive's
+   * own file list shows something a human can open — the JSON under
+   * documents/ stays the one internal source of truth this only mirrors.
+   *
+   * Identity, in order: the local fast-path cache, then the doc's own
+   * synced driveExport (a companion another device already created),
+   * then a Drive-side search by app property (a fresh browser with
+   * neither of the above still finds — and updates, never duplicates —
+   * a companion created elsewhere). Only once none of those hit does this
+   * create a new file.
+   */
+  private async syncCompanion(
+    projectId: string,
+    meta: RichDocMeta,
+    body: JSONContent,
+  ): Promise<void> {
+    const drive = this.drive!
+    const path = ['projects', projectId, 'documents-readable']
+    const name = companionFileName(meta.title)
+    const html = buildStandaloneHtml(meta, body)
+    const appProperties = { latticeDocId: meta.id, latticeCompanion: 'true' }
+
+    let fileId: string | undefined = this.meta.docCompanions[meta.id] ?? meta.driveExport?.fileId
+    if (!fileId) {
+      const found = await drive.findFileByAppProperty(path, 'latticeDocId', meta.id)
+      fileId = found?.id
+    }
+    if (fileId) {
+      await drive.updateFileById(fileId, name, html, 'text/html', appProperties)
+    } else {
+      fileId = await drive.createFile(path, name, html, 'text/html', appProperties)
+    }
+
+    this.meta.docCompanions[meta.id] = fileId
+    this.saveMeta()
+    useStore.getState().setDocDriveExport(meta.id, {
+      fileId,
+      format: 'html',
+      syncedAt: meta.updatedAt,
+    })
   }
 
   /* ---------------- pull ---------------- */

@@ -289,6 +289,23 @@ export interface RichDocMeta {
   folderId?: string
   /** page layout; absent means continuous (the historical default) */
   page?: PageSetup
+  /**
+   * Readable companion synced to Drive alongside the JSON source (Phase:
+   * Drive-readable docs). Absent until the first successful sync; the JSON
+   * body under /documents remains the one internal source of truth — this
+   * only points at its human-readable mirror under /documents-readable.
+   */
+  driveExport?: DriveExportRef
+}
+
+/** Where a document's Drive-readable companion lives, and what it mirrors. */
+export interface DriveExportRef {
+  /** Drive file id of the companion — updated in place across devices
+   *  (never re-created) and followed through renames. */
+  fileId: string
+  format: 'html'
+  /** updatedAt of the doc body this companion last reflected */
+  syncedAt: number
 }
 
 /** Card display mode for rich document / code cards on boards. */

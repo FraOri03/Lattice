@@ -295,6 +295,13 @@ interface AppState {
   createDoc: (partial?: Partial<RichDocMeta>) => string
   updateDocMeta: (id: string, patch: Partial<Omit<RichDocMeta, 'id' | 'type'>>) => void
   /**
+   * Record (or clear) a document's Drive-readable companion — sync
+   * bookkeeping, not a content edit, so unlike updateDocMeta this does
+   * NOT bump updatedAt. Bumping it here would make the sync engine see
+   * its own bookkeeping as new work and re-push every cycle.
+   */
+  setDocDriveExport: (id: string, driveExport: RichDocMeta['driveExport']) => void
+  /**
    * Write a document body to storage and refresh its digested metadata.
    * `silent` skips the activity/announce hooks — used when persisting
    * remote CRDT changes that another user already authored.
@@ -1514,6 +1521,13 @@ export const useStore = create<AppState>()(
               [id]: { ...meta, ...patch, updatedAt: Date.now() },
             },
           }
+        }),
+
+      setDocDriveExport: (id, driveExport) =>
+        set((s) => {
+          const meta = s.docs[id]
+          if (!meta) return {}
+          return { docs: { ...s.docs, [id]: { ...meta, driveExport } } }
         }),
 
       persistDocContent: (id, body, opts) => {

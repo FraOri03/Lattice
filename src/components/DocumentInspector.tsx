@@ -2,6 +2,7 @@ import { backlinksToTitle, useStore } from '@/store/useStore'
 import { downloadAsset } from '@/lib/assets/AssetRegistry'
 import {
   EXPORT_FORMATS,
+  companionFileName,
   exportDocument,
   type ExportFormat,
 } from '@/lib/export/ExportService'
@@ -9,7 +10,7 @@ import { KIND_ICONS } from '@/components/assetKinds'
 import { DocumentOutline } from '@/components/richdoc/DocumentOutline'
 import { toast } from '@/components/ui/Toaster'
 import { confirmDialog } from '@/components/ui/ConfirmDialog'
-import { IcTrash } from '@/components/Icons'
+import { IcDrive, IcTrash } from '@/components/Icons'
 import { ActionIcon } from '@/components/ActionIcons'
 
 /**
@@ -65,6 +66,18 @@ export function DocumentInspector() {
           })
         }
       />
+
+      {doc.driveExport && (
+        <div
+          className="mt-2 flex items-center gap-1.5 text-[10.5px] text-muted"
+          title="Lattice keeps editing this document as JSON; this readable copy is generated and kept in sync automatically — it is not the source."
+        >
+          <IcDrive size={11} className="flex-none" />
+          <span className="min-w-0 truncate">
+            Readable on Drive as {companionFileName(doc.title)}
+          </span>
+        </div>
+      )}
 
       <div className="insp-h">Outline</div>
       <DocumentOutline doc={doc} />

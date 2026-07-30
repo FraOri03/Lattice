@@ -47,31 +47,7 @@ export async function exportDocument(
 
   switch (format) {
     case 'html': {
-      const inner = generateHTML(body, baseExtensions)
-      const page = `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<title>${escapeHtml(meta.title)}</title>
-<style>
-body{max-width:760px;margin:2rem auto;padding:0 1rem;font-family:ui-sans-serif,system-ui,sans-serif;line-height:1.6;color:#1f1f24}
-table{border-collapse:collapse}th,td{border:1px solid #ccc;padding:6px 10px}
-blockquote{border-left:3px solid #0d99ff;margin:1em 0;padding:.2em 1em;color:#555}
-pre{background:#f4f4f6;border:1px solid #e2e2e6;border-radius:8px;padding:12px;overflow-x:auto}
-code{font-family:ui-monospace,monospace}
-.callout{border:1px solid #e2e2e6;border-left:4px solid #0d99ff;border-radius:8px;padding:.4em 1em;margin:1em 0}
-.callout-warning{border-left-color:#ffa629}.callout-danger{border-left-color:#f24822}.callout-success{border-left-color:#14ae5c}
-.wikilink{color:#0d99ff;border-bottom:1px dashed #0d99ff}
-img{max-width:100%}
-${printPageCss(pageSetupOf(meta.page))}
-</style>
-</head>
-<body>
-<h1>${escapeHtml(meta.title)}</h1>
-${inner}
-</body>
-</html>`
-      downloadText(`${name}.html`, page, 'text/html')
+      downloadText(`${name}.html`, buildStandaloneHtml(meta, body), 'text/html')
       return
     }
     case 'markdown': {
@@ -140,6 +116,62 @@ ${innerHtml}
 </body>
 </html>`)
   win.document.close()
+}
+
+/**
+ * Build a self-contained HTML document from a Tiptap JSON body — the one
+ * template shared by the manual "Export as HTML" download and the
+ * Drive-readable companion synced alongside the JSON source (both need the
+ * exact same page). Always renders as a comfortable reading column; the
+ * @page rule embedded here only takes effect if/when the file is printed,
+ * so it stays print-accurate without looking cramped on screen.
+ */
+export function buildStandaloneHtml(meta: RichDocMeta, body: JSONContent): string {
+  const inner = generateHTML(body, baseExtensions)
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>${escapeHtml(meta.title)}</title>
+<style>
+body{max-width:760px;margin:2rem auto;padding:0 1rem;font-family:ui-sans-serif,system-ui,sans-serif;line-height:1.6;color:#1f1f24}
+table{border-collapse:collapse}th,td{border:1px solid #ccc;padding:6px 10px}
+blockquote{border-left:3px solid #0d99ff;margin:1em 0;padding:.2em 1em;color:#555}
+pre{background:#f4f4f6;border:1px solid #e2e2e6;border-radius:8px;padding:12px;overflow-x:auto}
+code{font-family:ui-monospace,monospace}
+.callout{border:1px solid #e2e2e6;border-left:4px solid #0d99ff;border-radius:8px;padding:.4em 1em;margin:1em 0}
+.callout-warning{border-left-color:#ffa629}.callout-danger{border-left-color:#f24822}.callout-success{border-left-color:#14ae5c}
+.wikilink{color:#0d99ff;border-bottom:1px dashed #0d99ff}
+img{max-width:100%}
+${printPageCss(pageSetupOf(meta.page))}
+</style>
+</head>
+<body>
+<h1>${escapeHtml(meta.title)}</h1>
+${inner}
+</body>
+</html>`
+}
+
+/**
+ * Filename for a document's Drive-readable companion — the SAME name as
+ * the document on Lattice ("Il file leggibile deve avere lo stesso nome
+ * del documento su Lattice"), sanitized only enough to be a safe Drive
+ * filename. Shared by SyncEngine (what it writes) and the document
+ * inspector (what it tells the user to expect).
+ */
+export function companionFileName(title: string): string {
+  const safe = Array.from(title)
+    .map((ch) => {
+      const code = ch.codePointAt(0) ?? 0
+      // strip control characters and the backslash (path-separator
+      // confusion); every other glyph in a Lattice title passes through
+      return code < 32 || ch === '\\' ? ' ' : ch
+    })
+    .join('')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return `${safe || 'Untitled'}.html`
 }
 
 const escapeHtml = (s: string): string =>
