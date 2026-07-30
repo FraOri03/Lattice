@@ -355,7 +355,11 @@ body {
 .richdoc-paged .ProseMirror {
   max-width: none;
   width: var(--page-w);
+  /* always at least one full page tall, so an empty or short document
+     still reads as a portrait sheet rather than collapsing to its content */
+  min-height: var(--page-h);
   margin: 0 auto;
+  box-sizing: border-box;
   /* left/right margins as padding; the page-break lines add the vertical
      rhythm, so top/bottom padding matches one page margin */
   padding: var(--page-margin);
