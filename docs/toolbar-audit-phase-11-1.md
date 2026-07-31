@@ -156,14 +156,41 @@ verify, not facts): presentation text 42→48, image 55→61, shapes 24→30; sh
 The two clear-colour buttons stay 24 px wide even then — `w-4` loses to
 `min-width: 24px`, which is a box-model rule, not a cascade one.
 
+## Re-measured after the Photo and Board migrations
+
+The primitives are layered from the start, so the two migrated modes moved
+onto them without disturbing the rest:
+
+| Was | Now |
+|---|---|
+| Board: `role="toolbar"` with **8 tab stops** | **1 tab stop**, arrows/Home/End move inside |
+| Board: split chevrons **19 × 45 px** | **32 × 41 px** — clears WCAG 2.2 SC 2.5.8 |
+| Board: button heights 45 px, "Web embed" 60 px | **41 px throughout** — no label wraps to two lines |
+| Board: menu triggers named "… — show all tools" | "Open card tools" · "Open media tools" · "Open import & embed tools" |
+| Board: unnamed groups | `role="group"` × 3, named per semantic level |
+| Photo: `.icon-btn` 28 × 28, no toolbar role | `role="toolbar"` + name, controls 32 × 32, bar height unchanged at 40 px |
+| Both: hardcoded English | localised — the toolbars render as "Strumenti board" / "Strumenti foto" under `locale: 'it'` |
+
+Unchanged, deliberately: the `.doc-toolbar` family. Re-measured after the
+migration, the sheet bar is still 33 px with `.tbtn` at 24 × 24 and `tbtn
+px-1.5` still computing 5 px — Document, Sheet and Presentation keep their
+current rendering until their own migration step, so the predicted padding
+changes above have **not** happened yet.
+
+Screenshots were not captured: the browser pane was not displayed during the
+run, so verification is by computed measurement instead.
+
 ## Order of work
 
 | Step | Content | State |
 |---|---|---|
 | 11.1.1 | this audit | **done** |
-| 11.1.2 | shared primitives (`ToolbarRoot`, `ToolbarButton`, `ToolbarGroup`, overflow) | next |
-| 11.1.3 | per-mode action registry + i18n keys | |
-| 11.1.4 | Board migration (pilot — must keep every action and every test) | |
-| 11.1.5 | Document / Note migration | |
-| 11.1.6 | Sheet · Presentation · Code · Photo migration | |
+| 11.1.2a | shared primitives + tests | **done** |
+| 11.1.2b | roving focus and a11y semantics | **done** |
+| 11.1.2c | action registry + i18n keys (EN/IT) | **done** |
+| 11.1.2d | Photo migration (reference fixture) | **done** |
+| 11.1.2e | Board migration (pilot) | **done** |
+| 11.1.2f | visual verification after the layer change | **done** |
+| 11.1.5 | Document / Note migration | next |
+| 11.1.6 | Sheet · Presentation · Code migration | |
 | 11.1.7 | responsive, a11y, i18n and tests across all modes | |

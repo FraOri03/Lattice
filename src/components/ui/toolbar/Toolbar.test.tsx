@@ -217,6 +217,55 @@ describe('ToolbarSplitButton', () => {
     expect(screen.queryByRole('menu')).toBeNull()
   })
 
+  it('runs the default tool straight from the primary half', () => {
+    const runNote = vi.fn()
+    render(
+      <ToolbarRoot label="t">
+        <ToolbarSplitButton
+          menuLabel="Open card tools"
+          items={[
+            { id: 'note', label: 'Note', description: 'Add note', icon, run: runNote },
+            { id: 'doc', label: 'Document', icon, run: () => {} },
+          ]}
+          defaultItemId="note"
+        />
+      </ToolbarRoot>,
+    )
+    const primary = screen.getByRole('button', { name: 'Note' })
+    expect(primary).toHaveAttribute('title', 'Add note')
+    fireEvent.click(primary)
+    expect(runNote).toHaveBeenCalledOnce()
+    expect(screen.queryByRole('menu')).toBeNull()
+  })
+
+  it('advertises a shortcut without making it the only way in', () => {
+    const run = vi.fn()
+    render(
+      <ToolbarRoot label="t">
+        <ToolbarSplitButton
+          menuLabel="Open card tools"
+          items={[
+            { id: 'note', label: 'Note', icon, run: () => {} },
+            { id: 'doc', label: 'Document', icon, shortcut: 'D', run },
+          ]}
+        />
+      </ToolbarRoot>,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Open card tools' }))
+    expect(screen.getByText('D')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('menuitem', { name: /Document/ }))
+    expect(run).toHaveBeenCalledOnce()
+  })
+
+  it('returns focus to the trigger after Escape', async () => {
+    render(<Sample />)
+    const chevron = screen.getByRole('button', { name: 'Open card tools' })
+    fireEvent.click(chevron)
+    fireEvent.keyDown(screen.getByRole('menuitem', { name: 'Note' }), { key: 'Escape' })
+    await new Promise(requestAnimationFrame)
+    expect(document.activeElement).toBe(chevron)
+  })
+
   it('closes on Escape without running anything', () => {
     const run = vi.fn()
     render(

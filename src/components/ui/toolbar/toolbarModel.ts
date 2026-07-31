@@ -15,12 +15,25 @@ import type { Capability } from '@/lib/collab/permissions'
  * exists here for a tool the product has not built.
  */
 
-/** The three semantic levels every mode's toolbar is ordered by. */
-export type ToolbarGroupId = 'select' | 'create' | 'annotate' | 'integrate'
+/**
+ * The semantic levels every mode's toolbar is ordered by.
+ *
+ * `history` is the one addition to the original select/create/annotate/
+ * integrate model: undo/redo is none of those four, it already exists in
+ * Photo, and the Board is due to get it (issue #16). Filing it under
+ * "integrate" would have been a lie of convenience.
+ */
+export type ToolbarGroupId =
+  | 'select'
+  | 'create'
+  | 'history'
+  | 'annotate'
+  | 'integrate'
 
 export const TOOLBAR_GROUP_ORDER: readonly ToolbarGroupId[] = [
   'select',
   'create',
+  'history',
   'annotate',
   'integrate',
 ]

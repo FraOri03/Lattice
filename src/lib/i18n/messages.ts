@@ -226,6 +226,62 @@ export const en = {
       'Sharing with people is role-based and server-enforced: invite them above and the realtime backend rejects anything their role does not allow. Truly public no-login links need an anonymous read-only viewer, which is not built yet — until then, share a copy instead: documents export to HTML/PDF/DOCX, presentations to PDF/PPTX, and the whole vault to a .lattice.json file. Nothing is ever exposed publicly by default.',
     rolesHeading: 'Roles',
   },
+
+  /**
+   * Mode toolbars (Phase 11.1). Every entry names something the product can
+   * already do — the audit rule is that a toolbar never advertises a tool
+   * that does not exist, so this catalogue stays deliberately short.
+   */
+  toolbar: {
+    groups: {
+      select: 'Selection tools',
+      create: 'Creation tools',
+      history: 'History',
+      annotate: 'Annotation tools',
+      integrate: 'Import and export',
+    },
+    photo: {
+      label: 'Photo tools',
+      select: 'Select',
+      selectTip: 'Select tool',
+      pan: 'Pan',
+      panTip: 'Pan tool, or hold Space',
+      addCamera: 'Add camera',
+      addLight: 'Add light source',
+      addPerson: 'Add person',
+      addProp: 'Add generic prop',
+      undo: 'Undo',
+      redo: 'Redo',
+      importScene: 'Import scene JSON',
+      exportScene: 'Export scene as JSON',
+      ai: 'AI assistant',
+      aiTip: 'AI set designer',
+    },
+    board: {
+      label: 'Board tools',
+      section: 'Section',
+      sectionTip: 'Add section — a labelled group on the board',
+      note: 'Note',
+      document: 'Document',
+      spreadsheet: 'Spreadsheet',
+      presentation: 'Presentation',
+      code: 'Code',
+      image: 'Image',
+      video: 'Video',
+      threeD: '3D',
+      photo: 'Photo',
+      link: 'Link',
+      webEmbed: 'Web embed',
+      import: 'Import',
+      comment: 'Comment',
+      commentTip: 'Comment — click to pin, drag to comment on an area',
+      /** menu triggers are named for what they open, never a bare "More" */
+      openCardTools: 'Open card tools',
+      openMediaTools: 'Open media tools',
+      openImportTools: 'Open import & embed tools',
+      addTool: (tool: string) => `Add ${tool.toLowerCase()}`,
+    },
+  },
 }
 
 export type Catalog = typeof en
@@ -437,6 +493,56 @@ export const it: Catalog = {
     publicLinksBody:
       'La condivisione con le persone è basata sui ruoli e applicata dal server: invitale qui sopra e il backend realtime rifiuta tutto ciò che il loro ruolo non consente. I veri link pubblici senza login richiedono un visualizzatore anonimo in sola lettura, non ancora realizzato — nel frattempo condividi una copia: i documenti si esportano in HTML/PDF/DOCX, le presentazioni in PDF/PPTX e l’intero vault in un file .lattice.json. Nulla è mai esposto pubblicamente per impostazione predefinita.',
     rolesHeading: 'Ruoli',
+  },
+
+  toolbar: {
+    groups: {
+      select: 'Strumenti di selezione',
+      create: 'Strumenti di creazione',
+      history: 'Cronologia',
+      annotate: 'Strumenti di annotazione',
+      integrate: 'Importazione ed esportazione',
+    },
+    photo: {
+      label: 'Strumenti foto',
+      select: 'Seleziona',
+      selectTip: 'Strumento selezione',
+      pan: 'Sposta',
+      panTip: 'Strumento mano, o tieni premuto Spazio',
+      addCamera: 'Aggiungi camera',
+      addLight: 'Aggiungi fonte di luce',
+      addPerson: 'Aggiungi persona',
+      addProp: 'Aggiungi oggetto di scena',
+      undo: 'Annulla',
+      redo: 'Ripristina',
+      importScene: 'Importa scena JSON',
+      exportScene: 'Esporta scena come JSON',
+      ai: 'Assistente AI',
+      aiTip: 'Set designer AI',
+    },
+    board: {
+      label: 'Strumenti board',
+      section: 'Sezione',
+      sectionTip: 'Aggiungi sezione — un gruppo con etichetta sulla board',
+      note: 'Nota',
+      document: 'Documento',
+      spreadsheet: 'Foglio di calcolo',
+      presentation: 'Presentazione',
+      code: 'Codice',
+      image: 'Immagine',
+      video: 'Video',
+      threeD: '3D',
+      photo: 'Foto',
+      link: 'Link',
+      webEmbed: 'Incorpora pagina web',
+      import: 'Importa',
+      comment: 'Commento',
+      commentTip: 'Commento — clic per fissare, trascina per commentare un’area',
+      openCardTools: 'Apri strumenti card',
+      openMediaTools: 'Apri strumenti media',
+      openImportTools: 'Apri strumenti di importazione e incorporamento',
+      addTool: (tool) => `Aggiungi ${tool.toLowerCase()}`,
+    },
   },
 }
 

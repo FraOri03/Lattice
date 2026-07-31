@@ -23,8 +23,16 @@ import {
   IcVideo,
 } from '@/components/Icons'
 import { ActionIcon } from '@/components/ActionIcons'
-import { ToolbarDivider } from '@/components/ui/ToolbarDivider'
-import { ToolMenu, type ToolMenuItem } from './ToolMenu'
+import { useI18n } from '@/lib/i18n'
+import {
+  ToolbarAction,
+  ToolbarGroup,
+  ToolbarRoot,
+  ToolbarSeparator,
+  ToolbarSplitButton,
+  ToolbarToggle,
+  type ToolbarMenuItem,
+} from '@/components/ui/toolbar'
 import { announceCardInserted, OPEN_CREATE_MENU_EVENT } from './boardToolEvents'
 
 /**
@@ -35,6 +43,7 @@ import { announceCardInserted, OPEN_CREATE_MENU_EVENT } from './boardToolEvents'
  * split menu (see ToolMenu) so the bar stays short.
  */
 export function CanvasToolbar() {
+  const t = useI18n()
   const { screenToFlowPosition } = useReactFlow()
   const addCard = useStore((s) => s.addCard)
   const addSection = useStore((s) => s.addSection)
@@ -73,6 +82,20 @@ export function CanvasToolbar() {
     }
   }
 
+  /** Every menu item's tooltip is "Add <thing>", localised in one place. */
+  const item = (
+    id: string,
+    label: string,
+    icon: React.ReactNode,
+    run: () => void,
+  ): ToolbarMenuItem => ({
+    id,
+    label,
+    description: t.toolbar.board.addTool(label),
+    icon,
+    run,
+  })
+
   const promptWebEmbed = () => {
     void promptDialog({
       title: 'Embed a webpage',
@@ -89,133 +112,121 @@ export function CanvasToolbar() {
   }
 
   // Creation — document entities that can really be created from the board
-  const createItems: ToolMenuItem[] = [
-    { key: 'note', label: 'Note', icon: <IcNote size={16} />, onRun: () => insert('note', 'note') },
-    {
-      key: 'richdoc',
-      label: 'Document',
-      icon: <IcDoc size={16} />,
-      onRun: () => {
-        const docId = useStore.getState().createDoc()
-        inserted(
-          addCard('richdoc', centerPos(), { docId, mode: 'compact', color: 'blue' }),
-          'document',
-        )
-      },
-    },
-    {
-      key: 'sheet',
-      label: 'Spreadsheet',
-      icon: <IcTable size={16} />,
-      onRun: () => {
-        const sheetId = useStore.getState().createSheetDoc()
-        inserted(
-          addCard('sheet', centerPos(), { sheetId, mode: 'compact', color: 'green' }),
-          'spreadsheet',
-        )
-      },
-    },
-    {
-      key: 'presentation',
-      label: 'Presentation',
-      icon: <IcPresentation size={16} />,
-      onRun: () => {
-        const presentId = useStore.getState().createPresentDoc()
-        inserted(
-          addCard('presentation', centerPos(), { presentId, mode: 'compact', color: 'orange' }),
-          'presentation',
-        )
-      },
-    },
-    {
-      key: 'code',
-      label: 'Code',
-      icon: <IcCode size={16} />,
-      onRun: () => {
-        const codeId = useStore.getState().createCode()
-        inserted(
-          addCard('code', centerPos(), { codeId, mode: 'compact', color: 'purple' }),
-          'code',
-        )
-      },
-    },
+  const createItems: ToolbarMenuItem[] = [
+    item('note', t.toolbar.board.note, <IcNote size={16} />, () => insert('note', 'note')),
+    item('richdoc', t.toolbar.board.document, <IcDoc size={16} />, () => {
+      const docId = useStore.getState().createDoc()
+      inserted(
+        addCard('richdoc', centerPos(), { docId, mode: 'compact', color: 'blue' }),
+        'document',
+      )
+    }),
+    item('sheet', t.toolbar.board.spreadsheet, <IcTable size={16} />, () => {
+      const sheetId = useStore.getState().createSheetDoc()
+      inserted(
+        addCard('sheet', centerPos(), { sheetId, mode: 'compact', color: 'green' }),
+        'spreadsheet',
+      )
+    }),
+    item('presentation', t.toolbar.board.presentation, <IcPresentation size={16} />, () => {
+      const presentId = useStore.getState().createPresentDoc()
+      inserted(
+        addCard('presentation', centerPos(), { presentId, mode: 'compact', color: 'orange' }),
+        'presentation',
+      )
+    }),
+    item('code', t.toolbar.board.code, <IcCode size={16} />, () => {
+      const codeId = useStore.getState().createCode()
+      inserted(
+        addCard('code', centerPos(), { codeId, mode: 'compact', color: 'purple' }),
+        'code',
+      )
+    }),
   ]
 
   // Media — image / video / 3D / photo / link cards
-  const mediaItems: ToolMenuItem[] = [
-    { key: 'image', label: 'Image', icon: <IcImage size={16} />, onRun: () => imageInput.current?.click() },
-    { key: 'video', label: 'Video', icon: <IcVideo size={16} />, onRun: () => insert('video', 'video') },
-    { key: 'embed3d', label: '3D', icon: <IcCube size={16} />, onRun: () => insert('embed3d', '3D embed') },
-    { key: 'photo', label: 'Photo', icon: <IcCamera size={16} />, onRun: () => insert('photo', 'photo') },
-    { key: 'link', label: 'Link', icon: <IcLink size={16} />, onRun: () => insert('link', 'link') },
+  const mediaItems: ToolbarMenuItem[] = [
+    item('image', t.toolbar.board.image, <IcImage size={16} />, () =>
+      imageInput.current?.click(),
+    ),
+    item('video', t.toolbar.board.video, <IcVideo size={16} />, () =>
+      insert('video', 'video'),
+    ),
+    item('embed3d', t.toolbar.board.threeD, <IcCube size={16} />, () =>
+      insert('embed3d', '3D embed'),
+    ),
+    item('photo', t.toolbar.board.photo, <IcCamera size={16} />, () =>
+      insert('photo', 'photo'),
+    ),
+    item('link', t.toolbar.board.link, <IcLink size={16} />, () => insert('link', 'link')),
   ]
 
   // More — the less-frequent external actions
-  const moreItems: ToolMenuItem[] = [
-    { key: 'web', label: 'Web embed', icon: <IcGlobe size={16} />, onRun: promptWebEmbed },
-    {
-      key: 'import',
-      label: 'Import',
-      icon: <ActionIcon.Import size={16} />,
-      onRun: () => importInput.current?.click(),
-    },
+  const moreItems: ToolbarMenuItem[] = [
+    item('web', t.toolbar.board.webEmbed, <IcGlobe size={16} />, promptWebEmbed),
+    item('import', t.toolbar.board.import, <ActionIcon.Import size={16} />, () =>
+      importInput.current?.click(),
+    ),
   ]
 
   return (
-    <div
-      className="flex items-center gap-1 rounded-xl border border-bord bg-panel p-1 shadow-lg"
-      role="toolbar"
-      aria-label="Board tools"
+    <ToolbarRoot
+      label={t.toolbar.board.label}
+      content="icon-label"
+      className="gap-1 rounded-xl border border-bord bg-panel p-1 shadow-lg"
     >
       {/* Structure */}
-      <button
-        type="button"
-        className="flex cursor-pointer flex-col items-center gap-0.5 rounded-lg px-3 py-1.5 text-muted hover:bg-panel2 hover:text-ink"
-        onClick={() => inserted(addSection(centerPos()), 'section')}
-        aria-label="Add section"
-        title="Add section — a labelled group on the board"
-      >
-        <IcSection size={16} />
-        <span className="text-[10px] font-medium">Section</span>
-      </button>
+      <ToolbarGroup label={t.toolbar.groups.create}>
+        <ToolbarAction
+          icon={<IcSection size={16} />}
+          label={t.toolbar.board.section}
+          description={t.toolbar.board.sectionTip}
+          onRun={() => inserted(addSection(centerPos()), 'section')}
+        />
 
-      <ToolbarDivider />
+        <ToolbarSeparator />
 
-      {/* Creation — also the target of the board's `A` shortcut */}
-      <ToolMenu
-        groupLabel="Create a card"
-        items={createItems}
-        defaultKey="note"
-        openOnEvent={OPEN_CREATE_MENU_EVENT}
-      />
-      <ToolMenu groupLabel="Add media" items={mediaItems} defaultKey="image" />
+        {/* Creation — also the target of the board's `A` shortcut */}
+        <ToolbarSplitButton
+          menuLabel={t.toolbar.board.openCardTools}
+          items={createItems}
+          defaultItemId="note"
+          openOnEvent={OPEN_CREATE_MENU_EVENT}
+        />
+        <ToolbarSplitButton
+          menuLabel={t.toolbar.board.openMediaTools}
+          items={mediaItems}
+          defaultItemId="image"
+        />
+      </ToolbarGroup>
 
       {/* Annotation */}
       {mayComment && (
         <>
-          <ToolbarDivider />
-          <button
-            type="button"
-            className={`flex cursor-pointer flex-col items-center gap-0.5 rounded-lg px-3 py-1.5 ${
-              commentMode
-                ? 'bg-accent/15 text-accent'
-                : 'text-muted hover:bg-panel2 hover:text-ink'
-            }`}
-            onClick={() => setCommentMode(!commentMode)}
-            aria-label="Comment tool — click to pin, drag to mark an area"
-            aria-pressed={commentMode}
-            title="Comment (C) — click to pin, drag to comment on an area"
-          >
-            <IcMessage size={16} />
-            <span className="text-[10px] font-medium">Comment</span>
-          </button>
+          <ToolbarSeparator />
+          <ToolbarGroup label={t.toolbar.groups.annotate}>
+            <ToolbarToggle
+              icon={<IcMessage size={16} />}
+              label={t.toolbar.board.comment}
+              description={t.toolbar.board.commentTip}
+              shortcut="C"
+              pressed={commentMode}
+              onRun={() => setCommentMode(!commentMode)}
+            />
+          </ToolbarGroup>
         </>
       )}
 
-      <ToolbarDivider />
+      <ToolbarSeparator />
 
       {/* More */}
-      <ToolMenu groupLabel="More — import & embed" items={moreItems} defaultKey="web" />
+      <ToolbarGroup label={t.toolbar.groups.integrate}>
+        <ToolbarSplitButton
+          menuLabel={t.toolbar.board.openImportTools}
+          items={moreItems}
+          defaultItemId="web"
+        />
+      </ToolbarGroup>
 
       <input
         ref={imageInput}
@@ -239,6 +250,6 @@ export function CanvasToolbar() {
           e.target.value = ''
         }}
       />
-    </div>
+    </ToolbarRoot>
   )
 }

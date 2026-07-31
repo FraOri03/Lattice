@@ -38,8 +38,19 @@ export function useRovingFocus(
   rootRef: RefObject<HTMLElement | null>,
   orientation: 'horizontal' | 'vertical' = 'horizontal',
 ) {
+  /** Controls the arrows may land on. */
   const controls = useCallback(
     (): HTMLElement[] => [...(rootRef.current?.querySelectorAll<HTMLElement>(CONTROLS) ?? [])],
+    [rootRef],
+  )
+
+  /** Every control, disabled ones included — they must not keep tabIndex 0
+   *  from before they were disabled, or re-enabling adds a second tab stop. */
+  const allControls = useCallback(
+    (): HTMLElement[] => [
+      ...(rootRef.current?.querySelectorAll<HTMLElement>(`[${TOOLBAR_CONTROL_ATTR}]`) ??
+        []),
+    ],
     [rootRef],
   )
 
@@ -52,9 +63,9 @@ export function useRovingFocus(
         (focused && list.find((c) => c === focused)) ??
         list.find((c) => c.tabIndex === 0) ??
         list[0]
-      for (const c of list) c.tabIndex = c === current ? 0 : -1
+      for (const c of allControls()) c.tabIndex = c === current ? 0 : -1
     },
-    [controls],
+    [allControls, controls],
   )
 
   // after every render: a control that appeared or disappeared must not leave

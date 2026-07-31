@@ -23,7 +23,12 @@ import { TOOLBAR_CONTROL_ATTR, useRovingFocus } from './useRovingFocus'
  */
 
 export type ToolbarSize = 'sm' | 'md'
-export type ToolbarContent = 'icon' | 'icon-label'
+/**
+ * `icon` — icon only, named by aria-label.
+ * `icon-text` — icon and text side by side (compact bars).
+ * `icon-label` — text under the icon (wide canvases, discovery matters).
+ */
+export type ToolbarContent = 'icon' | 'icon-text' | 'icon-label'
 
 interface ToolbarCtx {
   size: ToolbarSize
@@ -102,6 +107,12 @@ interface ControlProps {
   /** shown instead of the tooltip when disabled — never invented */
   disabledReason?: string
   className?: string
+  /**
+   * Classes for the label span — the one legitimate use is hiding the text at
+   * narrow widths (`hidden lg:inline`). Passing it keeps `aria-label` on the
+   * button, because a label that can disappear cannot be the accessible name.
+   */
+  labelClassName?: string
   onRun: () => void
 }
 
@@ -121,11 +132,27 @@ function controlClass(size: ToolbarSize, content: ToolbarContent, extra = '') {
   return [
     'toolbar-control',
     `toolbar-control--${size}`,
-    content === 'icon-label' ? 'toolbar-control--icon-label' : '',
+    content === 'icon' ? '' : `toolbar-control--${content}`,
     extra,
   ]
     .filter(Boolean)
     .join(' ')
+}
+
+/** The visible text, plus whether the button still needs an aria-label. */
+function labelParts(
+  content: ToolbarContent,
+  label: string,
+  labelClassName?: string,
+): { text: ReactNode; ariaLabel?: string } {
+  if (content === 'icon') return { text: null, ariaLabel: label }
+  return {
+    text: (
+      <span className={`toolbar-control__label ${labelClassName ?? ''}`}>{label}</span>
+    ),
+    // a label that can be hidden by a breakpoint cannot carry the name alone
+    ariaLabel: labelClassName ? label : undefined,
+  }
 }
 
 /**
@@ -143,23 +170,25 @@ export function ToolbarAction({
   disabled,
   disabledReason,
   className,
+  labelClassName,
   onRun,
 }: ControlProps) {
   const ctx = useContext(ToolbarContext)
   const s = size ?? ctx.size
   const c = content ?? ctx.content
+  const { text, ariaLabel } = labelParts(c, label, labelClassName)
   return (
     <button
       type="button"
       {...{ [TOOLBAR_CONTROL_ATTR]: '' }}
       className={controlClass(s, c, className)}
       disabled={disabled}
-      aria-label={c === 'icon' ? label : undefined}
+      aria-label={ariaLabel}
       title={tooltipOf({ label, description, shortcut, disabled, disabledReason })}
       onClick={onRun}
     >
       {icon}
-      {c === 'icon-label' && <span className="toolbar-control__label">{label}</span>}
+      {text}
     </button>
   )
 }
@@ -174,6 +203,7 @@ export function ToolbarToggle({
   const ctx = useContext(ToolbarContext)
   const s = rest.size ?? ctx.size
   const c = rest.content ?? ctx.content
+  const { text, ariaLabel } = labelParts(c, rest.label, rest.labelClassName)
   return (
     <button
       type="button"
@@ -181,12 +211,12 @@ export function ToolbarToggle({
       className={controlClass(s, c, rest.className)}
       disabled={rest.disabled}
       aria-pressed={pressed}
-      aria-label={c === 'icon' ? rest.label : undefined}
+      aria-label={ariaLabel}
       title={tooltipOf(rest)}
       onClick={rest.onRun}
     >
       {rest.icon}
-      {c === 'icon-label' && <span className="toolbar-control__label">{rest.label}</span>}
+      {text}
     </button>
   )
 }
@@ -196,6 +226,8 @@ export function ToolbarToggle({
 export interface ToolbarMenuItem {
   id: string
   label: string
+  /** tooltip when this item is the split control's primary ("Add note") */
+  description?: string
   icon?: ReactNode
   shortcut?: string
   run: () => void
@@ -412,14 +444,16 @@ export function ToolbarSplitButton({
         type="button"
         {...{ [TOOLBAR_CONTROL_ATTR]: '' }}
         className={controlClass(s, c)}
-        aria-label={c === 'icon' ? active.label : undefined}
-        title={active.shortcut ? `${active.label} (${active.shortcut})` : active.label}
+        aria-label={labelParts(c, active.label).ariaLabel}
+        title={tooltipOf({
+          label: active.label,
+          description: active.description,
+          shortcut: active.shortcut,
+        })}
         onClick={() => run(active)}
       >
         {active.icon}
-        {c === 'icon-label' && (
-          <span className="toolbar-control__label">{active.label}</span>
-        )}
+        {labelParts(c, active.label).text}
       </button>
       <button
         ref={chevronRef}
