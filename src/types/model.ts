@@ -20,8 +20,10 @@ export interface NoteDoc {
  * A project is an organizational space (like ChatGPT/Claude projects): it
  * owns boards, notes, documents, spreadsheets, code files and assets.
  * Entities point at their project via projectId; the project itself holds
- * only metadata. storageRoot is the project's folder inside the cloud
- * vault (e.g. "projects/proj_x1" under /Lattice on Google Drive).
+ * only metadata. storageRoot is the project's logical path inside the
+ * cloud vault (e.g. "projects/proj_x1") — an address, not a folder name:
+ * on Drive that folder is NAMED after the project and matched by id, see
+ * GoogleDriveStorageProvider.
  */
 export interface Project {
   id: string

@@ -11,8 +11,8 @@ import type { CollabStateSlice } from './ConflictResolverV2'
  * the project's Google Drive folder, no realtime backend required.
  *
  * Each project stores one file:
- *   /Lattice/projects/<id>/collab.json   { members, invites, comments,
- *                                          activity, versions, savedAt }
+ *   /Lattice/projects/<name>/collab.json   { members, invites, comments,
+ *                                            activity, versions, savedAt }
  *
  * Loop (active project only, every POLL_MS):
  *   1. download remote collab.json → deliver as a 'collab-state' message
@@ -68,7 +68,13 @@ export class DrivePollingCollaborationProvider implements CollaborationProvider 
   start(onMessage: (msg: CollabMessage) => void): void {
     if (!this.isAvailable() || this.timer) return
     this.onMessage = onMessage
-    this.drive = new GoogleDriveStorageProvider(() => authService.getAccessToken())
+    // same project-name supplier as the SyncEngine: this provider owns its
+    // own Drive client, and without it collab.json would land in a second,
+    // id-named folder beside the one the user actually sees
+    this.drive = new GoogleDriveStorageProvider(
+      () => authService.getAccessToken(),
+      (projectId) => useStore.getState().projects[projectId]?.name,
+    )
     this.timer = setInterval(() => void this.tick(), POLL_MS)
     void this.tick()
   }

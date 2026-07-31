@@ -49,6 +49,12 @@ mock account** so the UI works in development; cloud sync stays disabled.
   prior remote versions.
 - **Deletions never propagate automatically** in either direction; remote deletes go to
   Drive's trash (recoverable) and only from explicit user actions.
+- Each project lives in a folder **named after the project** (`/Lattice/projects/<Project
+  name>`), so the Drive file list is browsable without knowing Lattice's internal ids.
+  Identity still travels in an app property, never in the name: renaming a project
+  renames that same folder in place, and a folder from an earlier version — named after
+  the project id — is adopted and renamed on the first sync rather than left behind as a
+  second copy. Two projects with the same title become `Name` and `Name (2)`.
 - Rich documents also get a **readable HTML companion** next to their JSON body
   (`/documents-readable/<title>.html`), because a raw Tiptap JSON file is opaque in
   Drive's own file browser. The JSON stays the one internal source of truth — the HTML

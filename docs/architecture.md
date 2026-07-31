@@ -190,7 +190,7 @@ configured, tabs of one browser still co-edit through a BroadcastChannel Yjs rel
 
 ```
 /Lattice
-  /projects/<project-id>
+  /projects/<Project name>       # named after the project, addressed by its id
     project.json                 # project + all entity metadata (incl. boards & notes)
     /documents/<id>.json         # rich document bodies (Tiptap JSON, source of truth)
     /documents-readable/<title>.html  # human-readable HTML mirror of each document
@@ -200,6 +200,15 @@ configured, tabs of one browser still co-edit through a BroadcastChannel Yjs rel
     collab.json           # durable collaboration state (DrivePolling provider)
   /data                   # flat area used by the raw StorageProvider interface
 ```
+
+**Project folders carry the project's name, not its id.** Code still asks for
+`['projects', projectId, …]`; `GoogleDriveStorageProvider` resolves that second
+segment through `appProperties.latticeProjectId` rather than by name, so
+renaming a project renames the one folder in place instead of orphaning it and
+starting a second one. Folders written by earlier versions — whose name *was*
+the id — are adopted on first sight: tagged with the id, then renamed, with
+nothing moved. Two projects sharing a title become `Name` and `Name (2)`, since
+Drive would otherwise show two indistinguishable folders.
 
 `/documents-readable` exists purely so Drive's own file list shows something a
 human can open — the JSON under `/documents` stays the one internal source of

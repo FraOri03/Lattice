@@ -5,7 +5,9 @@ import {
   GoogleDriveStorageProvider,
   DriveApiError,
   describeDriveError,
+  FOLDER_MIME,
 } from '@/lib/storage/GoogleDriveStorageProvider'
+import { PROJECT_ID_PROPERTY } from '@/lib/storage/driveProjectFolder'
 import { authService } from '@/lib/auth/AuthService'
 import { buildStandaloneHtml, companionFileName } from '@/lib/export/ExportService'
 import { useSyncStore } from './syncStore'
@@ -27,12 +29,17 @@ import type {
  * Google Drive.
  *
  * Layout on Drive (see GoogleDriveStorageProvider):
- *   /Lattice/projects/<id>/project.json           project + all entity metadata
- *   /Lattice/projects/<id>/documents/…            rich doc bodies (JSON, source of truth)
- *   /Lattice/projects/<id>/documents-readable/…   human-readable HTML mirror of each doc
- *   /Lattice/projects/<id>/code/…                 code sources
- *   /Lattice/projects/<id>/spreadsheets/…         workbook bodies
- *   /Lattice/projects/<id>/assets/…               binaries
+ *   /Lattice/projects/<name>/project.json           project + all entity metadata
+ *   /Lattice/projects/<name>/documents/…            rich doc bodies (JSON, source of truth)
+ *   /Lattice/projects/<name>/documents-readable/…   human-readable HTML mirror of each doc
+ *   /Lattice/projects/<name>/code/…                 code sources
+ *   /Lattice/projects/<name>/spreadsheets/…         workbook bodies
+ *   /Lattice/projects/<name>/assets/…               binaries
+ *
+ * The engine still addresses every path by project ID; the provider maps
+ * that id to a folder NAMED after the project (identity pinned in
+ * appProperties). Only the folder name has to be pushed explicitly, in
+ * pushInner — see syncProjectFolder.
  *
  * Behavior:
  *  - push: debounced after local changes; only entities newer than their
@@ -152,7 +159,10 @@ class SyncEngine {
 
     this.connecting = true
     useSyncStore.getState().setStatus('connecting')
-    const drive = new GoogleDriveStorageProvider(() => authService.getAccessToken())
+    const drive = new GoogleDriveStorageProvider(
+      () => authService.getAccessToken(),
+      (projectId) => useStore.getState().projects[projectId]?.name,
+    )
     try {
       const token = await authService.getAccessToken()
       if (!token) {
@@ -362,6 +372,9 @@ class SyncEngine {
     for (const project of Object.values(s.projects)) {
       const dirtyAt = this.projectDirtyAt(project.id)
       if (dirtyAt <= (this.meta.projectPush[project.id] ?? 0)) continue
+      // a rename touches nothing but the project's own metadata, so this
+      // is the one place that also pushes the folder name to Drive
+      await drive.syncProjectFolder(project.id)
       const snapshot = this.snapshotOf(project.id)
       await drive.putFile(
         ['projects', project.id],
@@ -480,7 +493,15 @@ class SyncEngine {
     const conflicts: SyncConflict[] = []
 
     for (const folder of projectFolders) {
-      const snapMeta = await drive.findFile(['projects', folder.name], 'project.json')
+      if (folder.mimeType !== FOLDER_MIME) continue
+      // the folder is named after the project, so its id comes from the
+      // app property. Untagged folders predate naming — their name still
+      // IS the id, and resolveProjectFolder adopts (and tags) them.
+      const taggedId = folder.appProperties?.[PROJECT_ID_PROPERTY]
+      if (taggedId) drive.bindProjectFolder(taggedId, folder)
+      const projectId = taggedId ?? folder.name
+
+      const snapMeta = await drive.findFile(['projects', projectId], 'project.json')
       if (!snapMeta) continue
       const snapshot = await drive.downloadJson<ProjectSnapshot>(snapMeta.id)
       if (snapshot?.app !== 'lattice-project' || !snapshot.project) continue
