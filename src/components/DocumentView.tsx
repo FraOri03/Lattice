@@ -114,6 +114,10 @@ export function DocumentView() {
               label={t.toolbar.note.write}
               content="icon-text"
               size="sm"
+              // px-2.5 restores this pill's original inset: the compact strips
+              // use 5px, but a segmented switch is roomier. Per-instance
+              // utilities work because the primitive is layered.
+              className="px-2.5"
               pressed={tab === 'write'}
               onRun={() => setTab('write')}
             />
@@ -121,6 +125,10 @@ export function DocumentView() {
               label={t.toolbar.note.preview}
               content="icon-text"
               size="sm"
+              // px-2.5 restores this pill's original inset: the compact strips
+              // use 5px, but a segmented switch is roomier. Per-instance
+              // utilities work because the primitive is layered.
+              className="px-2.5"
               pressed={tab === 'preview'}
               onRun={() => setTab('preview')}
             />

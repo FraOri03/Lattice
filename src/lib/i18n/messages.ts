@@ -373,6 +373,26 @@ export const en = {
       deleteCol: 'Delete column',
       deleteColsSelected: 'Delete the selected columns',
     },
+    presentation: {
+      label: 'Slide tools',
+      groups: {
+        insert: 'Insert',
+        shapes: 'Shapes',
+        background: 'Slide background',
+      },
+      text: 'Text',
+      addText: 'Add text box',
+      image: 'Image',
+      addImage: 'Add image',
+      addRect: 'Add rectangle',
+      addEllipse: 'Add ellipse',
+      addLine: 'Add line',
+      background: 'Background',
+      backgroundColour: 'Slide background colour',
+      resetBackground: 'Reset to the theme background',
+      status: (n: number, total: number) =>
+        `Slide ${n}/${total} · double-click text to edit · Del removes`,
+    },
   },
 }
 
@@ -725,6 +745,26 @@ export const it: Catalog = {
       insertColOne: 'Inserisci 1 colonna a sinistra',
       deleteCol: 'Elimina colonna',
       deleteColsSelected: 'Elimina le colonne selezionate',
+    },
+    presentation: {
+      label: 'Strumenti diapositiva',
+      groups: {
+        insert: 'Inserisci',
+        shapes: 'Forme',
+        background: 'Sfondo diapositiva',
+      },
+      text: 'Testo',
+      addText: 'Aggiungi casella di testo',
+      image: 'Immagine',
+      addImage: 'Aggiungi immagine',
+      addRect: 'Aggiungi rettangolo',
+      addEllipse: 'Aggiungi ellisse',
+      addLine: 'Aggiungi linea',
+      background: 'Sfondo',
+      backgroundColour: 'Colore di sfondo della diapositiva',
+      resetBackground: 'Ripristina lo sfondo del tema',
+      status: (n, total) =>
+        `Diapositiva ${n}/${total} · doppio clic sul testo per modificarlo · Canc elimina`,
     },
   },
 }

@@ -149,6 +149,13 @@ body {
     gap: 0.375rem;
     padding-inline: 0.5rem;
   }
+  /* …but a compact strip keeps the compact inset. The `px-2` these controls
+     used to carry never rendered (unlayered `.tbtn` beat it), so 5px is what
+     users actually see today, and widening them pushes the status line of the
+     slide toolbar onto a second row. */
+  .toolbar-control--sm.toolbar-control--icon-text {
+    padding-inline: 0.3125rem;
+  }
   /* a native <select> wearing the toolbar skin */
   .toolbar-control--select {
     justify-content: flex-start;

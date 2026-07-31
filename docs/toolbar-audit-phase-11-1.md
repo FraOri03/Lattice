@@ -322,6 +322,50 @@ special case (verified in the running app: 16×3 px, inside its button).
 grid. `preserveFocus` would fix it, but the sheet may commit an in-cell edit on
 blur, and proving that is not a normalisation task. Logged for **11.1.7**.
 
+## Presentation: baseline vs migrated (11.1.6b)
+
+The bar moved out of `PresentationWorkspace.tsx` into its own
+[`SlideToolbar.tsx`](../src/components/present/SlideToolbar.tsx), so it has the
+same shape as every other mode's — and so it can be tested at all, which it
+could not while inline in a 900-line component.
+
+Measured in English, against the frozen baseline:
+
+| Metric | Before | After | Verdict |
+|---|---|---|---|
+| Strip height · gap · padding · wrap | 33 · 2 · 4/8 · wrap | identical | unchanged |
+| `+ Text` | 42 px | 43 px | unchanged (1 px, the icon/label gap) |
+| `Image` | 55 px | 56 px | unchanged (same) |
+| Rectangle · ellipse · line | 24×24 | 24×24 | unchanged |
+| Icon size | 12 px | 12 px | unchanged |
+| `role="toolbar"` + name | none | "Slide tools" | **intentional** |
+| Tab stops | one per control | 1, colour input included | **intentional** |
+| Strings | hardcoded English, status line included | EN/IT | **intentional** |
+
+**A regression caught mid-migration.** `--icon-text` applies 8 px of inline
+padding, but the old `tbtn px-2` rendered at 5 px (the utility was dead under
+the unlayered `.tbtn`). The wider buttons pushed the status line — *"Slide 1/3
+· double-click text to edit · Del removes"* — onto a second row, taking the
+strip from 33 px to **50 px**. Fixed by giving the compact size its compact
+inset:
+
+```css
+.toolbar-control--sm.toolbar-control--icon-text { padding-inline: 0.3125rem }
+```
+
+That rule then shrank the Note pill's toggles to 5 px, where their original was
+`px-2.5`. They now carry `className="px-2.5"` per instance — which works, and
+is the whole point of putting the primitive in `@layer components`.
+
+**Naming detail:** the `+` on the Text button is `aria-hidden`. Without it the
+accessible name computed as "+Text"; the visible word stays, the punctuation
+leaves the name.
+
+The colour input is marked with `TOOLBAR_CONTROL_ATTR` directly rather than
+wrapped in a new primitive: the toolbar owns buttons and selects, and inventing
+a colour-input primitive for one call site would be worse than one honest
+attribute.
+
 ## Order of work
 
 | Step | Content | State |
@@ -336,6 +380,6 @@ blur, and proving that is not a normalisation task. Logged for **11.1.7**.
 | 11.1.5a | Document migration | **done** |
 | 11.1.5b | Note migration | **done** |
 | 11.1.6a | Sheet migration | **done** |
-| 11.1.6b | Presentation migration | next |
+| 11.1.6b | Presentation migration | **done** |
 | 11.1.6c | Code — action cluster only, no invented bar | |
 | 11.1.7 | legacy CSS cleanup (`.tbtn`, `.doc-toolbar`), overflow wiring, final audit | |
