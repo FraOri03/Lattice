@@ -4,14 +4,22 @@ import type { ViewMode } from '@/types/model'
  * navUrl — the small centralized abstraction for serializing, validating and
  * restoring the app's navigable state to/from the URL (issue #10).
  *
- * Navigable identity = project · mode · board · the single open entity. It is
- * deliberately coarse: transient things (card selection, drag positions,
- * scroll, panel toggles) are NOT part of it, so Back/Forward move between
- * meaningful places instead of every micro-interaction. Everything here is
- * pure so parse/serialize/validate can be unit-tested without a DOM.
+ * The app has exactly TWO navigable surfaces (Phase 11.0):
+ *
+ *   dashboard — no project is open; the URL carries no nav params
+ *   project   — a project is open: project · mode · board · one entity
+ *
+ * Navigable identity inside a project is deliberately coarse: transient things
+ * (card selection, drag positions, scroll, panel toggles) are NOT part of it,
+ * so Back/Forward move between meaningful places instead of every
+ * micro-interaction. Everything here is pure so parse/serialize/validate can be
+ * unit-tested without a DOM.
  */
 
 export type NavEntityKind = 'note' | 'doc' | 'code' | 'sheet' | 'present' | 'asset'
+
+/** Which shell surface is showing. */
+export type NavSurface = 'dashboard' | 'project'
 
 export interface NavState {
   projectId: string
@@ -26,6 +34,17 @@ export interface NavState {
   entity?: { kind: NavEntityKind; id: string }
 }
 
+/**
+ * The validated answer to "where are we?": either the dashboard (no project
+ * open) or a project with its full navigable identity.
+ */
+export type ResolvedNavigation =
+  | { surface: 'dashboard' }
+  | ({ surface: 'project' } & NavState)
+
+/** The dashboard surface — a shared constant so identity checks stay cheap. */
+export const DASHBOARD_NAV: ResolvedNavigation = { surface: 'dashboard' }
+
 /** Legacy/compat URL token for the split layout (pre-IA-refactor deep links). */
 const SPLIT_TOKEN = 'split'
 
@@ -36,6 +55,7 @@ const MODES: readonly ViewMode[] = [
   'sheet',
   'presentation',
   'code',
+  'photo',
 ]
 
 /** Section an entity kind opens into — used to rebuild a `m=split` deep link. */
@@ -95,9 +115,12 @@ export function parseNav(search: string): RawNav {
   return raw
 }
 
-/** Serialize nav state to a search string ("?p=…"), or "" when empty. */
-export function serializeNav(nav: NavState | null): string {
-  if (!nav?.projectId) return ''
+/**
+ * Serialize nav state to a search string ("?p=…"). The dashboard is the
+ * param-less root URL, so it serializes to "".
+ */
+export function serializeNav(nav: ResolvedNavigation | null): string {
+  if (!nav || nav.surface === 'dashboard' || !nav.projectId) return ''
   const q = new URLSearchParams()
   q.set('p', nav.projectId)
   // split is a layout, serialized as the legacy `m=split` token so pre-refactor
@@ -110,8 +133,9 @@ export function serializeNav(nav: NavState | null): string {
 
 /** Canonical identity string for dedup — two states are the "same place"
  *  iff their keys match (used to avoid pushing duplicate history entries). */
-export function navKey(nav: NavState | null): string {
+export function navKey(nav: ResolvedNavigation | null): string {
   if (!nav) return ''
+  if (nav.surface === 'dashboard') return 'dashboard'
   return [
     nav.projectId,
     nav.split ? SPLIT_TOKEN : nav.mode,
@@ -126,24 +150,24 @@ export function navKey(nav: NavState | null): string {
  */
 export interface NavSnapshot {
   hasProject: (id: string) => boolean
-  /** where to land when the requested project is missing/invalid */
-  fallbackProjectId: string
   boardBelongsTo: (boardId: string, projectId: string) => boolean
   firstBoardOf: (projectId: string) => string | undefined
   entityExists: (kind: NavEntityKind, id: string, projectId: string) => boolean
 }
 
 /**
- * Turn raw URL params into a valid NavState, degrading unknown ids safely:
- * a bad project falls back to the current one, a bad mode to `board`, a board
- * that doesn't belong to the project to that project's first board, and a
- * missing entity is simply dropped (its mode still opens, just empty).
+ * Turn raw URL params into a validated surface, degrading unknown ids safely:
+ *
+ *   no project param / unknown project → the dashboard (there is no "guess a
+ *     project" fallback: landing in someone else's or a deleted project would
+ *     be a worse answer than Home)
+ *   bad mode                           → `board`
+ *   board outside the project          → that project's first board
+ *   missing entity                     → dropped (its mode still opens, empty)
  */
-export function resolveNav(raw: RawNav, snap: NavSnapshot): NavState {
-  const projectId =
-    raw.projectId && snap.hasProject(raw.projectId)
-      ? raw.projectId
-      : snap.fallbackProjectId
+export function resolveNav(raw: RawNav, snap: NavSnapshot): ResolvedNavigation {
+  if (!raw.projectId || !snap.hasProject(raw.projectId)) return DASHBOARD_NAV
+  const projectId = raw.projectId
   const boardId =
     raw.boardId && snap.boardBelongsTo(raw.boardId, projectId)
       ? raw.boardId
@@ -166,5 +190,12 @@ export function resolveNav(raw: RawNav, snap: NavSnapshot): NavState {
     : isViewMode(raw.mode)
       ? raw.mode
       : 'board'
-  return { projectId, mode, split: split || undefined, boardId, entity }
+  return {
+    surface: 'project',
+    projectId,
+    mode,
+    split: split || undefined,
+    boardId,
+    entity,
+  }
 }

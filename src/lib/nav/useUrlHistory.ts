@@ -2,21 +2,29 @@ import { useEffect, useRef } from 'react'
 import { useStore } from '@/store/useStore'
 import { useWorkspaceLayoutStore } from '@/store/workspaceLayoutStore'
 import {
+  DASHBOARD_NAV,
   navKey,
   parseNav,
   resolveNav,
   serializeNav,
   type NavSnapshot,
   type NavState,
+  type ResolvedNavigation,
 } from './navUrl'
 
 /**
  * useUrlHistory — binds the app's navigable state to the browser History API
  * (issue #10). Mounted once inside the workspace.
  *
- *   store change (project/mode/board/entity) ──▶ history.pushState
- *   Back / Forward (popstate)                ──▶ store.applyNav
- *   direct load / refresh                    ──▶ restore from the URL
+ *   store change (surface/project/mode/board/entity) ──▶ history.pushState
+ *   Back / Forward (popstate)                        ──▶ store.applyNav
+ *   direct load / refresh                            ──▶ restore from the URL
+ *
+ * Surfaces (Phase 11.0): the bare root URL is the dashboard, `?p=…` is a
+ * project. An unknown project id lands on the dashboard rather than guessing
+ * a project. The dashboard SCREEN arrives in 11.2 — until then the shell keeps
+ * rendering the workspace, and the first section/project action re-enters the
+ * project surface, so no URL promises a page that does not exist yet.
  *
  * Loop-safety: an `applying` flag suppresses pushes while we are restoring
  * from the URL, and a `navKey` dedup means only genuine navigation (not the
@@ -26,8 +34,9 @@ import {
  */
 
 /** The nav state implied by the current store. */
-function currentNav(): NavState {
+function currentNav(): ResolvedNavigation {
   const s = useStore.getState()
+  if (s.navSurface === 'dashboard') return DASHBOARD_NAV
   let entity: NavState['entity']
   if (s.activeDocId) entity = { kind: 'doc', id: s.activeDocId }
   else if (s.activeCodeId) entity = { kind: 'code', id: s.activeCodeId }
@@ -36,6 +45,7 @@ function currentNav(): NavState {
   else if (s.activeNoteId) entity = { kind: 'note', id: s.activeNoteId }
   else if (s.activeAssetId) entity = { kind: 'asset', id: s.activeAssetId }
   return {
+    surface: 'project',
     projectId: s.activeProjectId,
     mode: s.viewMode,
     split: useWorkspaceLayoutStore.getState().split || undefined,
@@ -56,7 +66,6 @@ function snapshot(): NavSnapshot {
   } as const
   return {
     hasProject: (id) => !!s.projects[id],
-    fallbackProjectId: s.activeProjectId,
     boardBelongsTo: (bid, pid) => s.boards[bid]?.projectId === pid,
     firstBoardOf: (pid) => s.boardOrder.find((b) => s.boards[b]?.projectId === pid),
     entityExists: (kind, id, pid) => {
@@ -67,7 +76,7 @@ function snapshot(): NavSnapshot {
   }
 }
 
-function urlFor(nav: NavState): string {
+function urlFor(nav: ResolvedNavigation): string {
   return location.pathname + serializeNav(nav) + location.hash
 }
 
@@ -76,14 +85,12 @@ export function useUrlHistory() {
   const lastKeyRef = useRef<string | null>(null)
 
   const restoreFromUrl = (replace: boolean) => {
-    const raw = parseNav(location.search)
-    const hasParams = !!(raw.projectId || raw.mode || raw.entityId || raw.boardId)
-    const nav = hasParams ? resolveNav(raw, snapshot()) : currentNav()
-    if (hasParams) {
-      applyingRef.current = true
-      useStore.getState().applyNav(nav)
-      applyingRef.current = false
-    }
+    // the resolver answers for both surfaces: no/unknown `p` ⇒ dashboard,
+    // a valid `p` ⇒ that project. Either way the store follows the URL.
+    const nav = resolveNav(parseNav(location.search), snapshot())
+    applyingRef.current = true
+    useStore.getState().applyNav(nav)
+    applyingRef.current = false
     lastKeyRef.current = navKey(nav)
     const method = replace ? 'replaceState' : 'pushState'
     history[method](history.state, '', urlFor(nav))

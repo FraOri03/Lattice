@@ -1,5 +1,6 @@
 /// <reference types="vitest/config" />
 import { defineConfig } from 'vite'
+import { configDefaults } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { fileURLToPath } from 'node:url'
@@ -36,5 +37,12 @@ export default defineConfig({
     css: false,
     // keep unit tests deterministic: no real timers / cloud / network
     restoreMocks: true,
+    /**
+     * `.claude/worktrees/*` holds full checkouts of this repo from parallel
+     * agent sessions, each with its own node_modules. Discovering their tests
+     * runs a second copy of React against ours and fails with unrelated hook
+     * errors, so `npm test` is only trustworthy with them excluded.
+     */
+    exclude: [...configDefaults.exclude, '**/.claude/**'],
   },
 })

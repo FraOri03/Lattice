@@ -1,6 +1,8 @@
 import { lazy, Suspense, useState } from 'react'
 import { backlinksToTitle, useStore } from '@/store/useStore'
+import { useI18n } from '@/lib/i18n'
 import { downloadText, slugify } from '@/lib/download'
+import { ToolbarAction, ToolbarGroup, ToolbarRoot, ToolbarToggle } from '@/components/ui/toolbar'
 import { MarkdownView } from '@/components/MarkdownView'
 import { AssetPreviewPane } from '@/components/preview/AssetPreviewPane'
 import { RichDocWorkspacePane } from '@/components/richdoc/RichDocWorkspacePane'
@@ -28,6 +30,7 @@ export function DocumentView() {
   const createNote = useStore((s) => s.createNote)
   const setViewMode = useStore((s) => s.setViewMode)
   const viewMode = useStore((s) => s.viewMode)
+  const t = useI18n()
   const [tab, setTab] = useState<'write' | 'preview'>('write')
 
   // Which single pane this mode may mount (see lib/nav/activePane): Document
@@ -106,38 +109,48 @@ export function DocumentView() {
           onChange={(e) => updateNote(note.id, { title: e.target.value })}
           placeholder="Untitled"
         />
-        <div className="flex flex-none rounded-lg border border-bord bg-panel2 p-0.5">
-          {(['write', 'preview'] as const).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`cursor-pointer rounded-md px-2.5 py-1 text-xs font-medium capitalize ${
-                tab === t ? 'bg-panel text-ink shadow-sm' : 'text-muted hover:text-ink'
-              }`}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
-        <button
-          className="icon-btn"
-          title="Export as .md"
-          aria-label="Export note as Markdown"
-          onClick={() =>
-            downloadText(`${slugify(note.title)}.md`, `# ${note.title}\n\n${note.content}`)
-          }
-        >
-          <ActionIcon.Export size={14} />
-        </button>
-        {viewMode !== 'board' && (
-          <button
-            className="icon-btn"
-            title="Close editor"
-            onClick={() => setViewMode('board')}
+        {/* Deliberately small: a note is markdown, so it inherits none of the
+            Document toolbar's formatting grammar — and it needs no
+            `preserveFocus`, because nothing here acts on a text selection. */}
+        {/* Two sizes on purpose, both matching what was there before: the icon
+            actions come from the .icon-btn family, so `md` (32px) keeps them
+            from shrinking below their old 28px, while the segmented view switch
+            stays `sm` (24px), exactly its previous height. */}
+        <ToolbarRoot label={t.toolbar.note.label} className="flex-none gap-1">
+          <ToolbarGroup
+            label={t.toolbar.note.viewGroup}
+            className="rounded-lg border border-bord bg-panel2 p-0.5"
           >
-            <IcX size={14} />
-          </button>
-        )}
+            <ToolbarToggle
+              label={t.toolbar.note.write}
+              content="icon-text"
+              size="sm"
+              pressed={tab === 'write'}
+              onRun={() => setTab('write')}
+            />
+            <ToolbarToggle
+              label={t.toolbar.note.preview}
+              content="icon-text"
+              size="sm"
+              pressed={tab === 'preview'}
+              onRun={() => setTab('preview')}
+            />
+          </ToolbarGroup>
+          <ToolbarAction
+            icon={<ActionIcon.Export size={14} />}
+            label={t.toolbar.note.exportMd}
+            onRun={() =>
+              downloadText(`${slugify(note.title)}.md`, `# ${note.title}\n\n${note.content}`)
+            }
+          />
+          {viewMode !== 'board' && (
+            <ToolbarAction
+              icon={<IcX size={14} />}
+              label={t.toolbar.note.close}
+              onRun={() => setViewMode('board')}
+            />
+          )}
+        </ToolbarRoot>
       </div>
 
       {/* body */}

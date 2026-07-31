@@ -1,8 +1,16 @@
 import { useEffect, useRef } from 'react'
 import { useStore } from '@/store/useStore'
 import { usePhotoStore } from '@/store/photoStore'
+import { useI18n } from '@/lib/i18n'
 import { toast } from '@/components/ui/Toaster'
 import { ActionIcon } from '@/components/ActionIcons'
+import {
+  ToolbarAction,
+  ToolbarGroup,
+  ToolbarRoot,
+  ToolbarSeparator,
+  ToolbarToggle,
+} from '@/components/ui/toolbar'
 import { PhotoCanvas } from '@/components/photo/PhotoCanvas'
 import { PhotoLibrary } from '@/components/photo/PhotoLibrary'
 import { PhotoInspector } from '@/components/photo/PhotoInspector'
@@ -25,8 +33,15 @@ const isTyping = (t: EventTarget | null) =>
   t instanceof HTMLElement &&
   (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)
 
-/** Toolbar above the canvas: tools, quick add, undo/redo, import/export, AI. */
-function PhotoToolbar() {
+/**
+ * Toolbar above the canvas: tools, quick add, undo/redo, import/export, AI.
+ *
+ * Reference implementation for the Phase 11.1 primitives — Photo is the mode
+ * that already had the select/pan model, so it is what the shared components
+ * had to be able to express, rather than a mode bent to fit them.
+ */
+export function PhotoToolbar() {
+  const t = useI18n()
   const tool = usePhotoStore((s) => s.tool)
   const setTool = usePhotoStore((s) => s.setTool)
   const addElement = usePhotoStore((s) => s.addElement)
@@ -66,133 +81,113 @@ function PhotoToolbar() {
   }
 
   return (
-    <div className="flex h-10 flex-none items-center gap-2 border-b border-bord bg-panel px-2">
-      {/* tools */}
-      <div className="flex rounded-lg border border-bord bg-panel2 p-0.5">
-        <button
-          onClick={() => setTool('select')}
-          className={`flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium ${
-            tool === 'select' ? 'bg-panel text-ink shadow-sm' : 'text-muted hover:text-ink'
-          }`}
-          title="Select tool (V)"
-          aria-pressed={tool === 'select'}
-        >
-          <IcCursor size={12} /> <span className="hidden lg:inline">Select</span>
-        </button>
-        <button
-          onClick={() => setTool('pan')}
-          className={`flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium ${
-            tool === 'pan' ? 'bg-panel text-ink shadow-sm' : 'text-muted hover:text-ink'
-          }`}
-          title="Pan tool (H, or hold Space)"
-          aria-pressed={tool === 'pan'}
-        >
-          <IcHand size={12} /> <span className="hidden lg:inline">Pan</span>
-        </button>
-      </div>
+    <ToolbarRoot
+      label={t.toolbar.photo.label}
+      className="h-10 flex-none gap-2 border-b border-bord bg-panel px-2"
+    >
+      <ToolbarGroup
+        label={t.toolbar.groups.select}
+        className="rounded-lg border border-bord bg-panel2 p-0.5"
+      >
+        <ToolbarToggle
+          icon={<IcCursor size={12} />}
+          label={t.toolbar.photo.select}
+          description={t.toolbar.photo.selectTip}
+          shortcut="V"
+          content="icon-text"
+          labelClassName="hidden lg:inline"
+          pressed={tool === 'select'}
+          onRun={() => setTool('select')}
+        />
+        <ToolbarToggle
+          icon={<IcHand size={12} />}
+          label={t.toolbar.photo.pan}
+          description={t.toolbar.photo.panTip}
+          shortcut="H"
+          content="icon-text"
+          labelClassName="hidden lg:inline"
+          pressed={tool === 'pan'}
+          onRun={() => setTool('pan')}
+        />
+      </ToolbarGroup>
 
-      <span className="h-4 w-px bg-bord" />
+      <ToolbarSeparator />
 
-      {/* quick add */}
-      <div className="flex items-center gap-0.5">
-        <button
-          className="icon-btn"
-          onClick={() => addElement('camera', 0, 0)}
-          title="Add camera"
-          aria-label="Add camera"
-        >
-          <IcCamera size={15} />
-        </button>
-        <button
-          className="icon-btn"
-          onClick={() => addElement('light', 0, 0)}
-          title="Add light source"
-          aria-label="Add light source"
-        >
-          <IcBulb size={15} />
-        </button>
-        <button
-          className="icon-btn"
-          onClick={() => addElement('person', 0, 0)}
-          title="Add person"
-          aria-label="Add person"
-        >
-          <IcUserPlus size={15} />
-        </button>
-        <button
-          className="icon-btn"
-          onClick={() => addElement('prop', 0, 0)}
-          title="Add generic prop"
-          aria-label="Add generic prop"
-        >
-          <IcCube size={15} />
-        </button>
-      </div>
+      <ToolbarGroup label={t.toolbar.groups.create}>
+        <ToolbarAction
+          icon={<IcCamera size={15} />}
+          label={t.toolbar.photo.addCamera}
+          onRun={() => addElement('camera', 0, 0)}
+        />
+        <ToolbarAction
+          icon={<IcBulb size={15} />}
+          label={t.toolbar.photo.addLight}
+          onRun={() => addElement('light', 0, 0)}
+        />
+        <ToolbarAction
+          icon={<IcUserPlus size={15} />}
+          label={t.toolbar.photo.addPerson}
+          onRun={() => addElement('person', 0, 0)}
+        />
+        <ToolbarAction
+          icon={<IcCube size={15} />}
+          label={t.toolbar.photo.addProp}
+          onRun={() => addElement('prop', 0, 0)}
+        />
+      </ToolbarGroup>
 
       <div className="flex-1" />
 
-      {/* undo/redo */}
-      <div className="flex items-center gap-0.5">
-        <button
-          className="icon-btn disabled:opacity-30"
-          onClick={undo}
+      <ToolbarGroup label={t.toolbar.groups.history}>
+        <ToolbarAction
+          icon={<IcUndo size={14} />}
+          label={t.toolbar.photo.undo}
+          shortcut="Ctrl+Z"
           disabled={historyIndex <= 0}
-          title="Undo (Ctrl+Z)"
-          aria-label="Undo"
-        >
-          <IcUndo size={14} />
-        </button>
-        <button
-          className="icon-btn disabled:opacity-30"
-          onClick={redo}
+          onRun={undo}
+        />
+        <ToolbarAction
+          icon={<IcRedo size={14} />}
+          label={t.toolbar.photo.redo}
+          shortcut="Ctrl+Y"
           disabled={historyIndex >= history.length - 1}
-          title="Redo (Ctrl+Y)"
-          aria-label="Redo"
-        >
-          <IcRedo size={14} />
-        </button>
-      </div>
+          onRun={redo}
+        />
+      </ToolbarGroup>
 
-      <span className="h-4 w-px bg-bord" />
+      <ToolbarSeparator />
 
-      {/* import / export */}
-      <button
-        className="icon-btn"
-        onClick={() => fileRef.current?.click()}
-        title="Import scene JSON"
-        aria-label="Import scene JSON"
-      >
-        <ActionIcon.Import size={14} />
-      </button>
-      <input
-        ref={fileRef}
-        type="file"
-        accept=".json,application/json"
-        onChange={handleImport}
-        className="hidden"
-        aria-hidden
-      />
-      <button
-        className="icon-btn"
-        onClick={handleExport}
-        title="Export scene as JSON"
-        aria-label="Export scene as JSON"
-      >
-        <ActionIcon.Export size={14} />
-      </button>
-
-      <span className="h-4 w-px bg-bord" />
-
-      <button
-        className={`btn ${aiPanelOpen ? '!border-accent !text-accent' : ''}`}
-        onClick={() => setAiPanelOpen(!aiPanelOpen)}
-        title="AI set designer"
-        aria-pressed={aiPanelOpen}
-      >
-        <IcSparkles size={13} />
-        <span className="hidden md:inline">AI assistant</span>
-      </button>
-    </div>
+      <ToolbarGroup label={t.toolbar.groups.integrate}>
+        <ToolbarAction
+          icon={<ActionIcon.Import size={14} />}
+          label={t.toolbar.photo.importScene}
+          onRun={() => fileRef.current?.click()}
+        />
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".json,application/json"
+          onChange={handleImport}
+          className="hidden"
+          aria-hidden
+        />
+        <ToolbarAction
+          icon={<ActionIcon.Export size={14} />}
+          label={t.toolbar.photo.exportScene}
+          onRun={handleExport}
+        />
+        <ToolbarSeparator />
+        <ToolbarToggle
+          icon={<IcSparkles size={13} />}
+          label={t.toolbar.photo.ai}
+          description={t.toolbar.photo.aiTip}
+          content="icon-text"
+          labelClassName="hidden md:inline"
+          pressed={aiPanelOpen}
+          onRun={() => setAiPanelOpen(!aiPanelOpen)}
+        />
+      </ToolbarGroup>
+    </ToolbarRoot>
   )
 }
 

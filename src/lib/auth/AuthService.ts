@@ -47,6 +47,18 @@ export interface AuthService {
   /** Current stored token if still valid — no network, no popup. */
   peekToken(): StoredToken | null
   /**
+   * true when the session can only be restored by an explicit user action
+   * ("Reconnect Drive"): the silent refresh was refused or consent was
+   * never granted. Background callers use it to explain themselves.
+   */
+  needsReauth(): boolean
+  /**
+   * Notified whenever the token state changes — a fresh token was acquired
+   * (silent renewal, sign-in, reconnect) or the session went stale.
+   * Realtime and Drive sync listen to resume as soon as a token lands.
+   */
+  subscribe(listener: () => void): () => void
+  /**
    * Interactive (re)connect to Google Drive: forces a fresh consent
    * round-trip and stores the new token. Rejects with a human-readable
    * message on failure (popup blocked, origin not authorized, denied…).
@@ -60,6 +72,46 @@ const ACCOUNT_KEY = 'lattice-account'
 const TOKEN_KEY = 'lattice-google-token'
 const GIS_SRC = 'https://accounts.google.com/gsi/client'
 const SCOPES = `openid email profile ${DRIVE_SCOPE}`
+/** Renew this long before expiry, so background work never hits the cliff. */
+const RENEW_AHEAD_MS = 5 * 60_000
+/** A silent round-trip that never answers must not block the next one. */
+const SILENT_TIMEOUT_MS = 30_000
+
+/* ---------------- transient user activation ---------------- */
+
+/**
+ * Every GIS token request goes through window.open, so the browser blocks
+ * it unless the page has transient user activation. Background callers —
+ * realtime attach, Drive sync, media grants — have none: asking anyway
+ * yielded a blocked popup and a null token instead of a refreshed session.
+ * We therefore only request a token while a gesture is still "hot", and
+ * otherwise defer the refresh to the next one.
+ */
+const GESTURE_EVENTS = ['pointerdown', 'keydown', 'touchend'] as const
+/** Fallback window for browsers without navigator.userActivation. */
+const GESTURE_WINDOW_MS = 3000
+
+let lastGestureAt = 0
+
+if (typeof window !== 'undefined') {
+  for (const type of GESTURE_EVENTS) {
+    window.addEventListener(
+      type,
+      () => {
+        lastGestureAt = Date.now()
+      },
+      { capture: true, passive: true },
+    )
+  }
+}
+
+function hasUserActivation(): boolean {
+  const activation = (
+    navigator as Navigator & { userActivation?: { isActive?: boolean } }
+  ).userActivation
+  if (typeof activation?.isActive === 'boolean') return activation.isActive
+  return Date.now() - lastGestureAt < GESTURE_WINDOW_MS
+}
 
 function loadAccount(): Account | null {
   try {
@@ -167,6 +219,19 @@ class GoogleAuthService implements AuthService {
   private tokenClient: TokenClient | null = null
   /** reject of the token request currently in flight (error_callback path) */
   private pendingReject: ((err: Error) => void) | null = null
+  /**
+   * The TokenClient has a single callback slot, so two overlapping requests
+   * stomp on each other and leave promises pending forever. Every round-trip
+   * queues behind this chain instead.
+   */
+  private chain: Promise<unknown> = Promise.resolve()
+  /** The silent refresh in flight — concurrent callers share it. */
+  private silentFlight: Promise<StoredToken> | null = null
+  /** Silent renewal is no longer possible: only an explicit reconnect helps. */
+  private reauthNeeded = false
+  /** One-shot "refresh on the next user gesture" listener, when armed. */
+  private gestureRetry: (() => void) | null = null
+  private listeners = new Set<() => void>()
 
   private loadToken(): StoredToken | null {
     try {
@@ -200,20 +265,62 @@ class GoogleAuthService implements AuthService {
     return this.tokenClient
   }
 
-  /** One token round-trip through GIS. prompt '' = silent when possible. */
+  /**
+   * One token round-trip through GIS, serialised against any other.
+   * prompt '' = silent when possible; concurrent silent callers share one
+   * request instead of racing for the client's single callback slot.
+   */
   private requestToken(prompt: '' | 'consent'): Promise<StoredToken> {
+    if (prompt === '' && this.silentFlight) return this.silentFlight
+    const run = this.chain.then(() => this.roundTrip(prompt))
+    // the chain must never reject, or every later request would skip its turn
+    this.chain = run.then(
+      () => {},
+      () => {},
+    )
+    if (prompt === '') {
+      this.silentFlight = run
+      const clear = () => {
+        if (this.silentFlight === run) this.silentFlight = null
+      }
+      void run.then(clear, clear)
+    }
+    return run
+  }
+
+  private roundTrip(prompt: '' | 'consent'): Promise<StoredToken> {
     return new Promise((resolve, reject) => {
-      this.pendingReject = reject
+      let settled = false
+      let timer: ReturnType<typeof setTimeout> | null = null
+      const finish = (emit: () => void) => {
+        if (settled) return
+        settled = true
+        if (timer) clearTimeout(timer)
+        this.pendingReject = null
+        emit()
+      }
+      // a silent request the user never sees can hang; don't block the queue
+      if (prompt === '') {
+        timer = setTimeout(
+          () =>
+            finish(() =>
+              reject(new Error('Google did not answer the silent token refresh.')),
+            ),
+          SILENT_TIMEOUT_MS,
+        )
+      }
+      this.pendingReject = (err) => finish(() => reject(err))
       void this.client()
         .then((client) => {
           client.callback = (resp) => {
-            this.pendingReject = null
             if (resp.error || !resp.access_token) {
-              reject(
-                new Error(
-                  resp.error
-                    ? describeAuthError(resp.error, resp.error_description)
-                    : 'Google sign-in was cancelled',
+              finish(() =>
+                reject(
+                  new Error(
+                    resp.error
+                      ? describeAuthError(resp.error, resp.error_description)
+                      : 'Google sign-in was cancelled',
+                  ),
                 ),
               )
               return
@@ -225,15 +332,90 @@ class GoogleAuthService implements AuthService {
               scope: resp.scope,
             }
             this.saveToken(token)
-            resolve(token)
+            finish(() => resolve(token))
           }
           client.requestAccessToken({ prompt })
         })
         .catch((err: unknown) => {
-          this.pendingReject = null
-          reject(err instanceof Error ? err : new Error(String(err)))
+          finish(() => reject(err instanceof Error ? err : new Error(String(err))))
         })
     })
+  }
+
+  /**
+   * Silent refresh, popup-safe. Without transient user activation the
+   * browser blocks the GIS window, so we skip the call entirely — no
+   * blocked-popup noise, no bogus "signed out" — and retry on the next
+   * gesture instead. Callers get null and stay honest in the meantime.
+   */
+  private async refreshSilently(): Promise<StoredToken | null> {
+    // no token ever stored → consent was never granted: only "Connect Drive"
+    // can help, and it must come from a real click.
+    if (!this.loadToken()) {
+      this.setReauthNeeded(true)
+      return null
+    }
+    if (!hasUserActivation()) {
+      this.armGestureRetry()
+      return null
+    }
+    try {
+      const token = await this.requestToken('')
+      this.setReauthNeeded(false)
+      this.notify()
+      return token
+    } catch {
+      this.setReauthNeeded(true)
+      return null
+    }
+  }
+
+  /** Refresh as soon as the user next interacts — the popup is allowed then. */
+  private armGestureRetry(): void {
+    if (this.gestureRetry || typeof window === 'undefined') return
+    void this.client() // pre-warm GIS so the gesture isn't spent loading it
+    const handler = () => {
+      this.disarmGestureRetry()
+      void this.refreshSilently()
+    }
+    this.gestureRetry = handler
+    for (const type of GESTURE_EVENTS) {
+      window.addEventListener(type, handler, { capture: true, passive: true })
+    }
+  }
+
+  private disarmGestureRetry(): void {
+    const handler = this.gestureRetry
+    if (!handler) return
+    this.gestureRetry = null
+    for (const type of GESTURE_EVENTS) {
+      window.removeEventListener(type, handler, { capture: true })
+    }
+  }
+
+  private setReauthNeeded(needed: boolean): void {
+    if (this.reauthNeeded === needed) return
+    this.reauthNeeded = needed
+    this.notify()
+  }
+
+  private notify(): void {
+    for (const listener of [...this.listeners]) {
+      try {
+        listener()
+      } catch {
+        // a broken listener must never break authentication
+      }
+    }
+  }
+
+  subscribe(listener: () => void): () => void {
+    this.listeners.add(listener)
+    return () => this.listeners.delete(listener)
+  }
+
+  needsReauth(): boolean {
+    return this.reauthNeeded
   }
 
   async signIn(): Promise<Account> {
@@ -260,6 +442,8 @@ class GoogleAuthService implements AuthService {
       updatedAt: now,
     }
     saveAccount(account)
+    this.setReauthNeeded(false)
+    this.notify()
     return account
   }
 
@@ -274,14 +458,17 @@ class GoogleAuthService implements AuthService {
 
   async getAccessToken(): Promise<string | null> {
     const cached = this.loadToken()
-    if (cached && cached.expiresAt > Date.now()) return cached.accessToken
-    if (!loadAccount()) return null
-    try {
-      const token = await this.requestToken('')
-      return token.accessToken
-    } catch {
-      return null // silent refresh needs interaction — caller shows "reconnect"
+    if (cached && cached.expiresAt > Date.now()) {
+      // renew ahead of the cliff while the user is around, so long-lived
+      // background work (realtime, sync) never trips over an expiry
+      if (cached.expiresAt - Date.now() < RENEW_AHEAD_MS && hasUserActivation()) {
+        void this.refreshSilently()
+      }
+      return cached.accessToken
     }
+    if (!loadAccount()) return null
+    const token = await this.refreshSilently()
+    return token?.accessToken ?? null
   }
 
   peekToken(): StoredToken | null {
@@ -290,10 +477,14 @@ class GoogleAuthService implements AuthService {
   }
 
   async connectDrive(): Promise<void> {
+    this.disarmGestureRetry()
     await this.requestToken('consent')
+    this.setReauthNeeded(false)
+    this.notify()
   }
 
   async disconnectDrive(): Promise<void> {
+    this.disarmGestureRetry()
     const token = this.loadToken()
     if (token) {
       try {
@@ -304,6 +495,8 @@ class GoogleAuthService implements AuthService {
       }
     }
     this.saveToken(null)
+    this.setReauthNeeded(false)
+    this.notify()
   }
 }
 
@@ -352,6 +545,14 @@ class MockAuthService implements AuthService {
 
   peekToken(): StoredToken | null {
     return null
+  }
+
+  needsReauth(): boolean {
+    return false // there is no cloud session to restore
+  }
+
+  subscribe(): () => void {
+    return () => {} // token state never changes
   }
 
   async connectDrive(): Promise<void> {

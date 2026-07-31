@@ -180,11 +180,17 @@ describe('applyNav — URL/history restore', () => {
     const s = useStore.getState()
     const pid = s.activeProjectId
     const docId = s.createDoc({ title: 'Restore me' })
-    s.applyNav({ projectId: pid, mode: 'doc', entity: { kind: 'doc', id: docId } })
+    s.applyNav({
+      surface: 'project',
+      projectId: pid,
+      mode: 'doc',
+      entity: { kind: 'doc', id: docId },
+    })
     const after = useStore.getState()
     expect(after.activeProjectId).toBe(pid)
     expect(after.viewMode).toBe('doc')
     expect(after.activeDocId).toBe(docId)
+    expect(after.navSurface).toBe('project')
     // opening one entity clears the others
     expect(after.activeSheetId).toBeNull()
     expect(after.activeCodeId).toBeNull()
@@ -192,7 +198,64 @@ describe('applyNav — URL/history restore', () => {
 
   it('ignores an unknown project id (safe no-op)', () => {
     const before = useStore.getState().activeProjectId
-    useStore.getState().applyNav({ projectId: 'proj_missing', mode: 'board' })
+    useStore
+      .getState()
+      .applyNav({ surface: 'project', projectId: 'proj_missing', mode: 'board' })
     expect(useStore.getState().activeProjectId).toBe(before)
+  })
+})
+
+/**
+ * Phase 11.0 — the shell has two surfaces. The dashboard is a place you can be
+ * (and link to: the param-less root URL), and every way of touching a project
+ * leaves it again.
+ */
+describe('navigation surfaces — dashboard vs project', () => {
+  beforeEach(() => {
+    useStore.getState().applyNav({ surface: 'dashboard' })
+  })
+
+  it('applyNav(dashboard) moves Home without discarding the open project', () => {
+    const s = useStore.getState()
+    const pid = s.activeProjectId
+    const docId = s.createDoc({ title: 'Still open' })
+    s.openDoc(docId)
+    useStore.getState().applyNav({ surface: 'dashboard' })
+    const after = useStore.getState()
+    expect(after.navSurface).toBe('dashboard')
+    // going back in must be free — nothing was torn down
+    expect(after.activeProjectId).toBe(pid)
+    expect(after.activeDocId).toBe(docId)
+  })
+
+  it('openDashboard() is the explicit Home action', () => {
+    useStore.getState().setViewMode('board')
+    expect(useStore.getState().navSurface).toBe('project')
+    useStore.getState().openDashboard()
+    expect(useStore.getState().navSurface).toBe('dashboard')
+  })
+
+  it('choosing a section re-enters the project surface', () => {
+    useStore.getState().setViewMode('board')
+    expect(useStore.getState().navSurface).toBe('project')
+  })
+
+  it('opening an entity re-enters the project surface', () => {
+    const docId = useStore.getState().createDoc({ title: 'From the dashboard' })
+    useStore.getState().openDashboard()
+    useStore.getState().openDoc(docId)
+    expect(useStore.getState().navSurface).toBe('project')
+  })
+
+  it('re-opening the ALREADY active project still leaves the dashboard', () => {
+    const pid = useStore.getState().activeProjectId
+    useStore.getState().setActiveProject(pid)
+    expect(useStore.getState().navSurface).toBe('project')
+    expect(useStore.getState().activeProjectId).toBe(pid)
+  })
+
+  it('an unknown project id never enters the project surface', () => {
+    useStore.getState().setActiveProject('proj_missing')
+    expect(useStore.getState().navSurface).toBe('dashboard')
   })
 })

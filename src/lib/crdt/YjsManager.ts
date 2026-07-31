@@ -48,6 +48,7 @@ class YjsManager {
   private attachment: RealtimeAttachment | null = null
   private attachSeq = 0
   private unsubscribeStore: (() => void) | null = null
+  private unsubscribeAuth: (() => void) | null = null
   private messageHandler: ((msg: CollabMessage) => void) | null = null
   private queue = new OfflineUpdateQueue()
   private started = false
@@ -79,10 +80,19 @@ class YjsManager {
         void this.activate(state.activeProjectId)
       }
     })
+    // attaching needs a Google token; when one lands later (silent renewal
+    // on the next gesture, "Reconnect Drive") pick the connection back up
+    this.unsubscribeAuth = authService.subscribe(() => {
+      if (!this.started || this.attachment || !this.activeProjectId) return
+      if (!authService.peekToken()) return
+      void this.activate(this.activeProjectId)
+    })
   }
 
   stop(): void {
     this.started = false
+    this.unsubscribeAuth?.()
+    this.unsubscribeAuth = null
     this.unsubscribeStore?.()
     this.unsubscribeStore = null
     this.detachRealtime()
@@ -148,6 +158,29 @@ class YjsManager {
 
     const seq = ++this.attachSeq
     useCrdtStore.getState().setStatus('connecting')
+
+    // Attaching needs a Google token. Asking for it here keeps the failure
+    // out of the transport: a token that can only be renewed on the next
+    // user gesture is not an error, and the auth subscription re-runs this
+    // as soon as one lands.
+    const token = await authService.getAccessToken()
+    if (seq !== this.attachSeq) return
+    if (!token) {
+      if (authService.needsReauth()) {
+        useCrdtStore
+          .getState()
+          .setStatus(
+            'unauthorized',
+            'Your Google session expired. Use "Reconnect Drive" in the profile menu to resume realtime collaboration.',
+          )
+      } else {
+        useCrdtStore
+          .getState()
+          .setStatus('connecting', 'Waiting for your Google session to refresh…')
+      }
+      return
+    }
+
     try {
       const { attachLiveblocks } = await import('./liveblocks')
       const callbacks: AttachmentCallbacks = {

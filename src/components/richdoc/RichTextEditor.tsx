@@ -28,6 +28,7 @@ import { toast } from '@/components/ui/Toaster'
 import { collabBaseExtensions } from './extensions'
 import { SlashCommands } from './SlashCommandMenu'
 import { AssetPickerDialog } from './AssetPickerDialog'
+import { useI18n } from '@/lib/i18n'
 import { DocumentToolbar, setOrUnsetLink, useEditorTick } from './DocumentToolbar'
 import { pageStyleVars } from '@/lib/richdoc/pageSetup'
 
@@ -101,6 +102,7 @@ function EditorInner({
   const persistDocContent = useStore((s) => s.persistDocContent)
   const pageSetup = useStore((s) => s.docs[docId]?.page)
   const readOnly = useReadOnly()
+  const t = useI18n()
   const saveTimer = useRef<number | undefined>(undefined)
   /** true when at least one local (non-CRDT-remote) edit awaits saving */
   const locallyDirty = useRef(false)
@@ -338,7 +340,7 @@ function EditorInner({
             </button>
             <button
               className={`tbtn ${editor.isActive('link') ? 'is-active' : ''}`}
-              onClick={() => setOrUnsetLink(editor)}
+              onClick={() => setOrUnsetLink(editor, t)}
             >
               Link
             </button>

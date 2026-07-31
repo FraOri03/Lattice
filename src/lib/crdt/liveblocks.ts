@@ -25,14 +25,29 @@ import type { ProjectRoom } from './ProjectRoom'
 
 let client: Client | null = null
 
+/**
+ * The Google token every realtime call is authenticated with. A missing
+ * token is reported for what it actually is — signed out, expired session,
+ * or a renewal still waiting for the user's next interaction.
+ */
+async function requireGoogleToken(): Promise<string> {
+  const token = await authService.getAccessToken()
+  if (token) return token
+  if (!authService.restore()) {
+    throw new Error('Sign in with Google to use realtime collaboration.')
+  }
+  throw new Error(
+    authService.needsReauth()
+      ? 'Your Google session expired — use "Reconnect Drive" to resume realtime collaboration.'
+      : 'Your Google session is being refreshed — realtime will reconnect shortly.',
+  )
+}
+
 function getClient(): Client {
   if (client) return client
   client = createClient({
     authEndpoint: async (roomId?: string) => {
-      const googleToken = await authService.getAccessToken()
-      if (!googleToken) {
-        throw new Error('Sign in with Google to use realtime collaboration.')
-      }
+      const googleToken = await requireGoogleToken()
       const res = await fetch(env.realtimeAuthUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -55,8 +70,7 @@ async function ensureServerRooms(
   projectId: string,
   projectName: string,
 ): Promise<CollabRole> {
-  const googleToken = await authService.getAccessToken()
-  if (!googleToken) throw new Error('Sign in with Google to use realtime collaboration.')
+  const googleToken = await requireGoogleToken()
   const res = await fetch(env.realtimeRoomsUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
