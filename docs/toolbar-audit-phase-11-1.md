@@ -366,6 +366,31 @@ wrapped in a new primitive: the toolbar owns buttons and selects, and inventing
 a colour-input primitive for one call site would be worse than one honest
 attribute.
 
+## Code: no toolbar, and none invented (11.1.6c)
+
+Code has a tab strip, a file header and Monaco. It has no Run, no Terminal, no
+source control and no search of its own (find/replace comes from Monaco). So
+this step adds **no bar** — a row of buttons created for symmetry would
+advertise tools that do not exist.
+
+What it does fix is the two real defects in the controls that *do* exist:
+
+| Finding | Before | After |
+|---|---|---|
+| **Tabs unreachable by keyboard** | each chip was a plain `<div onClick>` — no role, no focus, so switching file needed a mouse | a `role="tablist"` of real `role="tab"` buttons with `aria-selected`, tied to the editor through `aria-controls`/`role="tabpanel"` |
+| **Close target below the floor** | `icon-btn h-4 w-4` = **16×16**, under WCAG 2.2 SC 2.5.8 | 24×24 via `h-6 w-6 p-1 -m-1`: the glyph stays 9 px, the target grows, and the chip gains 1 px (27→28) |
+| Strings | hardcoded English | EN/IT |
+
+The tablist reuses `useRovingFocus`: one tab stop, arrows between controls.
+That is a keyboard model, not a toolbar-only behaviour, so borrowing it beats a
+second implementation.
+
+**Known deviation from the strict tabs pattern:** arrows walk *every* control
+in the strip, close buttons included, because both carry the roving attribute.
+The ARIA pattern would move tab→tab and reach the close with a dedicated key.
+Doing that properly means adding a close shortcut, otherwise the close buttons
+become unreachable — reachability now beats purity. Candidate for **11.1.7**.
+
 ## Order of work
 
 | Step | Content | State |
@@ -381,5 +406,5 @@ attribute.
 | 11.1.5b | Note migration | **done** |
 | 11.1.6a | Sheet migration | **done** |
 | 11.1.6b | Presentation migration | **done** |
-| 11.1.6c | Code — action cluster only, no invented bar | |
+| 11.1.6c | Code — no bar invented; tablist + target fixes | **done** |
 | 11.1.7 | legacy CSS cleanup (`.tbtn`, `.doc-toolbar`), overflow wiring, final audit | |

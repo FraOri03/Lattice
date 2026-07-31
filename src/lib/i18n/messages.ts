@@ -393,6 +393,20 @@ export const en = {
       status: (n: number, total: number) =>
         `Slide ${n}/${total} · double-click text to edit · Del removes`,
     },
+    /**
+     * Code has no toolbar and this phase does not invent one — it has a tab
+     * strip and a file header, and these are their strings.
+     */
+    code: {
+      tabs: 'Open code files',
+      closeTab: (file: string) => `Close ${file}`,
+      closeWorkspace: 'Close code workspace',
+      fileName: 'File name',
+      fileNamePlaceholder: 'filename',
+      language: 'Language',
+      lines: (n: number) => `${n} lines`,
+      editor: 'Code editor',
+    },
   },
 }
 
@@ -765,6 +779,16 @@ export const it: Catalog = {
       resetBackground: 'Ripristina lo sfondo del tema',
       status: (n, total) =>
         `Diapositiva ${n}/${total} · doppio clic sul testo per modificarlo · Canc elimina`,
+    },
+    code: {
+      tabs: 'File di codice aperti',
+      closeTab: (file) => `Chiudi ${file}`,
+      closeWorkspace: 'Chiudi il workspace codice',
+      fileName: 'Nome file',
+      fileNamePlaceholder: 'nomefile',
+      language: 'Linguaggio',
+      lines: (n) => `${n} righe`,
+      editor: 'Editor di codice',
     },
   },
 }
