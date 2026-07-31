@@ -149,6 +149,13 @@ body {
     gap: 0.375rem;
     padding-inline: 0.5rem;
   }
+  /* …but a compact strip keeps the compact inset. The `px-2` these controls
+     used to carry never rendered (unlayered `.tbtn` beat it), so 5px is what
+     users actually see today, and widening them pushes the status line of the
+     slide toolbar onto a second row. */
+  .toolbar-control--sm.toolbar-control--icon-text {
+    padding-inline: 0.3125rem;
+  }
   /* a native <select> wearing the toolbar skin */
   .toolbar-control--select {
     justify-content: flex-start;
@@ -196,6 +203,43 @@ body {
     border-start-start-radius: 0;
     border-end-start-radius: 0;
     padding-inline: 0.25rem;
+  }
+
+  /* ---------- .tbtn: a compact control that is NOT in a toolbar ----------
+     After Phase 11.1 every mode's toolbar is built from the primitives above.
+     What still needs this class is the editor's bubble and block menus and the
+     slide element inspector — surfaces that borrow the same compact look
+     without being toolbars. It moved into this layer with the rest, so a
+     per-instance utility finally wins over it. */
+  .tbtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    height: 24px;
+    padding: 0 5px;
+    border-radius: 6px;
+    font-size: 12px;
+    color: var(--muted);
+    cursor: pointer;
+    user-select: none;
+  }
+  .tbtn:hover {
+    background: var(--panel2);
+    color: var(--ink);
+  }
+  /* Left exactly as it was. `--accent` on `--accent-soft` measures 3.84:1 in
+     dark and 2.38:1 in light — the same failure the toolbar primitive fixed —
+     but these are menus and an inspector, not toolbars, and a cleanup commit
+     is the wrong place to change how shipped surfaces look. Recorded in the
+     audit as the follow-up for whoever migrates them. */
+  .tbtn.is-active {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+  .tbtn:disabled {
+    opacity: 0.4;
+    cursor: default;
   }
 }
 

@@ -1,4 +1,6 @@
+import { useRef } from 'react'
 import { useStore } from '@/store/useStore'
+import { useI18n } from '@/lib/i18n'
 import { LANGUAGES, extForLang } from '@/lib/code/languages'
 import { useCollabStore, isLockFresh } from '@/lib/collab/collabStore'
 import { SESSION_ID } from '@/lib/collab/CollaborationProvider'
@@ -7,7 +9,11 @@ import { useCan, useReadOnly } from '@/lib/collab/useCollab'
 import { githubProvider } from '@/lib/github/GithubCodeProvider'
 import { toast } from '@/components/ui/Toaster'
 import { IcGithub, IcLock, IcUnlock, IcX } from '@/components/Icons'
+import { TOOLBAR_CONTROL_ATTR, useRovingFocus } from '@/components/ui/toolbar'
 import CodeEditor from './CodeEditor'
+
+/** Ties the tabs to the editor they control. */
+const CODE_PANEL_ID = 'code-editor-panel'
 
 /**
  * VS Code-style workspace pane: tab strip for open files, breadcrumbs,
@@ -63,6 +69,11 @@ export default function CodeWorkspacePane() {
   const updateCodeMeta = useStore((s) => s.updateCodeMeta)
   const project = useStore((s) => s.projects[s.activeProjectId])
   const readOnly = useReadOnly()
+  const tc = useI18n().toolbar.code
+  const tabStrip = useRef<HTMLDivElement>(null)
+  // the tablist borrows the toolbar's roving focus: one tab stop, arrows
+  // between files. It is a keyboard model, not a toolbar-only behaviour.
+  const tabRoving = useRovingFocus(tabStrip, 'horizontal')
 
   const meta = activeCodeId ? codeDocs[activeCodeId] : undefined
   if (!meta) return null
@@ -73,36 +84,60 @@ export default function CodeWorkspacePane() {
 
   return (
     <section className="flex h-full min-w-0 flex-1 flex-col border-r border-bord bg-panel">
-      {/* tab strip */}
-      <div className="flex flex-none items-center gap-0.5 overflow-x-auto border-b border-bord bg-panel2 px-1 pt-1">
-        {tabs.map((tab) => (
-          <div
-            key={tab.id}
-            className={`code-tab ${tab.id === activeCodeId ? 'is-active' : ''}`}
-            onClick={() => openCode(tab.id)}
-            title={`${tab.title}.${tab.extension}`}
-          >
-            <span className="max-w-40 truncate">
-              {tab.title}.{tab.extension}
-            </span>
-            <button
-              className="icon-btn h-4 w-4"
-              title="Close tab"
-              aria-label={`Close ${tab.title}.${tab.extension}`}
-              onClick={(e) => {
-                e.stopPropagation()
-                closeCodeTab(tab.id)
-              }}
+      {/* Tab strip. Not a toolbar — Phase 11.1 deliberately does not invent
+          one for Code, which has no tools to put in it. It is a tablist, and
+          it is now reachable: the chips used to be plain <div onClick>, so
+          switching file was impossible without a mouse. */}
+      <div
+        ref={tabStrip}
+        role="tablist"
+        aria-label={tc.tabs}
+        aria-orientation="horizontal"
+        className="flex flex-none items-center gap-0.5 overflow-x-auto border-b border-bord bg-panel2 px-1 pt-1"
+        onKeyDown={tabRoving.onKeyDown}
+        onFocus={tabRoving.onFocus}
+      >
+        {tabs.map((tab) => {
+          const name = `${tab.title}.${tab.extension}`
+          return (
+            <div
+              key={tab.id}
+              className={`code-tab ${tab.id === activeCodeId ? 'is-active' : ''}`}
             >
-              <IcX size={9} />
-            </button>
-          </div>
-        ))}
+              <button
+                type="button"
+                role="tab"
+                {...{ [TOOLBAR_CONTROL_ATTR]: '' }}
+                aria-selected={tab.id === activeCodeId}
+                aria-controls={CODE_PANEL_ID}
+                className="max-w-40 cursor-pointer truncate bg-transparent"
+                title={name}
+                onClick={() => openCode(tab.id)}
+              >
+                {name}
+              </button>
+              <button
+                type="button"
+                {...{ [TOOLBAR_CONTROL_ATTR]: '' }}
+                /* the glyph stays 9px, but the target no longer does: it was
+                   16×16, under the 24px floor of WCAG 2.2 SC 2.5.8 */
+                className="icon-btn -m-1 h-6 w-6 p-1"
+                title={tc.closeTab(name)}
+                aria-label={tc.closeTab(name)}
+                onClick={() => closeCodeTab(tab.id)}
+              >
+                <IcX size={9} />
+              </button>
+            </div>
+          )
+        })}
         <div className="flex-1" />
         <button
+          type="button"
+          {...{ [TOOLBAR_CONTROL_ATTR]: '' }}
           className="icon-btn mb-1 flex-none"
-          title="Close code workspace"
-          aria-label="Close code workspace"
+          title={tc.closeWorkspace}
+          aria-label={tc.closeWorkspace}
           onClick={closeCode}
         >
           <IcX size={13} />
@@ -121,17 +156,15 @@ export default function CodeWorkspacePane() {
           value={meta.title}
           disabled={readOnly}
           onChange={(e) => updateCodeMeta(meta.id, { title: e.target.value })}
-          placeholder="filename"
-          aria-label="File name"
+          placeholder={tc.fileNamePlaceholder}
+          aria-label={tc.fileName}
         />
-        <span className="flex-none text-[11px] text-muted">
-          {meta.lineCount} lines
-        </span>
+        <span className="flex-none text-[11px] text-muted">{tc.lines(meta.lineCount)}</span>
         <select
           className="field h-6 w-32 flex-none cursor-pointer px-1 py-0 text-[11.5px]"
           value={meta.language}
-          title="Language"
-          aria-label="Language"
+          title={tc.language}
+          aria-label={tc.language}
           disabled={readOnly}
           onChange={(e) =>
             updateCodeMeta(meta.id, {
@@ -148,7 +181,12 @@ export default function CodeWorkspacePane() {
         </select>
       </div>
 
-      <div className="min-h-0 flex-1">
+      <div
+        id={CODE_PANEL_ID}
+        role="tabpanel"
+        aria-label={tc.editor}
+        className="min-h-0 flex-1"
+      >
         <CodeEditor codeId={meta.id} />
       </div>
 

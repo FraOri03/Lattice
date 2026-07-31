@@ -29,8 +29,9 @@ import {
 import { toast } from '@/components/ui/Toaster'
 import { confirmDialog } from '@/components/ui/ConfirmDialog'
 import { ToolbarDivider } from '@/components/ui/ToolbarDivider'
+import { SlideToolbar } from './SlideToolbar'
 import { ActionIcon } from '@/components/ActionIcons'
-import { IcCopy, IcImage, IcPlus, IcTrash, IcX } from '@/components/Icons'
+import { IcCopy, IcPlus, IcTrash, IcX } from '@/components/Icons'
 import { SlideView, StaticElement, elementStyle } from './SlideView'
 
 /**
@@ -386,41 +387,21 @@ export default function PresentationWorkspace({ meta }: { meta: PresentationDocM
         {/* canvas + notes */}
         <div className="flex min-w-0 flex-1 flex-col">
           {!readOnly && (
-            <div className="doc-toolbar flex-none">
-              <button className="tbtn px-2" title="Add text box" onClick={() => addElement(createTextElement({ z: maxZ + 1 }))}>
-                + Text
-              </button>
-              <button className="tbtn px-2" title="Add image" onClick={() => imageInput.current?.click()}>
-                <IcImage size={12} /> Image
-              </button>
-              <ToolbarDivider />
-              <button className="tbtn px-2" title="Add rectangle" onClick={() => addShape('rect')}>▭</button>
-              <button className="tbtn px-2" title="Add ellipse" onClick={() => addShape('ellipse')}>◯</button>
-              <button className="tbtn px-2" title="Add line" onClick={() => addShape('line')}>—</button>
-              <ToolbarDivider />
-              <label className="flex items-center gap-1 text-[11px] text-muted">
-                Background
-                <input
-                  type="color"
-                  className="h-5 w-8 cursor-pointer border-0 bg-transparent p-0"
-                  value={slide.background ?? theme.bg}
-                  aria-label="Slide background color"
-                  onChange={(e) => patchSlide(slideIndex, (s) => ({ ...s, background: e.target.value }))}
-                />
-                {slide.background && (
-                  <button
-                    className="tbtn w-4 text-[9px]"
-                    title="Reset to theme background"
-                    onClick={() => patchSlide(slideIndex, (s) => ({ ...s, background: null }))}
-                  >
-                    ✕
-                  </button>
-                )}
-              </label>
-              <span className="ml-auto text-[10.5px] text-muted">
-                Slide {slideIndex + 1}/{body.slides.length} · double-click text to edit · Del removes
-              </span>
-            </div>
+            <SlideToolbar
+              slideIndex={slideIndex}
+              slideCount={body.slides.length}
+              background={slide.background}
+              themeBackground={theme.bg}
+              onAddText={() => addElement(createTextElement({ z: maxZ + 1 }))}
+              onAddImage={() => imageInput.current?.click()}
+              onAddShape={addShape}
+              onBackground={(background) =>
+                patchSlide(slideIndex, (s) => ({ ...s, background }))
+              }
+              onResetBackground={() =>
+                patchSlide(slideIndex, (s) => ({ ...s, background: null }))
+              }
+            />
           )}
           <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto bg-panel2 p-4">
             <SlideCanvas

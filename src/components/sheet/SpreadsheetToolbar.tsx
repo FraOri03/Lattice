@@ -1,156 +1,65 @@
-import { useRef, useState, type ReactNode } from 'react'
-import { cellKey, type CellStyle, type NumFmt } from '@/lib/sheet/sheetModel'
-import { IcAlignCenter, IcAlignLeft, IcAlignRight, IcSearch } from '@/components/Icons'
+import { useRef } from 'react'
+import { cellKey, type NumFmt } from '@/lib/sheet/sheetModel'
+import { useI18n, type Catalog } from '@/lib/i18n'
+import { IcAlignCenter, IcAlignLeft, IcAlignRight } from '@/components/Icons'
 import { SheetPeerChips } from '@/components/collab/EntityPresence'
-import { toast } from '@/components/ui/Toaster'
-import type { BorderKind } from '@/lib/sheet/borders'
+import {
+  ToolbarAction,
+  ToolbarGroup,
+  ToolbarRoot,
+  ToolbarSelect,
+  ToolbarSeparator,
+  ToolbarToggle,
+} from '@/components/ui/toolbar'
 import { rectOf, useSheetSession } from './SheetSession'
 
-const NUM_FMTS: { id: NumFmt; label: string }[] = [
-  { id: 'general', label: 'General' },
-  { id: 'number', label: 'Number' },
-  { id: 'integer', label: 'Integer' },
-  { id: 'currency', label: 'Currency €' },
-  { id: 'percent', label: 'Percent %' },
-  { id: 'date', label: 'Date' },
-  { id: 'time', label: 'Time' },
-  { id: 'datetime', label: 'Date-time' },
-]
-
-const FONT_FAMILIES: { id: string; label: string }[] = [
-  { id: '', label: 'Default' },
-  { id: 'system-ui, sans-serif', label: 'Sans' },
-  { id: 'Georgia, serif', label: 'Serif' },
-  { id: 'ui-monospace, monospace', label: 'Mono' },
-]
-
-const FONT_SIZES = [10, 11, 12, 13, 14, 16, 18, 20, 24]
-
-/** Canned cell-style presets, mirroring the "Stili" group in the mock-up. */
-const CELL_STYLES: { id: string; label: string; patch: Partial<CellStyle> }[] = [
-  { id: 'normal', label: 'Normal', patch: { b: undefined, color: undefined, bg: undefined } },
-  { id: 'good', label: 'Good', patch: { color: '#0f6d31', bg: '#c6efce' } },
-  { id: 'bad', label: 'Bad', patch: { color: '#9c0006', bg: '#ffc7ce' } },
-  { id: 'neutral', label: 'Neutral', patch: { color: '#9c5700', bg: '#ffeb9c' } },
-  { id: 'heading', label: 'Heading', patch: { b: true, fs: 15, color: undefined, bg: undefined } },
-]
-
-/** One labelled category cluster, so the toolbar reads as clear groups. */
-function Group({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="tb-group" role="group" aria-label={label}>
-      <div className="tb-row">{children}</div>
-      <div className="tb-cat">{label}</div>
-    </div>
-  )
-}
+const NUM_FMTS: NumFmt[] = ['general', 'number', 'integer', 'percent', 'currency']
 
 /**
- * Find & replace over the current selection (or the used range when a
- * single cell is selected). Kept as a small popover so the toolbar stays
- * one row tall; the result count is reported rather than left silent.
+ * A small colour well: swatch button + hidden native picker + clear.
+ *
+ * Two controls, not one, because they do two things — and both now carry a
+ * name. Before this phase the whole sheet toolbar was unnamed: a screen reader
+ * announced "A", "✕", "B", "+ Row".
  */
-function FindReplace({
-  onReplace,
-}: {
-  onReplace: (find: string, replace: string, matchCase: boolean) => number
-}) {
-  const [open, setOpen] = useState(false)
-  const [find, setFind] = useState('')
-  const [replace, setReplace] = useState('')
-  const [matchCase, setMatchCase] = useState(false)
-
-  return (
-    <span className="relative">
-      <button
-        className={`tbtn ${open ? 'is-active' : ''}`}
-        title="Find & replace"
-        aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
-      >
-        <IcSearch size={13} />
-      </button>
-      {open && (
-        <div className="absolute top-7 left-0 z-30 w-56 rounded-lg border border-bord bg-panel p-2 shadow-xl">
-          <input
-            className="field mb-1.5"
-            placeholder="Find"
-            value={find}
-            autoFocus
-            onChange={(e) => setFind(e.target.value)}
-            aria-label="Find text"
-          />
-          <input
-            className="field mb-1.5"
-            placeholder="Replace with"
-            value={replace}
-            onChange={(e) => setReplace(e.target.value)}
-            aria-label="Replace with"
-          />
-          <label className="mb-2 flex cursor-pointer items-center gap-1.5 text-[11px] text-muted">
-            <input
-              type="checkbox"
-              checked={matchCase}
-              onChange={(e) => setMatchCase(e.target.checked)}
-            />
-            Match case
-          </label>
-          <div className="flex gap-1.5">
-            <button
-              className="btn flex-1"
-              disabled={!find}
-              onClick={() => {
-                const n = onReplace(find, replace, matchCase)
-                toast.success(
-                  n ? `Replaced in ${n} cell${n === 1 ? '' : 's'}` : 'Nothing to replace',
-                  n ? undefined : `No cell matched “${find}”.`,
-                )
-                setOpen(false)
-              }}
-            >
-              Replace all
-            </button>
-            <button className="btn" onClick={() => setOpen(false)}>
-              Close
-            </button>
-          </div>
-        </div>
-      )}
-    </span>
-  )
-}
-
-/** A small color well: swatch button + hidden native picker + clear. */
 function ColorWell({
   label,
   value,
   onPick,
   onClear,
   glyph,
+  t,
 }: {
   label: string
   value: string | undefined
   onPick: (color: string) => void
   onClear: () => void
   glyph: string
+  t: Catalog
 }) {
   const input = useRef<HTMLInputElement>(null)
   return (
-    <span className="flex items-center">
-      <button
-        className="tbtn relative"
-        title={`${label} — click to pick`}
-        onClick={() => input.current?.click()}
-      >
-        <span className="text-[12px] leading-none">{glyph}</span>
-        <span
-          className="absolute right-1 bottom-0.5 left-1 h-[3px] rounded-sm"
-          style={{ background: value ?? 'var(--muted)' }}
-        />
-      </button>
-      <button className="tbtn w-4 text-[9px]" title={`Clear ${label.toLowerCase()}`} onClick={onClear}>
-        ✕
-      </button>
+    <>
+      <ToolbarAction
+        icon={
+          <>
+            <span className="text-[12px] leading-none">{glyph}</span>
+            <span
+              aria-hidden
+              className="absolute right-1 bottom-0.5 left-1 h-[3px] rounded-sm"
+              style={{ background: value ?? 'var(--muted)' }}
+            />
+          </>
+        }
+        label={label}
+        description={t.toolbar.sheet.pickColour(label)}
+        onRun={() => input.current?.click()}
+      />
+      <ToolbarAction
+        icon="✕"
+        label={t.toolbar.sheet.clearColour(label)}
+        onRun={onClear}
+      />
       <input
         ref={input}
         type="color"
@@ -158,22 +67,22 @@ function ColorWell({
         defaultValue={value ?? '#0d99ff'}
         onChange={(e) => onPick(e.target.value)}
       />
-    </span>
+    </>
   )
 }
 
 /**
- * Spreadsheet toolbar, organised into the categories a user expects —
- * Clipboard, Font, Alignment, Numbers, Styles, Cells — each a labelled
- * cluster. The row wraps to the width available rather than clipping, so
- * it stays usable on a narrow pane. Everything acts on the current
- * selection rectangle.
+ * Formatting + structure toolbar: bold/italic, text & fill colour,
+ * alignment, number format, insert/delete rows & columns. Everything applies
+ * to the current selection rectangle.
  *
- * Heavier ribbon features (borders, cell merge, freeze panes, conditional
- * formatting, charts, page/print setup, data validation) are intentionally
- * left for a follow-up rather than shown as dead buttons.
+ * On the shared primitives since Phase 11.1.6a. The controls are the same
+ * ones; what changed is that the bar has a name, one tab stop, and states that
+ * assistive tech can read — bold, italic and alignment used to be conveyed by
+ * a background colour alone.
  */
 export function SpreadsheetToolbar() {
+  const t = useI18n()
   const {
     sheetId,
     sheet,
@@ -194,283 +103,136 @@ export function SpreadsheetToolbar() {
     findReplace,
     applyBorders,
   } = useSheetSession()
+  // unchanged from before: a viewer gets no formatting bar at all, rather than
+  // a row of controls that would all be disabled
   if (readOnly) return null
 
+  const s = t.toolbar.sheet
   const style = sheet.cells[cellKey(active.r, active.c)]?.s
   const rect = rectOf(selection)
   const rows = rect.r2 - rect.r1 + 1
   const cols = rect.c2 - rect.c1 + 1
   const decimals = style?.dec ?? 2
 
-  const bumpDecimals = (delta: number) =>
-    applyStyle({ dec: Math.max(0, Math.min(10, decimals + delta)) })
-
-  const paste = async () => {
-    try {
-      const text = await navigator.clipboard.readText()
-      if (!text) return
-      const grid = text.replace(/\r/g, '').replace(/\n$/, '').split('\n').map((l) => l.split('\t'))
-      pasteMatrix(grid, pasteOriginFor(text))
-    } catch {
-      // clipboard read blocked (permissions): the grid still takes Ctrl+V
-    }
-  }
+  const alignments = [
+    ['left', IcAlignLeft, s.alignLeft],
+    ['center', IcAlignCenter, s.alignCenter],
+    ['right', IcAlignRight, s.alignRight],
+  ] as const
 
   return (
-    <div className="doc-toolbar sheet-toolbar flex-none">
-      <Group label="Clipboard">
-        <button className="tbtn px-1.5" title="Paste (Ctrl+V)" onClick={() => void paste()}>
-          Paste
-        </button>
-        <button className="tbtn" title="Cut (Ctrl+X)" onClick={cutSelection}>
-          ✂
-        </button>
-        <button className="tbtn" title="Copy (Ctrl+C)" onClick={copySelection}>
-          ⧉
-        </button>
-      </Group>
+    <div className="flex flex-none flex-wrap items-center gap-0.5 border-b border-bord bg-panel px-2 py-1">
+      <ToolbarRoot label={s.label} size="sm" className="flex-wrap gap-0.5">
+        <ToolbarGroup label={s.groups.textStyle}>
+          <ToolbarToggle
+            icon={<b>B</b>}
+            label={s.bold}
+            shortcut="Ctrl+B"
+            pressed={!!style?.b}
+            onRun={() => applyStyle({ b: !style?.b })}
+          />
+          <ToolbarToggle
+            icon={<i>I</i>}
+            label={s.italic}
+            shortcut="Ctrl+I"
+            pressed={!!style?.i}
+            onRun={() => applyStyle({ i: !style?.i })}
+          />
+        </ToolbarGroup>
 
-      <Group label="Font">
-        <select
-          className="field h-6 w-20 cursor-pointer px-1 py-0 text-[11px]"
-          title="Font family"
-          value={style?.ff ?? ''}
-          onChange={(e) => applyStyle({ ff: e.target.value || undefined })}
-        >
-          {FONT_FAMILIES.map((f) => (
-            <option key={f.id} value={f.id}>
-              {f.label}
-            </option>
+        <ToolbarSeparator />
+
+        <ToolbarGroup label={s.groups.colour}>
+          <ColorWell
+            t={t}
+            label={s.textColour}
+            glyph="A"
+            value={style?.color}
+            onPick={(color) => applyStyle({ color })}
+            onClear={() => applyStyle({ color: undefined })}
+          />
+          <ColorWell
+            t={t}
+            label={s.fillColour}
+            glyph="◧"
+            value={style?.bg}
+            onPick={(bg) => applyStyle({ bg })}
+            onClear={() => applyStyle({ bg: undefined })}
+          />
+        </ToolbarGroup>
+
+        <ToolbarSeparator />
+
+        <ToolbarGroup label={s.groups.alignment}>
+          {alignments.map(([align, Icon, label]) => (
+            <ToolbarToggle
+              key={align}
+              icon={<Icon size={13} />}
+              label={label}
+              pressed={style?.align === align}
+              onRun={() =>
+                applyStyle({ align: style?.align === align ? undefined : align })
+              }
+            />
           ))}
-        </select>
-        <select
-          className="field h-6 w-12 cursor-pointer px-1 py-0 text-[11px]"
-          title="Font size"
-          value={style?.fs ?? 12}
-          onChange={(e) => applyStyle({ fs: Number(e.target.value) })}
-        >
-          {FONT_SIZES.map((n) => (
-            <option key={n} value={n}>
-              {n}
-            </option>
-          ))}
-        </select>
-        <button
-          className={`tbtn font-bold ${style?.b ? 'is-active' : ''}`}
-          title="Bold (Ctrl+B)"
-          onClick={() => applyStyle({ b: !style?.b })}
-        >
-          B
-        </button>
-        <button
-          className={`tbtn italic ${style?.i ? 'is-active' : ''}`}
-          title="Italic (Ctrl+I)"
-          onClick={() => applyStyle({ i: !style?.i })}
-        >
-          I
-        </button>
-        <button
-          className={`tbtn underline ${style?.u ? 'is-active' : ''}`}
-          title="Underline (Ctrl+U)"
-          onClick={() => applyStyle({ u: !style?.u })}
-        >
-          U
-        </button>
-        <ColorWell
-          label="Text color"
-          glyph="A"
-          value={style?.color}
-          onPick={(color) => applyStyle({ color })}
-          onClear={() => applyStyle({ color: undefined })}
-        />
-        <ColorWell
-          label="Fill color"
-          glyph="◧"
-          value={style?.bg}
-          onPick={(bg) => applyStyle({ bg })}
-          onClear={() => applyStyle({ bg: undefined })}
-        />
-        <select
-          className="field h-6 w-24 cursor-pointer px-1 py-0 text-[11px]"
-          title="Borders"
-          value=""
-          onChange={(e) => {
-            if (e.target.value) applyBorders(e.target.value as BorderKind)
-            e.target.value = ''
-          }}
-        >
-          <option value="">Borders…</option>
-          <option value="all">All borders</option>
-          <option value="outline">Outline</option>
-          <option value="none">No border</option>
-        </select>
-      </Group>
+        </ToolbarGroup>
 
-      <Group label="Alignment">
-        {(
-          [
-            ['top', '▔', 'Align top'],
-            ['middle', '—', 'Align middle'],
-            ['bottom', '▁', 'Align bottom'],
-          ] as const
-        ).map(([v, glyph, title]) => (
-          <button
-            key={v}
-            className={`tbtn ${style?.valign === v ? 'is-active' : ''}`}
-            title={title}
-            onClick={() => applyStyle({ valign: style?.valign === v ? undefined : v })}
-          >
-            <span className="text-[11px] leading-none">{glyph}</span>
-          </button>
-        ))}
-        {(
-          [
-            ['left', IcAlignLeft],
-            ['center', IcAlignCenter],
-            ['right', IcAlignRight],
-          ] as const
-        ).map(([align, Icon]) => (
-          <button
-            key={align}
-            className={`tbtn ${style?.align === align ? 'is-active' : ''}`}
-            title={`Align ${align}`}
-            onClick={() => applyStyle({ align: style?.align === align ? undefined : align })}
-          >
-            <Icon size={13} />
-          </button>
-        ))}
-        <button
-          className={`tbtn ${style?.wrap ? 'is-active' : ''}`}
-          title="Wrap text"
-          onClick={() => applyStyle({ wrap: !style?.wrap })}
-        >
-          <span className="text-[12px] leading-none">↵</span>
-        </button>
-      </Group>
+        <ToolbarSeparator />
 
-      <Group label="Numbers">
-        <select
-          className="field h-6 w-24 cursor-pointer px-1 py-0 text-[11px]"
+        <ToolbarSelect
+          label={s.numberFormat}
           value={style?.fmt ?? 'general'}
-          title="Number format"
-          onChange={(e) => {
-            const fmt = e.target.value as NumFmt
+          options={NUM_FMTS.map((id) => ({ value: id, label: s.formats[id] }))}
+          onChange={(value) => {
+            const fmt = value as NumFmt
             applyStyle({ fmt: fmt === 'general' ? undefined : fmt })
           }}
-        >
-          {NUM_FMTS.map((f) => (
-            <option key={f.id} value={f.id}>
-              {f.label}
-            </option>
-          ))}
-        </select>
-        <button
-          className={`tbtn ${style?.thou ? 'is-active' : ''}`}
-          title="Thousands separator"
-          onClick={() => applyStyle({ thou: !style?.thou })}
-        >
-          <span className="text-[11px] leading-none">,000</span>
-        </button>
-        <button className="tbtn" title="Increase decimals" onClick={() => bumpDecimals(1)}>
-          <span className="text-[10px] leading-none">.0→</span>
-        </button>
-        <button className="tbtn" title="Decrease decimals" onClick={() => bumpDecimals(-1)}>
-          <span className="text-[10px] leading-none">←.0</span>
-        </button>
-      </Group>
-
-      <Group label="Styles">
-        <select
-          className="field h-6 w-24 cursor-pointer px-1 py-0 text-[11px]"
-          title="Cell style"
-          value=""
-          onChange={(e) => {
-            const preset = CELL_STYLES.find((p) => p.id === e.target.value)
-            if (preset) applyStyle(preset.patch)
-            e.target.value = ''
-          }}
-        >
-          <option value="">Cell styles…</option>
-          {CELL_STYLES.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.label}
-            </option>
-          ))}
-        </select>
-      </Group>
-
-      <Group label="Cells">
-        <button
-          className="tbtn px-1.5"
-          title={`Insert ${rows} row${rows > 1 ? 's' : ''} above`}
-          onClick={() => {
-            for (let i = 0; i < rows; i++) insertRowAt(rect.r1)
-          }}
-        >
-          + Row
-        </button>
-        <button
-          className="tbtn px-1.5"
-          title={`Delete row${rows > 1 ? `s ${rect.r1 + 1}–${rect.r2 + 1}` : ` ${rect.r1 + 1}`}`}
-          onClick={() => {
-            for (let i = 0; i < rows; i++) deleteRowAt(rect.r1)
-          }}
-        >
-          − Row
-        </button>
-        <button
-          className="tbtn px-1.5"
-          title={`Insert ${cols} column${cols > 1 ? 's' : ''} left`}
-          onClick={() => {
-            for (let i = 0; i < cols; i++) insertColAt(rect.c1)
-          }}
-        >
-          + Col
-        </button>
-        <button
-          className="tbtn px-1.5"
-          title="Delete selected columns"
-          onClick={() => {
-            for (let i = 0; i < cols; i++) deleteColAt(rect.c1)
-          }}
-        >
-          − Col
-        </button>
-      </Group>
-
-      <Group label="Data">
-        <button
-          className="tbtn"
-          title="Sort ascending by the active column (whole table when one cell is selected)"
-          onClick={() => sortSelection('asc')}
-        >
-          <span className="text-[11px] leading-none">A→Z</span>
-        </button>
-        <button
-          className="tbtn"
-          title="Sort descending by the active column"
-          onClick={() => sortSelection('desc')}
-        >
-          <span className="text-[11px] leading-none">Z→A</span>
-        </button>
-        <button
-          className="tbtn px-1.5"
-          title="Remove duplicate rows"
-          onClick={() => {
-            const n = removeDuplicates()
-            toast.success(
-              n ? `Removed ${n} duplicate row${n === 1 ? '' : 's'}` : 'No duplicates found',
-              n ? undefined : 'Every row in the range is unique.',
-            )
-          }}
-        >
-          Dedupe
-        </button>
-        <FindReplace
-          onReplace={(find, replace, matchCase) => findReplace(find, replace, { matchCase })}
+          className="w-36"
         />
-      </Group>
 
+        <ToolbarSeparator />
+
+        <ToolbarGroup label={s.groups.structure}>
+          <ToolbarAction
+            icon="+ Row"
+            label={s.insertRow}
+            description={rows > 1 ? s.insertRows(rows) : s.insertRowOne}
+            onRun={() => {
+              for (let i = 0; i < rows; i++) insertRowAt(rect.r1)
+            }}
+          />
+          <ToolbarAction
+            icon="− Row"
+            label={s.deleteRow}
+            description={
+              rows > 1
+                ? s.deleteRowsRange(rect.r1 + 1, rect.r2 + 1)
+                : s.deleteRowOne(rect.r1 + 1)
+            }
+            onRun={() => {
+              for (let i = 0; i < rows; i++) deleteRowAt(rect.r1)
+            }}
+          />
+          <ToolbarAction
+            icon="+ Col"
+            label={s.insertCol}
+            description={cols > 1 ? s.insertCols(cols) : s.insertColOne}
+            onRun={() => {
+              for (let i = 0; i < cols; i++) insertColAt(rect.c1)
+            }}
+          />
+          <ToolbarAction
+            icon="− Col"
+            label={s.deleteCol}
+            description={s.deleteColsSelected}
+            onRun={() => {
+              for (let i = 0; i < cols; i++) deleteColAt(rect.c1)
+            }}
+          />
+        </ToolbarGroup>
+      </ToolbarRoot>
+
+      {/* presence, not a control: it stays outside the toolbar */}
       <SheetPeerChips sheetId={sheetId} />
     </div>
   )

@@ -98,7 +98,28 @@ _Tracked in [#10](https://github.com/FraOri03/Lattice/issues/10)._
 - **No drawing/shape/pen tools, no Frames, no Groups, and no Dev Mode.** The board toolbar
   creates cards and sections; pan/zoom are React Flow's own controls. The toolbar is
   grouped by category (Structure · Create · Media · Annotate · More) but deliberately does
-  **not** advertise tool families the product does not implement.
+  **not** advertise tool families the product does not implement. Shapes do exist in the
+  **presentation** editor (rectangle, ellipse, line) — that is a Board gap, not a
+  product-wide one.
+- **The board toolbar is clipped when the canvas pane is narrower than it** (roughly below
+  a 1060 px window, with the sidebar and inspector open). The overflow primitive exists but
+  is not wired to it yet ([#47](https://github.com/FraOri03/Lattice/issues/47)).
+
+## Toolbars
+
+_Phase 11.1 normalised every mode's toolbar; see
+[toolbar-audit-phase-11-1.md](toolbar-audit-phase-11-1.md)._
+
+- **Three surfaces did not move**: the rich-text bubble and block menus and the slide
+  element inspector still use the old `.tbtn` class. They keep the problems the audit
+  found — unnamed controls and pressed state carried by colour alone
+  ([#48](https://github.com/FraOri03/Lattice/issues/48)).
+- **Code has no toolbar and none was invented**: it has a tab strip, a file header and
+  Monaco. Find/replace comes from Monaco itself; there is no Run, Terminal or source
+  control.
+- **In the light theme the global focus ring measures 2.99:1** against the panel, just
+  under the 3:1 of WCAG 1.4.11. It affects every focusable control, not just toolbars, and
+  fixing it needs a new design token.
 
 ## Cloud, sync & collaboration
 

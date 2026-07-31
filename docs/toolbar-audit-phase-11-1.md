@@ -293,6 +293,154 @@ The primitives gained one thing: `icon` is now optional, so a control that is a
 word rather than a picture ("Write", "Preview") renders its label alone and the
 visible text becomes the accessible name.
 
+## Spreadsheet: baseline vs migrated (11.1.6a)
+
+The worst surface in the audit — nothing was named, and every state was a
+colour. The geometry, however, comes back byte-for-byte.
+
+| Metric | Before | After | Verdict |
+|---|---|---|---|
+| Strip height · gap · padding · wrap | 33 · 2 · 4/8 · wrap | identical | unchanged |
+| `.tbtn` controls | 24×24, padding 5 px | identical | unchanged |
+| `+ Row` · `− Row` | 44 px | 44 px | unchanged |
+| `+ Col` · `− Col` | 39 px | 39 px | unchanged |
+| Number-format select | 144×24, padding 4 px | 144×24, padding **5 px** | **intentional** — 1 px, the toolbar's own scale instead of `.field`'s |
+| Accessible names | **0 of 14** | 14 of 14 | **intentional** — a screen reader used to hear "B", "I", "A", "✕", "+ Row" |
+| `aria-pressed` | **none** | 5 (bold, italic, three alignments) | **intentional** — state was conveyed by a background colour alone (WCAG 4.1.2) |
+| Tab stops | one per control | 1 | **intentional** |
+| Read-only | whole bar hidden | whole bar hidden | unchanged, deliberately |
+| Strings | hardcoded English | EN/IT, number formats included | **intentional** |
+
+The dead `tbtn px-1.5` and `tbtn w-4` utilities are simply gone rather than
+revived: dropping them is why the widths land on exactly their old values.
+
+The colour wells keep their swatch underline — `.toolbar-control` already
+declares `position: relative`, so the absolutely-positioned strip needed no
+special case (verified in the running app: 16×3 px, inside its button).
+
+**Not changed, on purpose:** clicking a control still moves focus out of the
+grid. `preserveFocus` would fix it, but the sheet may commit an in-cell edit on
+blur, and proving that is not a normalisation task. Logged for **11.1.7**.
+
+## Presentation: baseline vs migrated (11.1.6b)
+
+The bar moved out of `PresentationWorkspace.tsx` into its own
+[`SlideToolbar.tsx`](../src/components/present/SlideToolbar.tsx), so it has the
+same shape as every other mode's — and so it can be tested at all, which it
+could not while inline in a 900-line component.
+
+Measured in English, against the frozen baseline:
+
+| Metric | Before | After | Verdict |
+|---|---|---|---|
+| Strip height · gap · padding · wrap | 33 · 2 · 4/8 · wrap | identical | unchanged |
+| `+ Text` | 42 px | 43 px | unchanged (1 px, the icon/label gap) |
+| `Image` | 55 px | 56 px | unchanged (same) |
+| Rectangle · ellipse · line | 24×24 | 24×24 | unchanged |
+| Icon size | 12 px | 12 px | unchanged |
+| `role="toolbar"` + name | none | "Slide tools" | **intentional** |
+| Tab stops | one per control | 1, colour input included | **intentional** |
+| Strings | hardcoded English, status line included | EN/IT | **intentional** |
+
+**A regression caught mid-migration.** `--icon-text` applies 8 px of inline
+padding, but the old `tbtn px-2` rendered at 5 px (the utility was dead under
+the unlayered `.tbtn`). The wider buttons pushed the status line — *"Slide 1/3
+· double-click text to edit · Del removes"* — onto a second row, taking the
+strip from 33 px to **50 px**. Fixed by giving the compact size its compact
+inset:
+
+```css
+.toolbar-control--sm.toolbar-control--icon-text { padding-inline: 0.3125rem }
+```
+
+That rule then shrank the Note pill's toggles to 5 px, where their original was
+`px-2.5`. They now carry `className="px-2.5"` per instance — which works, and
+is the whole point of putting the primitive in `@layer components`.
+
+**Naming detail:** the `+` on the Text button is `aria-hidden`. Without it the
+accessible name computed as "+Text"; the visible word stays, the punctuation
+leaves the name.
+
+The colour input is marked with `TOOLBAR_CONTROL_ATTR` directly rather than
+wrapped in a new primitive: the toolbar owns buttons and selects, and inventing
+a colour-input primitive for one call site would be worse than one honest
+attribute.
+
+## Code: no toolbar, and none invented (11.1.6c)
+
+Code has a tab strip, a file header and Monaco. It has no Run, no Terminal, no
+source control and no search of its own (find/replace comes from Monaco). So
+this step adds **no bar** — a row of buttons created for symmetry would
+advertise tools that do not exist.
+
+What it does fix is the two real defects in the controls that *do* exist:
+
+| Finding | Before | After |
+|---|---|---|
+| **Tabs unreachable by keyboard** | each chip was a plain `<div onClick>` — no role, no focus, so switching file needed a mouse | a `role="tablist"` of real `role="tab"` buttons with `aria-selected`, tied to the editor through `aria-controls`/`role="tabpanel"` |
+| **Close target below the floor** | `icon-btn h-4 w-4` = **16×16**, under WCAG 2.2 SC 2.5.8 | 24×24 via `h-6 w-6 p-1 -m-1`: the glyph stays 9 px, the target grows, and the chip gains 1 px (27→28) |
+| Strings | hardcoded English | EN/IT |
+
+The tablist reuses `useRovingFocus`: one tab stop, arrows between controls.
+That is a keyboard model, not a toolbar-only behaviour, so borrowing it beats a
+second implementation.
+
+**Known deviation from the strict tabs pattern:** arrows walk *every* control
+in the strip, close buttons included, because both carry the roving attribute.
+The ARIA pattern would move tab→tab and reach the close with a dedicated key.
+Doing that properly means adding a close shortcut, otherwise the close buttons
+become unreachable — reachability now beats purity. Candidate for **11.1.7**.
+
+## Final state (11.1.7)
+
+### What the phase changed, in one table
+
+| Surface | Before | After |
+|---|---|---|
+| Board | `role="toolbar"`, 8 tab stops, 19 px chevrons | 1 tab stop, all targets ≥ 24 px, EN/IT |
+| Photo | `.icon-btn` cluster, no role | named toolbar, `md` targets 32 px, EN/IT |
+| Document | `.doc-toolbar`, 19 tab stops, names from `title` | 1 tab stop, 19/19 explicit names, `preserveFocus`, EN/IT |
+| Note | 4 tab stops, view state in a background colour | 1 tab stop, `aria-pressed`, EN/IT |
+| Spreadsheet | **0 of 14 controls named**, no `aria-pressed` at all | 14/14 named, 5 pressed states, EN/IT |
+| Presentation | inline in a 900-line file, untestable | own `SlideToolbar.tsx` + tests, EN/IT |
+| Code | tabs unreachable by keyboard, 16 px close targets | `role="tablist"`, 24 px targets, **no toolbar invented** |
+
+Three grammars became one behaviour with two size axes. Every bar is a single
+tab stop with arrow navigation; every control has a name; every toggle exposes
+`aria-pressed` plus a non-colour cue.
+
+### Legacy CSS
+
+- **`.doc-toolbar` is deleted** — zero call sites once Document, Sheet and
+  Presentation moved.
+- **`.tbtn` survives, with a narrower meaning**: a compact control that is *not*
+  in a toolbar. It is used by the rich-text bubble and block menus and by the
+  slide element inspector. It moved into `@layer components` with everything
+  else, so per-instance utilities finally apply to it — verified live:
+  `tbtn text-[9px]` now computes 9 px where the unlayered rule used to pin it
+  to 12 px. Those three surfaces keep the audit's unfixed problems (no names,
+  colour-only state, `--accent` on `--accent-soft` at 2.38:1 in light) and are
+  tracked in [#48](https://github.com/FraOri03/Lattice/issues/48).
+
+### The action registry was removed
+
+`toolbarModel.ts` — `ToolbarEntry`, `visibleEntries`, `groupEntries` — was
+designed before the migrations. Six surfaces later it had **no clients**: every
+mode composes the primitives directly in JSX, which turned out clearer and
+easier to test than a descriptor list. Keeping an exported abstraction that
+nothing uses would have been the same mistake as shipping an entitlement layer
+that enforces nothing, so it is deleted. If a future mode needs data-driven
+toolbars, it can come back with a caller attached.
+
+### Deliberately not done
+
+| Item | Why | Tracked |
+|---|---|---|
+| Board overflow below ~1060 px | `useToolbarOverflow` and `ToolbarOverflow` exist and are tested but unwired: folding a **split button** into a menu item loses its "repeat last tool" behaviour, and the fold order is a product decision. Not something to land on the pilot surface at the end of a long phase. | [#47](https://github.com/FraOri03/Lattice/issues/47) |
+| `preserveFocus` on the Sheet | Resolved, not deferred: the grid **commits an in-cell edit on blur** (`SpreadsheetEditor.tsx:466`), so suppressing that blur would change when the value lands. Left off. | — |
+| Code tabs: arrows walk close buttons too | The strict ARIA tabs pattern moves tab→tab and needs a dedicated close key; without one those buttons become unreachable. Reachability beat purity. | — |
+| Light-theme focus ring at 2.99:1 | `--accent` on `--panel` affects every focusable control in the app; it needs a new design token, not a toolbar change. | — |
+
 ## Order of work
 
 | Step | Content | State |
@@ -306,5 +454,7 @@ visible text becomes the accessible name.
 | 11.1.2f | visual verification after the layer change | **done** |
 | 11.1.5a | Document migration | **done** |
 | 11.1.5b | Note migration | **done** |
-| 11.1.6 | Sheet · Presentation · Code migration | |
-| 11.1.7 | legacy CSS cleanup (`.tbtn`, `.doc-toolbar`), overflow wiring, final audit | |
+| 11.1.6a | Sheet migration | **done** |
+| 11.1.6b | Presentation migration | **done** |
+| 11.1.6c | Code — no bar invented; tablist + target fixes | **done** |
+| 11.1.7 | legacy CSS cleanup, registry removal, final audit | **done** |
