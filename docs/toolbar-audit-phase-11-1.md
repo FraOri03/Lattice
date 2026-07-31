@@ -264,6 +264,35 @@ the editor and the selection is still "hello".
 `.tbtn` stays for now — the bubble and floating menus in `RichTextEditor`, plus
 the Sheet and Presentation toolbars, still use it. It goes in **11.1.7**.
 
+## Note: baseline vs migrated (11.1.5b)
+
+A note is markdown, so this bar stays four controls wide and inherits none of
+the Document toolbar's formatting grammar.
+
+| Metric | Before | After | Verdict |
+|---|---|---|---|
+| Write / Preview | ~24 px tall (`px-2.5 py-1 text-xs`) | 24 px (`sm`) | unchanged |
+| Export · Close | 28×28 (`.icon-btn`) | 32×32 (`md`) | **intentional** — the `.icon-btn` family normalises to `md`, as Photo did; the targets grow rather than shrink |
+| Header height | ~44 px | 49 px | consequence of the line above, accepted |
+| `role="toolbar"` + name | none | "Note actions" | **intentional** |
+| Tab stops | 4 | 1 | **intentional** |
+| View switch state | background colour only | `aria-pressed` | **intentional** — it was unreadable to assistive tech |
+| Close accessible name | `title` only | explicit `aria-label` | **intentional** |
+| Strings | hardcoded English | EN/IT | **intentional** |
+
+**Two sizes in one bar, on purpose.** Normalising everything to `sm` would have
+shrunk two live targets from 28 px to 24 px — the wrong direction, and work
+Phase 16 would have to undo for touch. So the segmented view switch keeps its
+previous 24 px and the icon actions take the 32 px of their own family. `size`
+is per-control precisely so a bar can hold both without forking the component.
+
+`preserveFocus` is deliberately **off** here: nothing in this bar acts on a text
+selection, so there is no caret to protect — unlike the Document toolbar.
+
+The primitives gained one thing: `icon` is now optional, so a control that is a
+word rather than a picture ("Write", "Preview") renders its label alone and the
+visible text becomes the accessible name.
+
 ## Order of work
 
 | Step | Content | State |
@@ -276,6 +305,6 @@ the Sheet and Presentation toolbars, still use it. It goes in **11.1.7**.
 | 11.1.2e | Board migration (pilot) | **done** |
 | 11.1.2f | visual verification after the layer change | **done** |
 | 11.1.5a | Document migration | **done** |
-| 11.1.5b | Note migration | next |
+| 11.1.5b | Note migration | **done** |
 | 11.1.6 | Sheet · Presentation · Code migration | |
 | 11.1.7 | legacy CSS cleanup (`.tbtn`, `.doc-toolbar`), overflow wiring, final audit | |

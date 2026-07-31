@@ -120,7 +120,12 @@ export const ToolbarSeparator = ToolbarDivider
 /* --------------------------------------------------------------- controls */
 
 interface ControlProps {
-  icon: ReactNode
+  /**
+   * Optional: some controls are a word, not a picture ("Write", "+Row"). When
+   * there is no icon, `content: 'icon-text'` renders the label alone — and the
+   * visible text is then the accessible name, which is the honest result.
+   */
+  icon?: ReactNode
   /** the accessible name, always required */
   label: string
   /** longer tooltip; falls back to the label */

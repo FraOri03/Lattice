@@ -326,6 +326,15 @@ export const en = {
         confirm: 'Apply',
       },
     },
+    /** Notes are markdown, not rich text: this bar is deliberately tiny. */
+    note: {
+      label: 'Note actions',
+      viewGroup: 'View',
+      write: 'Write',
+      preview: 'Preview',
+      exportMd: 'Export as Markdown',
+      close: 'Close editor',
+    },
   },
 }
 
@@ -632,6 +641,14 @@ export const it: Catalog = {
         label: 'URL',
         confirm: 'Applica',
       },
+    },
+    note: {
+      label: 'Azioni nota',
+      viewGroup: 'Vista',
+      write: 'Scrivi',
+      preview: 'Anteprima',
+      exportMd: 'Esporta come Markdown',
+      close: 'Chiudi editor',
     },
   },
 }

@@ -85,6 +85,7 @@ class SyncEngine {
   private drive: GoogleDriveStorageProvider | null = null
   private meta: SyncMeta = loadMeta()
   private unsubscribe: (() => void) | null = null
+  private unsubscribeAuth: (() => void) | null = null
   private pushTimer: ReturnType<typeof setTimeout> | null = null
   private running = false
   private busy = false
@@ -110,6 +111,10 @@ class SyncEngine {
       useSyncStore.getState().setStatus('disabled')
       return
     }
+
+    // a token can arrive later (silent renewal on the next user gesture,
+    // "Reconnect Drive"): resume then instead of staying dead until reload
+    this.watchAuth()
 
     // offline: don't fail verification on a dead network — wait and retry
     if (!navigator.onLine) {
@@ -163,8 +168,20 @@ class SyncEngine {
 
   private retryStart = () => void this.start()
 
+  /** Resume once a fresh Google token lands, if we're not already syncing. */
+  private watchAuth(): void {
+    if (this.unsubscribeAuth) return
+    this.unsubscribeAuth = authService.subscribe(() => {
+      if (this.running || this.connecting) return
+      if (!authService.peekToken() || !authService.restore()) return
+      void this.start()
+    })
+  }
+
   stop(): void {
     this.running = false
+    this.unsubscribeAuth?.()
+    this.unsubscribeAuth = null
     this.unsubscribe?.()
     this.unsubscribe = null
     if (this.pushTimer) clearTimeout(this.pushTimer)
