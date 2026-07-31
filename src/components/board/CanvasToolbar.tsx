@@ -173,7 +173,10 @@ export function CanvasToolbar() {
     <ToolbarRoot
       label={t.toolbar.board.label}
       content="icon-label"
-      className="gap-1 rounded-xl border border-bord bg-panel p-1 shadow-lg"
+      // w-max: the pill sizes to its tools. React Flow's centred panel is
+      // shrink-to-fit and would otherwise cap the bar below its content — with
+      // longer labels (Italian) the last split painted outside the background.
+      className="w-max gap-1 rounded-xl border border-bord bg-panel p-1 shadow-lg"
     >
       {/* Structure */}
       <ToolbarGroup label={t.toolbar.groups.create}>

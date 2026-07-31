@@ -180,6 +180,56 @@ changes above have **not** happened yet.
 Screenshots were not captured: the browser pane was not displayed during the
 run, so verification is by computed measurement instead.
 
+## What the visual pass caught (and the tests did not)
+
+Three things only showed up with the app actually running:
+
+1. **The board pill was narrower than its own tools.** React Flow's centred
+   panel is shrink-to-fit and capped the bar at 484 px while the Italian
+   labels needed 539 px; the groups shrank, the controls did not, and the last
+   split painted 51 px outside the rounded background. In English it fitted, so
+   it only became visible once the labels were localised. Fixed by `flex-none`
+   on `ToolbarGroup` (a group never squashes its own controls) and `w-max` on
+   the board's root.
+2. **The pressed state lost contrast.** Photo used to show the active tool as
+   `--ink` on `--panel`; the primitive's `--accent` on `--accent-soft` measures
+   **3.84:1 in dark and 2.38:1 in light** — under the 4.5:1 text owes, and in
+   light under the 3:1 a state graphic owes. The label and the underline now
+   use `--ink` (9.4:1 / 13.0:1) and the brand tint stays in the background
+   wash. A regression introduced by this phase, caught before it spread.
+3. **Below roughly a 1060 px window the pill is clipped** by the canvas pane
+   (the bar is 539 px; the pane is the window minus the sidebar and inspector).
+   Pre-existing in kind — `limitations.md` already records that panels starve
+   the canvas below ~1100 px — but the longer localised labels raised the
+   threshold. This is the case `ToolbarOverflow` exists for; wiring it is
+   **11.1.7**.
+
+Measured, unchanged and NOT regressions: rest-state contrast 4.79 (dark) /
+4.25 (light), disabled at 0.4 opacity (exempt from 1.4.3 as an inactive
+control, and lighter-handed than Photo's previous 0.3), targets ≥32 px in both
+toolbars, no label wrapping at 1280/1100/1024/900 or at 125 % zoom, menus
+opening upward and staying inside the viewport, and the responsive labels
+collapsing at their breakpoints while `aria-label` keeps the name.
+
+**Still open, not introduced here:** `--accent` on `--panel` is 2.99:1 in the
+light theme, so the global `:focus-visible` ring sits a hair under the 3:1 of
+WCAG 1.4.11 there. It affects every focusable control in the app, not just
+toolbars, and fixing it means a new design token — deliberately out of scope
+for a toolbar normalisation.
+
+### Two limits of the verification environment
+
+Not app defects, established by control experiments:
+
+- **`Enter` activates nothing** through the automation's synthetic key events —
+  the untouched theme-toggle button ignores them too. Keyboard activation stays
+  covered by the unit tests.
+- **`requestAnimationFrame` never fires** because the pane is not displayed
+  (`document.visibilityState === 'hidden'`), so the menu's initial focus and the
+  focus return after Escape cannot be observed live. Both are unit-tested.
+  Arrow keys, Home/End and Escape run through plain handlers and were verified
+  for real.
+
 ## Order of work
 
 | Step | Content | State |

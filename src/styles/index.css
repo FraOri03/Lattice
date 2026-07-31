@@ -155,10 +155,14 @@ body {
     line-height: 1.1;
   }
   /* Pressed state carries a SHAPE, not just a hue (WCAG 1.4.1): the underline
-     is what survives greyscale and most colour-vision differences. */
+     is what survives greyscale and most colour-vision differences.
+     The label and the underline both use `--ink`. `--accent` on `--accent-soft`
+     measures 3.84:1 in dark and 2.38:1 in light — under the 4.5:1 text owes
+     (WCAG 1.4.3) and, in light, under the 3:1 a state graphic owes (1.4.11).
+     The brand tint stays in the background wash; the indicator is the bar. */
   .toolbar-control[aria-pressed='true'] {
     background: var(--accent-soft);
-    color: var(--accent);
+    color: var(--ink);
   }
   .toolbar-control[aria-pressed='true']::after {
     content: '';

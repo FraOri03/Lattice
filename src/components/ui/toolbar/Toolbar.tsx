@@ -83,7 +83,14 @@ export function ToolbarGroup({
   children: ReactNode
 }) {
   return (
-    <div role="group" aria-label={label} className={`flex items-center gap-0.5 ${className}`}>
+    // flex-none: a group never squashes its own controls. Without it a bar
+    // narrower than its content shrinks the groups while the controls keep
+    // their size, and they paint outside the toolbar's background.
+    <div
+      role="group"
+      aria-label={label}
+      className={`flex flex-none items-center gap-0.5 ${className}`}
+    >
       {children}
     </div>
   )
