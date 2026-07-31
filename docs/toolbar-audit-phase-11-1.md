@@ -293,6 +293,35 @@ The primitives gained one thing: `icon` is now optional, so a control that is a
 word rather than a picture ("Write", "Preview") renders its label alone and the
 visible text becomes the accessible name.
 
+## Spreadsheet: baseline vs migrated (11.1.6a)
+
+The worst surface in the audit — nothing was named, and every state was a
+colour. The geometry, however, comes back byte-for-byte.
+
+| Metric | Before | After | Verdict |
+|---|---|---|---|
+| Strip height · gap · padding · wrap | 33 · 2 · 4/8 · wrap | identical | unchanged |
+| `.tbtn` controls | 24×24, padding 5 px | identical | unchanged |
+| `+ Row` · `− Row` | 44 px | 44 px | unchanged |
+| `+ Col` · `− Col` | 39 px | 39 px | unchanged |
+| Number-format select | 144×24, padding 4 px | 144×24, padding **5 px** | **intentional** — 1 px, the toolbar's own scale instead of `.field`'s |
+| Accessible names | **0 of 14** | 14 of 14 | **intentional** — a screen reader used to hear "B", "I", "A", "✕", "+ Row" |
+| `aria-pressed` | **none** | 5 (bold, italic, three alignments) | **intentional** — state was conveyed by a background colour alone (WCAG 4.1.2) |
+| Tab stops | one per control | 1 | **intentional** |
+| Read-only | whole bar hidden | whole bar hidden | unchanged, deliberately |
+| Strings | hardcoded English | EN/IT, number formats included | **intentional** |
+
+The dead `tbtn px-1.5` and `tbtn w-4` utilities are simply gone rather than
+revived: dropping them is why the widths land on exactly their old values.
+
+The colour wells keep their swatch underline — `.toolbar-control` already
+declares `position: relative`, so the absolutely-positioned strip needed no
+special case (verified in the running app: 16×3 px, inside its button).
+
+**Not changed, on purpose:** clicking a control still moves focus out of the
+grid. `preserveFocus` would fix it, but the sheet may commit an in-cell edit on
+blur, and proving that is not a normalisation task. Logged for **11.1.7**.
+
 ## Order of work
 
 | Step | Content | State |
@@ -306,5 +335,7 @@ visible text becomes the accessible name.
 | 11.1.2f | visual verification after the layer change | **done** |
 | 11.1.5a | Document migration | **done** |
 | 11.1.5b | Note migration | **done** |
-| 11.1.6 | Sheet · Presentation · Code migration | |
+| 11.1.6a | Sheet migration | **done** |
+| 11.1.6b | Presentation migration | next |
+| 11.1.6c | Code — action cluster only, no invented bar | |
 | 11.1.7 | legacy CSS cleanup (`.tbtn`, `.doc-toolbar`), overflow wiring, final audit | |
