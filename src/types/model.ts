@@ -444,7 +444,7 @@ export type CardType =
   | 'presentation' // renders a PresentationDocMeta (compact info or slide preview)
   | 'section' // Figma-like frame that groups cards (Phase 6)
   | 'webembed' // sandboxed website embed / link preview (Phase 6)
-  | 'photo' // live preview of the project's Photo-mode set (no payload)
+  | 'photo' // live preview of a Photo-mode shot (pinned via shotId, or the active one)
 
 export type CardColor =
   | 'gray'
@@ -515,6 +515,8 @@ export interface WebEmbed {
  *  - embed3d: (self-contained placeholder scene)
  *  - section: section (BoardSection metadata; geometry mirrors the node)
  *  - webembed: embed (WebEmbed payload)
+ *  - photo:  shotId (pins one shot of the project's scene; unset = follow
+ *            whichever shot Photo mode has open)
  */
 export interface CardData extends Record<string, unknown> {
   type: CardType
@@ -525,6 +527,8 @@ export interface CardData extends Record<string, unknown> {
   codeId?: string
   sheetId?: string
   presentId?: string
+  /** photo cards: the pinned shot; unset means "follow the active shot" */
+  shotId?: string
   mode?: RichDocCardMode
   title?: string
   src?: string

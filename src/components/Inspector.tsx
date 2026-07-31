@@ -16,6 +16,7 @@ import { useCollabStore } from '@/lib/collab/collabStore'
 import { useMyRole, useOpenCommentCount, useReadOnly } from '@/lib/collab/useCollab'
 import { ROLE_LABEL } from '@/types/collab'
 import { confirmDialog } from '@/components/ui/ConfirmDialog'
+import { PhotoShotPicker } from '@/components/board/PhotoShotPicker'
 import { IcCopy, IcEdit, IcEye, IcMessage, IcTrash } from '@/components/Icons'
 import { ActionIcon } from '@/components/ActionIcons'
 
@@ -410,6 +411,8 @@ function NodeInspector({ node }: { node: BoardNode }) {
           The presentation behind this card was deleted.
         </p>
       )}
+
+      {d.type === 'photo' && <PhotoShotPicker node={node} />}
 
       {(d.type === 'image' || d.type === 'video' || d.type === 'link') && (
         <>
