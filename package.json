@@ -12,6 +12,8 @@
     "graph:build": "python -m graphify update ."
   },
   "dependencies": {
+    "@ffmpeg/ffmpeg": "^0.12.15",
+    "@ffmpeg/util": "^0.12.2",
     "@liveblocks/client": "^3.22.0",
     "@liveblocks/node": "^3.22.0",
     "@liveblocks/yjs": "^3.22.0",

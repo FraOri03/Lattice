@@ -190,15 +190,32 @@ configured, tabs of one browser still co-edit through a BroadcastChannel Yjs rel
 
 ```
 /Lattice
-  /projects/<project-id>
-    project.json          # project + all entity metadata (incl. boards & notes)
-    /documents/<id>.json  # rich document bodies (Tiptap JSON)
+  /projects/<Project name>       # named after the project, addressed by its id
+    project.json                 # project + all entity metadata (incl. boards & notes)
+    /documents/<id>.json         # rich document bodies (Tiptap JSON, source of truth)
+    /documents-readable/<title>.html  # human-readable HTML mirror of each document
     /spreadsheets/<id>.json
     /code/<id>.<ext>      # code sources as real text files
     /assets/<id>.<ext>    # imported binaries
     collab.json           # durable collaboration state (DrivePolling provider)
   /data                   # flat area used by the raw StorageProvider interface
 ```
+
+**Project folders carry the project's name, not its id.** Code still asks for
+`['projects', projectId, …]`; `GoogleDriveStorageProvider` resolves that second
+segment through `appProperties.latticeProjectId` rather than by name, so
+renaming a project renames the one folder in place instead of orphaning it and
+starting a second one. Folders written by earlier versions — whose name *was*
+the id — are adopted on first sight: tagged with the id, then renamed, with
+nothing moved. Two projects sharing a title become `Name` and `Name (2)`, since
+Drive would otherwise show two indistinguishable folders.
+
+`/documents-readable` exists purely so Drive's own file list shows something a
+human can open — the JSON under `/documents` stays the one internal source of
+truth. Each HTML file is found by a persistent Drive file id (never by name),
+so a Lattice-side rename updates it in place; `SyncEngine.pull()` never reads
+this folder, so it cannot itself trigger a sync. Details in
+[integrations.md](integrations.md#google-sign-in--drive).
 
 ## Serverless functions (`api/`)
 

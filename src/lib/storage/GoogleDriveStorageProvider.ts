@@ -1,5 +1,11 @@
 import type { StorageProvider } from './StorageProvider'
 import { env } from '@/lib/env'
+import {
+  isLegacyProjectFolder,
+  PROJECT_ID_PROPERTY,
+  folderNameCandidate,
+  projectFolderName,
+} from './driveProjectFolder'
 
 /**
  * GoogleDriveStorageProvider — REAL Google Drive REST v3 client.
@@ -9,12 +15,23 @@ import { env } from '@/lib/env'
  * under one app folder in the user's Drive:
  *
  *   /Lattice
- *     /projects/<project-id>/project.json     project + entity metadata
- *     /projects/<project-id>/documents/…      rich document bodies (JSON)
- *     /projects/<project-id>/code/…           code file sources
- *     /projects/<project-id>/spreadsheets/…   workbook bodies (JSON)
- *     /projects/<project-id>/boards/…         (reserved: boards ship inside project.json today)
- *     /projects/<project-id>/assets/…         imported binaries
+ *     /projects/<Project name>/project.json           project + entity metadata
+ *     /projects/<Project name>/documents/…            rich document bodies (JSON, source of truth)
+ *     /projects/<Project name>/documents-readable/…   human-readable HTML mirror of each document
+ *     /projects/<Project name>/code/…                 code file sources
+ *     /projects/<Project name>/spreadsheets/…         workbook bodies (JSON)
+ *     /projects/<Project name>/boards/…               (reserved: boards ship inside project.json today)
+ *     /projects/<Project name>/assets/…               imported binaries
+ *
+ * Project folders are the one place where the Drive NAME and the path
+ * SEGMENT differ. Callers keep addressing a project by its id —
+ * `ensurePath(['projects', projectId, 'assets'])` — while the folder on
+ * Drive is named after the project title, because that is what the user
+ * reads in their own Drive. The two are reconciled inside ensurePath:
+ * the second segment under `projects` is resolved through
+ * `appProperties.latticeProjectId` instead of by name, so renaming a
+ * project renames the folder in place rather than orphaning it. Every
+ * other segment is still plain find-or-create by name.
  *
  * Uses the drive.file OAuth scope: Lattice can only see files it created
  * — it never gets access to the rest of the user's Drive.
@@ -27,7 +44,10 @@ import { env } from '@/lib/env'
 
 const API = 'https://www.googleapis.com/drive/v3'
 const UPLOAD = 'https://www.googleapis.com/upload/drive/v3'
-const FOLDER_MIME = 'application/vnd.google-apps.folder'
+export const FOLDER_MIME = 'application/vnd.google-apps.folder'
+
+/** Give up numbering same-named folders and fall back to a unique suffix. */
+const MAX_NAME_ATTEMPTS = 20
 
 export interface DriveFileMeta {
   id: string
@@ -43,6 +63,14 @@ export interface DriveAbout {
 }
 
 export type TokenSupplier = () => Promise<string | null>
+
+/**
+ * Resolves a project id to its current title, so the Drive folder can be
+ * named after it. Returns undefined for a project this vault doesn't know
+ * — in which case the folder keeps whatever name it already has on Drive:
+ * a title we can't see must never overwrite one another device set.
+ */
+export type ProjectNameSupplier = (projectId: string) => string | undefined
 
 function q(value: string): string {
   return value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")
@@ -112,8 +140,15 @@ export class GoogleDriveStorageProvider implements StorageProvider {
   private folderCache = new Map<string, string>()
   /** "path|name" → Drive file id */
   private fileIdCache = new Map<string, string>()
+  /** project id → Drive folder id, resolved by app property, never by name */
+  private projectFolderIds = new Map<string, string>()
+  /** project id → the folder name currently on Drive (avoids a PATCH per push) */
+  private projectFolderNames = new Map<string, string>()
 
-  constructor(private readonly getToken: TokenSupplier) {}
+  constructor(
+    private readonly getToken: TokenSupplier,
+    private readonly getProjectName: ProjectNameSupplier = () => undefined,
+  ) {}
 
   private async authHeaders(): Promise<Record<string, string>> {
     const token = await this.getToken()
@@ -161,13 +196,26 @@ export class GoogleDriveStorageProvider implements StorageProvider {
     return data.files[0] ?? null
   }
 
-  private async createFolder(parentId: string, name: string): Promise<string> {
+  private async createFolder(
+    parentId: string,
+    name: string,
+    appProperties?: Record<string, string>,
+  ): Promise<string> {
     const res = await this.request(`${API}/files?fields=id`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, mimeType: FOLDER_MIME, parents: [parentId] }),
+      body: JSON.stringify({ name, mimeType: FOLDER_MIME, parents: [parentId], appProperties }),
     })
     return ((await res.json()) as { id: string }).id
+  }
+
+  /** Change a file's metadata (name, appProperties, trashed) in place. */
+  private async patchMetadata(fileId: string, patch: Record<string, unknown>): Promise<void> {
+    await this.request(`${API}/files/${fileId}?fields=id`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    })
   }
 
   /** Find-or-create the app root folder (default name "Lattice"). */
@@ -175,7 +223,13 @@ export class GoogleDriveStorageProvider implements StorageProvider {
     return this.ensurePath([])
   }
 
-  /** Find-or-create a nested folder path under the app root; returns its id. */
+  /**
+   * Find-or-create a nested folder path under the app root; returns its id.
+   *
+   * Segments are matched by name, with one exception: the project segment
+   * (`projects/<projectId>`) is matched by app property, because that
+   * folder is named after the project title — see resolveProjectFolder.
+   */
   async ensurePath(segments: string[]): Promise<string> {
     const key = segments.join('/')
     const cached = this.folderCache.get(key)
@@ -188,18 +242,145 @@ export class GoogleDriveStorageProvider implements StorageProvider {
       this.folderCache.set('', parentId)
     }
     let path = ''
-    for (const segment of segments) {
+    for (const [index, segment] of segments.entries()) {
       path = path ? `${path}/${segment}` : segment
       const hit = this.folderCache.get(path)
       if (hit) {
         parentId = hit
         continue
       }
-      const found = await this.findChild(parentId, segment, FOLDER_MIME)
-      parentId = found?.id ?? (await this.createFolder(parentId, segment))
+      if (index === 1 && segments[0] === 'projects') {
+        parentId = await this.resolveProjectFolder(parentId, segment)
+      } else {
+        const found = await this.findChild(parentId, segment, FOLDER_MIME)
+        parentId = found?.id ?? (await this.createFolder(parentId, segment))
+      }
       this.folderCache.set(path, parentId)
     }
     return parentId
+  }
+
+  /* ---------------- project folders ----------------
+   * A project's folder is addressed by id but named after the project, so
+   * the user recognises it in their own Drive. Identity therefore lives in
+   * appProperties.latticeProjectId, never in the name.
+   *
+   * The two caches below are per-instance and deliberately NOT persisted:
+   * a stale folder id would silently send every later write into a folder
+   * the user has trashed, and the cost of rebuilding them is one query per
+   * project per session.
+   */
+
+  /** Locate a project's folder by the id pinned in its app properties. */
+  private async findFolderByProjectId(
+    parentId: string,
+    projectId: string,
+  ): Promise<DriveFileMeta | null> {
+    const query =
+      `'${q(parentId)}' in parents and trashed = false and mimeType = '${FOLDER_MIME}'` +
+      ` and appProperties has { key='${q(PROJECT_ID_PROPERTY)}' and value='${q(projectId)}' }`
+    const res = await this.request(
+      `${API}/files?q=${encodeURIComponent(query)}&fields=files(id,name,mimeType,appProperties)&pageSize=1`,
+    )
+    return ((await res.json()) as { files: DriveFileMeta[] }).files[0] ?? null
+  }
+
+  /** First name in the `Name`, `Name (2)`, … series free among siblings. */
+  private async freeFolderName(
+    parentId: string,
+    base: string,
+    ownFolderId?: string,
+  ): Promise<string> {
+    for (let attempt = 0; attempt < MAX_NAME_ATTEMPTS; attempt++) {
+      const candidate = folderNameCandidate(base, attempt)
+      const clash = await this.findChild(parentId, candidate, FOLDER_MIME)
+      if (!clash || clash.id === ownFolderId) return candidate
+    }
+    return `${base} (${ownFolderId ?? Date.now()})`
+  }
+
+  /**
+   * Find-or-create the folder holding a project, resolved in this order:
+   * the in-memory cache, the app-property search (works on a device that
+   * has never pushed this project), then a folder still named after the
+   * project id — the pre-naming layout, adopted and renamed in place so no
+   * data has to move.
+   */
+  private async resolveProjectFolder(parentId: string, projectId: string): Promise<string> {
+    const known = this.projectFolderIds.get(projectId)
+    if (known) return known
+
+    const tagged = await this.findFolderByProjectId(parentId, projectId)
+    const byName = tagged ? null : await this.findChild(parentId, projectId, FOLDER_MIME)
+    const legacy = byName && isLegacyProjectFolder(byName, projectId) ? byName : null
+    const existing = tagged ?? legacy
+
+    if (existing) {
+      this.projectFolderIds.set(projectId, existing.id)
+      this.projectFolderNames.set(projectId, existing.name)
+      if (!existing.appProperties?.[PROJECT_ID_PROPERTY]) {
+        // pin identity BEFORE renaming, so an interrupted migration still
+        // finds this folder next time instead of creating a second one
+        await this.patchMetadata(existing.id, {
+          appProperties: { [PROJECT_ID_PROPERTY]: projectId },
+        })
+      }
+    } else {
+      const base = projectFolderName(this.getProjectName(projectId), projectId)
+      const name = await this.freeFolderName(parentId, base)
+      const created = await this.createFolder(parentId, name, {
+        [PROJECT_ID_PROPERTY]: projectId,
+      })
+      this.projectFolderIds.set(projectId, created)
+      this.projectFolderNames.set(projectId, name)
+    }
+
+    await this.applyProjectFolderName(parentId, projectId)
+    return this.projectFolderIds.get(projectId)!
+  }
+
+  /** Rename the folder when the project title no longer matches it. */
+  private async applyProjectFolderName(parentId: string, projectId: string): Promise<void> {
+    const folderId = this.projectFolderIds.get(projectId)
+    const title = this.getProjectName(projectId)
+    if (!folderId || title === undefined) return
+
+    const current = this.projectFolderNames.get(projectId)
+    const desired = projectFolderName(title, projectId)
+    if (current === desired) return
+
+    const name = await this.freeFolderName(parentId, desired, folderId)
+    if (name === current) return
+    await this.patchMetadata(folderId, { name })
+    this.projectFolderNames.set(projectId, name)
+  }
+
+  /**
+   * Make a project's folder exist and its Drive name mirror the project
+   * title. Path resolution alone can't do this: once the folder id is
+   * cached, ensurePath short-circuits and would never notice a rename made
+   * later in the same session.
+   */
+  async syncProjectFolder(projectId: string): Promise<string> {
+    const folderId = await this.ensurePath(['projects', projectId])
+    const parentId = this.folderCache.get('projects')
+    if (parentId) await this.applyProjectFolderName(parentId, projectId)
+    return folderId
+  }
+
+  /**
+   * Adopt a project folder already listed from Drive, skipping the lookup
+   * resolveProjectFolder would otherwise repeat.
+   *
+   * Only for folders that ALREADY carry their project id: binding an
+   * untagged one would skip the migration that tags it, and the next
+   * session — finding neither the property nor the old id-shaped name —
+   * would create a second folder.
+   */
+  bindProjectFolder(projectId: string, folder: DriveFileMeta): void {
+    this.projectFolderIds.set(projectId, folder.id)
+    this.projectFolderNames.set(projectId, folder.name)
+    this.folderCache.set(`projects/${projectId}`, folder.id)
   }
 
   /* ---------------- files ---------------- */
@@ -228,9 +409,43 @@ export class GoogleDriveStorageProvider implements StorageProvider {
     return files
   }
 
+  /** Shared multipart-upload mechanics for create (POST) and update (PATCH). */
+  private async multipartUpload(
+    url: string,
+    method: 'POST' | 'PATCH',
+    metadata: Record<string, unknown>,
+    content: Blob | string,
+    contentType: string,
+  ): Promise<{ id: string }> {
+    const boundary = `lattice-${Math.random().toString(36).slice(2)}`
+    const blob = typeof content === 'string' ? new Blob([content], { type: contentType }) : content
+    const body = new Blob(
+      [
+        `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n`,
+        JSON.stringify(metadata),
+        `\r\n--${boundary}\r\nContent-Type: ${contentType}\r\n\r\n`,
+        blob,
+        `\r\n--${boundary}--`,
+      ],
+      { type: `multipart/related; boundary=${boundary}` },
+    )
+    const res = await this.request(url, {
+      method,
+      headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
+      body,
+    })
+    return (await res.json()) as { id: string }
+  }
+
   /**
-   * Create-or-update a file (multipart upload). appProperties carries the
-   * sync version id so pulls can compare without downloading content.
+   * Create-or-update a file (multipart upload), identified by NAME within
+   * its folder. appProperties carries the sync version id so pulls can
+   * compare without downloading content.
+   *
+   * Name-keyed identity is right for the vault's own bodies (their Drive
+   * filename is a stable id, e.g. `<docId>.json`, never renamed by the
+   * user) but wrong for a companion file whose name follows a human title —
+   * see createFile/updateFileById/findFileByAppProperty for that case.
    */
   async putFile(
     path: string[],
@@ -249,30 +464,83 @@ export class GoogleDriveStorageProvider implements StorageProvider {
     const metadata: Record<string, unknown> = fileId
       ? { name, appProperties }
       : { name, parents: [folderId], appProperties }
-
-    const boundary = `lattice-${Math.random().toString(36).slice(2)}`
-    const blob = typeof content === 'string' ? new Blob([content], { type: contentType }) : content
-    const body = new Blob(
-      [
-        `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n`,
-        JSON.stringify(metadata),
-        `\r\n--${boundary}\r\nContent-Type: ${contentType}\r\n\r\n`,
-        blob,
-        `\r\n--${boundary}--`,
-      ],
-      { type: `multipart/related; boundary=${boundary}` },
-    )
     const url = fileId
       ? `${UPLOAD}/files/${fileId}?uploadType=multipart&fields=id`
       : `${UPLOAD}/files?uploadType=multipart&fields=id`
-    const res = await this.request(url, {
-      method: fileId ? 'PATCH' : 'POST',
-      headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
-      body,
-    })
-    const id = ((await res.json()) as { id: string }).id
+    const { id } = await this.multipartUpload(
+      url,
+      fileId ? 'PATCH' : 'POST',
+      metadata,
+      content,
+      contentType,
+    )
     this.fileIdCache.set(cacheKey, id)
     return id
+  }
+
+  /**
+   * Always creates a new file — for callers that already confirmed (e.g.
+   * via findFileByAppProperty) that none exists yet.
+   */
+  async createFile(
+    path: string[],
+    name: string,
+    content: Blob | string,
+    contentType: string,
+    appProperties?: Record<string, string>,
+  ): Promise<string> {
+    const folderId = await this.ensurePath(path)
+    const { id } = await this.multipartUpload(
+      `${UPLOAD}/files?uploadType=multipart&fields=id`,
+      'POST',
+      { name, parents: [folderId], appProperties },
+      content,
+      contentType,
+    )
+    return id
+  }
+
+  /**
+   * Update an existing file's content/name/appProperties by its KNOWN Drive
+   * id — no name lookup, so a Lattice-side rename updates the SAME file
+   * (Drive's `name` field changes in place) instead of leaving a stale
+   * copy behind and creating a new one under the new name.
+   */
+  async updateFileById(
+    fileId: string,
+    name: string,
+    content: Blob | string,
+    contentType: string,
+    appProperties?: Record<string, string>,
+  ): Promise<void> {
+    await this.multipartUpload(
+      `${UPLOAD}/files/${fileId}?uploadType=multipart&fields=id`,
+      'PATCH',
+      { name, appProperties },
+      content,
+      contentType,
+    )
+  }
+
+  /**
+   * Find a file inside `path` carrying a given (key, value) app property.
+   * This is the identity check a DERIVED file (one keyed by a human title
+   * rather than a stable id) uses before creating itself, so a second
+   * device — with no local cache of the file's id — still finds the one
+   * already on Drive instead of duplicating it.
+   */
+  async findFileByAppProperty(
+    path: string[],
+    key: string,
+    value: string,
+  ): Promise<DriveFileMeta | null> {
+    const folderId = await this.ensurePath(path)
+    const query = `'${q(folderId)}' in parents and trashed = false and appProperties has { key='${q(key)}' and value='${q(value)}' }`
+    const res = await this.request(
+      `${API}/files?q=${encodeURIComponent(query)}&fields=files(id,name,mimeType,modifiedTime,appProperties)&pageSize=1`,
+    )
+    const data = (await res.json()) as { files: DriveFileMeta[] }
+    return data.files[0] ?? null
   }
 
   async downloadJson<T = unknown>(fileId: string): Promise<T> {
@@ -292,11 +560,7 @@ export class GoogleDriveStorageProvider implements StorageProvider {
 
   /** Move a file to Drive's trash (recoverable) — never permanent delete. */
   async trashFile(fileId: string): Promise<void> {
-    await this.request(`${API}/files/${fileId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ trashed: true }),
-    })
+    await this.patchMetadata(fileId, { trashed: true })
   }
 
   /* ---------------- StorageProvider interface ----------------

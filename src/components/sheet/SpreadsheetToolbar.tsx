@@ -94,6 +94,14 @@ export function SpreadsheetToolbar() {
     deleteRowAt,
     insertColAt,
     deleteColAt,
+    copySelection,
+    cutSelection,
+    pasteMatrix,
+    pasteOriginFor,
+    sortSelection,
+    removeDuplicates,
+    findReplace,
+    applyBorders,
   } = useSheetSession()
   // unchanged from before: a viewer gets no formatting bar at all, rather than
   // a row of controls that would all be disabled
@@ -104,6 +112,7 @@ export function SpreadsheetToolbar() {
   const rect = rectOf(selection)
   const rows = rect.r2 - rect.r1 + 1
   const cols = rect.c2 - rect.c1 + 1
+  const decimals = style?.dec ?? 2
 
   const alignments = [
     ['left', IcAlignLeft, s.alignLeft],

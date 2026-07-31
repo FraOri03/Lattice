@@ -332,6 +332,35 @@ body {
   fill: var(--bg);
 }
 
+/* ---------- board zoom controls ---------- */
+/*
+ * Every React Flow panel shares z-index 5, so the last one in the DOM wins.
+ * The bottom edge already belongs to the full-width CanvasToolbar and to
+ * BoardAddMenu, which painted over the lower half of the default
+ * bottom-left control column and left "Fit view" / "Toggle interactivity"
+ * unclickable. The controls now sit bottom-right, lifted above the minimap.
+ *
+ * Colours come from the app tokens rather than React Flow's generic greys,
+ * so hover/disabled contrast follows the active theme (its own dark palette
+ * only applies under .react-flow.dark, which drifts from ours).
+ */
+.react-flow__controls {
+  --xy-controls-button-background-color: var(--panel);
+  --xy-controls-button-background-color-hover: var(--panel2);
+  --xy-controls-button-color: var(--ink);
+  --xy-controls-button-color-hover: var(--accent);
+  --xy-controls-button-border-color: var(--bord);
+  border: 1px solid var(--bord);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+/* Offset tied to the minimap actually being rendered (150px + its 15px
+   panel margin), so the controls fall back to the corner without it. */
+.react-flow:has(.react-flow__minimap) .react-flow__controls.bottom.right {
+  bottom: 165px;
+}
+
 /* ---------- markdown ---------- */
 .md {
   line-height: 1.55;
@@ -451,6 +480,58 @@ body {
 .richdoc-mini .ProseMirror {
   padding: 10px 12px;
   font-size: 12.5px;
+}
+
+/*
+ * Paged mode: one continuous white sheet of page WIDTH on a grey backdrop,
+ * with the margins as padding and dashed page-break lines every printable
+ * height. A contenteditable cannot be reflowed into separate DOM pages
+ * live, so this is the honest on-screen indicator — the real pagination is
+ * done by the print/PDF engine via the @page rule (see lib/richdoc/
+ * pageSetup). Geometry comes from the --page-* custom properties the editor
+ * sets inline.
+ */
+.richdoc-paged {
+  background: var(--panel2);
+  padding: 24px 0 40vh;
+}
+.richdoc-paged .ProseMirror {
+  max-width: none;
+  width: var(--page-w);
+  /* always at least one full page tall, so an empty or short document
+     still reads as a portrait sheet rather than collapsing to its content */
+  min-height: var(--page-h);
+  margin: 0 auto;
+  box-sizing: border-box;
+  /* left/right margins as padding; the page-break lines add the vertical
+     rhythm, so top/bottom padding matches one page margin */
+  padding: var(--page-margin);
+  font-size: 14px;
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+  border: 1px solid var(--bord);
+  border-radius: 2px;
+  /* dashed rule at every page boundary: a 1px line at the end of each
+     printable-height band, starting below the top margin */
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent calc(var(--page-content-h) - 1px),
+    var(--bord) calc(var(--page-content-h) - 1px),
+    var(--bord) var(--page-content-h)
+  );
+  background-position: left var(--page-margin);
+  background-repeat: repeat-y;
+  background-size: 100% var(--page-content-h);
+}
+/* keep blocks whole across a page break on screen, mirroring print */
+.richdoc-paged .ProseMirror table,
+.richdoc-paged .ProseMirror img,
+.richdoc-paged .ProseMirror pre,
+.richdoc-paged .ProseMirror blockquote,
+.richdoc-paged .ProseMirror .callout {
+  break-inside: avoid;
 }
 .richdoc .ProseMirror > * + * {
   margin-top: 0.45em;
@@ -656,8 +737,73 @@ body {
   color: var(--ink);
 }
 
-/* editor menus (`.doc-toolbar` is gone: every toolbar that used it now builds
-   on the primitives in @layer components — Phase 11.1.7) */
+/* toolbar + menus */
+.doc-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--bord);
+  background: var(--panel);
+}
+.tbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 5px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+}
+.tbtn:hover {
+  background: var(--panel2);
+  color: var(--ink);
+}
+.tbtn.is-active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.tbtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+/* categorised spreadsheet toolbar: labelled clusters that wrap to width */
+.sheet-toolbar {
+  gap: 0;
+  align-items: stretch;
+  row-gap: 4px;
+  /* groups wrap to width; if a single group is wider than a very narrow
+     pane, scroll rather than clip so every control stays reachable */
+  overflow-x: auto;
+}
+.tb-group {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 0 7px;
+  border-right: 1px solid var(--bord);
+}
+.tb-group:last-of-type {
+  border-right: none;
+}
+.tb-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.tb-cat {
+  font-size: 8.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  line-height: 1;
+}
 .bubble-menu,
 .block-menu {
   display: flex;
@@ -819,6 +965,23 @@ body {
   font-family: inherit;
   outline: none;
   box-shadow: var(--shadow);
+}
+/* fill handle: the small square at the selection's bottom-right corner */
+.sheet-fill-handle {
+  position: absolute;
+  z-index: 3;
+  background: var(--accent);
+  border: 1px solid var(--panel);
+  border-radius: 1px;
+  cursor: crosshair;
+}
+/* dashed outline previewing where a fill drag will land */
+.sheet-fill-preview {
+  position: absolute;
+  z-index: 3;
+  pointer-events: none;
+  outline: 2px dashed var(--accent);
+  outline-offset: -2px;
 }
 .sheet-tab {
   display: flex;

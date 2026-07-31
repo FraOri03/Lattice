@@ -391,16 +391,22 @@ each fixture's type, power, spread and position).
 
 **What it adds.** A scene is a list of *shots*; each shot holds elements with
 position, rotation and per-type parameters, edited through the inspector and the
-timeline (shot list). Elements are drawn with the **Photoicons** top-down
+timeline (shot list). The shot list is a **sequence**: shots can be reordered
+from the timeline, and their numbers are positional, so they always read 1..n in
+the order shown. Elements are drawn with the **Photoicons** top-down
 artwork. An **AI set designer** (`src/lib/photo/ai.ts`) can propose a setup from
 a prompt — it is **BYOK** (bring your own key) and degrades to an offline
 heuristic when no key is present, so the mode is fully usable without any
 network call. Scenes import/export as JSON.
 
-**Board integration.** A `photo` **card type** puts a live preview of the
-project's set on the board; double-clicking it opens Photo mode. The card
-carries **no payload** — it reads the project's scene — so it travels through the
-generic card path and needs no export-schema change.
+**Board integration.** A `photo` **card type** puts a live preview of one shot on
+the board; double-clicking it opens Photo mode. Each card either **pins** a shot
+(picked in the inspector, stored as `shotId` on the card) or **follows** whichever
+shot Photo mode has open. Pinning is what lets one board show several setups side
+by side — every unpinned card mirrors the editor, so they all show the same thing
+and change together as you click through the shot list. A card whose pinned shot
+is deleted says so and offers to follow the active shot again, rather than quietly
+drawing a different set.
 
 **State & collaboration.** Photo scenes live in a **separate store**
 (`src/store/photoStore.ts`) persisted to `localStorage` and keyed per project.

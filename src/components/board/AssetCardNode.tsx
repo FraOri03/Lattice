@@ -8,6 +8,8 @@ import { conversionNoteForAsset } from '@/lib/convert/ConversionService'
 import { formatBytes } from '@/lib/media'
 import { KIND_ICONS, KIND_LABEL } from '@/components/assetKinds'
 import { ThreeDViewer } from '@/components/preview/ThreeDViewerLazy'
+import { VideoConversionBadge } from '@/components/video/VideoConversionBadge'
+import { retryVideoConversion } from '@/lib/video/videoUploadPipeline'
 import { CardChrome } from './CardChrome'
 
 interface BodyProps {
@@ -40,8 +42,29 @@ const ImageBody: FC<BodyProps> = ({ asset, url }) =>
     <Loading />
   )
 
-const VideoBody: FC<BodyProps> = ({ url }) =>
-  url ? <video src={url} controls className="nodrag h-full w-full bg-black" /> : <Loading />
+const VideoBody: FC<BodyProps> = ({ asset, url }) => {
+  if (!url) return <Loading />
+  return (
+    <div className="relative h-full w-full">
+      <video
+        src={url}
+        controls
+        poster={asset.thumbnailDataUrl}
+        className="nodrag h-full w-full bg-black"
+      />
+      {asset.videoConversion && asset.videoConversion.status !== 'done' && (
+        <div className="pointer-events-none absolute right-1.5 bottom-1.5 left-1.5 flex justify-center">
+          <div className="pointer-events-auto">
+            <VideoConversionBadge
+              state={asset.videoConversion}
+              onRetry={() => void retryVideoConversion(asset.id)}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 const AudioBody: FC<BodyProps> = ({ url }) => {
   const Icon = KIND_ICONS.audio

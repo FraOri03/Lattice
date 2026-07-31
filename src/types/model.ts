@@ -10,6 +10,8 @@ export interface NoteDoc {
   updatedAt: number
   /** owning project (Phase 6); entities without one belong to the default project */
   projectId?: string
+  /** sidebar folder inside its category; unset = unfiled */
+  folderId?: string
 }
 
 /* ---------------- projects (Phase 6) ---------------- */
@@ -18,8 +20,10 @@ export interface NoteDoc {
  * A project is an organizational space (like ChatGPT/Claude projects): it
  * owns boards, notes, documents, spreadsheets, code files and assets.
  * Entities point at their project via projectId; the project itself holds
- * only metadata. storageRoot is the project's folder inside the cloud
- * vault (e.g. "projects/proj_x1" under /Lattice on Google Drive).
+ * only metadata. storageRoot is the project's logical path inside the
+ * cloud vault (e.g. "projects/proj_x1") — an address, not a folder name:
+ * on Drive that folder is NAMED after the project and matched by id, see
+ * GoogleDriveStorageProvider.
  */
 export interface Project {
   id: string
@@ -85,6 +89,54 @@ export interface Workspace {
   archived: boolean
   /** the automatically created personal workspace (undeletable) */
   personal: boolean
+  createdAt: number
+  updatedAt: number
+}
+
+/* ---------------- sidebar folders ---------------- */
+
+/**
+ * The sidebar sections that can hold user folders. These mirror the
+ * existing type-based grouping — folders live INSIDE a category, so an
+ * item never changes type by being filed.
+ */
+export type FolderCategory =
+  | 'boards'
+  | 'docs'
+  | 'sheets'
+  | 'presentations'
+  | 'code'
+  | 'notes'
+  | 'assets'
+
+export const FOLDER_CATEGORIES: FolderCategory[] = [
+  'boards',
+  'docs',
+  'sheets',
+  'presentations',
+  'code',
+  'notes',
+  'assets',
+]
+
+/**
+ * A user-created folder inside one sidebar category, scoped to a project.
+ *
+ * Membership is stored on the ITEM (`folderId`), exactly like `projectId`
+ * already is: an item with no folderId is simply unfiled, which is what
+ * every pre-folder vault looks like, so the feature needs no data rewrite.
+ * Deleting a folder therefore only has to clear that pointer — the items
+ * survive as unfiled unless the user explicitly asks otherwise.
+ */
+export interface Folder {
+  id: string
+  name: string
+  category: FolderCategory
+  projectId?: string
+  /** sort position within its category, ascending */
+  order: number
+  /** collapsed in the sidebar; persisted so it survives a refresh */
+  collapsed: boolean
   createdAt: number
   updatedAt: number
 }
@@ -159,6 +211,30 @@ export interface AssetBundleInfo {
 }
 
 /**
+ * Web-conversion lifecycle for a video asset (upload → convert). Only
+ * meaningful when AssetDoc.kind === 'video'.
+ *  - queued/converting: a background ffmpeg.wasm job is running (or
+ *    waiting behind another one — one video transcodes at a time)
+ *  - done: the stored blob IS the converted, web-friendly file; the
+ *    pre-conversion original is gone (never kept twice — "a single usable
+ *    video resource")
+ *  - skipped: conversion was not attempted (e.g. the file is over the
+ *    auto-convert size ceiling, or no worker is available) — the ORIGINAL
+ *    upload is what plays; skippedReason explains why in the UI
+ *  - error: the job ran and failed; the original upload is untouched and
+ *    still what plays, exactly as if conversion had been skipped
+ */
+export type VideoConversionStatus = 'queued' | 'converting' | 'done' | 'skipped' | 'error'
+
+export interface VideoConversionState {
+  status: VideoConversionStatus
+  /** 0-1, best-effort — ffmpeg.wasm's own progress events are coarse */
+  progress?: number
+  error?: string
+  skippedReason?: string
+}
+
+/**
  * An imported file. Metadata lives in the vault store; the binary lives in
  * the StorageProvider (IndexedDB today, File System Access API later).
  * assetPath/importPath are the file's virtual locations inside the vault —
@@ -176,8 +252,14 @@ export interface AssetDoc {
   assetPath: string // e.g. assets/asset_x1y2.pdf
   importPath: string // e.g. imports/report.pdf
   projectId?: string
+  /** sidebar folder inside its category; unset = unfiled */
+  folderId?: string
   /** companion files for multi-file formats (GLTF+BIN+textures, OBJ+MTL) */
   bundle?: AssetBundleInfo
+  /** video upload → web-conversion state; unset for non-video assets */
+  videoConversion?: VideoConversionState
+  /** small inline JPEG data: URL, generated once conversion succeeds */
+  thumbnailDataUrl?: string
 }
 
 /* ---------------- rich documents ---------------- */
@@ -185,6 +267,26 @@ export interface AssetDoc {
 export interface OutlineItem {
   level: number
   text: string
+}
+
+/* ---------------- document page layout (Phase: A4) ---------------- */
+
+/**
+ * How the Document editor lays the body out:
+ *  - continuous: one uninfinite vertical surface (the original behaviour,
+ *    best for reading on screen)
+ *  - paged: A4/Letter sheets with margins, visual page separation and
+ *    break indicators, so the on-screen shape matches the printed/exported
+ *    output
+ */
+export type PageMode = 'continuous' | 'paged'
+export type PageSize = 'a4' | 'letter'
+export type PageMargin = 'normal' | 'narrow' | 'wide'
+
+export interface PageSetup {
+  mode: PageMode
+  size: PageSize
+  margin: PageMargin
 }
 
 /**
@@ -213,6 +315,27 @@ export interface RichDocMeta {
   /** open extension point for plugins / future fields */
   metadata: Record<string, unknown>
   projectId?: string
+  /** sidebar folder inside its category; unset = unfiled */
+  folderId?: string
+  /** page layout; absent means continuous (the historical default) */
+  page?: PageSetup
+  /**
+   * Readable companion synced to Drive alongside the JSON source (Phase:
+   * Drive-readable docs). Absent until the first successful sync; the JSON
+   * body under /documents remains the one internal source of truth — this
+   * only points at its human-readable mirror under /documents-readable.
+   */
+  driveExport?: DriveExportRef
+}
+
+/** Where a document's Drive-readable companion lives, and what it mirrors. */
+export interface DriveExportRef {
+  /** Drive file id of the companion — updated in place across devices
+   *  (never re-created) and followed through renames. */
+  fileId: string
+  format: 'html'
+  /** updatedAt of the doc body this companion last reflected */
+  syncedAt: number
 }
 
 /** Card display mode for rich document / code cards on boards. */
@@ -243,6 +366,8 @@ export interface CodeDocMeta {
   tags: string[]
   metadata: Record<string, unknown>
   projectId?: string
+  /** sidebar folder inside its category; unset = unfiled */
+  folderId?: string
 }
 
 /* ---------------- spreadsheet documents ---------------- */
@@ -273,6 +398,8 @@ export interface SpreadsheetDocMeta {
   /** open extension point for plugins / future fields */
   metadata: Record<string, unknown>
   projectId?: string
+  /** sidebar folder inside its category; unset = unfiled */
+  folderId?: string
 }
 
 /* ---------------- presentations (Phase 8) ---------------- */
@@ -297,6 +424,8 @@ export interface PresentationDocMeta {
   tags: string[]
   metadata: Record<string, unknown>
   projectId?: string
+  /** sidebar folder inside its category; unset = unfiled */
+  folderId?: string
 }
 
 /* ---------------- board cards ---------------- */
@@ -315,7 +444,7 @@ export type CardType =
   | 'presentation' // renders a PresentationDocMeta (compact info or slide preview)
   | 'section' // Figma-like frame that groups cards (Phase 6)
   | 'webembed' // sandboxed website embed / link preview (Phase 6)
-  | 'photo' // live preview of the project's Photo-mode set (no payload)
+  | 'photo' // live preview of a Photo-mode shot (pinned via shotId, or the active one)
 
 export type CardColor =
   | 'gray'
@@ -386,6 +515,8 @@ export interface WebEmbed {
  *  - embed3d: (self-contained placeholder scene)
  *  - section: section (BoardSection metadata; geometry mirrors the node)
  *  - webembed: embed (WebEmbed payload)
+ *  - photo:  shotId (pins one shot of the project's scene; unset = follow
+ *            whichever shot Photo mode has open)
  */
 export interface CardData extends Record<string, unknown> {
   type: CardType
@@ -396,6 +527,8 @@ export interface CardData extends Record<string, unknown> {
   codeId?: string
   sheetId?: string
   presentId?: string
+  /** photo cards: the pinned shot; unset means "follow the active shot" */
+  shotId?: string
   mode?: RichDocCardMode
   title?: string
   src?: string
@@ -416,6 +549,8 @@ export interface Board {
   nodes: BoardNode[]
   edges: Edge[]
   projectId?: string
+  /** sidebar folder inside its category; unset = unfiled */
+  folderId?: string
 }
 
 /**

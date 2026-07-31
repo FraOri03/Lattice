@@ -65,8 +65,32 @@ also backs the in-app format view (code and docs cannot drift).
 
 | Ext | Support | Notes |
 |---|---|---|
-| mp4, webm, ogv, mov | Preview only | Playback is codec-dependent; honest fallback when unsupported. |
+| mp4, webm, mov, m4v, ogv | Converted (video) | Uploads up to 150 MB auto-convert to H.264/AAC MP4 in a background worker (ffmpeg.wasm) — see below. Over that ceiling, or if the worker is unavailable, the original upload is kept and played as-is. |
 | mp3, wav, ogg, m4a, flac | Preview only | m4a/aac codec-dependent. |
+
+### Video upload conversion
+
+Every uploaded video is transcoded client-side to H.264/AAC MP4 (`+faststart`,
+so playback can begin before the whole file has downloaded) — the format
+combination with the widest browser support, notably including Safari, which
+WebM cannot rely on. A JPEG thumbnail is extracted from the result when
+possible.
+
+- Runs entirely in a dedicated Web Worker via [ffmpeg.wasm](https://ffmpegwasm.netlify.app/)
+  (single-thread core — no SharedArrayBuffer/COOP-COEP, which would otherwise
+  break cross-origin WebEmbed iframes elsewhere in the app), so the main
+  thread never blocks regardless of file size.
+- One conversion runs at a time; others wait their turn. The card shows
+  queued/converting/done/error/skipped state and an inline progress
+  percentage while running.
+- The **same** asset is replaced in place once conversion succeeds — there is
+  never a second, permanently-kept copy of the pre-conversion bytes. If
+  conversion fails or is skipped, the original upload is untouched and is
+  what plays; a card in that state offers a manual retry.
+- The ffmpeg-core WASM/JS build (~30 MB) is fetched lazily, on first use,
+  from jsDelivr — a version-pinned external CDN dependency, not bundled with
+  the app (self-hosting it as a build asset was investigated but has real
+  Vite build friction). See [integrations.md](integrations.md#video-conversion-ffmpegwasm).
 
 ## 3D
 

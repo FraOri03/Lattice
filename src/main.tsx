@@ -9,6 +9,7 @@ import { docJsonToMarkdown } from '@/lib/export/ExportService'
 import { docJsonToOdtXml } from '@/lib/convert/odt'
 import { docJsonToRtf, rtfToDocJson } from '@/lib/convert/rtf'
 import { ADAPTERS } from '@/lib/convert/ConversionService'
+import { videoConversionClient } from '@/lib/video/VideoConversionClient'
 
 // dev-only handles for debugging from the browser console
 if (import.meta.env.DEV) {
@@ -21,6 +22,7 @@ if (import.meta.env.DEV) {
     docJsonToRtf,
     rtfToDocJson,
     ADAPTERS,
+    videoConversionClient,
   }
 }
 

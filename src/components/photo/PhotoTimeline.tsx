@@ -24,6 +24,7 @@ export function PhotoTimeline() {
   const addShot = usePhotoStore((s) => s.addShot)
   const deleteShot = usePhotoStore((s) => s.deleteShot)
   const duplicateShot = usePhotoStore((s) => s.duplicateShot)
+  const moveShot = usePhotoStore((s) => s.moveShot)
   const selectShot = usePhotoStore((s) => s.selectShot)
   const updateShotProperties = usePhotoStore((s) => s.updateShotProperties)
   const pushHistory = usePhotoStore((s) => s.pushHistory)
@@ -144,7 +145,31 @@ export function PhotoTimeline() {
                       </div>
                     </div>
 
-                    <div className="ml-1.5 flex flex-none items-center gap-0.5 opacity-0 group-hover:opacity-100">
+                    <div className="ml-1.5 flex flex-none items-center gap-0.5 opacity-0 focus-within:opacity-100 group-hover:opacity-100">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          moveShot(shot.id, -1)
+                        }}
+                        className="cursor-pointer rounded p-1 text-muted hover:bg-panel hover:text-ink disabled:cursor-default disabled:opacity-30"
+                        title="Move earlier in the sequence"
+                        aria-label={`Move ${shot.name} earlier in the sequence`}
+                        disabled={idx === 0}
+                      >
+                        <IcChevronUp size={12} />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          moveShot(shot.id, 1)
+                        }}
+                        className="cursor-pointer rounded p-1 text-muted hover:bg-panel hover:text-ink disabled:cursor-default disabled:opacity-30"
+                        title="Move later in the sequence"
+                        aria-label={`Move ${shot.name} later in the sequence`}
+                        disabled={idx === shots.length - 1}
+                      >
+                        <IcChevronDown size={12} />
+                      </button>
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
