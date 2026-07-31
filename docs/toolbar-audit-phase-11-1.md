@@ -133,6 +133,29 @@ hand, and overflow becomes "everything past the measured width folds into one
 menu" — one implementation instead of `flex-wrap` in two places and nothing
 anywhere else.
 
+## Measured baseline (before the layer change)
+
+Captured from the running app so the migration can be diffed against something
+real rather than remembered. Re-measure these after the primitives move into
+`@layer components` (step 11.1.2f).
+
+| Surface | Container | Controls |
+|---|---|---|
+| **Document** | `.doc-toolbar` — h 33, gap 2, padding 4/8, `flex-wrap: wrap` | 18 buttons · `.tbtn` 24×24, padding 5 px, font 12 px · block select `pr-1` → **5 px**, 84.7×24 · 19 tab stops · 13/18 carry `aria-pressed` |
+| **Spreadsheet** | `.doc-toolbar flex-none` — h 33, gap 2, padding 4/8, wrap | `.tbtn` 24×24 padding 5 px · `tbtn w-4` (clear colour) → **24 px wide** · `tbtn px-1.5` → padding **5 px**, widths 44/44/39/39 · `.field` select 144×24 padding 4 px — **`w-36` and `px-1` do apply** (`.field` is layered) |
+| **Presentation** | `.doc-toolbar flex-none` — h 33, gap 2, padding 4/8, wrap | `tbtn px-2` → padding **5 px** everywhere: text 42×24, image 55×24, rect/ellipse/line 24×24 · icons 12 px |
+| **Photo** | `.icon-btn` cluster | 28×28, radius 6 px, padding 0 |
+| **Board** | floating pill — h 69, gap 4, padding 4, `nowrap` | labelled buttons 45 px tall (Web embed **60** — its label wraps), padding 12 px, font 13 px, icons 16 px · split chevrons **19×45 / 19×60**, padding 4 px, chevron icon 11 px |
+
+The `.field` row is the control case: it is layered, so its utilities apply,
+while its `.tbtn` neighbours in the same bar ignore theirs.
+
+**What should change when `.tbtn`'s successor becomes layered** (predictions to
+verify, not facts): presentation text 42→48, image 55→61, shapes 24→30; sheet
++Row/−Row 44→46 and +Col/−Col 39→41; the document select's right padding 5→4.
+The two clear-colour buttons stay 24 px wide even then — `w-4` loses to
+`min-width: 24px`, which is a box-model rule, not a cascade one.
+
 ## Order of work
 
 | Step | Content | State |
