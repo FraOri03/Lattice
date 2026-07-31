@@ -60,6 +60,7 @@ import {
 import { createWebEmbed } from '@/lib/web/WebEmbedService'
 import type { GraphViewSettings } from '@/lib/graph/graphTypes'
 import { decodeGraphSettings } from '@/lib/graph/GraphSettingsService'
+import type { NavSurface, ResolvedNavigation } from '@/lib/nav/navUrl'
 import { useWorkspaceLayoutStore } from './workspaceLayoutStore'
 import {
   DEFAULT_PROJECT_ID,
@@ -143,6 +144,12 @@ interface AppState {
   /** recently opened entities, newest first */
   recents: RecentEntry[]
   viewMode: ViewMode
+  /**
+   * Which shell surface is showing (Phase 11.0). Deliberately NOT persisted:
+   * the URL is the source of truth for it, so a refresh inside a project
+   * returns to that project while the bare root URL lands on the dashboard.
+   */
+  navSurface: NavSurface
   theme: Theme
   locale: Locale
   search: string
@@ -173,22 +180,16 @@ interface AppState {
   setActiveProject: (id: string) => void
   /**
    * Restore navigable state from the URL / browser history (issue #10).
-   * Sets project, workspace, board, mode and the single open entity in one
-   * transaction, without the side effects of the open* helpers (no activity
-   * log, no mode remapping). Invalid ids are expected to be resolved away by
-   * the caller (navUrl.resolveNav) before this runs.
+   * For the project surface: sets project, workspace, board, mode and the
+   * single open entity in one transaction, without the side effects of the
+   * open* helpers (no activity log, no mode remapping). For the dashboard
+   * surface it only moves the shell Home — the active project and its open
+   * entity are left untouched, so going back into it is free. Invalid ids are
+   * expected to be resolved away by the caller (navUrl.resolveNav).
    */
-  applyNav: (nav: {
-    projectId: string
-    mode: ViewMode
-    /** whether the second (split) pane is open — the layout, not a section */
-    split?: boolean
-    boardId?: string
-    entity?: {
-      kind: 'note' | 'doc' | 'code' | 'sheet' | 'present' | 'asset'
-      id: string
-    }
-  }) => void
+  applyNav: (nav: ResolvedNavigation) => void
+  /** Leave the project surface for the dashboard (Home). */
+  openDashboard: () => void
 
   setActiveBoard: (id: string) => void
   addBoard: () => void
@@ -417,6 +418,7 @@ export const useStore = create<AppState>()(
       codeTabs: [],
       recents: [],
       viewMode: 'board',
+      navSurface: 'project',
       theme: 'dark',
       locale: detectLocale(),
       search: '',
@@ -433,7 +435,8 @@ export const useStore = create<AppState>()(
         // enum where board/graph/split were a single value. Split is
         // re-opened explicitly via the ViewModeIsland or openSplit().
         useWorkspaceLayoutStore.getState().closeSplit()
-        set({ viewMode })
+        // choosing a section is entering the project: it leaves the dashboard
+        set({ viewMode, navSurface: 'project' })
       },
       setTheme: (theme) => set({ theme }),
       setLocale: (locale) => set({ locale }),
@@ -698,7 +701,13 @@ export const useStore = create<AppState>()(
 
       setActiveProject: (id) => {
         const s = get()
-        if (!s.projects[id] || s.activeProjectId === id) return
+        if (!s.projects[id]) return
+        if (s.activeProjectId === id) {
+          // already active, but opening it from the dashboard is still
+          // navigation — enter the project surface without re-seeding anything
+          if (s.navSurface !== 'project') set({ navSurface: 'project' })
+          return
+        }
         let activeBoardId = s.boardOrder.find((b) => s.boards[b]?.projectId === id)
         let boards = s.boards
         let boardOrder = s.boardOrder
@@ -737,10 +746,19 @@ export const useStore = create<AppState>()(
           activePresentId: null,
           codeTabs: [],
           viewMode: s.viewMode,
+          navSurface: 'project',
         })
       },
 
+      openDashboard: () => set({ navSurface: 'dashboard' }),
+
       applyNav: (nav) => {
+        if (nav.surface === 'dashboard') {
+          // Home: the shell leaves the project surface, but the active project
+          // and its open entity survive so going back in costs nothing.
+          set({ navSurface: 'dashboard' })
+          return
+        }
         // restore the split layout alongside the section (only for a valid
         // project target; unknown projects keep the current view)
         if (get().projects[nav.projectId]) {
@@ -785,6 +803,7 @@ export const useStore = create<AppState>()(
             ].slice(0, 8),
             activeBoardId: boardId,
             viewMode: nav.mode,
+            navSurface: 'project' as NavSurface,
             codeTabs:
               nav.entity?.kind === 'code'
                 ? [...new Set([...s.codeTabs, nav.entity.id])]
@@ -1202,6 +1221,7 @@ export const useStore = create<AppState>()(
           activeCodeId: null,
           activeSheetId: null,
           viewMode: 'doc',
+          navSurface: 'project' as NavSurface,
           recents: pushRecent(s.recents, { kind: 'note', id }),
         })),
 
@@ -1285,6 +1305,7 @@ export const useStore = create<AppState>()(
           activeCodeId: null,
           activeSheetId: null,
           viewMode: 'doc',
+          navSurface: 'project' as NavSurface,
           recents: pushRecent(s.recents, { kind: 'asset', id }),
         })),
 
@@ -1369,6 +1390,7 @@ export const useStore = create<AppState>()(
           activeCodeId: null,
           activeSheetId: null,
           viewMode: 'doc',
+          navSurface: 'project' as NavSurface,
           recents: pushRecent(s.recents, { kind: 'doc', id }),
         })),
 
@@ -1442,6 +1464,7 @@ export const useStore = create<AppState>()(
           activeDocId: null,
           activeCodeId: null,
           viewMode: 'sheet',
+          navSurface: 'project' as NavSurface,
           recents: pushRecent(s.recents, { kind: 'sheet', id }),
         })),
 
@@ -1519,6 +1542,7 @@ export const useStore = create<AppState>()(
           activeCodeId: null,
           activeSheetId: null,
           viewMode: 'presentation',
+          navSurface: 'project' as NavSurface,
           recents: pushRecent(s.recents, { kind: 'present', id }),
         }))
       },
@@ -1607,6 +1631,7 @@ export const useStore = create<AppState>()(
           activeSheetId: null,
           codeTabs: s.codeTabs.includes(id) ? s.codeTabs : [...s.codeTabs, id],
           viewMode: 'code',
+          navSurface: 'project' as NavSurface,
           recents: pushRecent(s.recents, { kind: 'code', id }),
         })),
 

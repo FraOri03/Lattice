@@ -1,10 +1,10 @@
 # Navigation & URL model
 
-Implements issue **#10** (`NAV-1` High): the SPA now has real browser Back/Forward and refreshable deep links. Split-as-mode demotion (`LAT-7` / `NAV-2` / `IA-1`) has since landed — see [Split is a layout, not a mode](#split-is-a-layout-not-a-mode). Workspace auto-hide remains out of scope.
+Implements issue **#10** (`NAV-1` High): the SPA now has real browser Back/Forward and refreshable deep links. Split-as-mode demotion (`LAT-7` / `NAV-2` / `IA-1`) has since landed — see [Split is a layout, not a mode](#split-is-a-layout-not-a-mode). Phase 11.0 added the **dashboard surface** — see [Two surfaces](#two-surfaces-dashboard-and-project). Workspace auto-hide remains out of scope.
 
 ## Navigable identity
 
-Exactly five things define "where you are":
+First, **which surface**: the dashboard (no project open) or a project. Inside a project, exactly five things define "where you are":
 
 - **project** (`activeProjectId`)
 - **section** (`viewMode`: board · doc · sheet · presentation · code · photo)
@@ -21,12 +21,14 @@ One small, pure, tested module serializes, validates and restores this state:
 
 | Function | Role |
 |---|---|
-| `serializeNav(nav)` | → `?p=<project>&m=<mode>&b=<board>&e=<kind>.<id>` (or `""`) |
+| `serializeNav(nav)` | → `?p=<project>&m=<mode>&b=<board>&e=<kind>.<id>` (or `""` for the dashboard) |
 | `parseNav(search)` | URL search → raw params |
-| `resolveNav(raw, snapshot)` | raw params + a store snapshot → a **validated** `NavState`, degrading unknown ids |
-| `navKey(nav)` | canonical identity string for dedup |
+| `resolveNav(raw, snapshot)` | raw params + a store snapshot → a **validated** `ResolvedNavigation`, degrading unknown ids |
+| `navKey(nav)` | canonical identity string for dedup (`"dashboard"` for the dashboard) |
 
-`resolveNav` degrades safely: unknown project → the current one; a board that doesn't belong to the project → that project's first board; a missing entity → dropped (its mode still opens, just empty); an invalid mode → `board`; an unknown entity kind → ignored.
+`resolveNav` returns a discriminated union — `{ surface: 'dashboard' }` or `{ surface: 'project', … }` — and degrades safely: no project param or an unknown project → the dashboard; a board that doesn't belong to the project → that project's first board; a missing entity → dropped (its mode still opens, just empty); an invalid mode → `board`; an unknown entity kind → ignored.
+
+There is deliberately **no "guess a project" fallback**: landing in a different project than the link asked for is a worse answer than landing Home.
 
 `applyNav` (a store action) sets project · workspace · board · mode · the one open entity in a single transaction, without the side effects of the `open*` helpers. Because bodies persist continuously (CRDT + storage), navigating never loses unsaved work.
 
@@ -44,6 +46,27 @@ direct load / refresh                    ──▶ restore from the URL (replace
 
 **Invite flow preserved:** the `#invite=` hash flow is untouched — this module owns only the search string and always re-appends the current `location.hash`. Invite handling runs first (it strips its hash via `replaceState`), then history restore runs.
 
+## Two surfaces: dashboard and project
+
+The shell can be in exactly two places, and the URL says which:
+
+| Entry point | Lands on |
+|---|---|
+| Bare root URL (`/`) | **Dashboard** |
+| Fresh login | **Dashboard** (the URL is bare) |
+| Valid project deep link (`?p=…`) | that **project** |
+| Refresh inside a project | the **same project** (the URL still carries `?p=…`) |
+| Invite link (`#invite=…`) | invite flow → the **project** |
+| Unknown / deleted project id | **Dashboard** |
+| Nav params without a project (`?m=doc`) | **Dashboard** |
+| Valid project, missing entity | that **project**, section open and empty |
+
+The surface lives in the store as `navSurface` and is **not persisted**: the URL owns it, which is exactly what makes "refresh returns to the project" and "root URL is Home" both true without a special case.
+
+Going Home does **not** tear the project down — `applyNav({ surface: 'dashboard' })` leaves `activeProjectId` and the open entity alone, so re-entering costs nothing. Conversely every way of touching a project leaves the dashboard: `setActiveProject` (including re-selecting the already-active project), `setViewMode`, and the `open*` entity helpers.
+
+> **The dashboard SCREEN lands in Phase 11.2.** This phase ships the state machine, the URL contract and its tests; until the screen exists the shell keeps rendering the workspace, so no URL promises a page that isn't built yet.
+
 ## Examples
 
 | URL | Restores |
@@ -51,7 +74,9 @@ direct load / refresh                    ──▶ restore from the URL (replace
 | `?p=proj_x&m=board&b=board_1` | project x, Board section, board 1 |
 | `?p=proj_x&m=split&b=board_1&e=doc.doc_9` | document `doc_9` in the primary pane with the board beside it (split layout) |
 | `?p=proj_x&m=graph&b=board_1` | the Graph view in the single pane |
-| `?p=ghost&m=code` | falls back to the current project, Code section, no entity |
+| `?p=proj_x&m=photo` | the Photo section (added to the mode allow-list in 11.0 — before that `m=photo` degraded to the Board on refresh) |
+| `?p=ghost&m=code` | the dashboard |
+| `/` | the dashboard |
 
 ## Split is a layout, not a mode
 
@@ -82,4 +107,4 @@ restored split always opens with the Board beside the primary pane.
 
 ## Tests
 
-`src/lib/nav/navUrl.test.ts` — round-trip, `navKey` dedup, the popstate parse→resolve path, every degradation case (bad project / board / entity / mode / kind), and the `m=split` back-compatibility path (serialize → `m=split`; resolve legacy links with and without an entity; `m=graph` stays a mode). `src/store/boardActions.test.ts` covers `applyNav` restoring the project/mode/entity and no-op'ing on an unknown project. `src/store/workspaceLayoutStore.test.ts` covers the split layout itself.
+`src/lib/nav/navUrl.test.ts` — round-trip (including the Photo section), `navKey` dedup, the popstate parse→resolve path, every degradation case (bad project / board / entity / mode / kind), the surface rules (root URL → dashboard, unknown project → dashboard, params without a project → dashboard, dashboard serializes to `""` and keys apart from every project), and the `m=split` back-compatibility path (serialize → `m=split`; resolve legacy links with and without an entity; `m=graph` stays a mode). `src/store/boardActions.test.ts` covers `applyNav` restoring the project/mode/entity, no-op'ing on an unknown project, and the surface transitions (Home keeps the project open; sections, entities and re-selecting the active project all return to the project surface). `src/store/workspaceLayoutStore.test.ts` covers the split layout itself.

@@ -47,14 +47,22 @@ _Tracked in [#11](https://github.com/FraOri03/Lattice/issues/11)._
 
 _Tracked in [#10](https://github.com/FraOri03/Lattice/issues/10)._
 
-- **No browser back/forward** — the SPA has no router; the Back button exits the app.
+- ~~**No browser back/forward** — the SPA has no router; the Back button exits the app.~~
+  **Fixed** (`NAV-1`): Back/Forward and refreshable deep links work — see
+  [navigation.md](navigation.md). Phase 11.0 added the dashboard surface (the bare root
+  URL, and where unknown/deleted project links land).
+- **The dashboard has no screen yet.** 11.0 shipped the navigation state, the URL contract
+  and its tests; the Home screen itself is Phase 11.2, so until then the shell renders the
+  workspace on both surfaces.
 - ~~**"Board" is overloaded** … Split behaves like a layout but is presented as a peer
   mode.~~ **Fixed** (`LAT-7`/`NAV-2`/`IA-1`): Split is now a layout toggle in
   `workspaceLayoutStore` and Graph is a content view; neither is a section. See
   [navigation.md](navigation.md#split-is-a-layout-not-a-mode).
 - **Workspaces add a nesting level** (`Workspace → Project → Mode → Entity → Card`) without
   enforcement — they should auto-hide for single-workspace accounts.
-- No per-entity shareable deep link (only the `#invite=` hash).
+- **No UI for copying a link to an entity.** The URL already encodes the open entity
+  (`e=<kind>.<id>`), so copying the address bar works — but nothing in the product
+  surfaces it.
 - **The secondary pane's content is not deep-linkable.** A restored `m=split` link always
   opens the Board beside the primary pane; "editor + Graph" is transient view state.
 - **Split pairs the primary section with the Board or the Graph only** — there is no
