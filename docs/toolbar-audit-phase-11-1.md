@@ -391,6 +391,56 @@ The ARIA pattern would move tab→tab and reach the close with a dedicated key.
 Doing that properly means adding a close shortcut, otherwise the close buttons
 become unreachable — reachability now beats purity. Candidate for **11.1.7**.
 
+## Final state (11.1.7)
+
+### What the phase changed, in one table
+
+| Surface | Before | After |
+|---|---|---|
+| Board | `role="toolbar"`, 8 tab stops, 19 px chevrons | 1 tab stop, all targets ≥ 24 px, EN/IT |
+| Photo | `.icon-btn` cluster, no role | named toolbar, `md` targets 32 px, EN/IT |
+| Document | `.doc-toolbar`, 19 tab stops, names from `title` | 1 tab stop, 19/19 explicit names, `preserveFocus`, EN/IT |
+| Note | 4 tab stops, view state in a background colour | 1 tab stop, `aria-pressed`, EN/IT |
+| Spreadsheet | **0 of 14 controls named**, no `aria-pressed` at all | 14/14 named, 5 pressed states, EN/IT |
+| Presentation | inline in a 900-line file, untestable | own `SlideToolbar.tsx` + tests, EN/IT |
+| Code | tabs unreachable by keyboard, 16 px close targets | `role="tablist"`, 24 px targets, **no toolbar invented** |
+
+Three grammars became one behaviour with two size axes. Every bar is a single
+tab stop with arrow navigation; every control has a name; every toggle exposes
+`aria-pressed` plus a non-colour cue.
+
+### Legacy CSS
+
+- **`.doc-toolbar` is deleted** — zero call sites once Document, Sheet and
+  Presentation moved.
+- **`.tbtn` survives, with a narrower meaning**: a compact control that is *not*
+  in a toolbar. It is used by the rich-text bubble and block menus and by the
+  slide element inspector. It moved into `@layer components` with everything
+  else, so per-instance utilities finally apply to it — verified live:
+  `tbtn text-[9px]` now computes 9 px where the unlayered rule used to pin it
+  to 12 px. Those three surfaces keep the audit's unfixed problems (no names,
+  colour-only state, `--accent` on `--accent-soft` at 2.38:1 in light) and are
+  tracked in [#48](https://github.com/FraOri03/Lattice/issues/48).
+
+### The action registry was removed
+
+`toolbarModel.ts` — `ToolbarEntry`, `visibleEntries`, `groupEntries` — was
+designed before the migrations. Six surfaces later it had **no clients**: every
+mode composes the primitives directly in JSX, which turned out clearer and
+easier to test than a descriptor list. Keeping an exported abstraction that
+nothing uses would have been the same mistake as shipping an entitlement layer
+that enforces nothing, so it is deleted. If a future mode needs data-driven
+toolbars, it can come back with a caller attached.
+
+### Deliberately not done
+
+| Item | Why | Tracked |
+|---|---|---|
+| Board overflow below ~1060 px | `useToolbarOverflow` and `ToolbarOverflow` exist and are tested but unwired: folding a **split button** into a menu item loses its "repeat last tool" behaviour, and the fold order is a product decision. Not something to land on the pilot surface at the end of a long phase. | [#47](https://github.com/FraOri03/Lattice/issues/47) |
+| `preserveFocus` on the Sheet | Resolved, not deferred: the grid **commits an in-cell edit on blur** (`SpreadsheetEditor.tsx:466`), so suppressing that blur would change when the value lands. Left off. | — |
+| Code tabs: arrows walk close buttons too | The strict ARIA tabs pattern moves tab→tab and needs a dedicated close key; without one those buttons become unreachable. Reachability beat purity. | — |
+| Light-theme focus ring at 2.99:1 | `--accent` on `--panel` affects every focusable control in the app; it needs a new design token, not a toolbar change. | — |
+
 ## Order of work
 
 | Step | Content | State |
@@ -407,4 +457,4 @@ become unreachable — reachability now beats purity. Candidate for **11.1.7**.
 | 11.1.6a | Sheet migration | **done** |
 | 11.1.6b | Presentation migration | **done** |
 | 11.1.6c | Code — no bar invented; tablist + target fixes | **done** |
-| 11.1.7 | legacy CSS cleanup (`.tbtn`, `.doc-toolbar`), overflow wiring, final audit | |
+| 11.1.7 | legacy CSS cleanup, registry removal, final audit | **done** |
