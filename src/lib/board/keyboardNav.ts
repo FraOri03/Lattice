@@ -57,6 +57,7 @@ export type BoardKeyAction =
   | { kind: 'move'; dx: number; dy: number }
   | { kind: 'open' }
   | { kind: 'delete' }
+  | { kind: 'duplicate' }
   | { kind: 'link-start' }
   | { kind: 'link-confirm' }
   | { kind: 'cancel' }
@@ -107,6 +108,12 @@ export function resolveBoardKey(
   // focused card — but it still refuses read-only roles and editor focus.
   if ((e.key === 'Delete' || e.key === 'Backspace') && !ctx.readOnly) {
     return { kind: 'delete' }
+  }
+
+  // Duplicate (Ctrl/Cmd+D) also acts on the selection. The copy shares the
+  // original's entity, so this never re-stores a file.
+  if ((e.key === 'd' || e.key === 'D') && (e.ctrl || e.meta) && !e.alt && !ctx.readOnly) {
+    return { kind: 'duplicate' }
   }
 
   if (!ctx.hasActive) return null

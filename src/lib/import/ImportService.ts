@@ -54,6 +54,14 @@ async function importAsAsset(
     ...extra,
   }
   useStore.getState().addAsset(asset)
+  if (kind === 'video') {
+    // fire-and-forget: the card for the original, already-playable upload
+    // renders immediately: conversion runs in the background and swaps
+    // the same asset's blob in place once it succeeds
+    void import('@/lib/video/videoUploadPipeline').then(({ queueVideoConversion }) =>
+      queueVideoConversion(id, file),
+    )
+  }
   return { kind: 'asset', asset }
 }
 

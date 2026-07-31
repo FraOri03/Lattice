@@ -4,6 +4,7 @@ import { downloadText, slugify } from '@/lib/download'
 import { MarkdownView } from '@/components/MarkdownView'
 import { AssetPreviewPane } from '@/components/preview/AssetPreviewPane'
 import { RichDocWorkspacePane } from '@/components/richdoc/RichDocWorkspacePane'
+import { documentPaneFor } from '@/lib/nav/activePane'
 import { IcDoc, IcNote, IcPlus, IcX } from '@/components/Icons'
 import { ActionIcon } from '@/components/ActionIcons'
 
@@ -29,10 +30,22 @@ export function DocumentView() {
   const viewMode = useStore((s) => s.viewMode)
   const [tab, setTab] = useState<'write' | 'preview'>('write')
 
-  // Pane priority: open asset > code file > spreadsheet > rich document > note
+  // Which single pane this mode may mount (see lib/nav/activePane): Document
+  // hosts asset/document/note, Split additionally hosts code and sheets.
+  // Dangling ids are nulled out here so the pane always has an entity.
   const activeAsset = activeAssetId ? assets[activeAssetId] : undefined
-  if (activeAsset) return <AssetPreviewPane asset={activeAsset} />
-  if (activeCodeId && useStore.getState().codeDocs[activeCodeId]) {
+  const activeCode = activeCodeId ? useStore.getState().codeDocs[activeCodeId] : undefined
+  const activeSheet = activeSheetId ? sheetDocs[activeSheetId] : undefined
+  const activeDoc = activeDocId ? docs[activeDocId] : undefined
+  const pane = documentPaneFor(viewMode, {
+    activeAssetId: activeAsset ? activeAssetId : null,
+    activeCodeId: activeCode ? activeCodeId : null,
+    activeSheetId: activeSheet ? activeSheetId : null,
+    activeDocId: activeDoc ? activeDocId : null,
+  })
+
+  if (pane === 'asset' && activeAsset) return <AssetPreviewPane asset={activeAsset} />
+  if (pane === 'code' && activeCode) {
     return (
       <Suspense
         fallback={
@@ -45,8 +58,7 @@ export function DocumentView() {
       </Suspense>
     )
   }
-  const activeSheet = activeSheetId ? sheetDocs[activeSheetId] : undefined
-  if (activeSheet) {
+  if (pane === 'sheet' && activeSheet) {
     return (
       <Suspense
         fallback={
@@ -59,8 +71,7 @@ export function DocumentView() {
       </Suspense>
     )
   }
-  const activeDoc = activeDocId ? docs[activeDocId] : undefined
-  if (activeDoc) return <RichDocWorkspacePane doc={activeDoc} />
+  if (pane === 'doc' && activeDoc) return <RichDocWorkspacePane doc={activeDoc} />
 
   const note = activeNoteId ? notes[activeNoteId] : undefined
 

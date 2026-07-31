@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { nid } from '@/lib/id'
+import { moveShot as moveShotInSequence, renumberShots } from '@/lib/photo/shots'
 import type {
   PhotoCameraElement,
   PhotoElement,
@@ -216,6 +217,8 @@ interface PhotoState {
   addShot: () => void
   duplicateShot: (shotId: string) => void
   deleteShot: (shotId: string) => void
+  /** reorder the sequence: negative moves earlier, positive later */
+  moveShot: (shotId: string, delta: number) => void
   selectShot: (shotId: string) => void
   updateShotProperties: (shotId: string, partial: Partial<PhotoShot>) => void
 
@@ -478,10 +481,11 @@ export const usePhotoStore = create<PhotoState>()(
       addShot: () => {
         const { shots, activeShotId } = get()
         const currentShot = shots.find((s) => s.id === activeShotId)
+        const position = shots.length + 1
         const newShot: PhotoShot = {
           id: nid('shot'),
-          number: Math.max(...shots.map((s) => s.number), 0) + 1,
-          name: `Shot ${Math.max(...shots.map((s) => s.number), 0) + 1} - New setup`,
+          number: position,
+          name: `Shot ${position} - New setup`,
           description: '',
           priority: 'Medium',
           status: 'Draft',
@@ -489,7 +493,7 @@ export const usePhotoStore = create<PhotoState>()(
           // start from the current layout so consecutive setups evolve
           elements: currentShot ? deepCopy(currentShot.elements) : [],
         }
-        get().pushHistory([...shots, newShot])
+        get().pushHistory(renumberShots([...shots, newShot]))
         set({ activeShotId: newShot.id, selectedElementId: null })
       },
 
@@ -500,24 +504,30 @@ export const usePhotoStore = create<PhotoState>()(
         const duplicated: PhotoShot = {
           ...deepCopy(source),
           id: nid('shot'),
-          number: Math.max(...shots.map((s) => s.number), 0) + 1,
+          number: shots.length + 1,
           name: `${source.name} (copy)`,
         }
-        get().pushHistory([...shots, duplicated])
+        get().pushHistory(renumberShots([...shots, duplicated]))
         set({ activeShotId: duplicated.id, selectedElementId: null })
       },
 
       deleteShot: (shotId) => {
         const { shots, activeShotId } = get()
         if (shots.length <= 1) return // a scene always keeps one shot
-        const remaining = shots
-          .filter((s) => s.id !== shotId)
-          .map((s, idx) => ({ ...s, number: idx + 1 }))
+        const remaining = renumberShots(shots.filter((s) => s.id !== shotId))
         get().pushHistory(remaining)
         set({
           activeShotId: activeShotId === shotId ? remaining[0].id : activeShotId,
           selectedElementId: null,
         })
+      },
+
+      moveShot: (shotId, delta) => {
+        const { shots } = get()
+        const reordered = moveShotInSequence(shots, shotId, delta)
+        // same reference = the move had nowhere to go; don't spend an undo step
+        if (reordered === shots) return
+        get().pushHistory(reordered)
       },
 
       selectShot: (shotId) => set({ activeShotId: shotId, selectedElementId: null }),

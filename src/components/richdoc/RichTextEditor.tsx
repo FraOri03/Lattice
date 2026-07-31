@@ -29,6 +29,7 @@ import { collabBaseExtensions } from './extensions'
 import { SlashCommands } from './SlashCommandMenu'
 import { AssetPickerDialog } from './AssetPickerDialog'
 import { DocumentToolbar, setOrUnsetLink, useEditorTick } from './DocumentToolbar'
+import { pageStyleVars } from '@/lib/richdoc/pageSetup'
 
 export interface RichTextEditorProps {
   docId: string
@@ -98,6 +99,7 @@ function EditorInner({
   variant: 'full' | 'mini'
 }) {
   const persistDocContent = useStore((s) => s.persistDocContent)
+  const pageSetup = useStore((s) => s.docs[docId]?.page)
   const readOnly = useReadOnly()
   const saveTimer = useRef<number | undefined>(undefined)
   /** true when at least one local (non-CRDT-remote) edit awaits saving */
@@ -272,6 +274,10 @@ function EditorInner({
       toast.error('Image import failed', `${outcome.fileName}: ${outcome.message}`)
   }
 
+  // A4/Letter sheet layout is a full-editor affordance only (board-card
+  // minis stay compact and continuous).
+  const paged = variant === 'full' && pageSetup?.mode === 'paged'
+
   return (
     <div className={`richdoc richdoc-${variant} flex h-full min-h-0 flex-col`}>
       {variant === 'full' && editor && (
@@ -354,7 +360,10 @@ function EditorInner({
       )}
 
       <div
-        className={`min-h-0 flex-1 overflow-y-auto ${variant === 'mini' ? 'nowheel nodrag' : ''}`}
+        className={`min-h-0 flex-1 overflow-y-auto ${variant === 'mini' ? 'nowheel nodrag' : ''} ${
+          paged ? 'richdoc-paged' : ''
+        }`}
+        style={paged ? (pageStyleVars(pageSetup!) as React.CSSProperties) : undefined}
       >
         <EditorContent editor={editor} className="h-full" />
       </div>

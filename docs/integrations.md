@@ -14,6 +14,7 @@ runs fully local and says so. See [setup.md](setup.md) for the command/deploy fl
 | GitHub code sync | Works via personal access token (PAT) | One-click OAuth via serverless function |
 | Realtime (Liveblocks + Yjs) | Tabs-of-one-browser + Drive polling | **Experimental** cross-device CRDT + server ACLs |
 | Conversion backend | Disabled (originals preserved) | Remote worker for legacy/high-fidelity conversion |
+| Video conversion (ffmpeg.wasm) | Always on, no config needed | Client-side only; fetches its ~30 MB core from jsDelivr on first use |
 
 ## Google sign-in + Drive
 
@@ -48,6 +49,21 @@ mock account** so the UI works in development; cloud sync stays disabled.
   prior remote versions.
 - **Deletions never propagate automatically** in either direction; remote deletes go to
   Drive's trash (recoverable) and only from explicit user actions.
+- Each project lives in a folder **named after the project** (`/Lattice/projects/<Project
+  name>`), so the Drive file list is browsable without knowing Lattice's internal ids.
+  Identity still travels in an app property, never in the name: renaming a project
+  renames that same folder in place, and a folder from an earlier version — named after
+  the project id — is adopted and renamed on the first sync rather than left behind as a
+  second copy. Two projects with the same title become `Name` and `Name (2)`.
+- Rich documents also get a **readable HTML companion** next to their JSON body
+  (`/documents-readable/<title>.html`), because a raw Tiptap JSON file is opaque in
+  Drive's own file browser. The JSON stays the one internal source of truth — the HTML
+  is purely derived and is never read back by `pull()`. It shares the JSON body's dirty
+  check (only re-synced when the document actually changed), is found by a persistent
+  Drive file id rather than by name (a Lattice-side rename updates it in place instead
+  of duplicating it, and a companion created on one device is found — never
+  re-created — by another), and, matching the "deletions never propagate" policy above,
+  is **not** auto-trashed when the local document is deleted.
 
 Drive layout is documented in [architecture.md](architecture.md#cloud-storage-layout-google-drive).
 
@@ -115,6 +131,25 @@ Contract: `POST {url}/convert` (multipart: `file`, `sourceFormat`, `targetFormat
 `projectId`) with a Google Bearer token; the response is the converted file with
 `x-conversion-engine` / `x-conversion-warnings` / `x-conversion-unsupported` headers. No
 native conversion binary is ever bundled into the frontend.
+
+## Video conversion (ffmpeg.wasm)
+
+Every uploaded video (up to 150 MB) is transcoded client-side to a
+web-friendly H.264/AAC MP4 so it plays reliably regardless of what codec it
+arrived in — no configuration, no opt-in, always on. See
+[file-formats.md](file-formats.md#video-upload-conversion) for the full
+behavior (worker isolation, one-at-a-time queueing, in-place asset
+replacement, retry on failure).
+
+**The one external runtime dependency this adds**: the ffmpeg-core WASM/JS
+build (~30 MB, version-pinned to `@ffmpeg/core@0.12.10`) is fetched lazily
+from jsDelivr (`cdn.jsdelivr.net`) the first time a video is uploaded in a
+session — it is not bundled with the app. This is the pattern ffmpeg.wasm's
+own documentation recommends; self-hosting it as a Vite build asset was
+investigated but has real build friction (Vite's static-asset handling
+doesn't cleanly support the `toBlobURL` loading ffmpeg.wasm needs). If
+jsDelivr is unreachable, conversion is skipped for that session and uploads
+keep working with their original file untouched — never a hard failure.
 
 ## Full environment-variable reference
 

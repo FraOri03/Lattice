@@ -18,10 +18,12 @@ import { ProjectSwitcher } from '@/components/projects/ProjectSwitcher'
 import { useCan } from '@/lib/collab/useCollab'
 import { toast } from '@/components/ui/Toaster'
 import { confirmDialog } from '@/components/ui/ConfirmDialog'
+import { assetRefsOf, describeAssetRefs } from '@/lib/assets/assetRefs'
+import { SidebarCategory } from '@/components/sidebar/SidebarCategory'
+import { BOARD_DRAG_MIME } from '@/lib/dnd'
 import {
   IcBoard,
   IcClock,
-  IcPlus,
   IcSearch,
   IcTag,
   IcTrash,
@@ -349,83 +351,71 @@ export function Sidebar() {
         )}
 
         {/* boards */}
-        <div className="insp-h flex items-center justify-between">
-          <span>Boards</span>
-          {mayCreate && (
-            <button
-              className="icon-btn h-5 w-5"
-              onClick={addBoard}
-              title="New board"
-              aria-label="New board"
-            >
-              <IcPlus size={12} />
-            </button>
-          )}
-        </div>
-        {projectBoards.map((id) => {
-          const b = boards[id]
-          if (!b) return null
-          const active = id === activeBoardId
-          return (
-            <div
-              key={id}
-              className={`group flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 ${
-                active ? 'bg-panel2 text-ink' : 'text-muted hover:bg-panel2/60'
-              }`}
-              onClick={() => setActiveBoard(id)}
-            >
-              <IcBoard size={13} />
-              <span className="min-w-0 flex-1 truncate text-xs font-medium">
-                {b.name}
-              </span>
-              <span className="text-[10px] text-muted">{b.nodes.length}</span>
-              {projectBoards.length > 1 && mayDelete && (
-                <button
-                  className="icon-btn hidden h-5 w-5 group-hover:flex"
-                  title="Delete board"
-                  aria-label={`Delete board ${b.name}`}
-                  onClick={async (e) => {
-                    e.stopPropagation()
-                    if (
-                      await confirmDialog({
-                        title: `Delete board “${b.name}”?`,
-                        body: 'Cards on this board are removed; notes, documents and assets are kept.',
-                        confirmLabel: 'Delete board',
-                        danger: true,
-                      })
-                    )
-                      deleteBoard(id)
-                  }}
-                >
-                  <IcTrash size={11} />
-                </button>
-              )}
-            </div>
-          )
-        })}
+        <SidebarCategory
+          category="boards"
+          label="Boards"
+          items={projectBoards.map((id) => boards[id]).filter(Boolean)}
+          onCreate={mayCreate ? addBoard : undefined}
+          createLabel="New board"
+          mayEditFolders={mayCreate}
+          renderItem={(b) => {
+            const active = b.id === activeBoardId
+            return (
+              <div
+                key={b.id}
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData(BOARD_DRAG_MIME, b.id)
+                  e.dataTransfer.effectAllowed = 'move'
+                }}
+                className={`group flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 ${
+                  active ? 'bg-panel2 text-ink' : 'text-muted hover:bg-panel2/60'
+                }`}
+                onClick={() => setActiveBoard(b.id)}
+              >
+                <IcBoard size={13} />
+                <span className="min-w-0 flex-1 truncate text-xs font-medium">
+                  {b.name}
+                </span>
+                <span className="text-[10px] text-muted">{b.nodes.length}</span>
+                {projectBoards.length > 1 && mayDelete && (
+                  <button
+                    className="icon-btn hidden h-5 w-5 group-hover:flex"
+                    title="Delete board"
+                    aria-label={`Delete board ${b.name}`}
+                    onClick={async (e) => {
+                      e.stopPropagation()
+                      if (
+                        await confirmDialog({
+                          title: `Delete board “${b.name}”?`,
+                          body: 'Cards on this board are removed; notes, documents and assets are kept.',
+                          confirmLabel: 'Delete board',
+                          danger: true,
+                        })
+                      )
+                        deleteBoard(b.id)
+                    }}
+                  >
+                    <IcTrash size={11} />
+                  </button>
+                )}
+              </div>
+            )
+          }}
+        />
 
         {/* documents */}
         {show('docs') && (
           <>
-            <div className="insp-h flex items-center justify-between">
-              <span>Documents</span>
-              {mayCreate && (
-                <button
-                  className="icon-btn h-5 w-5"
-                  title="New document"
-                  aria-label="New document"
-                  onClick={() => openDoc(createDoc())}
-                >
-                  <IcPlus size={12} />
-                </button>
-              )}
-            </div>
-            {docList.length === 0 && (
-              <div className="px-2 py-1 text-[11px] text-muted italic">
-                No documents — create one or import a DOCX
-              </div>
-            )}
-            {docList.map((d) => (
+            <SidebarCategory
+              category="docs"
+              label="Documents"
+              items={docList}
+              emptyHint="No documents — create one or import a DOCX"
+              onCreate={mayCreate ? () => openDoc(createDoc()) : undefined}
+              createLabel="New document"
+              mayEditFolders={mayCreate}
+              renderItem={(d) => (
               <div
                 key={d.id}
                 draggable
@@ -464,32 +454,22 @@ export function Sidebar() {
                   </button>
                 )}
               </div>
-            ))}
+            )}
+            />
           </>
         )}
 
         {/* spreadsheets */}
         {show('sheets') && (
-          <>
-            <div className="insp-h flex items-center justify-between">
-              <span>Spreadsheets</span>
-              {mayCreate && (
-                <button
-                  className="icon-btn h-5 w-5"
-                  title="New spreadsheet"
-                  aria-label="New spreadsheet"
-                  onClick={() => openSheet(createSheetDoc())}
-                >
-                  <IcPlus size={12} />
-                </button>
-              )}
-            </div>
-            {sheetList.length === 0 && (
-              <div className="px-2 py-1 text-[11px] text-muted italic">
-                No spreadsheets — create one or import CSV/XLSX/ODS
-              </div>
-            )}
-            {sheetList.map((sh) => (
+          <SidebarCategory
+            category="sheets"
+            label="Spreadsheets"
+            items={sheetList}
+            emptyHint="No spreadsheets — create one or import CSV/XLSX/ODS"
+            onCreate={mayCreate ? () => openSheet(createSheetDoc()) : undefined}
+            createLabel="New spreadsheet"
+            mayEditFolders={mayCreate}
+            renderItem={(sh) => (
               <div
                 key={sh.id}
                 draggable
@@ -528,32 +508,21 @@ export function Sidebar() {
                   </button>
                 )}
               </div>
-            ))}
-          </>
+            )}
+          />
         )}
 
         {/* presentations (Phase 8) */}
         {show('all') && (
-          <>
-            <div className="insp-h flex items-center justify-between">
-              <span>Presentations</span>
-              {mayCreate && (
-                <button
-                  className="icon-btn h-5 w-5"
-                  title="New presentation"
-                  aria-label="New presentation"
-                  onClick={() => openPresent(createPresentDoc())}
-                >
-                  <IcPlus size={12} />
-                </button>
-              )}
-            </div>
-            {presentList.length === 0 && (
-              <div className="px-2 py-1 text-[11px] text-muted italic">
-                No presentations — create one or import PPTX/ODP
-              </div>
-            )}
-            {presentList.map((p) => (
+          <SidebarCategory
+            category="presentations"
+            label="Presentations"
+            items={presentList}
+            emptyHint="No presentations — create one or import PPTX/ODP"
+            onCreate={mayCreate ? () => openPresent(createPresentDoc()) : undefined}
+            createLabel="New presentation"
+            mayEditFolders={mayCreate}
+            renderItem={(p) => (
               <div
                 key={p.id}
                 draggable
@@ -592,32 +561,21 @@ export function Sidebar() {
                   </button>
                 )}
               </div>
-            ))}
-          </>
+            )}
+          />
         )}
 
         {/* code files */}
         {show('code') && (
-          <>
-            <div className="insp-h flex items-center justify-between">
-              <span>Code</span>
-              {mayCreate && (
-                <button
-                  className="icon-btn h-5 w-5"
-                  title="New code file"
-                  aria-label="New code file"
-                  onClick={() => openCode(createCode())}
-                >
-                  <IcPlus size={12} />
-                </button>
-              )}
-            </div>
-            {codeList.length === 0 && (
-              <div className="px-2 py-1 text-[11px] text-muted italic">
-                No code files — create one or import js/ts/py/…
-              </div>
-            )}
-            {codeList.map((c) => (
+          <SidebarCategory
+            category="code"
+            label="Code"
+            items={codeList}
+            emptyHint="No code files — create one or import js/ts/py/…"
+            onCreate={mayCreate ? () => openCode(createCode()) : undefined}
+            createLabel="New code file"
+            mayEditFolders={mayCreate}
+            renderItem={(c) => (
               <div
                 key={c.id}
                 draggable
@@ -658,30 +616,21 @@ export function Sidebar() {
                   </button>
                 )}
               </div>
-            ))}
-          </>
+            )}
+          />
         )}
 
         {/* notes */}
         {show('notes') && (
-          <>
-            <div className="insp-h flex items-center justify-between">
-              <span>Notes</span>
-              {mayCreate && (
-                <button
-                  className="icon-btn h-5 w-5"
-                  title="New note"
-                  aria-label="New note"
-                  onClick={() => openNote(createNote())}
-                >
-                  <IcPlus size={12} />
-                </button>
-              )}
-            </div>
-            {noteList.length === 0 && (
-              <div className="px-2 py-1 text-[11px] text-muted italic">No notes match</div>
-            )}
-            {noteList.map((n) => (
+          <SidebarCategory
+            category="notes"
+            label="Notes"
+            items={noteList}
+            emptyHint="No notes match"
+            onCreate={mayCreate ? () => openNote(createNote()) : undefined}
+            createLabel="New note"
+            mayEditFolders={mayCreate}
+            renderItem={(n) => (
               <div
                 key={n.id}
                 draggable
@@ -719,32 +668,21 @@ export function Sidebar() {
                   </button>
                 )}
               </div>
-            ))}
-          </>
+            )}
+          />
         )}
 
         {/* asset library */}
         {show('assets') && (
-          <>
-            <div className="insp-h flex items-center justify-between">
-              <span>Assets</span>
-              {mayCreate && (
-                <button
-                  className="icon-btn h-5 w-5"
-                  title="Import files"
-                  aria-label="Import files"
-                  onClick={() => filesInput.current?.click()}
-                >
-                  <IcPlus size={12} />
-                </button>
-              )}
-            </div>
-            {assetList.length === 0 && (
-              <div className="px-2 py-1 text-[11px] text-muted italic">
-                No assets yet — import PDFs, Office files, media or 3D models
-              </div>
-            )}
-            {assetList.map((a) => (
+          <SidebarCategory
+            category="assets"
+            label="Assets"
+            items={assetList}
+            emptyHint="No assets yet — import PDFs, Office files, media or 3D models"
+            onCreate={mayCreate ? () => filesInput.current?.click() : undefined}
+            createLabel="Import files"
+            mayEditFolders={mayCreate}
+            renderItem={(a) => (
               <div
                 key={a.id}
                 draggable
@@ -770,10 +708,17 @@ export function Sidebar() {
                     aria-label={`Delete asset ${a.name}`}
                     onClick={async (e) => {
                       e.stopPropagation()
+                      // One file can back many cards and documents, so say
+                      // exactly what would break before removing the binary.
+                      const used = describeAssetRefs(
+                        assetRefsOf(a.id, useStore.getState()),
+                      )
                       if (
                         await confirmDialog({
                           title: `Delete asset “${a.name}”?`,
-                          body: 'The file and its cards on all boards are removed from the vault.',
+                          body: used
+                            ? `This file is still used by ${used}. Deleting it removes the file and everything showing it.`
+                            : 'Nothing references this file — it will be removed from the vault.',
                           confirmLabel: 'Delete asset',
                           danger: true,
                         })
@@ -785,17 +730,17 @@ export function Sidebar() {
                   </button>
                 )}
               </div>
-            ))}
-            {mayCreate && (
-              <button
-                className="btn mt-1.5 w-full"
-                onClick={() => filesInput.current?.click()}
-                title="Import PDF, DOCX, XLSX, PPTX, images, video, audio, GLB/OBJ and more"
-              >
-                <ActionIcon.Import size={13} /> Import files…
-              </button>
             )}
-          </>
+          />
+        )}
+        {show('assets') && mayCreate && (
+          <button
+            className="btn mt-1.5 w-full"
+            onClick={() => filesInput.current?.click()}
+            title="Import PDF, DOCX, XLSX, PPTX, images, video, audio, GLB/OBJ and more"
+          >
+            <ActionIcon.Import size={13} /> Import files…
+          </button>
         )}
         <input
           ref={filesInput}
