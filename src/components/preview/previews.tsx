@@ -7,6 +7,8 @@ import { RemoteConversionProvider } from '@/lib/convert/ConversionBackendProvide
 import { formatBytes } from '@/lib/media'
 import { KIND_ICONS, KIND_LABEL } from '@/components/assetKinds'
 import { ActionIcon } from '@/components/ActionIcons'
+import { VideoConversionBadge } from '@/components/video/VideoConversionBadge'
+import { retryVideoConversion } from '@/lib/video/videoUploadPipeline'
 import { ThreeDViewer } from './ThreeDViewerLazy'
 
 export interface PreviewProps {
@@ -36,14 +38,22 @@ export const ImagePreview: FC<PreviewProps> = ({ asset, url }) =>
     <Loading />
   )
 
-export const VideoPreview: FC<PreviewProps> = ({ url }) =>
-  url ? (
-    <div className="flex h-full items-center justify-center bg-black">
-      <video src={url} controls className="max-h-full max-w-full" />
+export const VideoPreview: FC<PreviewProps> = ({ asset, url }) => {
+  if (!url) return <Loading />
+  return (
+    <div className="relative flex h-full items-center justify-center bg-black">
+      <video src={url} controls poster={asset.thumbnailDataUrl} className="max-h-full max-w-full" />
+      {asset.videoConversion && asset.videoConversion.status !== 'done' && (
+        <div className="absolute right-3 bottom-3">
+          <VideoConversionBadge
+            state={asset.videoConversion}
+            onRetry={() => void retryVideoConversion(asset.id)}
+          />
+        </div>
+      )}
     </div>
-  ) : (
-    <Loading />
   )
+}
 
 export const AudioPreview: FC<PreviewProps> = ({ asset, url }) => {
   const Icon = KIND_ICONS.audio

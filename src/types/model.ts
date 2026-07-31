@@ -209,6 +209,30 @@ export interface AssetBundleInfo {
 }
 
 /**
+ * Web-conversion lifecycle for a video asset (upload → convert). Only
+ * meaningful when AssetDoc.kind === 'video'.
+ *  - queued/converting: a background ffmpeg.wasm job is running (or
+ *    waiting behind another one — one video transcodes at a time)
+ *  - done: the stored blob IS the converted, web-friendly file; the
+ *    pre-conversion original is gone (never kept twice — "a single usable
+ *    video resource")
+ *  - skipped: conversion was not attempted (e.g. the file is over the
+ *    auto-convert size ceiling, or no worker is available) — the ORIGINAL
+ *    upload is what plays; skippedReason explains why in the UI
+ *  - error: the job ran and failed; the original upload is untouched and
+ *    still what plays, exactly as if conversion had been skipped
+ */
+export type VideoConversionStatus = 'queued' | 'converting' | 'done' | 'skipped' | 'error'
+
+export interface VideoConversionState {
+  status: VideoConversionStatus
+  /** 0-1, best-effort — ffmpeg.wasm's own progress events are coarse */
+  progress?: number
+  error?: string
+  skippedReason?: string
+}
+
+/**
  * An imported file. Metadata lives in the vault store; the binary lives in
  * the StorageProvider (IndexedDB today, File System Access API later).
  * assetPath/importPath are the file's virtual locations inside the vault —
@@ -230,6 +254,10 @@ export interface AssetDoc {
   folderId?: string
   /** companion files for multi-file formats (GLTF+BIN+textures, OBJ+MTL) */
   bundle?: AssetBundleInfo
+  /** video upload → web-conversion state; unset for non-video assets */
+  videoConversion?: VideoConversionState
+  /** small inline JPEG data: URL, generated once conversion succeeds */
+  thumbnailDataUrl?: string
 }
 
 /* ---------------- rich documents ---------------- */

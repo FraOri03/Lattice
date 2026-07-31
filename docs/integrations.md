@@ -14,6 +14,7 @@ runs fully local and says so. See [setup.md](setup.md) for the command/deploy fl
 | GitHub code sync | Works via personal access token (PAT) | One-click OAuth via serverless function |
 | Realtime (Liveblocks + Yjs) | Tabs-of-one-browser + Drive polling | **Experimental** cross-device CRDT + server ACLs |
 | Conversion backend | Disabled (originals preserved) | Remote worker for legacy/high-fidelity conversion |
+| Video conversion (ffmpeg.wasm) | Always on, no config needed | Client-side only; fetches its ~30 MB core from jsDelivr on first use |
 
 ## Google sign-in + Drive
 
@@ -124,6 +125,25 @@ Contract: `POST {url}/convert` (multipart: `file`, `sourceFormat`, `targetFormat
 `projectId`) with a Google Bearer token; the response is the converted file with
 `x-conversion-engine` / `x-conversion-warnings` / `x-conversion-unsupported` headers. No
 native conversion binary is ever bundled into the frontend.
+
+## Video conversion (ffmpeg.wasm)
+
+Every uploaded video (up to 150 MB) is transcoded client-side to a
+web-friendly H.264/AAC MP4 so it plays reliably regardless of what codec it
+arrived in — no configuration, no opt-in, always on. See
+[file-formats.md](file-formats.md#video-upload-conversion) for the full
+behavior (worker isolation, one-at-a-time queueing, in-place asset
+replacement, retry on failure).
+
+**The one external runtime dependency this adds**: the ffmpeg-core WASM/JS
+build (~30 MB, version-pinned to `@ffmpeg/core@0.12.10`) is fetched lazily
+from jsDelivr (`cdn.jsdelivr.net`) the first time a video is uploaded in a
+session — it is not bundled with the app. This is the pattern ffmpeg.wasm's
+own documentation recommends; self-hosting it as a Vite build asset was
+investigated but has real build friction (Vite's static-asset handling
+doesn't cleanly support the `toBlobURL` loading ffmpeg.wasm needs). If
+jsDelivr is unreachable, conversion is skipped for that session and uploads
+keep working with their original file untouched — never a hard failure.
 
 ## Full environment-variable reference
 
