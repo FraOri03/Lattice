@@ -230,6 +230,40 @@ Not app defects, established by control experiments:
   Arrow keys, Home/End and Escape run through plain handlers and were verified
   for real.
 
+## Document: baseline vs migrated (11.1.5a)
+
+Measured in the running app, against the frozen baseline above. Every
+difference is classified — nothing is left as "it looks about right".
+
+| Metric | Before | After | Verdict |
+|---|---|---|---|
+| Bar height · gap · padding · wrap | 33 · 2 · 4/8 · wrap | identical | unchanged |
+| Buttons | 18 | 18 | unchanged |
+| Control box | 24×24, padding 5 px, font 12 px, `--muted` | identical | unchanged |
+| Block-type select | 84.7×24, padding-right 5 px | 85×24, padding-right 5 px | unchanged |
+| Smallest target | 24 px | 24 px | unchanged |
+| Tab stops | **19** | **1** | **intentional** — the toolbar is one stop, arrows move inside it |
+| `aria-pressed` | 13 | 12 | **intentional** — "Insert table" was a fake toggle; inserting is not a state |
+| Accessible names | 18, inherited from `title` | 19/19 explicit `aria-label` | **intentional** |
+| Link prompt | `window.prompt` | the app's own prompt dialog | **intentional** — a native prompt cannot be translated, and the board already used the app dialog |
+| Dead utilities | `pr-1` on the select never applied | none left | **corrected** — the value is now declared, not accidentally inherited |
+| Click steals the editor's caret | no | **yes** | **regression, compensated** — see below |
+
+The select measures 70 px in Italian because "Titolo 1" is shorter than
+"Heading 1"; in English it is 85 px, i.e. the baseline. Locale, not layout.
+
+**The regression, and the fix.** The old `TBtn` carried
+`onMouseDown={(e) => e.preventDefault()}` with the comment "keep editor focus".
+The first migration dropped it, so clicking **Bold** applied the mark — the
+command chain calls `.focus()` — but left the caret and the visible selection
+on the button. `ToolbarRoot` now takes a `preserveFocus` prop that blocks that
+mousedown for its controls (never for a native `<select>`, which needs it to
+open). Verified live: after clicking Italic the mark applies, focus is still
+the editor and the selection is still "hello".
+
+`.tbtn` stays for now — the bubble and floating menus in `RichTextEditor`, plus
+the Sheet and Presentation toolbars, still use it. It goes in **11.1.7**.
+
 ## Order of work
 
 | Step | Content | State |
@@ -241,6 +275,7 @@ Not app defects, established by control experiments:
 | 11.1.2d | Photo migration (reference fixture) | **done** |
 | 11.1.2e | Board migration (pilot) | **done** |
 | 11.1.2f | visual verification after the layer change | **done** |
-| 11.1.5 | Document / Note migration | next |
+| 11.1.5a | Document migration | **done** |
+| 11.1.5b | Note migration | next |
 | 11.1.6 | Sheet · Presentation · Code migration | |
-| 11.1.7 | responsive, a11y, i18n and tests across all modes | |
+| 11.1.7 | legacy CSS cleanup (`.tbtn`, `.doc-toolbar`), overflow wiring, final audit | |

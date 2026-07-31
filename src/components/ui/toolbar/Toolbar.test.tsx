@@ -5,6 +5,7 @@ import {
   ToolbarGroup,
   ToolbarOverflow,
   ToolbarRoot,
+  ToolbarSelect,
   ToolbarSeparator,
   ToolbarSplitButton,
   ToolbarToggle,
@@ -326,5 +327,49 @@ describe('ToolbarOverflow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'More board tools' }))
     fireEvent.click(screen.getByRole('menuitem', { name: 'Import' }))
     expect(run).toHaveBeenCalledOnce()
+  })
+})
+
+/**
+ * A formatting bar must not steal the caret from the editor it formats — the
+ * behaviour the old `TBtn` had through a mousedown preventDefault, which the
+ * first migration dropped.
+ */
+describe('ToolbarRoot — preserveFocus', () => {
+  const clickable = (preserveFocus: boolean) => {
+    render(
+      <ToolbarRoot label="t" preserveFocus={preserveFocus}>
+        <ToolbarAction icon={icon} label="Bold" onRun={() => {}} />
+      </ToolbarRoot>,
+    )
+    return screen.getByRole('button', { name: 'Bold' })
+  }
+
+  it('blocks the focus-stealing mousedown when asked', () => {
+    // fireEvent returns false when the default was prevented
+    expect(fireEvent.mouseDown(clickable(true))).toBe(false)
+  })
+
+  it('leaves focus alone by default — a canvas toolbar should take it', () => {
+    expect(fireEvent.mouseDown(clickable(false))).toBe(true)
+  })
+
+  it('never blocks a native select, which needs mousedown to open', () => {
+    render(
+      <ToolbarRoot label="t" preserveFocus>
+        <ToolbarSelect
+          label="Block type"
+          value="p"
+          options={[
+            { value: 'p', label: 'Text' },
+            { value: 'h1', label: 'Heading 1' },
+          ]}
+          onChange={() => {}}
+        />
+      </ToolbarRoot>,
+    )
+    expect(fireEvent.mouseDown(screen.getByRole('combobox', { name: 'Block type' }))).toBe(
+      true,
+    )
   })
 })

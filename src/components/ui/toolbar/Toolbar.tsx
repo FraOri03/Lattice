@@ -43,6 +43,7 @@ export function ToolbarRoot({
   orientation = 'horizontal',
   size = 'md',
   content = 'icon',
+  preserveFocus = false,
   className = '',
   children,
 }: {
@@ -51,6 +52,12 @@ export function ToolbarRoot({
   orientation?: 'horizontal' | 'vertical'
   size?: ToolbarSize
   content?: ToolbarContent
+  /**
+   * Clicking a control must not pull focus away from whatever has it — what a
+   * formatting bar needs, so the caret and the visible selection stay in the
+   * editor. Off by default: on a canvas toolbar, taking focus is correct.
+   */
+  preserveFocus?: boolean
   className?: string
   children: ReactNode
 }) {
@@ -66,6 +73,17 @@ export function ToolbarRoot({
         className={`flex ${orientation === 'vertical' ? 'flex-col' : 'flex-row'} items-center ${className}`}
         onKeyDown={roving.onKeyDown}
         onFocus={roving.onFocus}
+        onMouseDown={
+          preserveFocus
+            ? (e) => {
+                const control = (e.target as HTMLElement).closest(
+                  `[${TOOLBAR_CONTROL_ATTR}]`,
+                )
+                // a native select still needs its own mousedown to open
+                if (control && control.tagName !== 'SELECT') e.preventDefault()
+              }
+            : undefined
+        }
       >
         {children}
       </div>
@@ -225,6 +243,47 @@ export function ToolbarToggle({
       {rest.icon}
       {text}
     </button>
+  )
+}
+
+/**
+ * A native `<select>` wearing the toolbar skin — for the handful of controls
+ * that are a choice among many rather than a button (block type, number
+ * format). It joins the roving order so the toolbar keeps ONE tab stop, but
+ * the arrows belong to the select itself while it has focus (that is what
+ * arrows mean in a native select); Tab is how you leave it.
+ */
+export function ToolbarSelect({
+  label,
+  value,
+  options,
+  onChange,
+  size,
+  className = '',
+}: {
+  label: string
+  value: string
+  options: { value: string; label: string }[]
+  onChange: (value: string) => void
+  size?: ToolbarSize
+  className?: string
+}) {
+  const ctx = useContext(ToolbarContext)
+  return (
+    <select
+      {...{ [TOOLBAR_CONTROL_ATTR]: '' }}
+      className={controlClass(size ?? ctx.size, 'icon', `toolbar-control--select ${className}`)}
+      aria-label={label}
+      title={label}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+    >
+      {options.map((o) => (
+        <option key={o.value} value={o.value}>
+          {o.label}
+        </option>
+      ))}
+    </select>
   )
 }
 

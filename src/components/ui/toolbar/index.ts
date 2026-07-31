@@ -6,6 +6,7 @@ export {
   ToolbarToggle,
   ToolbarMenu,
   ToolbarOverflow,
+  ToolbarSelect,
   ToolbarSplitButton,
   type ToolbarMenuItem,
   type ToolbarSize,

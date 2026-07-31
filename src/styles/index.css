@@ -149,6 +149,14 @@ body {
     gap: 0.375rem;
     padding-inline: 0.5rem;
   }
+  /* a native <select> wearing the toolbar skin */
+  .toolbar-control--select {
+    justify-content: flex-start;
+    width: auto;
+    background: transparent;
+    font-size: 12px;
+    outline: none;
+  }
   .toolbar-control__label {
     font-size: 10px;
     font-weight: 500;

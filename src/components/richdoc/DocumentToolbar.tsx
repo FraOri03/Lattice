@@ -1,8 +1,17 @@
 import { useEffect, useReducer } from 'react'
 import type { Editor } from '@tiptap/core'
 import type { CalloutKind } from './extensions'
+import { useI18n, type Catalog } from '@/lib/i18n'
+import { promptDialog } from '@/components/ui/ConfirmDialog'
 import { IcImage, IcLink, IcTable } from '@/components/Icons'
-import { ToolbarDivider } from '@/components/ui/ToolbarDivider'
+import {
+  ToolbarAction,
+  ToolbarGroup,
+  ToolbarRoot,
+  ToolbarSelect,
+  ToolbarSeparator,
+  ToolbarToggle,
+} from '@/components/ui/toolbar'
 
 /** Re-render on every editor transaction so active states stay fresh. */
 export function useEditorTick(editor: Editor | null): void {
@@ -19,65 +28,75 @@ export function useEditorTick(editor: Editor | null): void {
   }, [editor])
 }
 
-function TBtn({
-  active,
-  disabled,
-  title,
-  onClick,
-  children,
-}: {
-  active?: boolean
-  disabled?: boolean
-  title: string
-  onClick: () => void
-  children: React.ReactNode
-}) {
-  return (
-    <button
-      className={`tbtn ${active ? 'is-active' : ''}`}
-      disabled={disabled}
-      title={title}
-      aria-label={title}
-      aria-pressed={active}
-      onMouseDown={(e) => e.preventDefault() /* keep editor focus */}
-      onClick={onClick}
-    >
-      {children}
-    </button>
-  )
-}
-
-const Sep = () => <ToolbarDivider />
-
-export function setOrUnsetLink(editor: Editor): void {
+/**
+ * Set or clear the link on the selection.
+ *
+ * Uses the app's own prompt, not `window.prompt`: the audit found the same
+ * interaction implemented two ways (the board already used `promptDialog`),
+ * and a native prompt cannot be translated.
+ */
+export function setOrUnsetLink(editor: Editor, t: Catalog): void {
   const existing = editor.getAttributes('link').href as string | undefined
-  const url = window.prompt('Link URL (empty to remove)', existing ?? 'https://')
-  if (url === null) return
-  if (!url.trim()) editor.chain().focus().unsetLink().run()
-  else editor.chain().focus().setLink({ href: url.trim() }).run()
+  const copy = t.toolbar.document.linkPrompt
+  void promptDialog({
+    title: copy.title,
+    body: copy.body,
+    label: copy.label,
+    placeholder: 'https://…',
+    initialValue: existing ?? '',
+    confirmLabel: copy.confirm,
+  }).then((url) => {
+    if (url === null) return // cancelled
+    if (!url.trim()) editor.chain().focus().unsetLink().run()
+    else editor.chain().focus().setLink({ href: url.trim() }).run()
+  })
 }
 
 /** Contextual table controls, shown only while the selection is in a table. */
 export function TableControls({ editor }: { editor: Editor }) {
+  const t = useI18n()
+  const table = t.toolbar.document.table
   const c = () => editor.chain().focus()
   return (
-    <div className="flex items-center gap-0.5 rounded-md border border-bord bg-panel2 px-1 py-0.5">
-      <span className="px-1 text-[10px] font-semibold tracking-wider text-muted uppercase">
-        Table
+    <ToolbarGroup
+      label={table.group}
+      className="gap-0.5 rounded-md border border-bord bg-panel2 px-1 py-0.5"
+    >
+      <span
+        aria-hidden
+        className="px-1 text-[10px] font-semibold tracking-wider text-muted uppercase"
+      >
+        {table.group}
       </span>
-      <TBtn title="Add row below" onClick={() => c().addRowAfter().run()}>+Row</TBtn>
-      <TBtn title="Add column right" onClick={() => c().addColumnAfter().run()}>+Col</TBtn>
-      <TBtn title="Delete row" onClick={() => c().deleteRow().run()}>−Row</TBtn>
-      <TBtn title="Delete column" onClick={() => c().deleteColumn().run()}>−Col</TBtn>
-      <TBtn title="Toggle header row" onClick={() => c().toggleHeaderRow().run()}>Hdr</TBtn>
-      <TBtn title="Delete table" onClick={() => c().deleteTable().run()}>✕</TBtn>
-    </div>
+      <ToolbarAction icon="+Row" label={table.addRow} onRun={() => c().addRowAfter().run()} />
+      <ToolbarAction
+        icon="+Col"
+        label={table.addColumn}
+        onRun={() => c().addColumnAfter().run()}
+      />
+      <ToolbarAction icon="−Row" label={table.deleteRow} onRun={() => c().deleteRow().run()} />
+      <ToolbarAction
+        icon="−Col"
+        label={table.deleteColumn}
+        onRun={() => c().deleteColumn().run()}
+      />
+      <ToolbarAction
+        icon="Hdr"
+        label={table.headerRow}
+        onRun={() => c().toggleHeaderRow().run()}
+      />
+      <ToolbarAction icon="✕" label={table.deleteTable} onRun={() => c().deleteTable().run()} />
+    </ToolbarGroup>
   )
 }
 
 /**
- * Fixed toolbar for the full document workspace. Keyboard shortcuts
- * (Ctrl+B/I/U…, Ctrl+Z) come from Tiptap itself.
+ * Fixed toolbar for the full document workspace, on the shared primitives
+ * (Phase 11.1.5a). Keyboard shortcuts (Ctrl+B/I/U…, Ctrl+Z) come from Tiptap
+ * itself; the toolbar only names them in its tooltips.
+ *
+ * Every control here already existed — this phase normalises the grammar, it
+ * does not add editing features.
  */
 export function DocumentToolbar({
   editor,
@@ -89,6 +108,8 @@ export function DocumentToolbar({
   onAsset: () => void
 }) {
   useEditorTick(editor)
+  const t = useI18n()
+  const d = t.toolbar.document
   const c = () => editor.chain().focus()
 
   const blockValue = editor.isActive('heading')
@@ -96,87 +117,161 @@ export function DocumentToolbar({
     : 'p'
 
   return (
-    <div className="doc-toolbar">
-      <TBtn title="Undo (Ctrl+Z)" disabled={!editor.can().undo()} onClick={() => c().undo().run()}>↶</TBtn>
-      <TBtn title="Redo (Ctrl+Y)" disabled={!editor.can().redo()} onClick={() => c().redo().run()}>↷</TBtn>
-      <Sep />
-      <select
-        className="tbtn h-6 cursor-pointer bg-transparent pr-1 text-xs outline-none"
+    <ToolbarRoot
+      label={d.label}
+      size="sm"
+      // clicking a control keeps the caret and the selection in the editor,
+      // which is what the old TBtn's mousedown preventDefault was for
+      preserveFocus
+      className="flex-none flex-wrap gap-0.5 border-b border-bord bg-panel px-2 py-1"
+    >
+      <ToolbarGroup label={t.toolbar.groups.history}>
+        <ToolbarAction
+          icon="↶"
+          label={d.undo}
+          shortcut="Ctrl+Z"
+          disabled={!editor.can().undo()}
+          onRun={() => c().undo().run()}
+        />
+        <ToolbarAction
+          icon="↷"
+          label={d.redo}
+          shortcut="Ctrl+Y"
+          disabled={!editor.can().redo()}
+          onRun={() => c().redo().run()}
+        />
+      </ToolbarGroup>
+
+      <ToolbarSeparator />
+
+      <ToolbarSelect
+        label={d.blockType}
         value={blockValue}
-        title="Block type"
-        onChange={(e) => {
-          const v = e.target.value
+        options={[
+          { value: 'p', label: d.text },
+          ...[1, 2, 3, 4, 5, 6].map((l) => ({ value: `h${l}`, label: d.heading(l) })),
+        ]}
+        onChange={(v) => {
           if (v === 'p') c().setParagraph().run()
           else c().setHeading({ level: Number(v.slice(1)) as 1 | 2 | 3 | 4 | 5 | 6 }).run()
         }}
-      >
-        <option value="p">Text</option>
-        {[1, 2, 3, 4, 5, 6].map((l) => (
-          <option key={l} value={`h${l}`}>{`Heading ${l}`}</option>
-        ))}
-      </select>
-      <Sep />
-      <TBtn title="Bold (Ctrl+B)" active={editor.isActive('bold')} onClick={() => c().toggleBold().run()}>
-        <b>B</b>
-      </TBtn>
-      <TBtn title="Italic (Ctrl+I)" active={editor.isActive('italic')} onClick={() => c().toggleItalic().run()}>
-        <i>I</i>
-      </TBtn>
-      <TBtn title="Underline (Ctrl+U)" active={editor.isActive('underline')} onClick={() => c().toggleUnderline().run()}>
-        <u>U</u>
-      </TBtn>
-      <TBtn title="Strikethrough" active={editor.isActive('strike')} onClick={() => c().toggleStrike().run()}>
-        <s>S</s>
-      </TBtn>
-      <TBtn title="Inline code" active={editor.isActive('code')} onClick={() => c().toggleCode().run()}>
-        {'<>'}
-      </TBtn>
-      <TBtn title="Link" active={editor.isActive('link')} onClick={() => setOrUnsetLink(editor)}>
-        <IcLink size={12} />
-      </TBtn>
-      <Sep />
-      <TBtn title="Bullet list" active={editor.isActive('bulletList')} onClick={() => c().toggleBulletList().run()}>
-        •≡
-      </TBtn>
-      <TBtn title="Numbered list" active={editor.isActive('orderedList')} onClick={() => c().toggleOrderedList().run()}>
-        1≡
-      </TBtn>
-      <TBtn title="Checklist" active={editor.isActive('taskList')} onClick={() => c().toggleTaskList().run()}>
-        ☑
-      </TBtn>
-      <Sep />
-      <TBtn title="Quote" active={editor.isActive('blockquote')} onClick={() => c().toggleBlockquote().run()}>
-        ❝
-      </TBtn>
-      <TBtn title="Code block" active={editor.isActive('codeBlock')} onClick={() => c().toggleCodeBlock().run()}>
-        {'{ }'}
-      </TBtn>
-      <TBtn
-        title="Callout"
-        active={editor.isActive('callout')}
-        onClick={() => c().toggleCallout('info' as CalloutKind).run()}
-      >
-        ℹ
-      </TBtn>
-      <TBtn title="Divider" onClick={() => c().setHorizontalRule().run()}>—</TBtn>
-      <Sep />
-      <TBtn
-        title="Insert table"
-        active={editor.isActive('table')}
-        onClick={() => c().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
-      >
-        <IcTable size={12} />
-      </TBtn>
-      <TBtn title="Insert image" onClick={onImage}>
-        <IcImage size={12} />
-      </TBtn>
-      <TBtn title="Embed asset" onClick={onAsset}>📎</TBtn>
+      />
+
+      <ToolbarSeparator />
+
+      <ToolbarGroup label={d.groups.textStyle}>
+        <ToolbarToggle
+          icon={<b>B</b>}
+          label={d.bold}
+          shortcut="Ctrl+B"
+          pressed={editor.isActive('bold')}
+          onRun={() => c().toggleBold().run()}
+        />
+        <ToolbarToggle
+          icon={<i>I</i>}
+          label={d.italic}
+          shortcut="Ctrl+I"
+          pressed={editor.isActive('italic')}
+          onRun={() => c().toggleItalic().run()}
+        />
+        <ToolbarToggle
+          icon={<u>U</u>}
+          label={d.underline}
+          shortcut="Ctrl+U"
+          pressed={editor.isActive('underline')}
+          onRun={() => c().toggleUnderline().run()}
+        />
+        <ToolbarToggle
+          icon={<s>S</s>}
+          label={d.strike}
+          pressed={editor.isActive('strike')}
+          onRun={() => c().toggleStrike().run()}
+        />
+        <ToolbarToggle
+          icon={'<>'}
+          label={d.inlineCode}
+          pressed={editor.isActive('code')}
+          onRun={() => c().toggleCode().run()}
+        />
+        <ToolbarToggle
+          icon={<IcLink size={12} />}
+          label={d.link}
+          pressed={editor.isActive('link')}
+          onRun={() => setOrUnsetLink(editor, t)}
+        />
+      </ToolbarGroup>
+
+      <ToolbarSeparator />
+
+      <ToolbarGroup label={d.groups.lists}>
+        <ToolbarToggle
+          icon="•≡"
+          label={d.bulletList}
+          pressed={editor.isActive('bulletList')}
+          onRun={() => c().toggleBulletList().run()}
+        />
+        <ToolbarToggle
+          icon="1≡"
+          label={d.numberedList}
+          pressed={editor.isActive('orderedList')}
+          onRun={() => c().toggleOrderedList().run()}
+        />
+        <ToolbarToggle
+          icon="☑"
+          label={d.checklist}
+          pressed={editor.isActive('taskList')}
+          onRun={() => c().toggleTaskList().run()}
+        />
+      </ToolbarGroup>
+
+      <ToolbarSeparator />
+
+      <ToolbarGroup label={d.groups.blocks}>
+        <ToolbarToggle
+          icon="❝"
+          label={d.quote}
+          pressed={editor.isActive('blockquote')}
+          onRun={() => c().toggleBlockquote().run()}
+        />
+        <ToolbarToggle
+          icon={'{ }'}
+          label={d.codeBlock}
+          pressed={editor.isActive('codeBlock')}
+          onRun={() => c().toggleCodeBlock().run()}
+        />
+        <ToolbarToggle
+          icon="ℹ"
+          label={d.callout}
+          pressed={editor.isActive('callout')}
+          onRun={() => c().toggleCallout('info' as CalloutKind).run()}
+        />
+        <ToolbarAction
+          icon="—"
+          label={d.divider}
+          onRun={() => c().setHorizontalRule().run()}
+        />
+      </ToolbarGroup>
+
+      <ToolbarSeparator />
+
+      {/* Inserting is not a toggle: these carry no pressed state, unlike the
+          old shared TBtn which put aria-pressed on every button it rendered. */}
+      <ToolbarGroup label={d.groups.insert}>
+        <ToolbarAction
+          icon={<IcTable size={12} />}
+          label={d.insertTable}
+          onRun={() => c().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
+        />
+        <ToolbarAction icon={<IcImage size={12} />} label={d.insertImage} onRun={onImage} />
+        <ToolbarAction icon="📎" label={d.embedAsset} onRun={onAsset} />
+      </ToolbarGroup>
+
       {editor.isActive('table') && (
         <>
-          <Sep />
+          <ToolbarSeparator />
           <TableControls editor={editor} />
         </>
       )}
-    </div>
+    </ToolbarRoot>
   )
 }
