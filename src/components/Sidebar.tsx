@@ -15,6 +15,7 @@ import { importFiles, reportErrors } from '@/lib/import/ImportService'
 import { labelForLang } from '@/lib/code/languages'
 import { FileKindIcon, fileKindForAsset, type FileKind } from '@/lib/registry/fileKinds'
 import { ProjectSwitcher } from '@/components/projects/ProjectSwitcher'
+import { useI18n } from '@/lib/i18n'
 import { useCan } from '@/lib/collab/useCollab'
 import { toast } from '@/components/ui/Toaster'
 import { confirmDialog } from '@/components/ui/ConfirmDialog'
@@ -51,6 +52,8 @@ const RECENT_KIND: Record<RecentEntry['kind'], FileKind> = {
 }
 
 export function Sidebar() {
+  const t = useI18n()
+  const openDashboard = useStore((s) => s.openDashboard)
   const boards = useStore((s) => s.boards)
   const boardOrder = useStore((s) => s.boardOrder)
   const activeBoardId = useStore((s) => s.activeBoardId)
@@ -298,14 +301,19 @@ export function Sidebar() {
 
   return (
     <aside className="flex w-60 flex-none flex-col border-r border-bord bg-panel">
-      {/* logo */}
-      <div className="flex items-center gap-2.5 px-4 pt-4 pb-3">
+      {/* logo — and the only way back to Home, which is what the product
+          mark means everywhere else on the web */}
+      <button
+        className="flex cursor-pointer items-center gap-2.5 px-4 pt-4 pb-3 text-left hover:opacity-80"
+        onClick={() => openDashboard()}
+        aria-label={t.dashboard.title}
+      >
         <span className="h-6 w-6 flex-none rounded-md bg-gradient-to-br from-[#0d99ff] to-[#9747ff]" />
         <span className="text-[15px] font-bold tracking-tight">Lattice</span>
         <span className="mt-0.5 rounded bg-panel2 px-1.5 py-0.5 text-[9px] font-semibold tracking-wider text-muted uppercase">
           beta
         </span>
-      </div>
+      </button>
 
       {/* project switcher */}
       <ProjectSwitcher />

@@ -13,6 +13,7 @@ import { notificationService } from '@/lib/collab/NotificationService'
 import { autoSnapshot } from '@/lib/collab/AutoSnapshot'
 import { membersService } from '@/lib/collab/MembersService'
 import { inviteService } from '@/lib/collab/InviteService'
+import { Dashboard } from '@/components/dashboard/Dashboard'
 import { Sidebar } from '@/components/Sidebar'
 import { TopBar } from '@/components/TopBar'
 import { Inspector } from '@/components/Inspector'
@@ -291,12 +292,13 @@ function ProjectSurface() {
  * surface, each is `fixed inset-0` so it does not need the surface's flex
  * container, and the command palette has to answer on the dashboard too.
  *
- * Phase 11.2 replaces the marked line with the dashboard/project switch on
- * `navSurface`. Until that screen exists the shell keeps rendering the
- * project surface, so no URL promises a page that is not built yet.
+ * The surface switch below is the whole of `navSurface`'s effect on what you
+ * see: the URL owns which one is showing (bare root = Home), and opening a
+ * project is what leaves the dashboard again.
  */
 function AppShell() {
   const theme = useStore((s) => s.theme)
+  const surface = useStore((s) => s.navSurface)
 
   useCollaboration()
   useGlobalShortcuts()
@@ -308,8 +310,7 @@ function AppShell() {
 
   return (
     <>
-      {/* surface — 11.2 adds the dashboard branch here */}
-      <ProjectSurface />
+      {surface === 'dashboard' ? <Dashboard /> : <ProjectSurface />}
       <GithubDialog />
       <DriveDialog />
       <CommandPalette />
