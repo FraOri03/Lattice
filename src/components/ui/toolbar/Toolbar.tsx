@@ -143,6 +143,13 @@ interface ControlProps {
    * button, because a label that can disappear cannot be the accessible name.
    */
   labelClassName?: string
+  /**
+   * For a control that opens something. `expanded` without `haspopup` is
+   * meaningless, so they travel together — a disclosure announces both what it
+   * opens and whether it is open.
+   */
+  haspopup?: 'menu' | 'dialog' | 'listbox'
+  expanded?: boolean
   onRun: () => void
 }
 
@@ -201,6 +208,8 @@ export function ToolbarAction({
   disabledReason,
   className,
   labelClassName,
+  haspopup,
+  expanded,
   onRun,
 }: ControlProps) {
   const ctx = useContext(ToolbarContext)
@@ -214,6 +223,8 @@ export function ToolbarAction({
       className={controlClass(s, c, className)}
       disabled={disabled}
       aria-label={ariaLabel}
+      aria-haspopup={haspopup}
+      aria-expanded={haspopup ? !!expanded : undefined}
       title={tooltipOf({ label, description, shortcut, disabled, disabledReason })}
       onClick={onRun}
     >
