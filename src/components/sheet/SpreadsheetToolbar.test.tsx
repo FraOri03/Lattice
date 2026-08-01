@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { useStore } from '@/store/useStore'
 import type { SheetSessionValue } from './SheetSession'
 import { SpreadsheetToolbar } from './SpreadsheetToolbar'
@@ -27,12 +27,24 @@ vi.mock('@/components/collab/EntityPresence', () => ({
   SheetPeerChips: () => null,
 }))
 
+vi.mock('@/components/ui/Toaster', () => ({
+  toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
+}))
+
 const calls = {
   applyStyle: vi.fn(),
   insertRowAt: vi.fn(),
   deleteRowAt: vi.fn(),
   insertColAt: vi.fn(),
   deleteColAt: vi.fn(),
+  copySelection: vi.fn(),
+  cutSelection: vi.fn(),
+  pasteMatrix: vi.fn(),
+  pasteOriginFor: vi.fn(() => undefined),
+  sortSelection: vi.fn(),
+  removeDuplicates: vi.fn(() => 0),
+  findReplace: vi.fn(() => 0),
+  applyBorders: vi.fn(),
 }
 
 function makeSession({
@@ -72,7 +84,9 @@ describe('SpreadsheetToolbar — naming', () => {
   it('names every control — the headline gap of this surface', () => {
     render(<SpreadsheetToolbar />)
     const controls = [...document.querySelectorAll('[data-toolbar-control]')]
-    expect(controls.length).toBeGreaterThan(10)
+    // an exact count on purpose: a merge already removed two thirds of this bar
+    // once, and nothing in the suite noticed
+    expect(controls.length).toBe(33)
     for (const c of controls) {
       expect(c.getAttribute('aria-label')?.trim()).toBeTruthy()
     }
@@ -81,23 +95,40 @@ describe('SpreadsheetToolbar — naming', () => {
   it('keeps every action the old bar had', () => {
     render(<SpreadsheetToolbar />)
     for (const name of [
+      'Paste',
+      'Cut',
+      'Copy',
       'Bold',
       'Italic',
+      'Underline',
       'Text colour',
       'Clear text colour',
       'Fill colour',
       'Clear fill colour',
+      'Align top',
+      'Align middle',
+      'Align bottom',
       'Align left',
       'Align centre',
       'Align right',
+      'Wrap text',
+      'Thousands separator',
+      'Increase decimals',
+      'Decrease decimals',
       'Insert row',
       'Delete row',
       'Insert column',
       'Delete column',
+      'Sort ascending',
+      'Sort descending',
+      'Remove duplicate rows',
+      'Find & replace',
     ]) {
       expect(screen.getByRole('button', { name })).toBeInTheDocument()
     }
-    expect(screen.getByRole('combobox', { name: 'Number format' })).toBeInTheDocument()
+    for (const name of ['Font', 'Font size', 'Borders', 'Number format', 'Cell style']) {
+      expect(screen.getByRole('combobox', { name })).toBeInTheDocument()
+    }
   })
 })
 
@@ -186,6 +217,95 @@ describe('SpreadsheetToolbar — commands', () => {
     render(<SpreadsheetToolbar />)
     fireEvent.click(screen.getByRole('button', { name: 'Delete column' }))
     expect(calls.deleteColAt).toHaveBeenCalledTimes(2)
+  })
+})
+
+/**
+ * The 11.1.6a migration was merged into a main that had meanwhile grown the
+ * Clipboard, Borders and Data groups, and the merge kept the migrated JSX while
+ * taking main's session destructuring — silently dropping two thirds of the
+ * bar. Only the unused bindings gave it away, as TS6133 in the Vercel build.
+ * These tests exist so the same merge cannot pass twice.
+ */
+describe('SpreadsheetToolbar — commands the merge dropped', () => {
+  it('cuts and copies the selection', () => {
+    render(<SpreadsheetToolbar />)
+    fireEvent.click(screen.getByRole('button', { name: 'Copy' }))
+    expect(calls.copySelection).toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Cut' }))
+    expect(calls.cutSelection).toHaveBeenCalled()
+  })
+
+  it('applies a border kind and returns to the placeholder', () => {
+    render(<SpreadsheetToolbar />)
+    const borders = screen.getByRole('combobox', { name: 'Borders' })
+    fireEvent.change(borders, { target: { value: 'outline' } })
+    expect(calls.applyBorders).toHaveBeenCalledWith('outline')
+    expect((borders as HTMLSelectElement).value).toBe('')
+  })
+
+  it('sorts by the active column in both directions', () => {
+    render(<SpreadsheetToolbar />)
+    fireEvent.click(screen.getByRole('button', { name: 'Sort ascending' }))
+    expect(calls.sortSelection).toHaveBeenCalledWith('asc')
+    fireEvent.click(screen.getByRole('button', { name: 'Sort descending' }))
+    expect(calls.sortSelection).toHaveBeenCalledWith('desc')
+  })
+
+  it('de-duplicates the range', () => {
+    render(<SpreadsheetToolbar />)
+    fireEvent.click(screen.getByRole('button', { name: 'Remove duplicate rows' }))
+    expect(calls.removeDuplicates).toHaveBeenCalled()
+  })
+
+  it('steps the decimals of the active cell, and says where it is', () => {
+    session = makeSession({ style: { dec: 3 } })
+    render(<SpreadsheetToolbar />)
+    const up = screen.getByRole('button', { name: 'Increase decimals' })
+    expect(up).toHaveAttribute('title', 'Increase decimals — 3 decimal places now')
+    fireEvent.click(up)
+    expect(calls.applyStyle).toHaveBeenCalledWith({ dec: 4 })
+    fireEvent.click(screen.getByRole('button', { name: 'Decrease decimals' }))
+    expect(calls.applyStyle).toHaveBeenCalledWith({ dec: 2 })
+  })
+
+  it('applies a cell-style preset', () => {
+    render(<SpreadsheetToolbar />)
+    fireEvent.change(screen.getByRole('combobox', { name: 'Cell style' }), {
+      target: { value: 'good' },
+    })
+    expect(calls.applyStyle).toHaveBeenCalledWith({ color: '#0f6d31', bg: '#c6efce' })
+  })
+
+  it('offers every number format, date and time included', () => {
+    render(<SpreadsheetToolbar />)
+    for (const name of ['General', 'Currency €', 'Date', 'Time', 'Date-time']) {
+      expect(screen.getByRole('option', { name })).toBeInTheDocument()
+    }
+  })
+
+  it('opens find & replace as a disclosure and replaces through the session', () => {
+    render(<SpreadsheetToolbar />)
+    const trigger = screen.getByRole('button', { name: 'Find & replace' })
+    expect(trigger).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(trigger)
+    expect(trigger).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('dialog', { name: 'Find & replace' })).toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('Find'), { target: { value: 'a' } })
+    fireEvent.change(screen.getByLabelText('Replace with'), { target: { value: 'b' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Replace all' }))
+    expect(calls.findReplace).toHaveBeenCalledWith('a', 'b', { matchCase: false })
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('closes find & replace on Escape and hands focus back', async () => {
+    render(<SpreadsheetToolbar />)
+    const trigger = screen.getByRole('button', { name: 'Find & replace' })
+    fireEvent.click(trigger)
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    await waitFor(() => expect(trigger).toHaveFocus())
   })
 })
 

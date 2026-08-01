@@ -23,7 +23,7 @@ what it can already do — the rule from
 | **Board (viewport)** | React Flow `<Controls>` | separate cluster, bottom-left | React Flow's own | Zoom in · Zoom out · Fit view · Toggle interactivity |
 | **Document** | [DocumentToolbar.tsx](../src/components/richdoc/DocumentToolbar.tsx) | `.doc-toolbar` strip, no role, no label | `.tbtn` (`TBtn` wrapper) | Undo · Redo · block-type `<select>` · Bold · Italic · Underline · Strike · Code · Link · Bullet · Numbered · Checklist · Quote · Code block · Callout · Divider · Table · Image · Asset · contextual TableControls |
 | **Note (markdown)** | [DocumentView.tsx](../src/components/DocumentView.tsx) | inline header | `.icon-btn` | Write/Preview tabs · Export .md · Close |
-| **Spreadsheet** | [SpreadsheetToolbar.tsx](../src/components/sheet/SpreadsheetToolbar.tsx) | `.doc-toolbar` strip, no role, no label | `.tbtn` + `ColorWell` + `.field` select | Bold · Italic · Text colour · Fill colour · Align L/C/R · Number format · +Row · −Row · +Col · −Col · peer chips |
+| **Spreadsheet** | [SpreadsheetToolbar.tsx](../src/components/sheet/SpreadsheetToolbar.tsx) | `.doc-toolbar` strip, no role, no label | `.tbtn` + `ColorWell` + `.field` select | Paste · Cut · Copy · Font family · Font size · Bold · Italic · Underline · Text colour · Fill colour · Borders · Align top/middle/bottom · Align L/C/R · Wrap · Number format · Thousands · Decimals ± · Cell styles · +Row · −Row · +Col · −Col · Sort A→Z · Sort Z→A · Dedupe · Find & replace · peer chips |
 | **Presentation** | inline in [PresentationWorkspace.tsx](../src/components/present/PresentationWorkspace.tsx) | `.doc-toolbar` strip | `.tbtn` | Text box · Image · Rectangle · Ellipse · Line · Slide background |
 | **Code** | [CodeWorkspacePane.tsx](../src/components/code/CodeWorkspacePane.tsx) | — **no toolbar** | `.icon-btn` | file-name field · language `<select>` · Close (tab strip carries the rest) |
 | **Photo** | [PhotoWorkspace.tsx](../src/components/photo/PhotoWorkspace.tsx) | `.icon-btn` cluster | `.icon-btn` | **Select (V)** · **Pan (H/Space)** · Camera · Light · Person · Prop · Undo · Redo · Import scene · Export scene · AI set designer |
@@ -305,8 +305,8 @@ colour. The geometry, however, comes back byte-for-byte.
 | `+ Row` · `− Row` | 44 px | 44 px | unchanged |
 | `+ Col` · `− Col` | 39 px | 39 px | unchanged |
 | Number-format select | 144×24, padding 4 px | 144×24, padding **5 px** | **intentional** — 1 px, the toolbar's own scale instead of `.field`'s |
-| Accessible names | **0 of 14** | 14 of 14 | **intentional** — a screen reader used to hear "B", "I", "A", "✕", "+ Row" |
-| `aria-pressed` | **none** | 5 (bold, italic, three alignments) | **intentional** — state was conveyed by a background colour alone (WCAG 4.1.2) |
+| Accessible names | **0 of 33** | 33 of 33 | **intentional** — a screen reader used to hear "B", "I", "A", "✕", "+ Row" |
+| `aria-pressed` | **none** | 11 (bold, italic, underline, three vertical and three horizontal alignments, wrap, thousands) | **intentional** — state was conveyed by a background colour alone (WCAG 4.1.2) |
 | Tab stops | one per control | 1 | **intentional** |
 | Read-only | whole bar hidden | whole bar hidden | unchanged, deliberately |
 | Strings | hardcoded English | EN/IT, number formats included | **intentional** |
@@ -321,6 +321,32 @@ special case (verified in the running app: 16×3 px, inside its button).
 **Not changed, on purpose:** clicking a control still moves focus out of the
 grid. `preserveFocus` would fix it, but the sheet may commit an in-cell edit on
 blur, and proving that is not a normalisation task. Logged for **11.1.7**.
+
+### The merge that ate two thirds of this bar
+
+The numbers above are the *repaired* ones. They were briefly wrong, and it is
+worth writing down why.
+
+11.1.6a was authored on `feat/phase-11-0-navigation-root`, branched before main
+grew the Clipboard group, the borders select and the Data group (`43fd41a`,
+`040f72f`, `24d2840`). The migrated file therefore carried 14 controls, and the
+audit row above was written from it — describing a bar that main had already
+outgrown. Merging main back in (`8d406d5`) resolved the file to the migrated
+JSX while taking main's `useSheetSession()` destructuring: −399/+161 lines, with
+Clipboard, font family and size, underline, vertical alignment, wrap, the
+thousands separator, the decimal steppers, borders, cell styles and the whole
+Data group gone, and `date`/`time`/`datetime` dropped from the number formats.
+
+Nothing in the suite failed — the tests had been written against the reduced
+bar, including one named "keeps every action the old bar had". What caught it
+was the compiler: eight `TS6133` unused bindings in the Vercel build, which were
+the removed controls' session calls with nothing left to call them, plus a
+`TS7053` where `NUM_FMTS: NumFmt[]` outgrew a five-key `formats` catalogue.
+
+Repaired by re-migrating the full set onto the primitives rather than deleting
+the bindings. Two guards were added: `formats` is now keyed by every `NumFmt`,
+so dropping a format is a type error, and the naming test asserts an exact
+control count instead of "more than ten".
 
 ## Presentation: baseline vs migrated (11.1.6b)
 
@@ -401,7 +427,7 @@ become unreachable — reachability now beats purity. Candidate for **11.1.7**.
 | Photo | `.icon-btn` cluster, no role | named toolbar, `md` targets 32 px, EN/IT |
 | Document | `.doc-toolbar`, 19 tab stops, names from `title` | 1 tab stop, 19/19 explicit names, `preserveFocus`, EN/IT |
 | Note | 4 tab stops, view state in a background colour | 1 tab stop, `aria-pressed`, EN/IT |
-| Spreadsheet | **0 of 14 controls named**, no `aria-pressed` at all | 14/14 named, 5 pressed states, EN/IT |
+| Spreadsheet | **0 of 33 controls named**, no `aria-pressed` at all | 33/33 named, 11 pressed states, EN/IT |
 | Presentation | inline in a 900-line file, untestable | own `SlideToolbar.tsx` + tests, EN/IT |
 | Code | tabs unreachable by keyboard, 16 px close targets | `role="tablist"`, 24 px targets, **no toolbar invented** |
 
