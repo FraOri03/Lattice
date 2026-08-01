@@ -49,6 +49,19 @@ export interface GroupedCategory<T> {
   unfiled: T[]
 }
 
+/**
+ * A group derived from the data instead of filed by hand — same shape in
+ * the tree as a folder, but there is nothing to rename, delete or drop
+ * into, because it only exists as long as the data says so.
+ */
+export interface AutoGroup<T> {
+  id: string
+  label: string
+  /** tooltip explaining where the group comes from */
+  hint?: string
+  items: T[]
+}
+
 /** Folders of one category in the active project, in display order. */
 export function foldersOf(
   folders: Record<string, Folder>,
@@ -80,6 +93,31 @@ export function groupByFolder<T extends FoldableItem>(
     groups: folders.map((folder) => ({ folder, items: known.get(folder.id) ?? [] })),
     unfiled,
   }
+}
+
+/**
+ * Lay derived groups over the items no user folder claims.
+ *
+ * Manual filing wins: an item the user dragged into a folder is never
+ * pulled back out by an automatic group, so the two groupings can coexist
+ * without one silently undoing the other. Groups left empty after that are
+ * dropped, and whatever no group claims comes back in `rest` — the same
+ * "never lose an item" guarantee folders make.
+ */
+export function applyAutoGroups<T extends FoldableItem>(
+  unfiled: readonly T[],
+  autoGroups: readonly AutoGroup<T>[],
+): { groups: AutoGroup<T>[]; rest: T[] } {
+  const available = new Set(unfiled.map((i) => i.id))
+  const claimed = new Set<string>()
+  const groups: AutoGroup<T>[] = []
+  for (const group of autoGroups) {
+    const items = group.items.filter((i) => available.has(i.id))
+    if (!items.length) continue
+    for (const item of items) claimed.add(item.id)
+    groups.push({ ...group, items })
+  }
+  return { groups, rest: unfiled.filter((i) => !claimed.has(i.id)) }
 }
 
 /** Next order value so a new folder lands at the end of its category. */

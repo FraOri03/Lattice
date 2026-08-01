@@ -12,6 +12,14 @@ All notable changes to Lattice are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Assets group themselves by board section** — the sidebar's asset library now shows a
+  read-only group per board section that uses a file, above the flat list. Membership is
+  read back from the board (a card's `data.assetId` plus its section `parentId`), so it can
+  never drift; a file used by two sections appears under both, a file no section uses stays
+  in the flat list, and manual folders still win over the automatic grouping.
+
 ### Changed
 
 - Reorganized project documentation: the roadmap moved from the README into GitHub Issues

@@ -19,6 +19,7 @@ import { useCan } from '@/lib/collab/useCollab'
 import { toast } from '@/components/ui/Toaster'
 import { confirmDialog } from '@/components/ui/ConfirmDialog'
 import { assetRefsOf, describeAssetRefs } from '@/lib/assets/assetRefs'
+import { assetSectionGroups } from '@/lib/sidebar/assetSections'
 import { SidebarCategory } from '@/components/sidebar/SidebarCategory'
 import { BOARD_DRAG_MIME } from '@/lib/dnd'
 import {
@@ -136,6 +137,17 @@ export function Sidebar() {
         )
         .sort((a, b) => b.importedAt - a.importedAt),
     [assets, q, activeProjectId],
+  )
+
+  // files group themselves under the board section whose cards use them;
+  // everything else stays in the flat list below the groups
+  const assetSections = useMemo(
+    () =>
+      assetSectionGroups(
+        assetList,
+        projectBoards.map((id) => boards[id]).filter(Boolean),
+      ),
+    [assetList, projectBoards, boards],
   )
 
   const docList = useMemo(
@@ -678,6 +690,7 @@ export function Sidebar() {
             category="assets"
             label="Assets"
             items={assetList}
+            autoGroups={assetSections}
             emptyHint="No assets yet — import PDFs, Office files, media or 3D models"
             onCreate={mayCreate ? () => filesInput.current?.click() : undefined}
             createLabel="Import files"
