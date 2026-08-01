@@ -69,7 +69,7 @@ The surface lives in the store as `navSurface` and is **not persisted**: the URL
 
 Going Home does **not** tear the project down — `applyNav({ surface: 'dashboard' })` leaves `activeProjectId` and the open entity alone, so re-entering costs nothing. Conversely every way of touching a project leaves the dashboard: `setActiveProject` (including re-selecting the already-active project), `setViewMode`, and the `open*` entity helpers.
 
-> **The dashboard SCREEN lands in Phase 11.2.** This phase ships the state machine, the URL contract and its tests; until the screen exists the shell keeps rendering the workspace, so no URL promises a page that isn't built yet.
+> **The dashboard SCREEN landed in Phase 11.2.** The shell switches on `navSurface` in one place (`AppShell` in `src/App.tsx`), and the sidebar's product mark is the explicit Home control. The cross-surface hooks — history, global shortcuts, collaboration — and the overlays are mounted *above* that switch, so going Home neither drops the URL binding nor re-attaches the project's CRDT rooms.
 
 ## Examples
 

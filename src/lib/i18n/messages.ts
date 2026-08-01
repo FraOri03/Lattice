@@ -469,6 +469,28 @@ export const en = {
       editor: 'Code editor',
     },
   },
+
+  /** Home — the surface shown when no project is open (Phase 11.2) */
+  dashboard: {
+    title: 'Home',
+    inWorkspace: (workspace: string) => `in ${workspace}`,
+    newProject: 'New project',
+    search: 'Search',
+    searchHint: 'Search files, boards and projects',
+    recent: 'Recent',
+    starred: 'Starred',
+    projects: 'Projects',
+    archived: 'Archived',
+    recentFiles: 'Recent files',
+    openRecent: (title: string, project: string) => `Open ${title} in ${project}`,
+    openProject: (name: string) => `Open project ${name}`,
+    updated: (when: string) => `Updated ${when}`,
+    starredBadge: 'Starred',
+    archivedBadge: 'Archived',
+    noDescription: 'No description',
+    emptyTitle: 'No projects in this workspace yet',
+    emptyBody: 'A project holds its own boards, notes, documents and files.',
+  },
 }
 
 export type Catalog = typeof en
@@ -911,6 +933,27 @@ export const it: Catalog = {
       lines: (n) => `${n} righe`,
       editor: 'Editor di codice',
     },
+  },
+
+  dashboard: {
+    title: 'Home',
+    inWorkspace: (workspace) => `in ${workspace}`,
+    newProject: 'Nuovo progetto',
+    search: 'Cerca',
+    searchHint: 'Cerca file, board e progetti',
+    recent: 'Recenti',
+    starred: 'Preferiti',
+    projects: 'Progetti',
+    archived: 'Archiviati',
+    recentFiles: 'File recenti',
+    openRecent: (title, project) => `Apri ${title} in ${project}`,
+    openProject: (name) => `Apri il progetto ${name}`,
+    updated: (when) => `Aggiornato ${when}`,
+    starredBadge: 'Preferito',
+    archivedBadge: 'Archiviato',
+    noDescription: 'Nessuna descrizione',
+    emptyTitle: 'Ancora nessun progetto in questo workspace',
+    emptyBody: 'Un progetto contiene le sue board, note, documenti e file.',
   },
 }
 
