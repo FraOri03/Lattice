@@ -15,6 +15,7 @@ import { importFiles, reportErrors } from '@/lib/import/ImportService'
 import { labelForLang } from '@/lib/code/languages'
 import { FileKindIcon, fileKindForAsset, type FileKind } from '@/lib/registry/fileKinds'
 import { ProjectSwitcher } from '@/components/projects/ProjectSwitcher'
+import { openRecent, resolveRecents } from '@/lib/recents/resolveRecents'
 import { useI18n } from '@/lib/i18n'
 import { useCan } from '@/lib/collab/useCollab'
 import { toast } from '@/components/ui/Toaster'
@@ -54,6 +55,7 @@ const RECENT_KIND: Record<RecentEntry['kind'], FileKind> = {
 export function Sidebar() {
   const t = useI18n()
   const openDashboard = useStore((s) => s.openDashboard)
+  const projects = useStore((s) => s.projects)
   const boards = useStore((s) => s.boards)
   const boardOrder = useStore((s) => s.boardOrder)
   const activeBoardId = useStore((s) => s.activeBoardId)
@@ -222,33 +224,31 @@ export function Sidebar() {
     [notes, activeProjectId],
   )
 
+  // Scoped to the open project on purpose: `recents` is one global list, so
+  // before 11.2.3 this pane could offer a file belonging to another project
+  // and open it under this one's URL. Home is where cross-project recents
+  // belong, and it says which project each file comes from.
   const recentRows = useMemo(() => {
     if (q || sidebarFilter !== 'all') return []
-    return recents
-      .map((r) => {
-        const label =
-          r.kind === 'note' ? notes[r.id]?.title
-          : r.kind === 'doc' ? docs[r.id]?.title
-          : r.kind === 'sheet' ? sheetDocs[r.id]?.title
-          : r.kind === 'present' ? presentDocs[r.id]?.title
-          : r.kind === 'code' ? codeDocs[r.id] && `${codeDocs[r.id].title}.${codeDocs[r.id].extension}`
-          : r.kind === 'asset' ? assets[r.id]?.name
-          : boards[r.id]?.name
-        return label ? { ...r, label } : null
-      })
-      .filter((r): r is RecentEntry & { label: string } => !!r)
-      .slice(0, 5)
-  }, [recents, notes, docs, sheetDocs, presentDocs, codeDocs, assets, boards, q, sidebarFilter])
-
-  const openRecent = (r: RecentEntry) => {
-    if (r.kind === 'note') openNote(r.id)
-    else if (r.kind === 'doc') openDoc(r.id)
-    else if (r.kind === 'sheet') openSheet(r.id)
-    else if (r.kind === 'present') openPresent(r.id)
-    else if (r.kind === 'code') openCode(r.id)
-    else if (r.kind === 'asset') openAsset(r.id)
-    else setActiveBoard(r.id)
-  }
+    return resolveRecents(
+      recents,
+      { notes, docs, sheetDocs, presentDocs, codeDocs, assets, boards, projects },
+      { projectId: activeProjectId, limit: 5 },
+    )
+  }, [
+    recents,
+    notes,
+    docs,
+    sheetDocs,
+    presentDocs,
+    codeDocs,
+    assets,
+    boards,
+    projects,
+    activeProjectId,
+    q,
+    sidebarFilter,
+  ])
 
   /** Universal import: any file type, from the sidebar. */
   const onImportFiles = async (list: FileList | null) => {
@@ -364,7 +364,7 @@ export function Sidebar() {
                 onClick={() => openRecent(r)}
               >
                 <FileKindIcon kind={RECENT_KIND[r.kind]} size={13} />
-                <span className="min-w-0 flex-1 truncate text-xs">{r.label}</span>
+                <span className="min-w-0 flex-1 truncate text-xs">{r.title}</span>
               </div>
             ))}
           </>

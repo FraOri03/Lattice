@@ -1,10 +1,35 @@
+import { useMemo } from 'react'
 import { useStore } from '@/store/useStore'
 import { useUiStore } from '@/store/useUiStore'
 import { useRecentProjects } from '@/lib/projects/ProjectStore'
 import { groupProjects } from '@/lib/projects/ProjectRegistry'
+import { openRecent, resolveRecents, type ResolvedRecent } from '@/lib/recents/resolveRecents'
 import { useI18n, useTimeAgo } from '@/lib/i18n'
 import { CARD_COLORS, type Project } from '@/types/model'
-import { IcArchive, IcClock, IcPlus, IcSearch, IcStar } from '@/components/Icons'
+import {
+  IcArchive,
+  IcBoard,
+  IcClock,
+  IcCode,
+  IcDoc,
+  IcFile,
+  IcNote,
+  IcPlus,
+  IcPresentation,
+  IcSearch,
+  IcStar,
+  IcTable,
+} from '@/components/Icons'
+
+const RECENT_ICON = {
+  note: IcNote,
+  doc: IcDoc,
+  sheet: IcTable,
+  present: IcPresentation,
+  code: IcCode,
+  asset: IcFile,
+  board: IcBoard,
+} as const satisfies Record<ResolvedRecent['kind'], unknown>
 
 /**
  * Home — the surface with no project open (Phase 11.2).
@@ -30,6 +55,28 @@ export function Dashboard() {
   const setProjectDialogOpen = useUiStore((s) => s.setProjectDialogOpen)
   const setPaletteOpen = useUiStore((s) => s.setPaletteOpen)
   const recent = useRecentProjects(6)
+  const recents = useStore((s) => s.recents)
+  const notes = useStore((s) => s.notes)
+  const docs = useStore((s) => s.docs)
+  const sheetDocs = useStore((s) => s.sheetDocs)
+  const presentDocs = useStore((s) => s.presentDocs)
+  const codeDocs = useStore((s) => s.codeDocs)
+  const assets = useStore((s) => s.assets)
+  const boards = useStore((s) => s.boards)
+
+  // resolved in a memo, not in the selector: the selector would build a new
+  // array on every store read and React would never see a stable snapshot.
+  const recentFiles = useMemo(
+    () =>
+      resolveRecents(
+        recents,
+        { notes, docs, sheetDocs, presentDocs, codeDocs, assets, boards, projects },
+        // Home shows every project's files, but only the ones it can name a
+        // project for: opening one has to land the surface somewhere real.
+        { attributedOnly: true, limit: 8 },
+      ),
+    [recents, notes, docs, sheetDocs, presentDocs, codeDocs, assets, boards, projects],
+  )
 
   const workspace = workspaces[activeWorkspaceId]
   // the dashboard scopes to the active workspace, like the project switcher
@@ -129,6 +176,40 @@ export function Dashboard() {
             <IcPlus size={12} /> {t.newProject}
           </button>
         </header>
+
+        {recentFiles.length > 0 && (
+          <section aria-labelledby="dash-files" className="mb-7">
+            <h2
+              id="dash-files"
+              className="mb-2 text-[9.5px] font-semibold tracking-widest text-muted uppercase"
+            >
+              {t.recentFiles}
+            </h2>
+            <div className="grid gap-2.5 [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))]">
+              {recentFiles.map((r) => {
+                const Icon = RECENT_ICON[r.kind]
+                return (
+                  <button
+                    key={`${r.kind}:${r.id}`}
+                    className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-bord bg-panel px-3 py-2.5 text-left hover:border-accent"
+                    onClick={() => openRecent(r)}
+                    aria-label={t.openRecent(r.title, r.projectName ?? '')}
+                  >
+                    <Icon size={14} className="flex-none text-muted" aria-hidden />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[12.5px] font-medium">
+                        {r.title}
+                      </span>
+                      <span className="block truncate text-[10.5px] text-muted">
+                        {r.projectName} · {timeAgo(r.at)}
+                      </span>
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </section>
+        )}
 
         {section('dash-starred', t.starred, groups.starred, 'starred')}
         {section('dash-recent', t.recent, recentOnly, 'recent')}

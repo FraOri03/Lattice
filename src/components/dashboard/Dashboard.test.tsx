@@ -40,6 +40,26 @@ describe('Dashboard', () => {
     expect(useStore.getState().navSurface).toBe('project')
   })
 
+  it('lists recent files from every project, each named with its own', () => {
+    const s = useStore.getState()
+    const alpha = s.createProject({ name: 'Alpha' })
+    s.setActiveProject(alpha)
+    const noteId = useStore.getState().createNote()
+    useStore.getState().updateNote(noteId, { title: 'Field notes' })
+    useStore.getState().openNote(noteId)
+
+    const beta = useStore.getState().createProject({ name: 'Beta' })
+    useStore.getState().setActiveProject(beta)
+    useStore.setState({ navSurface: 'dashboard' })
+
+    render(<Dashboard />)
+
+    // the project name is what tells two identically titled files apart
+    expect(
+      screen.getByRole('button', { name: 'Open Field notes in Alpha' }),
+    ).toBeInTheDocument()
+  })
+
   it('scopes to the active workspace', () => {
     const s = useStore.getState()
     const inside = s.createProject({ name: 'Inside' })

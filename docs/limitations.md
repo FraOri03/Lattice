@@ -55,8 +55,8 @@ _Tracked in [#10](https://github.com/FraOri03/Lattice/issues/10)._
   the active workspace's projects, grouped starred/recent/active/archived, reached from
   the product mark in the sidebar. "Shared with me", pending invites and Trash are absent
   on purpose: each needs an index no single browser holds, so they arrive with the server
-  (13.4). Recent *entities* are still missing too — `RecentEntry` carries no project id,
-  which is 11.2.3.
+  (13.4). Recent files are cross-project and say which project they come from; entries
+  whose entity is gone, or that predate project ids, are dropped rather than guessed at.
 - ~~**"Board" is overloaded** … Split behaves like a layout but is presented as a peer
   mode.~~ **Fixed** (`LAT-7`/`NAV-2`/`IA-1`): Split is now a layout toggle in
   `workspaceLayoutStore` and Graph is a content view; neither is a section. See

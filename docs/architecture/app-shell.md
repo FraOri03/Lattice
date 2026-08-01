@@ -110,7 +110,7 @@ projection of the active tab, and the tests say so.
 |---|---|
 | Surface model, URL contract, history binding | **done** (11.0) |
 | Per-mode toolbars on shared primitives | **done** (11.1) |
-| Dashboard screen | **done** (11.2) — `AppShell` switches on `navSurface`; recent *entities* wait for 11.2.3 |
+| Dashboard screen | **done** (11.2) — `AppShell` switches on `navSurface`; recents resolved cross-project in [`lib/recents`](../../src/lib/recents/resolveRecents.ts) |
 | Tabs | 11.3 — must arrive as the single source of truth for open entities |
 
 See also [navigation.md](../navigation.md) for the URL examples and the
