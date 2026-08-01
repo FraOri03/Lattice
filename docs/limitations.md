@@ -51,9 +51,12 @@ _Tracked in [#10](https://github.com/FraOri03/Lattice/issues/10)._
   **Fixed** (`NAV-1`): Back/Forward and refreshable deep links work — see
   [navigation.md](navigation.md). Phase 11.0 added the dashboard surface (the bare root
   URL, and where unknown/deleted project links land).
-- **The dashboard has no screen yet.** 11.0 shipped the navigation state, the URL contract
-  and its tests; the Home screen itself is Phase 11.2, so until then the shell renders the
-  workspace on both surfaces.
+- **The dashboard shows this browser's projects only.** 11.2 shipped the Home screen —
+  the active workspace's projects, grouped starred/recent/active/archived, reached from
+  the product mark in the sidebar. "Shared with me", pending invites and Trash are absent
+  on purpose: each needs an index no single browser holds, so they arrive with the server
+  (13.4). Recent files are cross-project and say which project they come from; entries
+  whose entity is gone, or that predate project ids, are dropped rather than guessed at.
 - ~~**"Board" is overloaded** … Split behaves like a layout but is presented as a peer
   mode.~~ **Fixed** (`LAT-7`/`NAV-2`/`IA-1`): Split is now a layout toggle in
   `workspaceLayoutStore` and Graph is a content view; neither is a section. See

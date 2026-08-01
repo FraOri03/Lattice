@@ -20,6 +20,7 @@ Surface
 |---|---|---|
 | The URL contract | [`lib/nav/navUrl.ts`](../../src/lib/nav/navUrl.ts) | pure: serialize · parse · resolve · key. No React, no store import. |
 | Browser history | [`lib/nav/useUrlHistory.ts`](../../src/lib/nav/useUrlHistory.ts) | **the only place that calls `pushState`/`replaceState`.** Mounted once. |
+| Where that "once" is | `AppShell` in [`App.tsx`](../../src/App.tsx) | history, global shortcuts, collaboration and the overlays mount **above** the surface switch — inside a surface they would unmount on the way to the other one. |
 | Surface · project · board · mode | `useStore` | written as one transaction by `applyNav`. |
 | The open entity | `useStore` (`active*Id`) | **today six independent slots — see the hazard below.** |
 | Split layout | [`store/workspaceLayoutStore.ts`](../../src/store/workspaceLayoutStore.ts) | UI-only. Deliberately not persisted. |
@@ -109,7 +110,7 @@ projection of the active tab, and the tests say so.
 |---|---|
 | Surface model, URL contract, history binding | **done** (11.0) |
 | Per-mode toolbars on shared primitives | **done** (11.1) |
-| Dashboard screen | 11.2 — the surface resolves to it, nothing renders it yet |
+| Dashboard screen | **done** (11.2) — `AppShell` switches on `navSurface`; recents resolved cross-project in [`lib/recents`](../../src/lib/recents/resolveRecents.ts) |
 | Tabs | 11.3 — must arrive as the single source of truth for open entities |
 
 See also [navigation.md](../navigation.md) for the URL examples and the
