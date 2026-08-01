@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AuthService } from './AuthService'
 
 /**
@@ -67,11 +67,57 @@ function seedExpiredSession(): void {
 
 let authService: AuthService
 
+/**
+ * `vi.resetModules()` hands every test a fresh AuthService, but jsdom shares
+ * one `window` across the whole file. A test that ends with a gesture retry
+ * still armed leaves its listener attached to it, so the NEXT test's gesture
+ * fires two refreshes — the orphan's and its own — and the second token
+ * request lands in assertions that counted on one. Record what each test
+ * attaches, detach it when the test ends.
+ */
+type Listener = EventListenerOrEventListenerObject
+
+const attached: Array<{
+  type: string
+  handler: Listener
+  options?: boolean | AddEventListenerOptions
+}> = []
+
+// The worker lib in this project's tsconfig makes the untyped overloads
+// resolve against DedicatedWorkerGlobalScope, so both ends take one plain
+// signature instead.
+const realAddEventListener = window.addEventListener as (
+  type: string,
+  handler: Listener,
+  options?: boolean | AddEventListenerOptions,
+) => void
+const realRemoveEventListener = window.removeEventListener as (
+  type: string,
+  handler: Listener,
+  options?: boolean | EventListenerOptions,
+) => void
+
 beforeEach(async () => {
   localStorage.clear()
   installGis()
+  window.addEventListener = ((
+    type: string,
+    handler: Listener,
+    options?: boolean | AddEventListenerOptions,
+  ) => {
+    attached.push({ type, handler, options })
+    realAddEventListener.call(window, type, handler, options)
+  }) as typeof window.addEventListener
   vi.resetModules()
   authService = (await import('./AuthService')).authService
+})
+
+afterEach(() => {
+  window.addEventListener = realAddEventListener as typeof window.addEventListener
+  for (const { type, handler, options } of attached) {
+    realRemoveEventListener.call(window, type, handler, options)
+  }
+  attached.length = 0
 })
 
 describe('background token refresh', () => {
