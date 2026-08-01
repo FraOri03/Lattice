@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  applyAutoGroups,
   fileInto,
   foldersOf,
   groupByFolder,
@@ -83,6 +84,61 @@ describe('groupByFolder', () => {
     const { groups, unfiled } = groupByFolder(items, folders)
     const seen = [...groups.flatMap((g) => g.items), ...unfiled].map((i) => i.id)
     expect(seen.sort()).toEqual(['a', 'b', 'c', 'd'])
+  })
+})
+
+describe('applyAutoGroups — derived groups under the manual ones', () => {
+  const group = (id: string, items: { id: string; folderId?: string }[]) => ({
+    id,
+    label: id,
+    items,
+  })
+
+  it('claims the unfiled items its groups name', () => {
+    const { groups, rest } = applyAutoGroups(
+      [item('a'), item('b'), item('c')],
+      [group('g1', [item('a')]), group('g2', [item('c')])],
+    )
+    expect(groups.map((g) => g.items.map((i) => i.id))).toEqual([['a'], ['c']])
+    expect(rest.map((i) => i.id)).toEqual(['b'])
+  })
+
+  it('never pulls an item out of the folder the user filed it in', () => {
+    // the caller derives its groups from ALL items, but only the unfiled
+    // ones are on offer here, so a filed item stays under its folder
+    const items = [item('a', 'f1'), item('b')]
+    const { groups: manual, unfiled } = groupByFolder(items, [folder({ id: 'f1' })])
+    const { groups: derived } = applyAutoGroups(unfiled, [group('g1', items)])
+    expect(manual[0].items.map((i) => i.id)).toEqual(['a'])
+    expect(derived[0].items.map((i) => i.id)).toEqual(['b'])
+  })
+
+  it('drops a group left with nothing to show', () => {
+    const { groups, rest } = applyAutoGroups([item('a')], [group('g1', [item('ghost')])])
+    expect(groups).toEqual([])
+    expect(rest.map((i) => i.id)).toEqual(['a'])
+  })
+
+  it('loses nothing: an unclaimed item comes back in rest', () => {
+    const items = [item('a'), item('b'), item('c')]
+    const { groups, rest } = applyAutoGroups(items, [group('g1', [item('a'), item('b')])])
+    const seen = [...groups.flatMap((g) => g.items), ...rest].map((i) => i.id)
+    expect(seen.sort()).toEqual(['a', 'b', 'c'])
+  })
+
+  it('lets two groups share an item without dropping it from either', () => {
+    const { groups, rest } = applyAutoGroups(
+      [item('a')],
+      [group('g1', [item('a')]), group('g2', [item('a')])],
+    )
+    expect(groups.map((g) => g.items.map((i) => i.id))).toEqual([['a'], ['a']])
+    expect(rest).toEqual([])
+  })
+
+  it('is a no-op without groups', () => {
+    const { groups, rest } = applyAutoGroups([item('a'), item('b')], [])
+    expect(groups).toEqual([])
+    expect(rest.map((i) => i.id)).toEqual(['a', 'b'])
   })
 })
 

@@ -2,9 +2,11 @@ import { useState, type ReactNode } from 'react'
 import { useStore } from '@/store/useStore'
 import type { Folder, FolderCategory } from '@/types/model'
 import {
+  applyAutoGroups,
   DRAG_MIME_FOR_CATEGORY,
   foldersOf,
   groupByFolder,
+  type AutoGroup,
   type FoldableItem,
 } from '@/lib/sidebar/folders'
 import { confirmDialog } from '@/components/ui/ConfirmDialog'
@@ -14,6 +16,7 @@ import {
   IcEdit,
   IcFolder,
   IcPlus,
+  IcSection,
   IcTrash,
 } from '@/components/Icons'
 
@@ -39,6 +42,12 @@ export interface SidebarCategoryProps<T extends FoldableItem> {
   createLabel?: string
   /** false hides folder creation (read-only roles) */
   mayEditFolders?: boolean
+  /**
+   * Derived groups shown under the user folders, for items no folder
+   * claims. Read-only: they come from the data, so there is nothing to
+   * rename, delete or drop into.
+   */
+  autoGroups?: AutoGroup<T>[]
 }
 
 export function SidebarCategory<T extends FoldableItem>({
@@ -50,6 +59,7 @@ export function SidebarCategory<T extends FoldableItem>({
   onCreate,
   createLabel,
   mayEditFolders = true,
+  autoGroups,
 }: SidebarCategoryProps<T>) {
   const allFolders = useStore((s) => s.folders)
   const activeProjectId = useStore((s) => s.activeProjectId)
@@ -59,9 +69,13 @@ export function SidebarCategory<T extends FoldableItem>({
   const moveToFolder = useStore((s) => s.moveToFolder)
 
   const [dropTarget, setDropTarget] = useState<string | null>(null)
+  // derived groups have no persisted record to collapse, so the open/shut
+  // state lives here rather than in the store
+  const [shutGroups, setShutGroups] = useState<string[]>([])
 
   const folders = foldersOf(allFolders, category, activeProjectId)
   const { groups, unfiled } = groupByFolder(items, folders)
+  const { groups: derived, rest } = applyAutoGroups(unfiled, autoGroups ?? [])
   const collapsed = collapsedCategories.includes(category)
   const mime = DRAG_MIME_FOR_CATEGORY[category]
 
@@ -140,6 +154,25 @@ export function SidebarCategory<T extends FoldableItem>({
             </FolderRow>
           ))}
 
+          {derived.map((group) => (
+            <AutoGroupRow
+              key={group.id}
+              label={group.label}
+              hint={group.hint}
+              count={group.items.length}
+              collapsed={shutGroups.includes(group.id)}
+              onToggle={() =>
+                setShutGroups((shut) =>
+                  shut.includes(group.id)
+                    ? shut.filter((id) => id !== group.id)
+                    : [...shut, group.id],
+                )
+              }
+            >
+              {group.items.map(renderItem)}
+            </AutoGroupRow>
+          ))}
+
           {/* unfiled items double as the "move out of a folder" drop target */}
           <div
             className={`rounded-md ${
@@ -147,7 +180,7 @@ export function SidebarCategory<T extends FoldableItem>({
             }`}
             {...dropProps('__unfiled__', null)}
           >
-            {unfiled.map(renderItem)}
+            {rest.map(renderItem)}
             {folders.length > 0 && unfiled.length === 0 && (
               <div className="px-2 py-1 text-[11px] text-muted italic">
                 Drag here to remove from a folder
@@ -161,6 +194,44 @@ export function SidebarCategory<T extends FoldableItem>({
         </>
       )}
     </>
+  )
+}
+
+/**
+ * A derived group's header. Deliberately thinner than FolderRow: no
+ * rename, no delete, no drop target — the group is a reading of the data,
+ * so the only thing the user owns here is whether it is open.
+ */
+function AutoGroupRow({
+  label,
+  hint,
+  count,
+  collapsed,
+  onToggle,
+  children,
+}: {
+  label: string
+  hint?: string
+  count: number
+  collapsed: boolean
+  onToggle: () => void
+  children: ReactNode
+}) {
+  return (
+    <div>
+      <button
+        className="flex w-full cursor-pointer items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-muted hover:bg-panel2/60"
+        onClick={onToggle}
+        aria-expanded={!collapsed}
+        title={hint}
+      >
+        {collapsed ? <IcChevronRight size={11} /> : <IcChevronDown size={11} />}
+        <IcSection size={13} />
+        <span className="min-w-0 flex-1 truncate text-xs font-medium">{label}</span>
+        <span className="text-[10px] text-muted">{count}</span>
+      </button>
+      {!collapsed && <div className="ml-3">{children}</div>}
+    </div>
   )
 }
 
