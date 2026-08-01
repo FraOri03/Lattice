@@ -2,6 +2,10 @@
 
 Implements issue **#10** (`NAV-1` High): the SPA now has real browser Back/Forward and refreshable deep links. Split-as-mode demotion (`LAT-7` / `NAV-2` / `IA-1`) has since landed — see [Split is a layout, not a mode](#split-is-a-layout-not-a-mode). Phase 11.0 added the **dashboard surface** — see [Two surfaces](#two-surfaces-dashboard-and-project). Workspace auto-hide remains out of scope.
 
+> This page is the URL model. For **who owns what** across the shell — and the
+> rule that keeps the entity slots from becoming a second source of truth — see
+> [architecture/app-shell.md](architecture/app-shell.md).
+
 ## Navigable identity
 
 First, **which surface**: the dashboard (no project open) or a project. Inside a project, exactly five things define "where you are":
