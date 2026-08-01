@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from 'react'
 import { useStore, exportVaultFull, type SidebarFilter } from '@/store/useStore'
 import type { RecentEntry, VaultExport } from '@/types/model'
 import { downloadText } from '@/lib/download'
+import { env } from '@/lib/env'
 import { formatBytes } from '@/lib/media'
 import {
   ASSET_DRAG_MIME,
@@ -30,6 +31,7 @@ import {
   IcTrash,
 } from '@/components/Icons'
 import { ActionIcon } from '@/components/ActionIcons'
+import { LatticeLogotype, LatticeMark } from '@/components/Brand'
 
 const FILTERS: { key: SidebarFilter; label: string }[] = [
   { key: 'all', label: 'All' },
@@ -300,11 +302,15 @@ export function Sidebar() {
     <aside className="flex w-60 flex-none flex-col border-r border-bord bg-panel">
       {/* logo */}
       <div className="flex items-center gap-2.5 px-4 pt-4 pb-3">
-        <span className="h-6 w-6 flex-none rounded-md bg-gradient-to-br from-[#0d99ff] to-[#9747ff]" />
-        <span className="text-[15px] font-bold tracking-tight">Lattice</span>
-        <span className="mt-0.5 rounded bg-panel2 px-1.5 py-0.5 text-[9px] font-semibold tracking-wider text-muted uppercase">
-          beta
-        </span>
+        <LatticeMark height={26} className="flex-none" />
+        <div className="min-w-0">
+          <LatticeLogotype height={12} />
+          {/* Release stage + version: the app is pre-1.0, so say so where the
+              user always sees it rather than only in the account menu. */}
+          <div className="mt-1 text-[10px] leading-none tracking-wide text-muted">
+            <span className="capitalize">{env.appStage}</span> v{env.appVersion}
+          </div>
+        </div>
       </div>
 
       {/* project switcher */}

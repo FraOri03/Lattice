@@ -1,6 +1,7 @@
 import { useAccount } from '@/lib/auth/AccountProvider'
 import { env } from '@/lib/env'
 import { IcAlert, IcCloud, IcDrive, IcGithub, IcShield } from '@/components/Icons'
+import { LatticeLogotypeTM, LatticeMark } from '@/components/Brand'
 
 /**
  * First-run login gate. Google OAuth is the primary method; "Continue
@@ -15,10 +16,13 @@ export function LoginScreen() {
     <div className="flex h-full items-center justify-center bg-bg">
       <div className="w-[420px] rounded-2xl border border-bord bg-panel p-8 shadow-xl">
         <div className="mb-6 flex items-center gap-3">
-          <span className="h-10 w-10 flex-none rounded-xl bg-gradient-to-br from-[#0d99ff] to-[#9747ff]" />
+          <LatticeMark height={38} className="flex-none" />
           <div>
-            <h1 className="text-lg font-bold tracking-tight">Lattice</h1>
-            <p className="text-[11px] text-muted">
+            {/* First contact with the brand, so this is the ™ lockup. */}
+            <h1>
+              <LatticeLogotypeTM height={16} />
+            </h1>
+            <p className="mt-1.5 text-[11px] text-muted">
               Your unified creative workspace · v{env.appVersion}
             </p>
           </div>

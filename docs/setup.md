@@ -90,6 +90,7 @@ are documented, with step-by-step provider setup, in
 | `VITE_CONVERSION_API_URL` | remote DOC/PPT conversion | no |
 | `VITE_APP_ENV` | environment label (display) | no |
 | `VITE_APP_VERSION` | version string (display) | no |
+| `VITE_APP_STAGE` | release stage label (display, default `alpha`) | no |
 
 > **Important:** `VITE_*` variables are inlined into the client bundle **at build time**.
 > Changing them on a hosting provider requires a **redeploy**. Variables **without** the

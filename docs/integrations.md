@@ -165,9 +165,9 @@ keep working with their original file untouched — never a hard failure.
 | `VITE_REALTIME_AUTH_URL` / `VITE_REALTIME_ROOMS_URL` | (optional) | Endpoint overrides; default `/api/realtime/{auth,rooms}`. |
 | `VITE_CONVERSION_API_URL` | remote DOC/PPT conversion | External worker endpoint; empty = disabled. |
 | `VITE_APP_ENV` | display | `development` / `preview` / `production`. |
-| `VITE_APP_VERSION` | display | Shown in the account menu. |
+| `VITE_APP_VERSION` | display | Shown under the app name in the sidebar and in the account menu. |
+| `VITE_APP_STAGE` | display | Release stage next to the version (default `alpha`). |
 
-> **Note on versioning:** the displayed version is set via `VITE_APP_VERSION`
-> (`.env.example` currently ships `0.8.0`). The `package.json` `version` field (`0.1.0`)
-> and the `env.ts` fallback (`0.6.0`) are out of sync with it — see
-> [limitations.md](limitations.md).
+> **Note on versioning:** the displayed version is set via `VITE_APP_VERSION`;
+> `package.json`, the `env.ts` fallback and `.env.example` all say `0.8.0`. Bump
+> them together when the effective version changes.

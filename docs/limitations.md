@@ -14,9 +14,10 @@ isn't done" companion to [features.md](features.md).
 - **Test coverage is minimal** — one unit-test file (a board/presentation round-trip).
   Broad automated testing is roadmap work
   ([#20](https://github.com/FraOri03/Lattice/issues/20)).
-- **Version strings are inconsistent** across the repo: `package.json` = `0.1.0`,
-  `src/lib/env.ts` fallback = `0.6.0`, `.env.example` `VITE_APP_VERSION` = `0.8.0`. The
-  effective current version is **0.8.0** (Phase 8). Reconciling these is a small cleanup.
+- **The effective version is 0.8.0** (Phase 8), now stated identically by `package.json`,
+  the `src/lib/env.ts` fallback and `.env.example`. The sidebar shows it as
+  `Alpha v0.8.0` (`VITE_APP_STAGE` + `VITE_APP_VERSION`); bump all three by hand when it
+  changes — nothing derives one from another.
 
 ## Accessibility
 

@@ -7,6 +7,7 @@ interface ImportMetaEnv {
   readonly VITE_GITHUB_CLIENT_ID?: string
   readonly VITE_APP_ENV?: string
   readonly VITE_APP_VERSION?: string
+  readonly VITE_APP_STAGE?: string
 }
 
 interface ImportMeta {

@@ -16,7 +16,13 @@ export const env = {
   /** GitHub OAuth app client id — enables browser OAuth via /api/github/oauth */
   githubClientId: (import.meta.env.VITE_GITHUB_CLIENT_ID as string | undefined) ?? '',
   appEnv: (import.meta.env.VITE_APP_ENV as string | undefined) || 'development',
-  appVersion: (import.meta.env.VITE_APP_VERSION as string | undefined) || '0.6.0',
+  appVersion: (import.meta.env.VITE_APP_VERSION as string | undefined) || '0.8.0',
+  /**
+   * Release stage shown next to the version (alpha → beta → stable). Display
+   * only: nothing in the app branches on it, it just tells the user how much
+   * to trust what they are looking at.
+   */
+  appStage: (import.meta.env.VITE_APP_STAGE as string | undefined) || 'alpha',
   /**
    * Realtime collaboration backend (Phase 8). 'liveblocks' enables the
    * production RealtimeCollaborationProvider; anything else leaves only
