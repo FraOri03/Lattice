@@ -219,22 +219,14 @@ function SectionContent({ viewMode }: { viewMode: ViewMode }) {
   )
 }
 
-function Workspace() {
-  const theme = useStore((s) => s.theme)
+/** The project surface: sidebar, top bar and the editor panes. */
+function ProjectSurface() {
   const viewMode = useStore((s) => s.viewMode)
   const split = useWorkspaceLayoutStore((s) => s.split)
   const direction = useWorkspaceLayoutStore((s) => s.direction)
   const ratio = useWorkspaceLayoutStore((s) => s.ratio)
   const secondaryContent = useWorkspaceLayoutStore((s) => s.secondaryContent)
   const setRatio = useWorkspaceLayoutStore((s) => s.setRatio)
-
-  useCollaboration()
-  useGlobalShortcuts()
-  useUrlHistory()
-
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme
-  }, [theme])
 
   // Presentation and Photo are full-page sections that do not split.
   const showSplit = split && viewMode !== 'presentation' && viewMode !== 'photo'
@@ -280,25 +272,63 @@ function Workspace() {
           <CollabPanel />
         </div>
       </div>
+    </div>
+  )
+}
+
+/**
+ * The shell that outlives every surface.
+ *
+ * Collaboration, the global shortcuts and the URL binding are mounted HERE,
+ * above the surface, and not inside one. `useUrlHistory` is the single writer
+ * of browser history: put it inside a surface and it unmounts the moment you
+ * leave that surface, so the dashboard would arrive by dropping the very
+ * binding that puts it in the URL. `useCollaboration` follows the same rule
+ * as `CallProvider` above it — a trip to the dashboard should not tear down
+ * and re-attach the CRDT rooms of the project you were just in.
+ *
+ * The overlays sit here for the same reason: none of them belongs to a
+ * surface, each is `fixed inset-0` so it does not need the surface's flex
+ * container, and the command palette has to answer on the dashboard too.
+ *
+ * Phase 11.2 replaces the marked line with the dashboard/project switch on
+ * `navSurface`. Until that screen exists the shell keeps rendering the
+ * project surface, so no URL promises a page that is not built yet.
+ */
+function AppShell() {
+  const theme = useStore((s) => s.theme)
+
+  useCollaboration()
+  useGlobalShortcuts()
+  useUrlHistory()
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme
+  }, [theme])
+
+  return (
+    <>
+      {/* surface — 11.2 adds the dashboard branch here */}
+      <ProjectSurface />
       <GithubDialog />
       <DriveDialog />
       <CommandPalette />
       <ShareDialog />
       <ShortcutsDialog />
       <ImportProgressToast />
-    </div>
+    </>
   )
 }
 
 function Gate() {
   const { account, loginSkipped } = useAccount()
   if (!account && !loginSkipped) return <LoginScreen />
-  // The call provider sits ABOVE the workspace: switching section, toggling
+  // The call provider sits ABOVE the shell: switching section, toggling
   // Split or opening the Graph re-renders the panes, but never remounts the
   // LiveKit room, so a call survives navigation.
   return (
     <CallProvider>
-      <Workspace />
+      <AppShell />
     </CallProvider>
   )
 }
