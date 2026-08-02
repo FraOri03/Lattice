@@ -26,12 +26,15 @@ function withReducedMotion(matches: boolean) {
 beforeEach(() => {
   withReducedMotion(false)
   root().className = ''
+  root().removeAttribute('style')
   root().dataset.theme = 'dark'
 })
 
 afterEach(() => {
   vi.useRealTimers()
   Reflect.deleteProperty(document, 'startViewTransition')
+  // the stub is an own property on <html>, and jsdom shares one per file
+  Reflect.deleteProperty(root(), 'animate')
 })
 
 describe('setThemeAnimated', () => {
@@ -68,6 +71,34 @@ describe('setThemeAnimated', () => {
     expect(commit).toHaveBeenCalledWith('light')
     // the view transition owns the visuals, so no crossfade class is added
     expect(root().classList.contains('theme-anim')).toBe(false)
+  })
+
+  it('grows the circle out of the control and clear off the screen', async () => {
+    const frames: Keyframe[] = []
+    root().animate = ((k: Keyframe[] | PropertyIndexedKeyframes) => {
+      frames.push(k as Keyframe)
+      return { finished: Promise.resolve() } as unknown as Animation
+    }) as Element['animate']
+    Object.defineProperty(document, 'startViewTransition', {
+      value: (update: () => void) => {
+        update()
+        return { ready: Promise.resolve(), finished: Promise.resolve() }
+      },
+      configurable: true,
+    })
+
+    setThemeAnimated('light', vi.fn(), { x: 0, y: 0, r: 14 })
+    await Promise.resolve()
+
+    const [from, to] = (frames[0] as unknown as { clipPath: string[] }).clipPath
+    // it leaves the button at the button's own size, not from a point
+    expect(from).toContain('circle(14px')
+    // and finishes past the furthest corner: a circle that ends exactly on it
+    // spends the flattest part of the easing on the last visible pixels, so
+    // the reveal reads as stopping short of the edges
+    const corner = Math.hypot(window.innerWidth, window.innerHeight)
+    const radius = Number(/circle\(([\d.]+)px/.exec(to)![1])
+    expect(radius).toBeGreaterThan(corner)
   })
 
   it('changes the theme with no animation at all under reduced motion', () => {

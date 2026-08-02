@@ -34,8 +34,31 @@ function viewTransitions(): Document['startViewTransition'] | null {
     : null
 }
 
-/** How long the reveal (or the crossfade) runs. */
+/** How long the fallback crossfade runs, and how long its class stays on. */
 export const THEME_ANIM_MS = 420
+
+/** How long the circular reveal runs. */
+export const THEME_REVEAL_MS = 460
+
+/**
+ * Quick out of the control, then a short settle.
+ *
+ * The tail is the part to be careful with. An ease-out steep enough to be
+ * exciting (`cubic-bezier(.16, 1, .3, 1)`, say) puts ~95% of the distance in
+ * the first third and then creeps through the rest: the circle appears to
+ * stop just short of the edges and the theme then changes when the animation
+ * ends, which reads as a stall, not as a reveal. This curve keeps some slope
+ * at the end so the circle is still visibly moving when it leaves the screen.
+ */
+const REVEAL_EASING = 'cubic-bezier(.22, .68, .3, 1)'
+
+/**
+ * How far past the furthest corner the circle finishes. The reveal is over
+ * for the viewer once the circle clears the screen; running to exactly the
+ * corner spends the least readable part of the curve on the most visible
+ * moment. The overshoot is off-screen, so it costs nothing to watch.
+ */
+const COVER_SLACK = 1.12
 
 export function prefersReducedMotion(): boolean {
   return typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
@@ -44,11 +67,22 @@ export function prefersReducedMotion(): boolean {
 export interface ThemeOrigin {
   x: number
   y: number
+  /**
+   * Radius the reveal starts at. Given the pressed control's own radius, the
+   * circle leaves the button at the size of the button instead of appearing
+   * out of a mathematical point — the first frames are the ones the eye is
+   * on, and starting at zero spends them on something too small to read.
+   */
+  r?: number
 }
 
-/** Distance from a point to the furthest corner of the viewport. */
+/** Radius that clears the whole viewport from a point, with room to spare. */
 function coverRadius({ x, y }: ThemeOrigin): number {
-  return Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y))
+  const corner = Math.hypot(
+    Math.max(x, window.innerWidth - x),
+    Math.max(y, window.innerHeight - y),
+  )
+  return corner * COVER_SLACK
 }
 
 export function setThemeAnimated(
@@ -76,13 +110,13 @@ export function setThemeAnimated(
         root.animate(
           {
             clipPath: [
-              `circle(0px at ${origin.x}px ${origin.y}px)`,
+              `circle(${origin.r ?? 0}px at ${origin.x}px ${origin.y}px)`,
               `circle(${radius}px at ${origin.x}px ${origin.y}px)`,
             ],
           },
           {
-            duration: THEME_ANIM_MS,
-            easing: 'cubic-bezier(.4, 0, .2, 1)',
+            duration: THEME_REVEAL_MS,
+            easing: REVEAL_EASING,
             pseudoElement: '::view-transition-new(root)',
           },
         )

@@ -22,6 +22,18 @@ All notable changes to Lattice are recorded here. The format follows
 
 ### Changed
 
+- **The tab strip is always drawn in a project**, empty session included. It used to hide
+  itself until something was open, which made it invisible on the path most people take —
+  Home, then a project, which lands on the Board section with nothing open — so a shipped
+  feature read as a missing one. Empty it is deliberately not a `tablist` (a tab list with
+  no tabs is a control a screen reader announces and then cannot enter) but a line of text
+  in the same box, so nothing shifts when the first tab arrives.
+- **The day ⇄ night reveal reaches the edges of the screen.** The circular wipe now leaves
+  the pressed control at the control's own size rather than from a point, runs on an easing
+  with a short tail, and finishes 12% past the furthest corner. The previous curve spent
+  ~95% of the distance in its first third and then crept, so the circle appeared to stop
+  short of the edges and the theme changed when the animation ended. The sun/moon glyph
+  overshoots on the swap, which is what makes a 15px icon register as having moved.
 - Reorganized project documentation: the roadmap moved from the README into GitHub Issues
   and a GitHub Project; detailed docs moved into `docs/`; the README is now a concise
   entry point. Added `ROADMAP.md`, `CONTRIBUTING.md`, this changelog, issue/PR templates,

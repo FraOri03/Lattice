@@ -321,6 +321,7 @@ export function TopBar() {
           setThemeAnimated(nextTheme(theme), setTheme, {
             x: box.left + box.width / 2,
             y: box.top + box.height / 2,
+            r: box.width / 2,
           })
         }}
         title={theme === 'dark' ? t.topbar.themeToLight : t.topbar.themeToDark}

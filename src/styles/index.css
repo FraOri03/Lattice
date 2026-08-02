@@ -1377,18 +1377,23 @@ body {
   html.theme-anim *,
   html.theme-anim *::before,
   html.theme-anim *::after {
+    /* ease-out rather than ease: the colours commit early and settle, which
+       is the same character the View Transitions path has, so the two
+       browsers do not feel like two different products */
     transition:
-      background-color 380ms ease,
-      border-color 380ms ease,
-      color 380ms ease,
-      fill 380ms ease,
-      stroke 380ms ease,
-      box-shadow 380ms ease !important;
+      background-color 380ms cubic-bezier(0.22, 0.61, 0.36, 1),
+      border-color 380ms cubic-bezier(0.22, 0.61, 0.36, 1),
+      color 380ms cubic-bezier(0.22, 0.61, 0.36, 1),
+      fill 380ms cubic-bezier(0.22, 0.61, 0.36, 1),
+      stroke 380ms cubic-bezier(0.22, 0.61, 0.36, 1),
+      box-shadow 380ms cubic-bezier(0.22, 0.61, 0.36, 1) !important;
   }
 }
 /* View Transitions path: the outgoing theme stays put and the incoming one
    is revealed by the circular clip-path animated in JS, so the two never
-   cross-fade into a washed-out midpoint. */
+   cross-fade into a washed-out midpoint. Neither pseudo-element carries an
+   animation of its own — a transform here would move the snapshot out from
+   under the clip that is revealing it. */
 ::view-transition-old(root) {
   animation: none;
 }
@@ -1396,18 +1401,24 @@ body {
   animation: none;
   mix-blend-mode: normal;
 }
-/* the sun/moon glyph turns into the other one instead of being replaced */
+/* The sun/moon glyph turns into the other one instead of being replaced, and
+   goes past the mark on the way: the overshoot is what makes a 15px icon
+   register as having moved at all. */
 @keyframes icon-swap {
-  from {
+  0% {
     opacity: 0;
-    transform: rotate(-90deg) scale(0.7);
+    transform: rotate(-150deg) scale(0.3);
   }
-  to {
+  55% {
+    opacity: 1;
+    transform: rotate(14deg) scale(1.14);
+  }
+  100% {
     opacity: 1;
     transform: none;
   }
 }
 .theme-icon-swap {
   display: inline-flex;
-  animation: icon-swap 380ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  animation: icon-swap 460ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
 }
