@@ -171,6 +171,11 @@ onto them without disturbing the rest:
 | Photo: `.icon-btn` 28 × 28, no toolbar role | `role="toolbar"` + name, controls 32 × 32, bar height unchanged at 40 px |
 | Both: hardcoded English | localised — the toolbars render as "Strumenti board" / "Strumenti foto" under `locale: 'it'` |
 
+Superseded since: the board's third family is gone. "Web embed" and "Import"
+are menu items of the media split, whose trigger is now "Open media, embed &
+import tools" — two groups (`role="group"` × 2 plus Annotation), not three.
+The measurements above still hold; only the grouping changed.
+
 Unchanged, deliberately: the `.doc-toolbar` family. Re-measured after the
 migration, the sheet bar is still 33 px with `.tbtn` at 24 × 24 and `tbtn
 px-1.5` still computing 5 px — Document, Sheet and Presentation keep their

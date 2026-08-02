@@ -32,23 +32,43 @@ describe('CanvasToolbar', () => {
   it('keeps every tool the hand-written toolbar offered', () => {
     renderBar()
     // structure + the primary of each split family
-    for (const name of [/^section$/i, /^note$/i, /^image$/i, /^web embed$/i]) {
+    for (const name of [/^section$/i, /^note$/i, /^image$/i]) {
       expect(screen.getByRole('button', { name })).toBeInTheDocument()
+    }
+    // web embed and import lost their own family but not their tools: they
+    // are menu items of the media split now, so open it to reach them
+    fireEvent.click(screen.getByRole('button', { name: /open media/i }))
+    for (const name of [/^web embed$/i, /^import$/i]) {
+      expect(screen.getByRole('menuitem', { name })).toBeInTheDocument()
     }
   })
 
   it('names each menu trigger for what it opens, never a bare "More"', () => {
     renderBar()
-    for (const name of [
-      /open card tools/i,
-      /open media tools/i,
-      /open import & embed tools/i,
-    ]) {
+    for (const name of [/open card tools/i, /open media, embed & import tools/i]) {
       const trigger = screen.getByRole('button', { name })
       expect(trigger).toHaveAttribute('aria-haspopup', 'menu')
       expect(trigger).toHaveAttribute('aria-expanded', 'false')
     }
     expect(screen.queryByRole('button', { name: /^more/i })).toBeNull()
+  })
+
+  it('gathers every way of adding media under one menu', () => {
+    renderBar()
+    fireEvent.click(screen.getByRole('button', { name: /open media/i }))
+    const menu = screen.getByRole('menu', { name: /open media/i })
+    const items = [...menu.querySelectorAll('[role="menuitem"]')].map((el) =>
+      el.textContent?.trim(),
+    )
+    expect(items).toEqual([
+      'Image',
+      'Video',
+      '3D',
+      'Photo',
+      'Link',
+      'Web embed',
+      'Import',
+    ])
   })
 
   it('offers only card kinds the product can really create', () => {

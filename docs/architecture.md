@@ -97,15 +97,36 @@ The entity model lives in `src/types/model.ts` (vault) and `src/types/collab.ts`
 | `Project` | Organizational space that owns all other entities; every entity carries a `projectId`. |
 | `Account` / `SyncState` | Signed-in identity + per-entity sync bookkeeping. |
 | `Board`, `BoardSection`, `WebEmbed` | Infinite canvas, Figma-like frames, sandboxed website cards. |
-| `NoteDoc` | Markdown note with wikilinks/backlinks/tags. |
+| `NoteDoc` | Markdown note with wikilinks/backlinks/tags — **capture**, see below. |
 | `AssetDoc` | Imported binary's metadata (body behind `StorageProvider`). |
-| `RichDocMeta` | Tiptap rich document (body lazy-loaded). |
+| `RichDocMeta` | Tiptap rich document (body lazy-loaded) — the **deliverable**. |
 | `CodeDocMeta` | Monaco code file (+ optional GitHub link metadata). |
 | `SpreadsheetDocMeta` | Grid + formula document. |
 | `PresentationDocMeta` | Slide deck (internal `presentModel.ts` format). |
 
 A persisted-store migration stamps pre-Phase-6 vaults with a default project
 automatically; a later migration wraps existing projects in a personal workspace.
+
+### Notes vs documents
+
+Two text entities is a design choice, not an accident, so the product has to
+keep them apart or they collapse into the same thing:
+
+- **A note is capture.** Markdown in a plain textarea, tags and `[[wikilinks]]`,
+  ordered newest-first. It has **no folders** (`SidebarCategory flat`), no page
+  setup and no formatting toolbar — an inbox you skim, not a cabinet you file.
+  `folderId` stays on `NoteDoc` for older vaults; the UI simply stops offering it.
+- **A document is the deliverable.** Tiptap body, folders, outline, page setup,
+  word count, DOCX/ODT/RTF adapters, a Drive-readable HTML mirror, CRDT
+  collaboration.
+
+The only bridge is **promotion**, note → document
+(`promoteNoteToDoc` → `lib/notes/noteToDocument.ts`). It reuses the note
+renderer, so the result is what Preview showed, then rewrites the two
+constructs whose HTML shape differs between the schemas (wikilink anchors →
+`span[data-wikilink]`; checkbox lists → `taskList`/`taskItem`). The note is
+consumed, so the same text never exists twice. There is deliberately no
+demotion: it could only work by throwing away tables, embeds and page setup.
 
 ## Stores
 

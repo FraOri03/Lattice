@@ -652,9 +652,12 @@ export function Sidebar() {
             category="notes"
             label="Notes"
             items={noteList}
-            emptyHint="No notes match"
+            // capture, not filing: no folders here, and the hint says what
+            // the section is for rather than reporting an empty query
+            flat
+            emptyHint={`${t.textEntities.notesEmpty} — ${t.textEntities.notePurpose}`}
             onCreate={mayCreate ? () => openNote(createNote()) : undefined}
-            createLabel="New note"
+            createLabel={t.textEntities.newNote}
             mayEditFolders={mayCreate}
             renderItem={(n) => (
               <div

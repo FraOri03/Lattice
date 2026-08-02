@@ -4,6 +4,8 @@ import { useI18n } from '@/lib/i18n'
 import { downloadText, slugify } from '@/lib/download'
 import { ToolbarAction, ToolbarGroup, ToolbarRoot, ToolbarToggle } from '@/components/ui/toolbar'
 import { MarkdownView } from '@/components/MarkdownView'
+import { confirmDialog } from '@/components/ui/ConfirmDialog'
+import { toast } from '@/components/ui/Toaster'
 import { AssetPreviewPane } from '@/components/preview/AssetPreviewPane'
 import { RichDocWorkspacePane } from '@/components/richdoc/RichDocWorkspacePane'
 import { documentPaneFor } from '@/lib/nav/activePane'
@@ -32,6 +34,20 @@ export function DocumentView() {
   const viewMode = useStore((s) => s.viewMode)
   const t = useI18n()
   const [tab, setTab] = useState<'write' | 'preview'>('write')
+
+  /** Capture → deliverable. Confirmed first: the note does not survive it. */
+  const promote = async (id: string, title: string) => {
+    const ok = await confirmDialog({
+      title: t.textEntities.promoteTitle(title),
+      body: t.textEntities.promoteBody,
+      confirmLabel: t.textEntities.promoteConfirm,
+    })
+    if (!ok) return
+    const docId = await useStore.getState().promoteNoteToDoc(id)
+    if (!docId) return
+    useStore.getState().openDoc(docId)
+    toast.success(t.textEntities.promoted, t.textEntities.promotedDetail(title))
+  }
 
   // Which single pane this mode may mount (see lib/nav/activePane): Document
   // hosts asset/document/note, Split additionally hosts code and sheets.
@@ -81,10 +97,15 @@ export function DocumentView() {
   if (!note) {
     return (
       <section className="flex h-full min-w-0 flex-1 flex-col items-center justify-center gap-3 border-r border-bord bg-panel text-muted">
-        <IcDoc size={28} />
-        <p className="text-sm">No note open</p>
+        <IcNote size={28} />
+        <p className="text-sm">{t.textEntities.noNoteOpen}</p>
+        {/* which of the two text entities this surface is, stated where the
+            user is about to choose one */}
+        <p className="max-w-[280px] text-center text-[11px]">
+          {t.textEntities.notePurpose}
+        </p>
         <button className="btn" onClick={() => openNote(createNote())}>
-          <IcPlus size={13} /> New note
+          <IcPlus size={13} /> {t.textEntities.newNote}
         </button>
       </section>
     )
@@ -150,6 +171,13 @@ export function DocumentView() {
             onRun={() =>
               downloadText(`${slugify(note.title)}.md`, `# ${note.title}\n\n${note.content}`)
             }
+          />
+          {/* the one bridge between the two entities, and only this way
+              round — see the store's promoteNoteToDoc */}
+          <ToolbarAction
+            icon={<IcDoc size={14} />}
+            label={t.toolbar.note.promote}
+            onRun={() => void promote(note.id, note.title)}
           />
           {viewMode !== 'board' && (
             <ToolbarAction

@@ -43,6 +43,13 @@ export interface SidebarCategoryProps<T extends FoldableItem> {
   /** false hides folder creation (read-only roles) */
   mayEditFolders?: boolean
   /**
+   * No folder tree at all: one list, newest first. For categories that are
+   * capture rather than filing (Notes) — an inbox you skim, not a cabinet
+   * you organise. Any folder record a category once had is left untouched
+   * in the store, and its items simply appear in the flat list.
+   */
+  flat?: boolean
+  /**
    * Derived groups shown under the user folders, for items no folder
    * claims. Read-only: they come from the data, so there is nothing to
    * rename, delete or drop into.
@@ -59,6 +66,7 @@ export function SidebarCategory<T extends FoldableItem>({
   onCreate,
   createLabel,
   mayEditFolders = true,
+  flat = false,
   autoGroups,
 }: SidebarCategoryProps<T>) {
   const allFolders = useStore((s) => s.folders)
@@ -73,7 +81,7 @@ export function SidebarCategory<T extends FoldableItem>({
   // state lives here rather than in the store
   const [shutGroups, setShutGroups] = useState<string[]>([])
 
-  const folders = foldersOf(allFolders, category, activeProjectId)
+  const folders = flat ? [] : foldersOf(allFolders, category, activeProjectId)
   const { groups, unfiled } = groupByFolder(items, folders)
   const { groups: derived, rest } = applyAutoGroups(unfiled, autoGroups ?? [])
   const collapsed = collapsedCategories.includes(category)
@@ -117,7 +125,7 @@ export function SidebarCategory<T extends FoldableItem>({
             <span className="ml-1 text-[10px] font-normal text-muted">{items.length}</span>
           )}
         </button>
-        {!collapsed && mayEditFolders && (
+        {!collapsed && mayEditFolders && !flat && (
           <button
             className="icon-btn h-5 w-5"
             title={`New folder in ${label}`}

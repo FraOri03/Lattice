@@ -97,11 +97,24 @@ _Tracked in [#10](https://github.com/FraOri03/Lattice/issues/10)._
   exercised in the browser and the configured path is covered by tests with
   mocked dependencies, but no real call has been placed from this branch.
 
+## Notes and documents
+
+- **Notes have no folders**, on purpose: they are capture, ordered newest-first
+  (see [architecture.md](architecture.md#notes-vs-documents)). Vaults that filed
+  notes before this keep their `folderId`, but the sidebar no longer shows those
+  folders — the notes appear in the flat list instead of disappearing.
+- **Promotion is one-way and destructive.** Note → document consumes the note and
+  removes its cards; there is no demotion, and no undo beyond deleting the new
+  document and retyping. The confirm dialog says so before it runs.
+- **A promoted note loses what markdown cannot say.** Headings, lists, task lists,
+  quotes, code blocks, images, inline marks and wikilinks cross over; anything the
+  document schema does not model degrades to text rather than vanishing.
+
 ## Board tools
 
 - **No drawing/shape/pen tools, no Frames, no Groups, and no Dev Mode.** The board toolbar
   creates cards and sections; pan/zoom are React Flow's own controls. The toolbar is
-  grouped by category (Structure · Create · Media · Annotate · More) but deliberately does
+  grouped by category (Structure · Create · Media · Annotate) but deliberately does
   **not** advertise tool families the product does not implement. Shapes do exist in the
   **presentation** editor (rectangle, ellipse, line) — that is a Board gap, not a
   product-wide one.

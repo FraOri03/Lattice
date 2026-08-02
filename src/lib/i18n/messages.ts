@@ -277,8 +277,7 @@ export const en = {
       commentTip: 'Comment — click to pin, drag to comment on an area',
       /** menu triggers are named for what they open, never a bare "More" */
       openCardTools: 'Open card tools',
-      openMediaTools: 'Open media tools',
-      openImportTools: 'Open import & embed tools',
+      openMediaTools: 'Open media, embed & import tools',
       addTool: (tool: string) => `Add ${tool.toLowerCase()}`,
     },
     document: {
@@ -333,6 +332,7 @@ export const en = {
       write: 'Write',
       preview: 'Preview',
       exportMd: 'Export as Markdown',
+      promote: 'Promote to document',
       close: 'Close editor',
     },
     sheet: {
@@ -490,6 +490,26 @@ export const en = {
     noDescription: 'No description',
     emptyTitle: 'No projects in this workspace yet',
     emptyBody: 'A project holds its own boards, notes, documents and files.',
+  },
+  /**
+   * Notes and documents are both text, so the product has to say out loud
+   * which one is for what — otherwise the user picks by coin toss and the
+   * two drift into the same thing.
+   */
+  textEntities: {
+    notePurpose: 'Quick capture — markdown, links, no formatting to fuss with.',
+    documentPurpose: 'Formatted, structured writing you finish and hand over.',
+    noNoteOpen: 'No note open',
+    newNote: 'New note',
+    notesEmpty: 'Nothing captured yet',
+    promoteTitle: (title: string) => `Promote “${title}” to a document?`,
+    promoteBody:
+      'The text, tags and wikilinks move into a new document you can format, ' +
+      'outline and export. The note itself is consumed, so the same text never ' +
+      'exists in two places — cards pointing at it are removed.',
+    promoteConfirm: 'Promote',
+    promoted: 'Promoted to a document',
+    promotedDetail: (title: string) => `“${title}” is now a document.`,
   },
 }
 
@@ -748,8 +768,7 @@ export const it: Catalog = {
       comment: 'Commento',
       commentTip: 'Commento — clic per fissare, trascina per commentare un’area',
       openCardTools: 'Apri strumenti card',
-      openMediaTools: 'Apri strumenti media',
-      openImportTools: 'Apri strumenti di importazione e incorporamento',
+      openMediaTools: 'Apri strumenti media, incorporamento e importazione',
       addTool: (tool) => `Aggiungi ${tool.toLowerCase()}`,
     },
     document: {
@@ -803,6 +822,7 @@ export const it: Catalog = {
       write: 'Scrivi',
       preview: 'Anteprima',
       exportMd: 'Esporta come Markdown',
+      promote: 'Promuovi a documento',
       close: 'Chiudi editor',
     },
     sheet: {
@@ -954,6 +974,21 @@ export const it: Catalog = {
     noDescription: 'Nessuna descrizione',
     emptyTitle: 'Ancora nessun progetto in questo workspace',
     emptyBody: 'Un progetto contiene le sue board, note, documenti e file.',
+  },
+  textEntities: {
+    notePurpose: 'Cattura rapida — markdown, link, nessuna formattazione da gestire.',
+    documentPurpose: 'Scrittura formattata e strutturata, da finire e consegnare.',
+    noNoteOpen: 'Nessuna nota aperta',
+    newNote: 'Nuova nota',
+    notesEmpty: 'Ancora niente catturato',
+    promoteTitle: (title) => `Promuovere “${title}” a documento?`,
+    promoteBody:
+      'Testo, tag e wikilink passano in un nuovo documento che puoi formattare, ' +
+      'strutturare ed esportare. La nota viene consumata, così lo stesso testo non ' +
+      'esiste in due posti — le card che la puntano vengono rimosse.',
+    promoteConfirm: 'Promuovi',
+    promoted: 'Promossa a documento',
+    promotedDetail: (title) => `“${title}” ora è un documento.`,
   },
 }
 
