@@ -22,7 +22,7 @@ Surface
 | Browser history | [`lib/nav/useUrlHistory.ts`](../../src/lib/nav/useUrlHistory.ts) | **the only place that calls `pushState`/`replaceState`.** Mounted once. |
 | Where that "once" is | `AppShell` in [`App.tsx`](../../src/App.tsx) | history, global shortcuts, collaboration and the overlays mount **above** the surface switch — inside a surface they would unmount on the way to the other one. |
 | Surface · project · board · mode | `useStore` | written as one transaction by `applyNav`. |
-| The open entity | `useStore.tabSessions` | one session per project: the open entities and which is active. **The single source of truth since 11.3.** |
+| The open entity | `useStore.tabSessions` | one session per project: the open entities and which is active. **The single source of truth since 11.3** — the URL serialises from it, and hydration prunes it. |
 | `active*Id` | derived | `slotsFor(activeTab(session))` — a projection, never written on its own. |
 | Split layout | [`store/workspaceLayoutStore.ts`](../../src/store/workspaceLayoutStore.ts) | UI-only. Deliberately not persisted. |
 | Selection, scroll, panel toggles | the components themselves | never navigation. |
@@ -92,6 +92,14 @@ What the session is *not*: it is per project and persisted, while the URL still
 carries a single entity. A link says which tab is **active**, never which tabs
 exist — so opening a deep link focuses that entity and leaves the rest of the
 strip alone, and a link with no `e=` focuses nothing without closing anything.
+
+Both directions read the session and nothing else. `currentNav` serialises the
+active tab (11.3.4); it does **not** walk the six slots looking for one that is
+set, which is what it used to do. And because sessions are persisted while the
+vault can move underneath them — a file deleted in another browser, a different
+export restored — hydration runs `pruneTabSessions`: a tab pointing at nothing
+is dropped there, at the source. The strip already refused to draw ghosts, but
+"next tab" would have happily focused one.
 
 The strip that shows it belongs to the **project**, not to a section: a note, a
 spreadsheet and a code file sit side by side, and selecting one takes you to the

@@ -43,11 +43,13 @@ import {
   closeTab,
   EMPTY_SESSION,
   openTab,
+  pruneTabs,
   slotsFor,
   tabFromSlots,
   type EntityTab,
   type TabSession,
 } from '@/lib/tabs/tabSession'
+import { describeEntity } from '@/lib/entities/entityLabel'
 import {
   createBody,
   digestSpreadsheet,
@@ -427,6 +429,8 @@ interface AppState {
   closeCode: () => void
   /** Close an open entity in the active project's session (Phase 11.3). */
   closeEntityTab: (tab: EntityTab) => void
+  /** Drop tabs whose entity this browser no longer holds (Phase 11.3.4). */
+  pruneTabSessions: () => void
   /** Focus an already-open entity without re-opening it. */
   activateEntityTab: (tab: EntityTab) => void
 
@@ -1908,6 +1912,42 @@ export const useStore = create<AppState>()(
       closeEntityTab: (tab) =>
         set((s) => withClosedTab(s, s.activeProjectId, tab)),
 
+      /**
+       * Sessions outlive the entities they point at: a file deleted in
+       * another browser, or a vault restored from a different export, leaves
+       * tabs referring to nothing. The strip already refuses to draw those,
+       * but a ghost tab is still reachable by keyboard — "next tab" would
+       * happily focus a note that no longer exists. Dropping them at load is
+       * the fix at the source.
+       */
+      pruneTabSessions: () =>
+        set((s) => {
+          const exists = (tab: EntityTab) =>
+            !!describeEntity(tab.kind, tab.id, {
+              notes: s.notes,
+              docs: s.docs,
+              sheetDocs: s.sheetDocs,
+              presentDocs: s.presentDocs,
+              codeDocs: s.codeDocs,
+              assets: s.assets,
+              boards: s.boards,
+              projects: s.projects,
+            })
+          const tabSessions: Record<string, TabSession> = {}
+          let changed = false
+          for (const [projectId, session] of Object.entries(s.tabSessions)) {
+            const pruned = pruneTabs(session, exists)
+            tabSessions[projectId] = pruned
+            if (pruned !== session) changed = true
+          }
+          if (!changed) return {}
+          return withSession(
+            { tabSessions },
+            s.activeProjectId,
+            tabSessions[s.activeProjectId] ?? EMPTY_SESSION,
+          )
+        }),
+
       activateEntityTab: (tab) =>
         set((s) => ({
           ...withOpenTab(s, s.activeProjectId, tab),
@@ -2060,6 +2100,9 @@ export const useStore = create<AppState>()(
         }
         return s as AppState
       },
+      // hydration is the moment a session meets the vault it was stored
+      // against: anything it points at that is no longer there goes now
+      onRehydrateStorage: () => (state) => state?.pruneTabSessions(),
       partialize: (s) => ({
         workspaces: s.workspaces,
         activeWorkspaceId: s.activeWorkspaceId,

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useStore } from '@/store/useStore'
 import { useWorkspaceLayoutStore } from '@/store/workspaceLayoutStore'
+import { activeTab, EMPTY_SESSION } from '@/lib/tabs/tabSession'
 import {
   DASHBOARD_NAV,
   navKey,
@@ -33,17 +34,21 @@ import {
  * the search string and always preserves the current hash.
  */
 
-/** The nav state implied by the current store. */
-function currentNav(): ResolvedNavigation {
+/**
+ * The nav state implied by the current store — i.e. what the URL must say.
+ * Exported because it *is* the serialisation half of the URL contract, and a
+ * contract that only runs inside a mounted hook cannot be asserted.
+ */
+export function currentNav(): ResolvedNavigation {
   const s = useStore.getState()
   if (s.navSurface === 'dashboard') return DASHBOARD_NAV
-  let entity: NavState['entity']
-  if (s.activeDocId) entity = { kind: 'doc', id: s.activeDocId }
-  else if (s.activeCodeId) entity = { kind: 'code', id: s.activeCodeId }
-  else if (s.activeSheetId) entity = { kind: 'sheet', id: s.activeSheetId }
-  else if (s.activePresentId) entity = { kind: 'present', id: s.activePresentId }
-  else if (s.activeNoteId) entity = { kind: 'note', id: s.activeNoteId }
-  else if (s.activeAssetId) entity = { kind: 'asset', id: s.activeAssetId }
+  // The URL's entity is the ACTIVE TAB, read from the session rather than
+  // from the six `active*Id` slots. Those are a projection of this same
+  // fact (11.3.2), and the priority order this used to walk them in --
+  // doc before code before sheet -- was an arbitrary tie-break for a tie
+  // that can no longer happen.
+  const entity: NavState['entity'] =
+    activeTab(s.tabSessions[s.activeProjectId] ?? EMPTY_SESSION) ?? undefined
   return {
     surface: 'project',
     projectId: s.activeProjectId,

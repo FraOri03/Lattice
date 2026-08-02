@@ -134,6 +134,36 @@ describe('per project', () => {
   })
 })
 
+describe('pruneTabSessions', () => {
+  it('drops tabs whose entity this browser no longer holds', () => {
+    const s = useStore.getState()
+    const kept = s.createNote()
+    const gone = useStore.getState().createNote()
+    useStore.getState().openNote(kept)
+    useStore.getState().openNote(gone)
+
+    // deleted the way another browser would: the entity vanishes from the
+    // maps without this tab's delete action ever running
+    useStore.setState((prev) => ({
+      notes: Object.fromEntries(Object.entries(prev.notes).filter(([id]) => id !== gone)),
+    }))
+    useStore.getState().pruneTabSessions()
+
+    expect(sessionTabs()).toEqual([`note:${kept}`])
+    // and the slots follow, so no section can render a ghost
+    expect(slots().note).toBe(kept)
+  })
+
+  it('leaves an intact session untouched', () => {
+    const s = useStore.getState()
+    const id = s.createNote()
+    s.openNote(id)
+    const before = useStore.getState().tabSessions
+    useStore.getState().pruneTabSessions()
+    expect(useStore.getState().tabSessions).toBe(before)
+  })
+})
+
 describe('applyNav', () => {
   it('decides which tab is active, not which tabs exist', () => {
     const s = useStore.getState()
