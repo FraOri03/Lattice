@@ -24,7 +24,7 @@ function openTwoFiles() {
   return { a, b }
 }
 
-beforeEach(() => useStore.setState({ locale: 'en', codeTabs: [] }))
+beforeEach(() => useStore.setState({ locale: 'en', tabSessions: {} }))
 afterEach(() => useStore.setState({ locale: 'en' }))
 
 describe('Code tab strip', () => {
@@ -74,7 +74,8 @@ describe('Code tab strip', () => {
     expect(close.className).toContain('h-6')
     expect(close.className).toContain('w-6')
     fireEvent.click(close)
-    expect(useStore.getState().codeTabs).toHaveLength(1)
+    const s = useStore.getState()
+    expect(s.tabSessions[s.activeProjectId].tabs).toHaveLength(1)
   })
 
   it('ties the tabs to the editor panel', () => {

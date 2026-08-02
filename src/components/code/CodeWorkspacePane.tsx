@@ -62,10 +62,12 @@ function LockBanner({ fileId }: { fileId: string }) {
 export default function CodeWorkspacePane() {
   const codeDocs = useStore((s) => s.codeDocs)
   const activeCodeId = useStore((s) => s.activeCodeId)
-  const codeTabs = useStore((s) => s.codeTabs)
+  // the code files of this project's tab session — since 11.3 there is no
+  // separate code-only tab list to keep in step with the open entity
+  const session = useStore((s) => s.tabSessions[s.activeProjectId])
   const openCode = useStore((s) => s.openCode)
   const closeCode = useStore((s) => s.closeCode)
-  const closeCodeTab = useStore((s) => s.closeCodeTab)
+  const closeEntityTab = useStore((s) => s.closeEntityTab)
   const updateCodeMeta = useStore((s) => s.updateCodeMeta)
   const project = useStore((s) => s.projects[s.activeProjectId])
   const readOnly = useReadOnly()
@@ -78,7 +80,10 @@ export default function CodeWorkspacePane() {
   const meta = activeCodeId ? codeDocs[activeCodeId] : undefined
   if (!meta) return null
 
-  const tabs = codeTabs.map((id) => codeDocs[id]).filter(Boolean)
+  const tabs = (session?.tabs ?? [])
+    .filter((t) => t.kind === 'code')
+    .map((t) => codeDocs[t.id])
+    .filter(Boolean)
   const github = project?.settings.github
   const githubConnected = githubProvider.isConnected()
 
@@ -124,7 +129,7 @@ export default function CodeWorkspacePane() {
                 className="icon-btn -m-1 h-6 w-6 p-1"
                 title={tc.closeTab(name)}
                 aria-label={tc.closeTab(name)}
-                onClick={() => closeCodeTab(tab.id)}
+                onClick={() => closeEntityTab({ kind: 'code', id: tab.id })}
               >
                 <IcX size={9} />
               </button>
