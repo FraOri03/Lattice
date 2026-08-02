@@ -7,6 +7,7 @@ import { extractGraph, nodeId } from '../GraphBuilder'
 import { navigateToNode } from '../GraphNavigationService'
 import { decodeGraphSettings } from '../GraphSettingsService'
 import type { LatticeGraphNode } from '../graphTypes'
+import { openIdOf } from '@/lib/tabs/openEntity'
 
 /**
  * Integration coverage that exercises the real Zustand store, the snapshot
@@ -62,7 +63,7 @@ describe('navigation to native workspaces', () => {
     const id = useStore.getState().createNote({ title: 'Nav note' })
     const res = navigateToNode(graphNode('note', id))
     expect(res.kind).toBe('opened')
-    expect(useStore.getState().activeNoteId).toBe(id)
+    expect(openIdOf(useStore.getState(), 'note')).toBe(id)
     expect(useStore.getState().viewMode).toBe('doc')
   })
 
@@ -80,7 +81,7 @@ describe('navigation to native workspaces', () => {
     navigateToNode(graphNode('document', id), { split: true })
     // the section is the Document; the split is now a layout, not a ViewMode
     expect(useStore.getState().viewMode).toBe('doc')
-    expect(useStore.getState().activeDocId).toBe(id)
+    expect(openIdOf(useStore.getState(), 'doc')).toBe(id)
     expect(useWorkspaceLayoutStore.getState().split).toBe(true)
   })
 

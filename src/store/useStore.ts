@@ -44,7 +44,6 @@ import {
   EMPTY_SESSION,
   openTab,
   pruneTabs,
-  slotsFor,
   tabFromSlots,
   type EntityTab,
   type TabSession,
@@ -148,6 +147,17 @@ function dropRecent(recents: RecentEntry[], kind: RecentEntry['kind'], id: strin
   return recents.filter((r) => !(r.kind === kind && r.id === id))
 }
 
+/** Storage shapes that predate the tab session, as `migrate` still finds them. */
+type PersistedBeforeTabs = Partial<AppState> & {
+  codeTabs?: string[]
+  activeNoteId?: string | null
+  activeDocId?: string | null
+  activeCodeId?: string | null
+  activeSheetId?: string | null
+  activePresentId?: string | null
+  activeAssetId?: string | null
+}
+
 /**
  * Tab-session patches (Phase 11.3.2).
  *
@@ -156,7 +166,7 @@ function dropRecent(recents: RecentEntry[], kind: RecentEntry['kind'], id: strin
  * of the active tab — the point of the whole phase. Writing a slot directly
  * anywhere else re-creates the second source of truth these replace.
  */
-type SessionPatch = { tabSessions: Record<string, TabSession> } & ReturnType<typeof slotsFor>
+type SessionPatch = { tabSessions: Record<string, TabSession> }
 
 function sessionOf(s: Pick<AppState, 'tabSessions'>, projectId: string): TabSession {
   return s.tabSessions[projectId] ?? EMPTY_SESSION
@@ -167,10 +177,10 @@ function withSession(
   projectId: string,
   session: TabSession,
 ): SessionPatch {
-  return {
-    tabSessions: { ...s.tabSessions, [projectId]: session },
-    ...slotsFor(activeTab(session)),
-  }
+  // Just the session. Until 11.3.5 this also had to spread the six derived
+  // slots into the patch; now that they are read rather than stored, keeping
+  // them in step is not a thing anyone has to remember to do.
+  return { tabSessions: { ...s.tabSessions, [projectId]: session } }
 }
 
 function withOpenTab(
@@ -228,18 +238,13 @@ interface AppState {
   /**
    * Open entities per project, with one active tab (Phase 11.3).
    *
-   * This is the source of truth for what is open. The six `active*Id` fields
-   * below are DERIVED from the active tab by `slotsFor` and must never be
-   * written on their own — that is how "close the tab, the slot survives,
-   * the section reopens the entity" is kept impossible.
+   * The single source of truth for what is open. There is no `activeNoteId`
+   * or `activeDocId` beside it any more (11.3.5): a projection kept in state
+   * is a second source of truth waiting for one `set()` to diverge, so what
+   * is open is READ from here — `useOpenId` / `useOpenEntity` in
+   * [`lib/tabs/openEntity`](../lib/tabs/openEntity.ts).
    */
   tabSessions: Record<string, TabSession>
-  activeNoteId: string | null
-  activeAssetId: string | null
-  activeDocId: string | null
-  activeCodeId: string | null
-  activeSheetId: string | null
-  activePresentId: string | null
   /** recently opened entities, newest first */
   recents: RecentEntry[]
   viewMode: ViewMode
@@ -1824,7 +1829,9 @@ export const useStore = create<AppState>()(
         }))
       },
 
-      closePresent: () => set({ activePresentId: null }),
+      // 11.3.2 rewired the other five and this one kept writing its slot
+      // directly; removing the field is what surfaced it
+      closePresent: () => set((s) => closeActiveOfKind(s, 'present')),
 
       /* ---------------- code documents ---------------- */
 
@@ -1910,7 +1917,15 @@ export const useStore = create<AppState>()(
       closeCode: () => set((s) => closeActiveOfKind(s, 'code')),
 
       closeEntityTab: (tab) =>
-        set((s) => withClosedTab(s, s.activeProjectId, tab)),
+        set((s) => {
+          const patch = withClosedTab(s, s.activeProjectId, tab)
+          // Focus moves to the neighbour, so the SECTION has to move with it:
+          // closing a note while a code file takes its place otherwise leaves
+          // the Document section rendering nothing, with `m=doc&e=code.…` in
+          // the URL. Nothing to follow when the strip empties.
+          const next = activeTab(patch.tabSessions[s.activeProjectId])
+          return next ? { ...patch, viewMode: ENTITY_MODE[next.kind] } : patch
+        }),
 
       /**
        * Sessions outlive the entities they point at: a file deleted in
@@ -2012,7 +2027,6 @@ export const useStore = create<AppState>()(
           activeBoardId: boardOrder[0],
           // an imported vault opens nothing: every session starts empty
           tabSessions: {},
-          ...slotsFor(null),
         })
       },
     }),
@@ -2021,7 +2035,10 @@ export const useStore = create<AppState>()(
       version: 5,
       migrate: (persisted, version) => {
         // v0 → v1: introduce projects; the default project adopts everything
-        const s = persisted as Partial<AppState>
+        // A migration reads OLD shapes by definition: the six entity slots
+        // and the code-only tab list were state up to v4, and are keys in
+        // storage here even though the store no longer has them (11.3.5).
+        const s = persisted as PersistedBeforeTabs
         if (version < 1) {
           const project = makeDefaultProject()
           s.projects = { [project.id]: project }
@@ -2078,7 +2095,7 @@ export const useStore = create<AppState>()(
         // the project they belonged to, so nobody's open file is lost on the
         // way in. The old keys are simply no longer read.
         if (version < 5) {
-          const legacy = s as Partial<AppState> & { codeTabs?: string[] }
+          const legacy = s
           const projectId = legacy.activeProjectId
           s.tabSessions = s.tabSessions ?? {}
           if (projectId) {

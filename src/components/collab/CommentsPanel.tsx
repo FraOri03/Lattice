@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '@/store/useStore'
+import { useOpenId } from '@/lib/tabs/openEntity'
 import { useWorkspaceLayoutStore } from '@/store/workspaceLayoutStore'
 import { useCollabStore } from '@/lib/collab/collabStore'
 import { commentService } from '@/lib/collab/CommentService'
@@ -350,10 +351,10 @@ export function CommentsPanel() {
   const split = useWorkspaceLayoutStore((s) => s.split)
   const secondaryContent = useWorkspaceLayoutStore((s) => s.secondaryContent)
   const activeBoardId = useStore((s) => s.activeBoardId)
-  const activeDocId = useStore((s) => s.activeDocId)
-  const activeCodeId = useStore((s) => s.activeCodeId)
-  const activeSheetId = useStore((s) => s.activeSheetId)
-  const activeAssetId = useStore((s) => s.activeAssetId)
+  const activeDocId = useOpenId('doc')
+  const activeCodeId = useOpenId('code')
+  const activeSheetId = useOpenId('sheet')
+  const activeAssetId = useOpenId('asset')
   const boards = useStore((s) => s.boards)
   const comments = useCollabStore((s) => s.comments[projectId]) ?? []
   const filter = useCollabStore((s) => s.commentFilter)

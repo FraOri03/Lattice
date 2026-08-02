@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { useStore } from './useStore'
+import { openEntityOf } from '@/lib/tabs/openEntity'
+import type { EntityTab } from '@/lib/tabs/tabSession'
 
 /**
  * Tab sessions in the store (Phase 11.3.2).
@@ -12,15 +14,22 @@ import { useStore } from './useStore'
  * reopens the entity" bug has nowhere left to live.
  */
 
+/**
+ * What each kind has open, read the way the app reads it since 11.3.5 — the
+ * six `active*Id` fields are gone, so this derives the same answer from the
+ * session. The assertions below are unchanged by that: they were always
+ * about "exactly one kind is open", never about where it was stored.
+ */
 const slots = () => {
-  const s = useStore.getState()
+  const open = openEntityOf(useStore.getState())
+  const of = (kind: EntityTab['kind']) => (open?.kind === kind ? open.id : null)
   return {
-    note: s.activeNoteId,
-    doc: s.activeDocId,
-    code: s.activeCodeId,
-    sheet: s.activeSheetId,
-    present: s.activePresentId,
-    asset: s.activeAssetId,
+    note: of('note'),
+    doc: of('doc'),
+    code: of('code'),
+    sheet: of('sheet'),
+    present: of('present'),
+    asset: of('asset'),
   }
 }
 
@@ -71,6 +80,29 @@ describe('closing', () => {
     expect(sessionTabs()).toEqual([`note:${a}`])
     expect(slots().doc).toBeNull()
     expect(slots().note).toBe(a)
+  })
+
+  it('takes the section to whatever the focus falls back to', () => {
+    const s = useStore.getState()
+    const code = s.createCode({ title: 'main', language: 'typescript' })
+    const note = useStore.getState().createNote()
+    useStore.getState().openCode(code)
+    useStore.getState().openNote(note) // section: doc, focus: the note
+
+    useStore.getState().closeEntityTab({ kind: 'note', id: note })
+
+    // the code file takes the focus, so the Code section takes the screen —
+    // otherwise Document renders nothing while the URL says a code file is open
+    expect(slots().code).toBe(code)
+    expect(useStore.getState().viewMode).toBe('code')
+  })
+
+  it('leaves the section alone when the last tab closes', () => {
+    const s = useStore.getState()
+    const note = s.createNote()
+    s.openNote(note)
+    useStore.getState().closeEntityTab({ kind: 'note', id: note })
+    expect(useStore.getState().viewMode).toBe('doc') // nothing to follow
   })
 
   it('drops the tab when the entity is deleted', () => {

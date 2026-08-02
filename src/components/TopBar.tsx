@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useStore } from '@/store/useStore'
+import { useOpenId } from '@/lib/tabs/openEntity'
 import { useUiStore } from '@/store/useUiStore'
 import { useWorkspaceLayoutStore } from '@/store/workspaceLayoutStore'
 import { useSyncStore } from '@/lib/sync/syncStore'
@@ -147,11 +148,11 @@ function ContextBreadcrumb() {
   const sheetDocs = useStore((s) => s.sheetDocs)
   const notes = useStore((s) => s.notes)
   const assets = useStore((s) => s.assets)
-  const activeDocId = useStore((s) => s.activeDocId)
-  const activeCodeId = useStore((s) => s.activeCodeId)
-  const activeSheetId = useStore((s) => s.activeSheetId)
-  const activeNoteId = useStore((s) => s.activeNoteId)
-  const activeAssetId = useStore((s) => s.activeAssetId)
+  const activeDocId = useOpenId('doc')
+  const activeCodeId = useOpenId('code')
+  const activeSheetId = useOpenId('sheet')
+  const activeNoteId = useOpenId('note')
+  const activeAssetId = useOpenId('asset')
   const split = useWorkspaceLayoutStore((s) => s.split)
   const secondaryContent = useWorkspaceLayoutStore((s) => s.secondaryContent)
   const readOnly = useReadOnly()

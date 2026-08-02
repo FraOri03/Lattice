@@ -23,7 +23,7 @@ Surface
 | Where that "once" is | `AppShell` in [`App.tsx`](../../src/App.tsx) | history, global shortcuts, collaboration and the overlays mount **above** the surface switch — inside a surface they would unmount on the way to the other one. |
 | Surface · project · board · mode | `useStore` | written as one transaction by `applyNav`. |
 | The open entity | `useStore.tabSessions` | one session per project: the open entities and which is active. **The single source of truth since 11.3** — the URL serialises from it, and hydration prunes it. |
-| `active*Id` | derived | `slotsFor(activeTab(session))` — a projection, never written on its own. |
+| What is open, read | [`lib/tabs/openEntity`](../../src/lib/tabs/openEntity.ts) | `useOpenId('doc')` / `useOpenEntity()`. The `active*Id` fields no longer exist (11.3.5). |
 | Split layout | [`store/workspaceLayoutStore.ts`](../../src/store/workspaceLayoutStore.ts) | UI-only. Deliberately not persisted. |
 | Selection, scroll, panel toggles | the components themselves | never navigation. |
 | Toolbars | [`components/ui/toolbar`](../../src/components/ui/toolbar) | primitives; each mode composes them. |
@@ -74,16 +74,24 @@ open entity. They agreed only because every `open*` helper cleared the other
 five by hand. Six chances to forget, and one was already taken: `openNote` left
 `activePresentId` set.
 
-Since **11.3.2** the truth is one place. A project's `TabSession` holds the open
-entities and which one is active; `slotsFor(activeTab(session))` derives all six
-slots, exactly one of them set, by construction. The rule that follows:
+Since **11.3.2** the truth is one place: a project's `TabSession` holds the open
+entities and which one is active. **11.3.5** finished the job by deleting the six
+fields outright — a projection kept in state is a second source of truth one
+`set()` away, and keeping it in step is work someone has to remember. What is
+open is now *read*:
 
-> **Never write an `active*Id`.** Open, close and focus go through the session
+> **There is no `activeDocId`.** Open, close and focus go through the session
 > ([`lib/tabs/tabSession.ts`](../../src/lib/tabs/tabSession.ts) and the
-> `with*Tab` helpers in the store); the slots are read-only output.
+> `with*Tab` helpers in the store); components ask
+> [`openEntity`](../../src/lib/tabs/openEntity.ts) — `useOpenId('doc')`,
+> `useOpenEntity()` — and services use its pure form.
 
-That is what makes the classic bug unreachable: close the tab and the slot it
-projected into goes with it, so no section can reopen an entity nobody has open.
+That is what makes the classic bug unreachable: there is no slot left to survive
+a closed tab, so no section can reopen an entity nobody has open. Removing the
+fields also flushed out the last two places still writing them by hand —
+`closePresent`, which 11.3.2 had missed, and `documentPaneFor`, whose whole
+priority order existed to referee slots that can no longer disagree.
+
 `codeTabs` — a code-only list that duplicated the same fact — folded into the
 session in the v4 → v5 migration, together with whatever the slots held, so no
 one's open file was lost on the way in.
@@ -137,7 +145,8 @@ drivers still bind to `Ctrl+Alt+Arrow`.
 | Surface model, URL contract, history binding | **done** (11.0) |
 | Per-mode toolbars on shared primitives | **done** (11.1) |
 | Dashboard screen | **done** (11.2) — `AppShell` switches on `navSurface`; recents resolved cross-project in [`lib/recents`](../../src/lib/recents/resolveRecents.ts) |
-| Tab sessions | **done** (11.3.1–11.3.2) — the model, and the store deriving the six slots from it |
+| Tab sessions | **done** (11.3.1–11.3.2) — the model, and the store built on it |
+| The six `active*Id` slots | **retired** (11.3.5) — gone from state; what is open is read from the session |
 | Tab strip UI | **done** (11.3.3) — one strip per project above the workspace, in [`EntityTabStrip`](../../src/components/shell/EntityTabStrip.tsx) |
 
 See also [navigation.md](../navigation.md) for the URL examples and the

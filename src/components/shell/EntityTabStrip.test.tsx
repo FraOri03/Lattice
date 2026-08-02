@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { useStore } from '@/store/useStore'
 import { EntityTabStrip } from './EntityTabStrip'
+import { openIdOf } from '@/lib/tabs/openEntity'
 
 /**
  * The shell tab strip (Phase 11.3.3).
@@ -53,8 +54,8 @@ describe('EntityTabStrip', () => {
     render(<EntityTabStrip />)
     fireEvent.click(screen.getByRole('tab', { name: /Field notes/ }))
     const s = useStore.getState()
-    expect(s.activeNoteId).toBeTruthy()
-    expect(s.activeCodeId).toBeNull()
+    expect(openIdOf(s, 'note')).toBeTruthy()
+    expect(openIdOf(s, 'code')).toBeNull()
     expect(s.viewMode).toBe('doc')
   })
 
@@ -80,7 +81,7 @@ describe('EntityTabStrip', () => {
     const s = useStore.getState()
     expect(s.tabSessions[s.activeProjectId].tabs).toHaveLength(1)
     // closing an inactive tab must not steal the focus from the active one
-    expect(s.activeCodeId).toBeTruthy()
+    expect(openIdOf(s, 'code')).toBeTruthy()
   })
 
   it('drops a tab whose entity is gone instead of showing a blank chip', () => {

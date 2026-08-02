@@ -1,4 +1,5 @@
 import { backlinksToTitle, useStore } from '@/store/useStore'
+import { useOpenId } from '@/lib/tabs/openEntity'
 import { downloadAsset } from '@/lib/assets/AssetRegistry'
 import {
   EXPORT_FORMATS,
@@ -18,7 +19,8 @@ import { ActionIcon } from '@/components/ActionIcons'
  * assets, backlinks and export options.
  */
 export function DocumentInspector() {
-  const doc = useStore((s) => (s.activeDocId ? s.docs[s.activeDocId] : undefined))
+  const openId = useOpenId('doc')
+  const doc = useStore((s) => (openId ? s.docs[openId] : undefined))
   const notes = useStore((s) => s.notes)
   const docs = useStore((s) => s.docs)
   const codeDocs = useStore((s) => s.codeDocs)

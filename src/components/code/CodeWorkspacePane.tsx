@@ -1,4 +1,5 @@
 import { useStore } from '@/store/useStore'
+import { useOpenId } from '@/lib/tabs/openEntity'
 import { useI18n } from '@/lib/i18n'
 import { LANGUAGES, extForLang } from '@/lib/code/languages'
 import { useCollabStore, isLockFresh } from '@/lib/collab/collabStore'
@@ -59,7 +60,7 @@ function LockBanner({ fileId }: { fileId: string }) {
 
 export default function CodeWorkspacePane() {
   const codeDocs = useStore((s) => s.codeDocs)
-  const activeCodeId = useStore((s) => s.activeCodeId)
+  const activeCodeId = useOpenId('code')
   const closeCode = useStore((s) => s.closeCode)
   const updateCodeMeta = useStore((s) => s.updateCodeMeta)
   const project = useStore((s) => s.projects[s.activeProjectId])

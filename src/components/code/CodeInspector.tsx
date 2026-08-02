@@ -1,4 +1,5 @@
 import { backlinksToTitle, useStore } from '@/store/useStore'
+import { useOpenId } from '@/lib/tabs/openEntity'
 import type { CodeEditingPolicy } from '@/types/model'
 import { storage } from '@/lib/storage/StorageProvider'
 import { downloadAsset } from '@/lib/assets/AssetRegistry'
@@ -14,7 +15,8 @@ import { ActionIcon } from '@/components/ActionIcons'
 
 /** Right panel of the code workspace: metadata, source file, backlinks, export. */
 export function CodeInspector() {
-  const meta = useStore((s) => (s.activeCodeId ? s.codeDocs[s.activeCodeId] : undefined))
+  const openId = useOpenId('code')
+  const meta = useStore((s) => (openId ? s.codeDocs[openId] : undefined))
   const notes = useStore((s) => s.notes)
   const docs = useStore((s) => s.docs)
   const codeDocs = useStore((s) => s.codeDocs)

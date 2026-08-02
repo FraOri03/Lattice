@@ -7,7 +7,6 @@ import {
   EMPTY_SESSION,
   openTab,
   pruneTabs,
-  slotsFor,
   tabFromSlots,
   tabKey,
   type EntityTab,
@@ -19,7 +18,7 @@ import {
  *
  * These lock down the two things that make tabs a single source of truth
  * rather than a seventh place to look: closing the active tab always leaves a
- * defined focus, and `slotsFor` sets exactly one of the six slots — so the
+ * defined focus, and one entity is open at a time — so the
  * "close the tab, the slot survives, the section reopens the entity" bug has
  * nowhere to live.
  */
@@ -125,19 +124,24 @@ describe('pruneTabs', () => {
   })
 })
 
-describe('slotsFor', () => {
-  it('sets exactly one slot', () => {
-    const slots = slotsFor(doc('d1'))
-    expect(slots.activeDocId).toBe('d1')
-    expect(Object.values(slots).filter(Boolean)).toEqual(['d1'])
+describe('tabFromSlots', () => {
+  // the only thing that still speaks the pre-11.3 shape is `migrate`, reading
+  // what a v4 payload had open so the upgrade does not lose it
+  const noSlots = {
+    activeNoteId: null,
+    activeDocId: null,
+    activeCodeId: null,
+    activeSheetId: null,
+    activePresentId: null,
+    activeAssetId: null,
+  }
+
+  it('finds the entity a stored v4 state had open', () => {
+    expect(tabFromSlots({ ...noSlots, activeNoteId: 'n1' })).toEqual(note('n1'))
+    expect(tabFromSlots({ ...noSlots, activeDocId: 'd1' })).toEqual(doc('d1'))
   })
 
-  it('clears every slot when nothing is open', () => {
-    expect(Object.values(slotsFor(null)).filter(Boolean)).toEqual([])
-  })
-
-  it('round-trips through the legacy slot shape', () => {
-    expect(tabFromSlots(slotsFor(note('n1')))).toEqual(note('n1'))
-    expect(tabFromSlots(slotsFor(null))).toBeNull()
+  it('answers null when that state had nothing open', () => {
+    expect(tabFromSlots(noSlots)).toBeNull()
   })
 })

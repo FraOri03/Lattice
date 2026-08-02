@@ -16,13 +16,9 @@ function openNote(content = 'hello') {
   const s = useStore.getState()
   const id = s.createNote()
   s.updateNote(id, { title: 'Test note', content })
+  // opening the note IS clearing the rest since 11.3.5: one entity is open
+  // at a time, so this no longer has to null four fields by hand
   s.openNote(id)
-  useStore.setState({
-    activeAssetId: null,
-    activeCodeId: null,
-    activeSheetId: null,
-    activeDocId: null,
-  })
   return id
 }
 

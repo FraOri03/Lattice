@@ -1,18 +1,18 @@
 import type { NavEntityKind } from '@/lib/nav/navUrl'
 
 /**
- * Project tab sessions (Phase 11.3.1) — the model, with no store in sight.
+ * Project tab sessions — the model, with no store in sight.
  *
- * The store holds six independent slots (`activeNoteId`, `activeDocId`,
+ * The store used to hold six independent slots (`activeNoteId`, `activeDocId`,
  * `activeCodeId`, `activeSheetId`, `activePresentId`, `activeAssetId`) that
- * nothing reconciles, while the URL carries exactly one open entity. They
- * agree today only because every `open*` helper clears the other five by
- * hand — six chances to forget.
+ * nothing reconciled, while the URL carried exactly one open entity. They
+ * agreed only because every `open*` helper cleared the other five by hand —
+ * six chances to forget, one of which had already been taken.
  *
- * Tabs replace that agreement-by-convention with a single fact: a session has
- * a list of open entities and one active tab, and `slotsFor` derives all six
- * slots from it. The slots become a projection, never a second source of
- * truth. See docs/architecture/app-shell.md for why that rule exists.
+ * A session replaces that agreement-by-convention with a single fact: the
+ * open entities, and which one is active. Since 11.3.5 the slots are not
+ * stored at all; what is open is read from here through
+ * [`openEntity`](./openEntity.ts). See docs/architecture/app-shell.md.
  *
  * Everything here is pure: no React, no store import, no side effects.
  */
@@ -104,7 +104,11 @@ export function pruneTabs(
   }
 }
 
-/** The six entity slots, as the store still spells them. */
+/**
+ * The six entity slots as storage still holds them in payloads written
+ * before 11.3. Nothing in the running app has this shape any more — only
+ * `migrate` reads it, to fold what was open into a session.
+ */
 export interface EntitySlots {
   activeNoteId: string | null
   activeDocId: string | null
@@ -123,25 +127,7 @@ const SLOT_OF: Record<NavEntityKind, keyof EntitySlots> = {
   asset: 'activeAssetId',
 }
 
-const NO_SLOTS: EntitySlots = {
-  activeNoteId: null,
-  activeDocId: null,
-  activeCodeId: null,
-  activeSheetId: null,
-  activePresentId: null,
-  activeAssetId: null,
-}
-
-/**
- * Derive all six slots from the active tab: exactly one is set, the rest are
- * null, by construction rather than by five hand-written `null`s per helper.
- */
-export function slotsFor(tab: EntityTab | null): EntitySlots {
-  if (!tab) return { ...NO_SLOTS }
-  return { ...NO_SLOTS, [SLOT_OF[tab.kind]]: tab.id }
-}
-
-/** The inverse, for reading a legacy state that still writes slots directly. */
+/** Reads the pre-11.3 shape: which entity that state had open, if any. */
 export function tabFromSlots(slots: EntitySlots): EntityTab | null {
   for (const kind of Object.keys(SLOT_OF) as NavEntityKind[]) {
     const id = slots[SLOT_OF[kind]]

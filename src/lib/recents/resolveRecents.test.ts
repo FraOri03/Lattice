@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { useStore } from '@/store/useStore'
 import { openRecent, resolveRecents, type RecentSources } from './resolveRecents'
 import type { RecentEntry } from '@/types/model'
+import { openIdOf } from '@/lib/tabs/openEntity'
 
 /**
  * Recents resolution (Phase 11.2.3).
@@ -91,7 +92,7 @@ describe('openRecent', () => {
     // setActiveProject clears every entity slot: open first and the note is
     // wiped by the project switch that follows.
     expect(after.activeProjectId).toBe(alpha)
-    expect(after.activeNoteId).toBe(noteId)
+    expect(openIdOf(after, 'note')).toBe(noteId)
     expect(after.navSurface).toBe('project')
   })
 

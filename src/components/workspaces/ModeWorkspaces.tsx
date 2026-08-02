@@ -1,5 +1,6 @@
 import { lazy, Suspense, type ReactNode } from 'react'
 import { useStore } from '@/store/useStore'
+import { useOpenId } from '@/lib/tabs/openEntity'
 import { useUiStore } from '@/store/useUiStore'
 import { CodeInspector } from '@/components/code/CodeInspector'
 import { FileKindIcon, type FileKind } from '@/lib/registry/fileKinds'
@@ -91,7 +92,7 @@ function JumpList<T extends { id: string }>({
 }
 
 export function SheetModeWorkspace() {
-  const activeSheetId = useStore((s) => s.activeSheetId)
+  const activeSheetId = useOpenId('sheet')
   const sheetDocs = useStore((s) => s.sheetDocs)
   const activeProjectId = useStore((s) => s.activeProjectId)
   const openSheet = useStore((s) => s.openSheet)
@@ -131,7 +132,7 @@ export function SheetModeWorkspace() {
 }
 
 export function CodeModeWorkspace() {
-  const activeCodeId = useStore((s) => s.activeCodeId)
+  const activeCodeId = useOpenId('code')
   const codeDocs = useStore((s) => s.codeDocs)
   const activeProjectId = useStore((s) => s.activeProjectId)
   const openCode = useStore((s) => s.openCode)
@@ -192,7 +193,7 @@ export function PhotoModeWorkspace() {
 }
 
 export function PresentationModeWorkspace() {
-  const activePresentId = useStore((s) => s.activePresentId)
+  const activePresentId = useOpenId('present')
   const presentDocs = useStore((s) => s.presentDocs)
   const assets = useStore((s) => s.assets)
   const activeProjectId = useStore((s) => s.activeProjectId)

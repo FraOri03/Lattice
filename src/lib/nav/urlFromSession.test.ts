@@ -37,15 +37,20 @@ describe('the URL follows the tab session', () => {
     expect(serializeNav(nav)).not.toContain('e=')
   })
 
-  it('does not invent an entity from a stale slot', () => {
+  it('carries the ACTIVE tab, not just any open one', () => {
     const s = useStore.getState()
-    const id = s.createNote()
-    // a slot written behind the session's back — what every open* helper used
-    // to do, and what nothing may do again
-    useStore.setState({ activeNoteId: id })
+    const note = s.createNote()
+    const doc = useStore.getState().createDoc()
+    useStore.getState().openNote(note)
+    useStore.getState().openDoc(doc) // two tabs open, the document focused
 
     const nav = currentNav()
-    expect(nav.surface === 'project' && nav.entity).toBeUndefined()
+    expect(nav).toMatchObject({ entity: { kind: 'doc', id: doc } })
+
+    // and it follows the focus, without the other tab ever appearing in it
+    useStore.getState().activateEntityTab({ kind: 'note', id: note })
+    expect(currentNav()).toMatchObject({ entity: { kind: 'note', id: note } })
+    expect(serializeNav(currentNav())).not.toContain(doc)
   })
 
   it('says nothing about a project when the dashboard is showing', () => {
