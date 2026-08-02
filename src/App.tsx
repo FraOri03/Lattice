@@ -40,6 +40,8 @@ import {
   PresentationModeWorkspace,
   SheetModeWorkspace,
 } from '@/components/workspaces/ModeWorkspaces'
+import { activeTab, cycleTab } from '@/lib/tabs/tabSession'
+import { EntityTabStrip } from '@/components/shell/EntityTabStrip'
 import { SplitResizer } from '@/components/shell/SplitResizer'
 import { CallProvider } from '@/components/call/CallProvider'
 import { CallIsland } from '@/components/call/CallIsland'
@@ -137,6 +139,32 @@ function useGlobalShortcuts() {
         e.preventDefault()
         setShortcutsOpen(true)
         return
+      }
+      /* Tabs (Phase 11.3.3). Cmd/Ctrl+W is the browser's and cannot be had;
+         PageUp/PageDown and W take Alt as well, which keeps them off every
+         keyboard layout's dead keys — brackets would need AltGr on an
+         Italian layout, and Ctrl+Alt+Arrow still rotates the screen on some
+         Windows graphics drivers. */
+      if ((e.ctrlKey || e.metaKey) && e.altKey) {
+        const s = useStore.getState()
+        const session = s.tabSessions[s.activeProjectId]
+        if (!session) return
+        if (e.key === 'PageDown' || e.key === 'PageUp') {
+          const target = cycleTab(session, e.key === 'PageDown' ? 1 : -1)
+          if (target) {
+            e.preventDefault()
+            s.activateEntityTab(target)
+          }
+          return
+        }
+        if (e.key === 'w' || e.key === 'W') {
+          const open = activeTab(session)
+          if (open) {
+            e.preventDefault()
+            s.closeEntityTab(open)
+          }
+          return
+        }
       }
       // "G G" chord opens Graph mode — ignored while typing / with modifiers
       const el = e.target as HTMLElement | null
@@ -238,6 +266,8 @@ function ProjectSurface() {
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar />
+        {/* the project's open entities, above the section they open into */}
+        <EntityTabStrip />
         <ReadOnlyBanner />
         <div className="relative flex min-h-0 flex-1">
           {showSplit ? (

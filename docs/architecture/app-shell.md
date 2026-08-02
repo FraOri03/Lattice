@@ -9,7 +9,7 @@ Surface
 ├── Dashboard          — no project open
 └── Project
     ├── Toolbar        — per mode, what this editor can really do
-    ├── Tabs           — the open entities of this project (11.3; strip is 11.3.3)
+    ├── Tabs           — the open entities of this project, every section (11.3)
     ├── Workspace      — the editor(s) for the active section
     └── Inspector      — properties of the current selection
 ```
@@ -93,6 +93,15 @@ carries a single entity. A link says which tab is **active**, never which tabs
 exist — so opening a deep link focuses that entity and leaves the rest of the
 strip alone, and a link with no `e=` focuses nothing without closing anything.
 
+The strip that shows it belongs to the **project**, not to a section: a note, a
+spreadsheet and a code file sit side by side, and selecting one takes you to the
+section it lives in. Its keys all carry Alt, because `Cmd/Ctrl+W` belongs to the
+browser and cannot be borrowed — `Ctrl/⌘+Alt+PageDown` / `PageUp` move along the
+strip and `Ctrl/⌘+Alt+W` closes the current tab. PageUp/PageDown and W were
+chosen over brackets or arrows so the chord needs no AltGr on an Italian layout
+and does not collide with the screen-rotation shortcut some Windows graphics
+drivers still bind to `Ctrl+Alt+Arrow`.
+
 ## Adding something navigable
 
 1. Can a reload legitimately restore it? If no, it is UI state — stop here.
@@ -121,7 +130,7 @@ strip alone, and a link with no `e=` focuses nothing without closing anything.
 | Per-mode toolbars on shared primitives | **done** (11.1) |
 | Dashboard screen | **done** (11.2) — `AppShell` switches on `navSurface`; recents resolved cross-project in [`lib/recents`](../../src/lib/recents/resolveRecents.ts) |
 | Tab sessions | **done** (11.3.1–11.3.2) — the model, and the store deriving the six slots from it |
-| Tab strip UI | 11.3.3 — the sections still show one entity at a time; only Code has a strip |
+| Tab strip UI | **done** (11.3.3) — one strip per project above the workspace, in [`EntityTabStrip`](../../src/components/shell/EntityTabStrip.tsx) |
 
 See also [navigation.md](../navigation.md) for the URL examples and the
 degradation table, and [toolbar-audit-phase-11-1.md](../toolbar-audit-phase-11-1.md)

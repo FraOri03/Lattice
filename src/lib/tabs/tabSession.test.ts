@@ -3,6 +3,7 @@ import {
   activateTab,
   activeTab,
   closeTab,
+  cycleTab,
   EMPTY_SESSION,
   openTab,
   pruneTabs,
@@ -83,6 +84,30 @@ describe('closeTab', () => {
   it('ignores a tab it never had', () => {
     const s = sessionOf(note('a'))
     expect(closeTab(s, doc('ghost'))).toBe(s)
+  })
+})
+
+describe('cycleTab', () => {
+  it('moves forward and back from the active tab', () => {
+    const s = activateTab(sessionOf(note('a'), doc('b'), note('c')), doc('b'))
+    expect(cycleTab(s, 1)).toEqual(note('c'))
+    expect(cycleTab(s, -1)).toEqual(note('a'))
+  })
+
+  it('wraps at both ends, so the key never reads as broken', () => {
+    const s = sessionOf(note('a'), doc('b')) // 'b' is active, and last
+    expect(cycleTab(s, 1)).toEqual(note('a'))
+    expect(cycleTab(activateTab(s, note('a')), -1)).toEqual(doc('b'))
+  })
+
+  it('answers from the edge when nothing is focused', () => {
+    const s = { ...sessionOf(note('a'), doc('b')), activeKey: null }
+    expect(cycleTab(s, 1)).toEqual(note('a'))
+    expect(cycleTab(s, -1)).toEqual(doc('b'))
+  })
+
+  it('has nothing to offer in an empty session', () => {
+    expect(cycleTab(EMPTY_SESSION, 1)).toBeNull()
   })
 })
 

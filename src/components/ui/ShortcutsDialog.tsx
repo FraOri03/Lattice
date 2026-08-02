@@ -14,6 +14,16 @@ const GROUPS: { title: string; rows: [string, string][] }[] = [
     ],
   },
   {
+    // Cmd/Ctrl+W belongs to the browser, so the tab keys all take Alt too
+    title: 'Tabs',
+    rows: [
+      ['Ctrl/⌘ + Alt + PageDown', 'Next open entity'],
+      ['Ctrl/⌘ + Alt + PageUp', 'Previous open entity'],
+      ['Ctrl/⌘ + Alt + W', 'Close the current tab'],
+      ['← / →', 'Move along the tab strip when it has focus'],
+    ],
+  },
+  {
     title: 'Graph',
     rows: [
       ['↑ / ↓', 'Move between nodes'],

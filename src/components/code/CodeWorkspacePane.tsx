@@ -1,4 +1,3 @@
-import { useRef } from 'react'
 import { useStore } from '@/store/useStore'
 import { useI18n } from '@/lib/i18n'
 import { LANGUAGES, extForLang } from '@/lib/code/languages'
@@ -9,7 +8,6 @@ import { useCan, useReadOnly } from '@/lib/collab/useCollab'
 import { githubProvider } from '@/lib/github/GithubCodeProvider'
 import { toast } from '@/components/ui/Toaster'
 import { IcGithub, IcLock, IcUnlock, IcX } from '@/components/Icons'
-import { TOOLBAR_CONTROL_ATTR, useRovingFocus } from '@/components/ui/toolbar'
 import CodeEditor from './CodeEditor'
 
 /** Ties the tabs to the editor they control. */
@@ -62,85 +60,28 @@ function LockBanner({ fileId }: { fileId: string }) {
 export default function CodeWorkspacePane() {
   const codeDocs = useStore((s) => s.codeDocs)
   const activeCodeId = useStore((s) => s.activeCodeId)
-  // the code files of this project's tab session — since 11.3 there is no
-  // separate code-only tab list to keep in step with the open entity
-  const session = useStore((s) => s.tabSessions[s.activeProjectId])
-  const openCode = useStore((s) => s.openCode)
   const closeCode = useStore((s) => s.closeCode)
-  const closeEntityTab = useStore((s) => s.closeEntityTab)
   const updateCodeMeta = useStore((s) => s.updateCodeMeta)
   const project = useStore((s) => s.projects[s.activeProjectId])
   const readOnly = useReadOnly()
   const tc = useI18n().toolbar.code
-  const tabStrip = useRef<HTMLDivElement>(null)
-  // the tablist borrows the toolbar's roving focus: one tab stop, arrows
-  // between files. It is a keyboard model, not a toolbar-only behaviour.
-  const tabRoving = useRovingFocus(tabStrip, 'horizontal')
 
   const meta = activeCodeId ? codeDocs[activeCodeId] : undefined
   if (!meta) return null
 
-  const tabs = (session?.tabs ?? [])
-    .filter((t) => t.kind === 'code')
-    .map((t) => codeDocs[t.id])
-    .filter(Boolean)
   const github = project?.settings.github
   const githubConnected = githubProvider.isConnected()
 
   return (
     <section className="flex h-full min-w-0 flex-1 flex-col border-r border-bord bg-panel">
-      {/* Tab strip. Not a toolbar — Phase 11.1 deliberately does not invent
-          one for Code, which has no tools to put in it. It is a tablist, and
-          it is now reachable: the chips used to be plain <div onClick>, so
-          switching file was impossible without a mouse. */}
-      <div
-        ref={tabStrip}
-        role="tablist"
-        aria-label={tc.tabs}
-        aria-orientation="horizontal"
-        className="flex flex-none items-center gap-0.5 overflow-x-auto border-b border-bord bg-panel2 px-1 pt-1"
-        onKeyDown={tabRoving.onKeyDown}
-        onFocus={tabRoving.onFocus}
-      >
-        {tabs.map((tab) => {
-          const name = `${tab.title}.${tab.extension}`
-          return (
-            <div
-              key={tab.id}
-              className={`code-tab ${tab.id === activeCodeId ? 'is-active' : ''}`}
-            >
-              <button
-                type="button"
-                role="tab"
-                {...{ [TOOLBAR_CONTROL_ATTR]: '' }}
-                aria-selected={tab.id === activeCodeId}
-                aria-controls={CODE_PANEL_ID}
-                className="max-w-40 cursor-pointer truncate bg-transparent"
-                title={name}
-                onClick={() => openCode(tab.id)}
-              >
-                {name}
-              </button>
-              <button
-                type="button"
-                {...{ [TOOLBAR_CONTROL_ATTR]: '' }}
-                /* the glyph stays 9px, but the target no longer does: it was
-                   16×16, under the 24px floor of WCAG 2.2 SC 2.5.8 */
-                className="icon-btn -m-1 h-6 w-6 p-1"
-                title={tc.closeTab(name)}
-                aria-label={tc.closeTab(name)}
-                onClick={() => closeEntityTab({ kind: 'code', id: tab.id })}
-              >
-                <IcX size={9} />
-              </button>
-            </div>
-          )
-        })}
-        <div className="flex-1" />
+      {/* The file tabs moved OUT of this pane in 11.3.3: they listed the same
+          tab session, filtered to code, so on screen they were the shell
+          strip's files printed twice. What is left here is the pane's own
+          affordance — closing the code workspace itself. */}
+      <div className="flex flex-none items-center justify-end border-b border-bord bg-panel2 px-1 py-1">
         <button
           type="button"
-          {...{ [TOOLBAR_CONTROL_ATTR]: '' }}
-          className="icon-btn mb-1 flex-none"
+          className="icon-btn flex-none"
           title={tc.closeWorkspace}
           aria-label={tc.closeWorkspace}
           onClick={closeCode}
@@ -186,9 +127,13 @@ export default function CodeWorkspacePane() {
         </select>
       </div>
 
+      {/* A region, not a `tabpanel`: the tabs that used to point here live in
+          the shell now, and a panel whose tab is in another component is a
+          relationship assistive tech cannot follow. The editor keeps its
+          accessible name either way. */}
       <div
         id={CODE_PANEL_ID}
-        role="tabpanel"
+        role="region"
         aria-label={tc.editor}
         className="min-h-0 flex-1"
       >

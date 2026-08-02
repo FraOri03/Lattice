@@ -74,6 +74,19 @@ export function closeTab(session: TabSession, tab: EntityTab): TabSession {
 }
 
 /**
+ * The tab `delta` places from the active one, wrapping at both ends. Used by
+ * the next/previous shortcuts: wrapping is what makes "next" answer from the
+ * last tab instead of doing nothing, which reads as a broken key.
+ */
+export function cycleTab(session: TabSession, delta: number): EntityTab | null {
+  if (!session.tabs.length) return null
+  const current = session.tabs.findIndex((t) => tabKey(t) === session.activeKey)
+  if (current === -1) return session.tabs[delta > 0 ? 0 : session.tabs.length - 1]
+  const size = session.tabs.length
+  return session.tabs[(((current + delta) % size) + size) % size]
+}
+
+/**
  * Drop tabs whose entity is gone — deleted here, or never present in this
  * browser. Called after a deletion, and when a session is restored from
  * storage against a vault that has moved on.
