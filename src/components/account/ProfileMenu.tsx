@@ -187,8 +187,10 @@ export function ProfileMenu() {
 
           {/* footer */}
           <div className="mt-3 flex items-center justify-between border-t border-bord pt-2.5">
+            {/* the commit is what turns "it's broken on prod" into a
+                diff — the version alone only says which build */}
             <span className="text-[10px] text-muted">
-              Lattice v{env.appVersion} · {env.appEnv}
+              Lattice v{env.appVersion} · {env.appCommit} · {env.appEnv}
             </span>
             <button
               className="flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-[12px] text-muted hover:bg-panel2 hover:text-ink"

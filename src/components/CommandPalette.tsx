@@ -7,6 +7,7 @@ import { syncEngine } from '@/lib/sync/SyncEngine'
 import { FileKindIcon, type FileKind } from '@/lib/registry/fileKinds'
 import type { RecentEntry, ViewMode } from '@/types/model'
 import { useCollabStore } from '@/lib/collab/collabStore'
+import { nextTheme, setThemeAnimated } from '@/lib/theme/animateTheme'
 import {
   IcActivity,
   IcBoard,
@@ -192,7 +193,13 @@ function usePaletteItems(query: string, close: () => void): PaletteItem[] {
       [
         s.theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme',
         s.theme === 'dark' ? <IcSun size={14} /> : <IcMoon size={14} />,
-        () => s.setTheme(s.theme === 'dark' ? 'light' : 'dark'),
+        // no click point to grow from here, so the reveal starts at the
+        // middle of the palette the command was run from
+        () =>
+          setThemeAnimated(nextTheme(s.theme), s.setTheme, {
+            x: window.innerWidth / 2,
+            y: window.innerHeight / 3,
+          }),
       ],
       ['GitHub — sync code', <IcGithub size={14} />, () => setGithubDialogOpen(true)],
       ['Google Drive — connect & diagnostics', <IcCloud size={14} />, () => setDriveDialogOpen(true)],

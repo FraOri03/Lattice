@@ -14,6 +14,7 @@ import { RealtimeStatusChip } from '@/components/collab/RealtimeStatusChip'
 import { NotificationCenter } from '@/components/collab/NotificationCenter'
 import { useCollabMode } from '@/lib/collab/collabPresentation'
 import { useI18n } from '@/lib/i18n'
+import { nextTheme, setThemeAnimated } from '@/lib/theme/animateTheme'
 import {
   IcAlert,
   IcChevronRight,
@@ -310,13 +311,25 @@ export function TopBar() {
         <kbd className="text-[10px] text-muted">Ctrl K</kbd>
       </button>
       <SyncIndicator />
+      {/* the reveal starts from this button, so the new theme visibly comes
+          out of the control the user pressed */}
       <button
         className="icon-btn"
-        onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+        onClick={(e) => {
+          const box = e.currentTarget.getBoundingClientRect()
+          setThemeAnimated(nextTheme(theme), setTheme, {
+            x: box.left + box.width / 2,
+            y: box.top + box.height / 2,
+          })
+        }}
         title={theme === 'dark' ? t.topbar.themeToLight : t.topbar.themeToDark}
         aria-label={theme === 'dark' ? t.topbar.themeToLight : t.topbar.themeToDark}
       >
-        {theme === 'dark' ? <IcSun size={15} /> : <IcMoon size={15} />}
+        {/* keyed on the theme so React remounts it and the swap animation
+            actually replays — a reused element would just change children */}
+        <span key={theme} className="theme-icon-swap">
+          {theme === 'dark' ? <IcSun size={15} /> : <IcMoon size={15} />}
+        </span>
       </button>
       <ProfileMenu />
     </header>

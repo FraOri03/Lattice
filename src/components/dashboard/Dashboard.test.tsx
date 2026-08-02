@@ -60,6 +60,34 @@ describe('Dashboard', () => {
     ).toBeInTheDocument()
   })
 
+  it('says what a project holds, not just its name', () => {
+    const s = useStore.getState()
+    const id = s.createProject({ name: 'Counted' }) // every project starts with one board
+    s.setActiveProject(id)
+    useStore.getState().createNote({ title: 'A thought' })
+    useStore.setState({ navSurface: 'dashboard' })
+
+    render(<Dashboard />)
+
+    const card = screen.getByRole('button', { name: 'Open project Counted' })
+    expect(card).toHaveTextContent('1 board')
+    expect(card).toHaveTextContent('1 file')
+  })
+
+  it('summarises the workspace above the projects', () => {
+    const s = useStore.getState()
+    s.createProject({ name: 'Summarised' })
+    useStore.setState({ navSurface: 'dashboard' })
+
+    render(<Dashboard />)
+
+    // the shell's top bar is not mounted here, so Home carries the totals
+    // and the "is my work leaving this browser" answer itself
+    const overview = screen.getByRole('region', { name: 'Workspace at a glance' })
+    expect(overview).toBeInTheDocument()
+    expect(screen.getByText('Local vault — nothing leaves this browser')).toBeInTheDocument()
+  })
+
   it('scopes to the active workspace', () => {
     const s = useStore.getState()
     const inside = s.createProject({ name: 'Inside' })

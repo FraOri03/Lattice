@@ -16,7 +16,21 @@ export const env = {
   /** GitHub OAuth app client id — enables browser OAuth via /api/github/oauth */
   githubClientId: (import.meta.env.VITE_GITHUB_CLIENT_ID as string | undefined) ?? '',
   appEnv: (import.meta.env.VITE_APP_ENV as string | undefined) || 'development',
-  appVersion: (import.meta.env.VITE_APP_VERSION as string | undefined) || '0.8.0',
+  /**
+   * `major.minor` from package.json, then a build number that ticks up on
+   * its own — so the version on screen changes with every production
+   * deploy instead of whenever someone remembers to bump a file.
+   *
+   * Order: an explicitly pinned `VITE_APP_VERSION` wins, then the stamp
+   * `vite.config.ts` compiled in, then a static fallback for any consumer
+   * of this module that is not built by Vite (tests, scripts).
+   */
+  appVersion:
+    (import.meta.env.VITE_APP_VERSION as string | undefined) ||
+    (typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : '') ||
+    '0.8.0',
+  /** Short commit sha of the build, or 'local' outside CI. */
+  appCommit: typeof __APP_COMMIT__ === 'string' ? __APP_COMMIT__ : 'local',
   /**
    * Release stage shown next to the version (alpha → beta → stable). Display
    * only: nothing in the app branches on it, it just tells the user how much

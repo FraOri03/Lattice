@@ -106,3 +106,15 @@ export function useAccount(): AccountContextValue {
   if (!ctx) throw new Error('useAccount must be used inside <AccountProvider>')
   return ctx
 }
+
+/**
+ * The account when there is one and a provider to ask, `null` otherwise.
+ *
+ * For surfaces that merely *decorate* with the identity — a greeting, an
+ * avatar — and must not become unrenderable without the provider. Anything
+ * that acts on the account (sign in/out, sync, sharing) uses `useAccount`
+ * and should still fail loudly when it is mounted outside one.
+ */
+export function useOptionalAccount(): Account | null {
+  return useContext(AccountContext)?.account ?? null
+}

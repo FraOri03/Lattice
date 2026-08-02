@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from 'react'
+import { lazy, Suspense, useEffect, useRef } from 'react'
 import { useStore } from '@/store/useStore'
 import { useUiStore } from '@/store/useUiStore'
 import { useWorkspaceLayoutStore } from '@/store/workspaceLayoutStore'
@@ -22,6 +22,7 @@ import { DocumentView } from '@/components/DocumentView'
 import { documentPaneFor } from '@/lib/nav/activePane'
 import { BoardCanvas } from '@/components/board/BoardCanvas'
 import { LoginScreen } from '@/components/account/LoginScreen'
+import { AuthHandoff, useAuthHandoff } from '@/components/account/AuthHandoff'
 import { GithubDialog } from '@/components/github/GithubDialog'
 import { DriveDialog } from '@/components/account/DriveDialog'
 import { CommandPalette } from '@/components/CommandPalette'
@@ -323,14 +324,38 @@ function AppShell() {
 
 function Gate() {
   const { account, loginSkipped } = useAccount()
-  if (!account && !loginSkipped) return <LoginScreen />
+  const open = !!account || loginSkipped
+  const phase = useAuthHandoff(open)
+  const wasGated = useRef(!open)
+
+  // Landing: signing in lands on Home, not on whatever project the URL
+  // still remembers from last time. This runs AFTER useUrlHistory's restore
+  // (child effects fire before the parent's), so it is the last word on the
+  // surface — and the URL follows it to the bare root. Only a real
+  // transition through the login screen triggers it: someone who is already
+  // signed in and opens a deep link keeps their link.
+  useEffect(() => {
+    if (wasGated.current && open) useStore.getState().openDashboard()
+    wasGated.current = !open
+  }, [open])
+
+  if (!open) return <LoginScreen />
   // The call provider sits ABOVE the shell: switching section, toggling
   // Split or opening the Graph re-renders the panes, but never remounts the
   // LiveKit room, so a call survives navigation.
   return (
-    <CallProvider>
-      <AppShell />
-    </CallProvider>
+    <>
+      {/* while the cover is opaque the login card is still the thing
+          underneath — the swap happens behind it, never in front */}
+      {phase === 'cover' ? (
+        <LoginScreen />
+      ) : (
+        <CallProvider>
+          <AppShell />
+        </CallProvider>
+      )}
+      <AuthHandoff phase={phase} />
+    </>
   )
 }
 

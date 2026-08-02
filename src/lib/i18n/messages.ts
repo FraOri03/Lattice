@@ -473,6 +473,26 @@ export const en = {
   /** Home — the surface shown when no project is open (Phase 11.2) */
   dashboard: {
     title: 'Home',
+    /**
+     * Time-of-day rather than "welcome back": it carries information (it
+     * tells you the app knows what time it is where you are) and it avoids
+     * having to guess at anyone's grammatical gender in translation.
+     */
+    greeting: (name: string) => {
+      const hour = new Date().getHours()
+      const part = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
+      return name ? `${part}, ${name}` : part
+    },
+    overview: 'Workspace at a glance',
+    boards: 'Boards',
+    files: 'Files',
+    storage: 'Stored here',
+    nothingStored: 'Empty',
+    localOnly: 'Local vault — nothing leaves this browser',
+    syncedAgo: (when: string) => `Cloud vault — synced ${when}`,
+    syncPending: 'Cloud vault — not synced yet',
+    boardCount: (n: number) => `${n} ${n === 1 ? 'board' : 'boards'}`,
+    fileCount: (n: number) => `${n} ${n === 1 ? 'file' : 'files'}`,
     inWorkspace: (workspace: string) => `in ${workspace}`,
     newProject: 'New project',
     search: 'Search',
@@ -957,6 +977,21 @@ export const it: Catalog = {
 
   dashboard: {
     title: 'Home',
+    greeting: (name) => {
+      const hour = new Date().getHours()
+      const part = hour < 12 ? 'Buongiorno' : hour < 18 ? 'Buon pomeriggio' : 'Buonasera'
+      return name ? `${part}, ${name}` : part
+    },
+    overview: 'Il workspace in sintesi',
+    boards: 'Board',
+    files: 'File',
+    storage: 'Archiviati qui',
+    nothingStored: 'Vuoto',
+    localOnly: 'Vault locale — non esce da questo browser',
+    syncedAgo: (when) => `Vault cloud — sincronizzato ${when}`,
+    syncPending: 'Vault cloud — non ancora sincronizzato',
+    boardCount: (n) => `${n} board`,
+    fileCount: (n) => `${n} file`,
     inWorkspace: (workspace) => `in ${workspace}`,
     newProject: 'Nuovo progetto',
     search: 'Cerca',

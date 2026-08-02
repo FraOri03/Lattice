@@ -89,7 +89,7 @@ are documented, with step-by-step provider setup, in
 | `VITE_REALTIME_AUTH_URL` / `VITE_REALTIME_ROOMS_URL` | endpoint overrides | no |
 | `VITE_CONVERSION_API_URL` | remote DOC/PPT conversion | no |
 | `VITE_APP_ENV` | environment label (display) | no |
-| `VITE_APP_VERSION` | version string (display) | no |
+| `VITE_APP_VERSION` | pins the displayed version; unset = stamped per build | no |
 | `VITE_APP_STAGE` | release stage label (display, default `alpha`) | no |
 
 > **Important:** `VITE_*` variables are inlined into the client bundle **at build time**.

@@ -168,6 +168,9 @@ keep working with their original file untouched — never a hard failure.
 | `VITE_APP_VERSION` | display | Shown under the app name in the sidebar and in the account menu. |
 | `VITE_APP_STAGE` | display | Release stage next to the version (default `alpha`). |
 
-> **Note on versioning:** the displayed version is set via `VITE_APP_VERSION`;
-> `package.json`, the `env.ts` fallback and `.env.example` all say `0.8.0`. Bump
-> them together when the effective version changes.
+> **Note on versioning:** the displayed version is composed at build time by
+> `vite.config.ts` — `major.minor` from `package.json` plus a build number that
+> is minutes since 2025-01-01 UTC (see `src/lib/version/buildStamp.ts`). Every
+> production deploy therefore shows a higher version than the last with no file
+> to edit; bump `package.json` only for a real `major.minor` change. Setting
+> `VITE_APP_VERSION` overrides the whole thing, for a pinned release.

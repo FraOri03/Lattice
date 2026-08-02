@@ -14,8 +14,10 @@ export function LoginScreen() {
 
   return (
     <div className="flex h-full items-center justify-center bg-bg">
-      <div className="w-[420px] rounded-2xl border border-bord bg-panel p-8 shadow-xl">
-        <div className="mb-6 flex items-center gap-3">
+      {/* the card arrives instead of appearing; the lockup leads by a beat
+          so the brand is what the eye lands on first */}
+      <div className="anim-rise w-[420px] rounded-2xl border border-bord bg-panel p-8 shadow-xl">
+        <div className="anim-fade mb-6 flex items-center gap-3">
           <LatticeMark height={38} className="flex-none" />
           <div>
             {/* First contact with the brand, so this is the ™ lockup. */}

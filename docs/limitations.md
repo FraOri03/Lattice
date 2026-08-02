@@ -14,10 +14,15 @@ isn't done" companion to [features.md](features.md).
 - **Test coverage is minimal** — one unit-test file (a board/presentation round-trip).
   Broad automated testing is roadmap work
   ([#20](https://github.com/FraOri03/Lattice/issues/20)).
-- **The effective version is 0.8.0** (Phase 8), now stated identically by `package.json`,
-  the `src/lib/env.ts` fallback and `.env.example`. The sidebar shows it as
-  `Alpha v0.8.0` (`VITE_APP_STAGE` + `VITE_APP_VERSION`); bump all three by hand when it
-  changes — nothing derives one from another.
+- **The displayed version is stamped per build**: `major.minor` come from `package.json`
+  (`0.8`, Phase 8) and the third number is minutes since 2025-01-01 UTC, so every
+  production deploy shows a higher version than the one before it without anyone editing
+  a file — `Alpha v0.8.833202`. The account menu adds the short commit sha.
+  `VITE_APP_STAGE` still names the stage and a set `VITE_APP_VERSION` still overrides the
+  stamp entirely. **The third number is a build counter, not a semver patch**: it does
+  not mean "0.8 patch 833202", and two builds a minute apart are indistinguishable by it.
+  A git commit count would read better but hosting providers clone shallowly, so it would
+  depend on the clone depth rather than the history.
 
 ## Accessibility
 
@@ -52,6 +57,18 @@ _Tracked in [#10](https://github.com/FraOri03/Lattice/issues/10)._
   **Fixed** (`NAV-1`): Back/Forward and refreshable deep links work — see
   [navigation.md](navigation.md). Phase 11.0 added the dashboard surface (the bare root
   URL, and where unknown/deleted project links land).
+- **Home is where signing in lands you**, and it summarises the workspace: project /
+  board / file counts, bytes stored, and whether the vault is local or synced. The
+  counts only include entities that carry a `projectId` — anything predating them is
+  left out rather than attributed to the wrong project. Someone already signed in who
+  opens a deep link still goes straight to it; only a crossing through the login screen
+  redirects.
+- **The login → Home handoff is a timed cover** (~540 ms), not a real transition
+  between two rendered states: the login card is still mounted behind it until the
+  swap. `prefers-reduced-motion` skips it entirely.
+- **The theme reveal needs View Transitions** (Chromium today). Elsewhere — and in a
+  hidden/backgrounded tab, where the API is skipped by the browser — day ⇄ night falls
+  back to a colour crossfade. Reduced motion gets neither.
 - **The dashboard shows this browser's projects only.** 11.2 shipped the Home screen —
   the active workspace's projects, grouped starred/recent/active/archived, reached from
   the product mark in the sidebar. "Shared with me", pending invites and Trash are absent
