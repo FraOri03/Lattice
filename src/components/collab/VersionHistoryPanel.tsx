@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useStore } from '@/store/useStore'
+import { useOpenId } from '@/lib/tabs/openEntity'
 import { useCollabStore } from '@/lib/collab/collabStore'
 import { versionHistory } from '@/lib/collab/VersionHistoryService'
 import { useCan } from '@/lib/collab/useCollab'
@@ -224,13 +225,13 @@ export function VersionHistoryPanel() {
   const project = useStore((s) => s.projects[s.activeProjectId])
   const activeBoardId = useStore((s) => s.activeBoardId)
   const boards = useStore((s) => s.boards)
-  const activeDocId = useStore((s) => s.activeDocId)
+  const activeDocId = useOpenId('doc')
   const docs = useStore((s) => s.docs)
-  const activeCodeId = useStore((s) => s.activeCodeId)
+  const activeCodeId = useOpenId('code')
   const codeDocs = useStore((s) => s.codeDocs)
-  const activeSheetId = useStore((s) => s.activeSheetId)
+  const activeSheetId = useOpenId('sheet')
   const sheetDocs = useStore((s) => s.sheetDocs)
-  const activePresentId = useStore((s) => s.activePresentId)
+  const activePresentId = useOpenId('present')
   const presentDocs = useStore((s) => s.presentDocs)
   const versions = useCollabStore((s) => s.versions[projectId]) ?? []
   const mayCreate = useCan('versions.create')

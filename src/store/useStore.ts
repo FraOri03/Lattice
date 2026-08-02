@@ -39,6 +39,17 @@ import { digestDocJson, EMPTY_DOC } from '@/lib/richdoc/docjson'
 import { digestCode } from '@/lib/code/digest'
 import { extForLang } from '@/lib/code/languages'
 import {
+  activeTab,
+  closeTab,
+  EMPTY_SESSION,
+  openTab,
+  pruneTabs,
+  tabFromSlots,
+  type EntityTab,
+  type TabSession,
+} from '@/lib/tabs/tabSession'
+import { describeEntity } from '@/lib/entities/entityLabel'
+import {
   createBody,
   digestSpreadsheet,
   normalizeBody,
@@ -70,7 +81,7 @@ import {
 } from '@/lib/sidebar/folders'
 import type { GraphViewSettings } from '@/lib/graph/graphTypes'
 import { decodeGraphSettings } from '@/lib/graph/GraphSettingsService'
-import type { NavSurface, ResolvedNavigation } from '@/lib/nav/navUrl'
+import { ENTITY_MODE, type NavSurface, type ResolvedNavigation } from '@/lib/nav/navUrl'
 import { useWorkspaceLayoutStore } from './workspaceLayoutStore'
 import {
   DEFAULT_PROJECT_ID,
@@ -136,6 +147,73 @@ function dropRecent(recents: RecentEntry[], kind: RecentEntry['kind'], id: strin
   return recents.filter((r) => !(r.kind === kind && r.id === id))
 }
 
+/** Storage shapes that predate the tab session, as `migrate` still finds them. */
+type PersistedBeforeTabs = Partial<AppState> & {
+  codeTabs?: string[]
+  activeNoteId?: string | null
+  activeDocId?: string | null
+  activeCodeId?: string | null
+  activeSheetId?: string | null
+  activePresentId?: string | null
+  activeAssetId?: string | null
+}
+
+/**
+ * Tab-session patches (Phase 11.3.2).
+ *
+ * Every state change that opens or closes an entity goes through one of
+ * these, so the six `active*Id` slots are only ever written as a projection
+ * of the active tab — the point of the whole phase. Writing a slot directly
+ * anywhere else re-creates the second source of truth these replace.
+ */
+type SessionPatch = { tabSessions: Record<string, TabSession> }
+
+function sessionOf(s: Pick<AppState, 'tabSessions'>, projectId: string): TabSession {
+  return s.tabSessions[projectId] ?? EMPTY_SESSION
+}
+
+function withSession(
+  s: Pick<AppState, 'tabSessions'>,
+  projectId: string,
+  session: TabSession,
+): SessionPatch {
+  // Just the session. Until 11.3.5 this also had to spread the six derived
+  // slots into the patch; now that they are read rather than stored, keeping
+  // them in step is not a thing anyone has to remember to do.
+  return { tabSessions: { ...s.tabSessions, [projectId]: session } }
+}
+
+function withOpenTab(
+  s: Pick<AppState, 'tabSessions'>,
+  projectId: string,
+  tab: EntityTab,
+): SessionPatch {
+  return withSession(s, projectId, openTab(sessionOf(s, projectId), tab))
+}
+
+function withClosedTab(
+  s: Pick<AppState, 'tabSessions'>,
+  projectId: string,
+  tab: EntityTab,
+): SessionPatch {
+  return withSession(s, projectId, closeTab(sessionOf(s, projectId), tab))
+}
+
+/**
+ * The `closeDoc` / `closeSheet` / … family: they take no id because they mean
+ * "close what this section has open". With tabs that is the active tab, and
+ * only when it is really that kind — closing a section while another kind is
+ * focused must not close someone else's tab.
+ */
+function closeActiveOfKind(
+  s: Pick<AppState, 'tabSessions' | 'activeProjectId'>,
+  kind: EntityTab['kind'],
+): SessionPatch | Record<string, never> {
+  const tab = activeTab(sessionOf(s, s.activeProjectId))
+  if (tab?.kind !== kind) return {}
+  return withClosedTab(s, s.activeProjectId, tab)
+}
+
 interface AppState {
   /** workspaces — the layer above projects (Phase 8) */
   workspaces: Record<string, Workspace>
@@ -157,14 +235,16 @@ interface AppState {
   sheetDocs: Record<string, SpreadsheetDocMeta>
   /** Presentation METADATA only — deck bodies are lazy-loaded from storage. */
   presentDocs: Record<string, PresentationDocMeta>
-  activeNoteId: string | null
-  activeAssetId: string | null
-  activeDocId: string | null
-  activeCodeId: string | null
-  activeSheetId: string | null
-  activePresentId: string | null
-  /** open tabs in the code workspace (code doc ids) */
-  codeTabs: string[]
+  /**
+   * Open entities per project, with one active tab (Phase 11.3).
+   *
+   * The single source of truth for what is open. There is no `activeNoteId`
+   * or `activeDocId` beside it any more (11.3.5): a projection kept in state
+   * is a second source of truth waiting for one `set()` to diverge, so what
+   * is open is READ from here — `useOpenId` / `useOpenEntity` in
+   * [`lib/tabs/openEntity`](../lib/tabs/openEntity.ts).
+   */
+  tabSessions: Record<string, TabSession>
   /** recently opened entities, newest first */
   recents: RecentEntry[]
   viewMode: ViewMode
@@ -352,7 +432,12 @@ interface AppState {
   deleteCode: (id: string) => void
   openCode: (id: string) => void
   closeCode: () => void
-  closeCodeTab: (id: string) => void
+  /** Close an open entity in the active project's session (Phase 11.3). */
+  closeEntityTab: (tab: EntityTab) => void
+  /** Drop tabs whose entity this browser no longer holds (Phase 11.3.4). */
+  pruneTabSessions: () => void
+  /** Focus an already-open entity without re-opening it. */
+  activateEntityTab: (tab: EntityTab) => void
 
   importVault: (data: VaultExport) => Promise<void>
 }
@@ -478,13 +563,13 @@ export const useStore = create<AppState>()(
       codeDocs: {},
       sheetDocs: {},
       presentDocs: {},
+      tabSessions: {},
       activeNoteId: null,
       activeAssetId: null,
       activeDocId: null,
       activeCodeId: null,
       activeSheetId: null,
       activePresentId: null,
-      codeTabs: [],
       recents: [],
       viewMode: 'board',
       navSurface: 'project',
@@ -839,13 +924,13 @@ export const useStore = create<AppState>()(
           sheetDocs: omit(s.sheetDocs, new Set(ownedSheets.map((sh) => sh.id))),
           presentDocs: omit(s.presentDocs, new Set(ownedPresents.map((p) => p.id))),
           assets: omit(s.assets, new Set(ownedAssets.map((a) => a.id))),
-          activeNoteId: null,
-          activeAssetId: null,
-          activeDocId: null,
-          activeCodeId: null,
-          activeSheetId: null,
-          activePresentId: null,
-          codeTabs: [],
+          // the deleted project's session goes with it; the one we land in
+          // supplies whatever it had open
+          ...withSession(
+            { tabSessions: omit(s.tabSessions, new Set([id])) },
+            nextActiveProject,
+            s.tabSessions[nextActiveProject] ?? EMPTY_SESSION,
+          ),
         })
       },
 
@@ -881,6 +966,7 @@ export const useStore = create<AppState>()(
         )
         // a fresh project starts in a single pane
         useWorkspaceLayoutStore.getState().closeSplit()
+        const restored = activeTab(sessionOf(s, id))
         set({
           activeWorkspaceId: containing?.id ?? s.activeWorkspaceId,
           activeProjectId: id,
@@ -888,14 +974,12 @@ export const useStore = create<AppState>()(
           boards,
           boardOrder,
           activeBoardId,
-          activeNoteId: null,
-          activeAssetId: null,
-          activeDocId: null,
-          activeCodeId: null,
-          activeSheetId: null,
-          activePresentId: null,
-          codeTabs: [],
-          viewMode: s.viewMode,
+          // Entering a project restores ITS tab session rather than clearing
+          // everything: what you had open is a property of the project, not
+          // of the visit. Landing on the section that tab belongs to keeps
+          // the URL, the slots and what renders in agreement.
+          ...withSession(s, id, sessionOf(s, id)),
+          viewMode: restored ? ENTITY_MODE[restored.kind] : s.viewMode,
           navSurface: 'project',
         })
       },
@@ -927,23 +1011,13 @@ export const useStore = create<AppState>()(
               ? nav.boardId
               : (s.boardOrder.find((b) => s.boards[b]?.projectId === nav.projectId) ??
                 s.activeBoardId)
-          const actives = {
-            activeNoteId: null as string | null,
-            activeAssetId: null as string | null,
-            activeDocId: null as string | null,
-            activeCodeId: null as string | null,
-            activeSheetId: null as string | null,
-            activePresentId: null as string | null,
-          }
-          const field = {
-            note: 'activeNoteId',
-            asset: 'activeAssetId',
-            doc: 'activeDocId',
-            code: 'activeCodeId',
-            sheet: 'activeSheetId',
-            present: 'activePresentId',
-          } as const
-          if (nav.entity) actives[field[nav.entity.kind]] = nav.entity.id
+          // The URL carries one open entity, so it decides which tab is
+          // ACTIVE — not which tabs exist. A link without `e=` therefore
+          // focuses nothing and keeps the strip, instead of closing it.
+          const session = sessionOf(s, nav.projectId)
+          const next = nav.entity
+            ? openTab(session, nav.entity)
+            : { ...session, activeKey: null }
           return {
             activeWorkspaceId: workspace?.id ?? s.activeWorkspaceId,
             activeProjectId: nav.projectId,
@@ -954,11 +1028,7 @@ export const useStore = create<AppState>()(
             activeBoardId: boardId,
             viewMode: nav.mode,
             navSurface: 'project' as NavSurface,
-            codeTabs:
-              nav.entity?.kind === 'code'
-                ? [...new Set([...s.codeTabs, nav.entity.id])]
-                : s.codeTabs,
-            ...actives,
+            ...withSession(s, nav.projectId, next),
           }
         })
       },
@@ -1414,18 +1484,14 @@ export const useStore = create<AppState>()(
           return {
             notes,
             boards: stripCards(s.boards, (d) => d.noteId === id),
-            activeNoteId: s.activeNoteId === id ? null : s.activeNoteId,
+            ...withClosedTab(s, s.activeProjectId, { kind: 'note', id }),
             recents: dropRecent(s.recents, 'note', id),
           }
         }),
 
       openNote: (id) =>
         set((s) => ({
-          activeNoteId: id,
-          activeAssetId: null,
-          activeDocId: null,
-          activeCodeId: null,
-          activeSheetId: null,
+          ...withOpenTab(s, s.activeProjectId, { kind: 'note', id }),
           viewMode: 'doc',
           navSurface: 'project' as NavSurface,
           recents: pushRecent(s.recents, { kind: 'note', id }),
@@ -1514,7 +1580,7 @@ export const useStore = create<AppState>()(
           return {
             assets,
             boards: stripCards(s.boards, (d) => d.assetId === id),
-            activeAssetId: s.activeAssetId === id ? null : s.activeAssetId,
+            ...withClosedTab(s, s.activeProjectId, { kind: 'asset', id }),
             recents: dropRecent(s.recents, 'asset', id),
           }
         })
@@ -1522,16 +1588,13 @@ export const useStore = create<AppState>()(
 
       openAsset: (id) =>
         set((s) => ({
-          activeAssetId: id,
-          activeDocId: null,
-          activeCodeId: null,
-          activeSheetId: null,
+          ...withOpenTab(s, s.activeProjectId, { kind: 'asset', id }),
           viewMode: 'doc',
           navSurface: 'project' as NavSurface,
           recents: pushRecent(s.recents, { kind: 'asset', id }),
         })),
 
-      closeAsset: () => set({ activeAssetId: null }),
+      closeAsset: () => set((s) => closeActiveOfKind(s, 'asset')),
 
       /* ---------------- rich documents ---------------- */
 
@@ -1606,7 +1669,7 @@ export const useStore = create<AppState>()(
           return {
             docs,
             boards: stripCards(s.boards, (d) => d.docId === id),
-            activeDocId: s.activeDocId === id ? null : s.activeDocId,
+            ...withClosedTab(s, s.activeProjectId, { kind: 'doc', id }),
             recents: dropRecent(s.recents, 'doc', id),
           }
         })
@@ -1614,16 +1677,13 @@ export const useStore = create<AppState>()(
 
       openDoc: (id) =>
         set((s) => ({
-          activeDocId: id,
-          activeAssetId: null,
-          activeCodeId: null,
-          activeSheetId: null,
+          ...withOpenTab(s, s.activeProjectId, { kind: 'doc', id }),
           viewMode: 'doc',
           navSurface: 'project' as NavSurface,
           recents: pushRecent(s.recents, { kind: 'doc', id }),
         })),
 
-      closeDoc: () => set({ activeDocId: null }),
+      closeDoc: () => set((s) => closeActiveOfKind(s, 'doc')),
 
       /* ---------------- spreadsheets ---------------- */
 
@@ -1680,7 +1740,7 @@ export const useStore = create<AppState>()(
           return {
             sheetDocs,
             boards: stripCards(s.boards, (d) => d.sheetId === id),
-            activeSheetId: s.activeSheetId === id ? null : s.activeSheetId,
+            ...withClosedTab(s, s.activeProjectId, { kind: 'sheet', id }),
             recents: dropRecent(s.recents, 'sheet', id),
           }
         })
@@ -1688,16 +1748,13 @@ export const useStore = create<AppState>()(
 
       openSheet: (id) =>
         set((s) => ({
-          activeSheetId: id,
-          activeAssetId: null,
-          activeDocId: null,
-          activeCodeId: null,
+          ...withOpenTab(s, s.activeProjectId, { kind: 'sheet', id }),
           viewMode: 'sheet',
           navSurface: 'project' as NavSurface,
           recents: pushRecent(s.recents, { kind: 'sheet', id }),
         })),
 
-      closeSheet: () => set({ activeSheetId: null }),
+      closeSheet: () => set((s) => closeActiveOfKind(s, 'sheet')),
 
       /* ---------------- presentations (Phase 8) ---------------- */
 
@@ -1755,7 +1812,7 @@ export const useStore = create<AppState>()(
           return {
             presentDocs,
             boards: stripCards(s.boards, (d) => d.presentId === id),
-            activePresentId: s.activePresentId === id ? null : s.activePresentId,
+            ...withClosedTab(s, s.activeProjectId, { kind: 'present', id }),
             recents: dropRecent(s.recents, 'present', id),
           }
         })
@@ -1765,18 +1822,16 @@ export const useStore = create<AppState>()(
         // presentations render as a full-page section, never in a split pane
         useWorkspaceLayoutStore.getState().closeSplit()
         set((s) => ({
-          activePresentId: id,
-          activeAssetId: null,
-          activeDocId: null,
-          activeCodeId: null,
-          activeSheetId: null,
+          ...withOpenTab(s, s.activeProjectId, { kind: 'present', id }),
           viewMode: 'presentation',
           navSurface: 'project' as NavSurface,
           recents: pushRecent(s.recents, { kind: 'present', id }),
         }))
       },
 
-      closePresent: () => set({ activePresentId: null }),
+      // 11.3.2 rewired the other five and this one kept writing its slot
+      // directly; removing the field is what surfaced it
+      closePresent: () => set((s) => closeActiveOfKind(s, 'present')),
 
       /* ---------------- code documents ---------------- */
 
@@ -1844,9 +1899,8 @@ export const useStore = create<AppState>()(
           delete codeDocs[id]
           return {
             codeDocs,
-            codeTabs: s.codeTabs.filter((t) => t !== id),
             boards: stripCards(s.boards, (d) => d.codeId === id),
-            activeCodeId: s.activeCodeId === id ? null : s.activeCodeId,
+            ...withClosedTab(s, s.activeProjectId, { kind: 'code', id }),
             recents: dropRecent(s.recents, 'code', id),
           }
         })
@@ -1854,28 +1908,68 @@ export const useStore = create<AppState>()(
 
       openCode: (id) =>
         set((s) => ({
-          activeCodeId: id,
-          activeAssetId: null,
-          activeDocId: null,
-          activeSheetId: null,
-          codeTabs: s.codeTabs.includes(id) ? s.codeTabs : [...s.codeTabs, id],
+          ...withOpenTab(s, s.activeProjectId, { kind: 'code', id }),
           viewMode: 'code',
           navSurface: 'project' as NavSurface,
           recents: pushRecent(s.recents, { kind: 'code', id }),
         })),
 
-      closeCode: () => set({ activeCodeId: null }),
+      closeCode: () => set((s) => closeActiveOfKind(s, 'code')),
 
-      closeCodeTab: (id) =>
+      closeEntityTab: (tab) =>
         set((s) => {
-          const codeTabs = s.codeTabs.filter((t) => t !== id)
-          let activeCodeId = s.activeCodeId
-          if (activeCodeId === id) {
-            const idx = s.codeTabs.indexOf(id)
-            activeCodeId = codeTabs[Math.min(idx, codeTabs.length - 1)] ?? null
-          }
-          return { codeTabs, activeCodeId }
+          const patch = withClosedTab(s, s.activeProjectId, tab)
+          // Focus moves to the neighbour, so the SECTION has to move with it:
+          // closing a note while a code file takes its place otherwise leaves
+          // the Document section rendering nothing, with `m=doc&e=code.…` in
+          // the URL. Nothing to follow when the strip empties.
+          const next = activeTab(patch.tabSessions[s.activeProjectId])
+          return next ? { ...patch, viewMode: ENTITY_MODE[next.kind] } : patch
         }),
+
+      /**
+       * Sessions outlive the entities they point at: a file deleted in
+       * another browser, or a vault restored from a different export, leaves
+       * tabs referring to nothing. The strip already refuses to draw those,
+       * but a ghost tab is still reachable by keyboard — "next tab" would
+       * happily focus a note that no longer exists. Dropping them at load is
+       * the fix at the source.
+       */
+      pruneTabSessions: () =>
+        set((s) => {
+          const exists = (tab: EntityTab) =>
+            !!describeEntity(tab.kind, tab.id, {
+              notes: s.notes,
+              docs: s.docs,
+              sheetDocs: s.sheetDocs,
+              presentDocs: s.presentDocs,
+              codeDocs: s.codeDocs,
+              assets: s.assets,
+              boards: s.boards,
+              projects: s.projects,
+            })
+          const tabSessions: Record<string, TabSession> = {}
+          let changed = false
+          for (const [projectId, session] of Object.entries(s.tabSessions)) {
+            const pruned = pruneTabs(session, exists)
+            tabSessions[projectId] = pruned
+            if (pruned !== session) changed = true
+          }
+          if (!changed) return {}
+          return withSession(
+            { tabSessions },
+            s.activeProjectId,
+            tabSessions[s.activeProjectId] ?? EMPTY_SESSION,
+          )
+        }),
+
+      activateEntityTab: (tab) =>
+        set((s) => ({
+          ...withOpenTab(s, s.activeProjectId, tab),
+          viewMode: ENTITY_MODE[tab.kind],
+          navSurface: 'project' as NavSurface,
+          recents: pushRecent(s.recents, { kind: tab.kind, id: tab.id }),
+        })),
 
       /* ---------------- project file import ---------------- */
 
@@ -1929,24 +2023,22 @@ export const useStore = create<AppState>()(
           codeDocs: stampProject(data.codeDocs ?? {}, fallbackProject),
           sheetDocs: stampProject(data.sheetDocs ?? {}, fallbackProject),
           presentDocs: stampProject(data.presentDocs ?? {}, fallbackProject),
-          codeTabs: [],
           recents: [],
           activeBoardId: boardOrder[0],
-          activeNoteId: null,
-          activeAssetId: null,
-          activeDocId: null,
-          activeCodeId: null,
-          activeSheetId: null,
-          activePresentId: null,
+          // an imported vault opens nothing: every session starts empty
+          tabSessions: {},
         })
       },
     }),
     {
       name: 'lattice-vault-v1',
-      version: 4,
+      version: 5,
       migrate: (persisted, version) => {
         // v0 → v1: introduce projects; the default project adopts everything
-        const s = persisted as Partial<AppState>
+        // A migration reads OLD shapes by definition: the six entity slots
+        // and the code-only tab list were state up to v4, and are keys in
+        // storage here even though the store no longer has them (11.3.5).
+        const s = persisted as PersistedBeforeTabs
         if (version < 1) {
           const project = makeDefaultProject()
           s.projects = { [project.id]: project }
@@ -1998,8 +2090,36 @@ export const useStore = create<AppState>()(
           s.folders = s.folders ?? {}
           s.collapsedCategories = s.collapsedCategories ?? []
         }
+        // v4 → v5: tab sessions. The slots and the code-only tab list were the
+        // two places that knew what was open; both fold into one session for
+        // the project they belonged to, so nobody's open file is lost on the
+        // way in. The old keys are simply no longer read.
+        if (version < 5) {
+          const legacy = s
+          const projectId = legacy.activeProjectId
+          s.tabSessions = s.tabSessions ?? {}
+          if (projectId) {
+            let session = EMPTY_SESSION
+            for (const id of legacy.codeTabs ?? []) {
+              session = openTab(session, { kind: 'code', id })
+            }
+            const open = tabFromSlots({
+              activeNoteId: legacy.activeNoteId ?? null,
+              activeDocId: legacy.activeDocId ?? null,
+              activeCodeId: legacy.activeCodeId ?? null,
+              activeSheetId: legacy.activeSheetId ?? null,
+              activePresentId: legacy.activePresentId ?? null,
+              activeAssetId: legacy.activeAssetId ?? null,
+            })
+            if (open) session = openTab(session, open)
+            s.tabSessions[projectId] = session
+          }
+        }
         return s as AppState
       },
+      // hydration is the moment a session meets the vault it was stored
+      // against: anything it points at that is no longer there goes now
+      onRehydrateStorage: () => (state) => state?.pruneTabSessions(),
       partialize: (s) => ({
         workspaces: s.workspaces,
         activeWorkspaceId: s.activeWorkspaceId,
@@ -2015,14 +2135,10 @@ export const useStore = create<AppState>()(
         codeDocs: s.codeDocs,
         sheetDocs: s.sheetDocs,
         presentDocs: s.presentDocs,
-        codeTabs: s.codeTabs,
         recents: s.recents,
-        activeNoteId: s.activeNoteId,
-        activeAssetId: s.activeAssetId,
-        activeDocId: s.activeDocId,
-        activeCodeId: s.activeCodeId,
-        activeSheetId: s.activeSheetId,
-        activePresentId: s.activePresentId,
+        // what is open is persisted ONCE, as the sessions; the six slots are
+        // derived from them on every read and are not stored at all
+        tabSessions: s.tabSessions,
         viewMode: s.viewMode,
         theme: s.theme,
         locale: s.locale,

@@ -1,4 +1,6 @@
 import { useStore } from '@/store/useStore'
+import { openEntityOf } from '@/lib/tabs/openEntity'
+import { describeEntity } from '@/lib/entities/entityLabel'
 import type { PresenceLocation, PresencePeer } from '@/types/collab'
 import { useCollabStore } from './collabStore'
 import {
@@ -20,6 +22,9 @@ import { collabHub } from './hub'
  * is instant across tabs; Drive polling deliberately does NOT fake live
  * presence (it only refreshes members' lastActiveAt).
  */
+
+type ReportedKind = NonNullable<PresenceLocation['entityKind']>
+const REPORTED_KINDS: ReportedKind[] = ['doc', 'code', 'sheet', 'note', 'asset']
 
 const HEARTBEAT_MS = 10_000
 const PEER_TTL_MS = 35_000
@@ -66,10 +71,10 @@ class PresenceService {
       if (
         state.viewMode !== prev.viewMode ||
         state.activeBoardId !== prev.activeBoardId ||
-        state.activeDocId !== prev.activeDocId ||
-        state.activeCodeId !== prev.activeCodeId ||
-        state.activeSheetId !== prev.activeSheetId ||
-        state.activeProjectId !== prev.activeProjectId
+        state.activeProjectId !== prev.activeProjectId ||
+        // one comparison instead of one per kind, and it now catches the two
+        // the old list forgot: opening a note or a presentation
+        openEntityOf(state) !== openEntityOf(prev)
       ) {
         this.beat()
       }
@@ -188,23 +193,18 @@ class PresenceService {
   private location(): PresenceLocation {
     const s = useStore.getState()
     const loc: PresenceLocation = { mode: s.viewMode, boardId: s.activeBoardId }
-    if (s.activeDocId && s.docs[s.activeDocId]) {
-      loc.entityKind = 'doc'
-      loc.entityId = s.activeDocId
-      loc.entityTitle = s.docs[s.activeDocId].title
-    } else if (s.activeCodeId && s.codeDocs[s.activeCodeId]) {
-      const c = s.codeDocs[s.activeCodeId]
-      loc.entityKind = 'code'
-      loc.entityId = s.activeCodeId
-      loc.entityTitle = `${c.title}.${c.extension}`
-    } else if (s.activeSheetId && s.sheetDocs[s.activeSheetId]) {
-      loc.entityKind = 'sheet'
-      loc.entityId = s.activeSheetId
-      loc.entityTitle = s.sheetDocs[s.activeSheetId].title
-    } else if (s.activeNoteId && s.notes[s.activeNoteId]) {
-      loc.entityKind = 'note'
-      loc.entityId = s.activeNoteId
-      loc.entityTitle = s.notes[s.activeNoteId].title
+    // "what this user has open" is the active tab, and its title comes from
+    // the one lookup every surface shares — this used to be a fifth hand-rolled
+    // chain over the slots, with its own idea of how a code file is named
+    const tab = openEntityOf(s)
+    const described = tab && describeEntity(tab.kind, tab.id, s)
+    // `PresenceLocation.entityKind` has no 'present' or 'asset', and the chain
+    // this replaced reported neither: peers see "in a presentation" as just
+    // the mode. Widening the wire type is a presence change, not a tab one.
+    if (tab && described && REPORTED_KINDS.includes(tab.kind as ReportedKind)) {
+      loc.entityKind = tab.kind as ReportedKind
+      loc.entityId = tab.id
+      loc.entityTitle = described.title
     }
     return loc
   }

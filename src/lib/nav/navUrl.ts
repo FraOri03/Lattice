@@ -58,8 +58,12 @@ const MODES: readonly ViewMode[] = [
   'photo',
 ]
 
-/** Section an entity kind opens into — used to rebuild a `m=split` deep link. */
-const ENTITY_MODE: Record<NavEntityKind, ViewMode> = {
+/**
+ * Section an entity kind opens into — used to rebuild a `m=split` deep link,
+ * and by the store to land on the right section when a tab session is
+ * restored. One map, so the two can never disagree about where a note opens.
+ */
+export const ENTITY_MODE: Record<NavEntityKind, ViewMode> = {
   note: 'doc',
   doc: 'doc',
   code: 'code',

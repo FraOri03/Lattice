@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { useStore } from './useStore'
+import { openIdOf } from '@/lib/tabs/openEntity'
 
 /**
  * Store actions that the board keyboard controller (A11Y-1) and the URL
@@ -189,11 +190,11 @@ describe('applyNav — URL/history restore', () => {
     const after = useStore.getState()
     expect(after.activeProjectId).toBe(pid)
     expect(after.viewMode).toBe('doc')
-    expect(after.activeDocId).toBe(docId)
+    expect(openIdOf(after, 'doc')).toBe(docId)
     expect(after.navSurface).toBe('project')
     // opening one entity clears the others
-    expect(after.activeSheetId).toBeNull()
-    expect(after.activeCodeId).toBeNull()
+    expect(openIdOf(after, 'sheet')).toBeNull()
+    expect(openIdOf(after, 'code')).toBeNull()
   })
 
   it('ignores an unknown project id (safe no-op)', () => {
@@ -225,7 +226,7 @@ describe('navigation surfaces — dashboard vs project', () => {
     expect(after.navSurface).toBe('dashboard')
     // going back in must be free — nothing was torn down
     expect(after.activeProjectId).toBe(pid)
-    expect(after.activeDocId).toBe(docId)
+    expect(openIdOf(after, 'doc')).toBe(docId)
   })
 
   it('openDashboard() is the explicit Home action', () => {

@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import { useStore, exportVaultFull, type SidebarFilter } from '@/store/useStore'
+import { useOpenId } from '@/lib/tabs/openEntity'
 import type { RecentEntry, VaultExport } from '@/types/model'
 import { downloadText } from '@/lib/download'
 import { env } from '@/lib/env'
@@ -71,12 +72,12 @@ export function Sidebar() {
   const codeDocs = useStore((s) => s.codeDocs)
   const sheetDocs = useStore((s) => s.sheetDocs)
   const presentDocs = useStore((s) => s.presentDocs)
-  const activeNoteId = useStore((s) => s.activeNoteId)
-  const activeAssetId = useStore((s) => s.activeAssetId)
-  const activeDocId = useStore((s) => s.activeDocId)
-  const activeCodeId = useStore((s) => s.activeCodeId)
-  const activeSheetId = useStore((s) => s.activeSheetId)
-  const activePresentId = useStore((s) => s.activePresentId)
+  const activeNoteId = useOpenId('note')
+  const activeAssetId = useOpenId('asset')
+  const activeDocId = useOpenId('doc')
+  const activeCodeId = useOpenId('code')
+  const activeSheetId = useOpenId('sheet')
+  const activePresentId = useOpenId('present')
   const recents = useStore((s) => s.recents)
   const openNote = useStore((s) => s.openNote)
   const openAsset = useStore((s) => s.openAsset)

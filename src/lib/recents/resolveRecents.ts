@@ -1,5 +1,6 @@
 import type { RecentEntry } from '@/types/model'
 import { useStore } from '@/store/useStore'
+import { describeEntity, type EntitySources } from '@/lib/entities/entityLabel'
 
 /**
  * Recents, resolved (Phase 11.2.3).
@@ -29,47 +30,11 @@ export interface ResolvedRecent {
   projectName: string | null
 }
 
-/** The store slices resolution reads. Structural, so the store state fits. */
-export interface RecentSources {
-  notes: Record<string, { title: string; projectId?: string }>
-  docs: Record<string, { title: string; projectId?: string }>
-  sheetDocs: Record<string, { title: string; projectId?: string }>
-  presentDocs: Record<string, { title: string; projectId?: string }>
-  codeDocs: Record<string, { title: string; extension: string; projectId?: string }>
-  assets: Record<string, { name: string; projectId?: string }>
-  boards: Record<string, { name: string; projectId?: string }>
-  projects: Record<string, { name: string }>
-}
-
-interface Resolution {
-  title: string
-  projectId?: string
-}
-
-function entityOf(entry: RecentEntry, src: RecentSources): Resolution | null {
-  switch (entry.kind) {
-    case 'note':
-      return src.notes[entry.id] ?? null
-    case 'doc':
-      return src.docs[entry.id] ?? null
-    case 'sheet':
-      return src.sheetDocs[entry.id] ?? null
-    case 'present':
-      return src.presentDocs[entry.id] ?? null
-    case 'code': {
-      const c = src.codeDocs[entry.id]
-      return c ? { title: `${c.title}.${c.extension}`, projectId: c.projectId } : null
-    }
-    case 'asset': {
-      const a = src.assets[entry.id]
-      return a ? { title: a.name, projectId: a.projectId } : null
-    }
-    case 'board': {
-      const b = src.boards[entry.id]
-      return b ? { title: b.name, projectId: b.projectId } : null
-    }
-  }
-}
+/**
+ * The store slices resolution reads. Shared with the tab strip, which asks the
+ * same question of the same maps — see `describeEntity`.
+ */
+export type RecentSources = EntitySources
 
 export interface ResolveOptions {
   /** Keep only this project's entries — what a project surface wants. */
@@ -90,7 +55,7 @@ export function resolveRecents(
 ): ResolvedRecent[] {
   const out: ResolvedRecent[] = []
   for (const entry of recents) {
-    const hit = entityOf(entry, src)
+    const hit = describeEntity(entry.kind, entry.id, src)
     if (!hit) continue // deleted, or from a vault this browser does not hold
     const projectId = hit.projectId ?? null
     const project = projectId ? (src.projects[projectId] ?? null) : null

@@ -1,5 +1,6 @@
 import { lazy, Suspense, useState } from 'react'
 import { backlinksToTitle, useStore } from '@/store/useStore'
+import { useOpenEntity, useOpenId } from '@/lib/tabs/openEntity'
 import { useI18n } from '@/lib/i18n'
 import { downloadText, slugify } from '@/lib/download'
 import { ToolbarAction, ToolbarGroup, ToolbarRoot, ToolbarToggle } from '@/components/ui/toolbar'
@@ -22,11 +23,11 @@ export function DocumentView() {
   const assets = useStore((s) => s.assets)
   const docs = useStore((s) => s.docs)
   const sheetDocs = useStore((s) => s.sheetDocs)
-  const activeNoteId = useStore((s) => s.activeNoteId)
-  const activeAssetId = useStore((s) => s.activeAssetId)
-  const activeDocId = useStore((s) => s.activeDocId)
-  const activeCodeId = useStore((s) => s.activeCodeId)
-  const activeSheetId = useStore((s) => s.activeSheetId)
+  const activeNoteId = useOpenId('note')
+  const activeAssetId = useOpenId('asset')
+  const activeDocId = useOpenId('doc')
+  const activeCodeId = useOpenId('code')
+  const activeSheetId = useOpenId('sheet')
   const updateNote = useStore((s) => s.updateNote)
   const openNote = useStore((s) => s.openNote)
   const createNote = useStore((s) => s.createNote)
@@ -56,12 +57,17 @@ export function DocumentView() {
   const activeCode = activeCodeId ? useStore.getState().codeDocs[activeCodeId] : undefined
   const activeSheet = activeSheetId ? sheetDocs[activeSheetId] : undefined
   const activeDoc = activeDocId ? docs[activeDocId] : undefined
-  const pane = documentPaneFor(viewMode, {
-    activeAssetId: activeAsset ? activeAssetId : null,
-    activeCodeId: activeCode ? activeCodeId : null,
-    activeSheetId: activeSheet ? activeSheetId : null,
-    activeDocId: activeDoc ? activeDocId : null,
-  })
+  // a dangling id must reach the resolver as "nothing open", so the pane it
+  // picks always has an entity behind it
+  const open = useOpenEntity()
+  const resolved =
+    (open?.kind === 'asset' && !activeAsset) ||
+    (open?.kind === 'code' && !activeCode) ||
+    (open?.kind === 'sheet' && !activeSheet) ||
+    (open?.kind === 'doc' && !activeDoc)
+      ? null
+      : open
+  const pane = documentPaneFor(viewMode, resolved)
 
   if (pane === 'asset' && activeAsset) return <AssetPreviewPane asset={activeAsset} />
   if (pane === 'code' && activeCode) {

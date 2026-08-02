@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useRef } from 'react'
 import { useStore } from '@/store/useStore'
+import { tabShortcutFor, useOpenEntity } from '@/lib/tabs/openEntity'
 import { useUiStore } from '@/store/useUiStore'
 import { useWorkspaceLayoutStore } from '@/store/workspaceLayoutStore'
 import type { ViewMode } from '@/types/model'
@@ -40,6 +41,8 @@ import {
   PresentationModeWorkspace,
   SheetModeWorkspace,
 } from '@/components/workspaces/ModeWorkspaces'
+import { activeTab, cycleTab } from '@/lib/tabs/tabSession'
+import { EntityTabStrip } from '@/components/shell/EntityTabStrip'
 import { SplitResizer } from '@/components/shell/SplitResizer'
 import { CallProvider } from '@/components/call/CallProvider'
 import { CallIsland } from '@/components/call/CallIsland'
@@ -138,6 +141,22 @@ function useGlobalShortcuts() {
         setShortcutsOpen(true)
         return
       }
+      // Tabs (Phase 11.3.3) — the binding itself lives in `tabShortcutFor`,
+      // which is pure and therefore assertable without a keyboard.
+      const command = tabShortcutFor(e)
+      if (command) {
+        const s = useStore.getState()
+        const session = s.tabSessions[s.activeProjectId]
+        if (!session) return
+        const target =
+          command === 'close' ? activeTab(session) : cycleTab(session, command === 'next' ? 1 : -1)
+        if (target) {
+          e.preventDefault()
+          if (command === 'close') s.closeEntityTab(target)
+          else s.activateEntityTab(target)
+        }
+        return
+      }
       // "G G" chord opens Graph mode — ignored while typing / with modifiers
       const el = e.target as HTMLElement | null
       const typing =
@@ -183,24 +202,14 @@ function GraphPane() {
  * area or the primary pane of a split.
  */
 function SectionContent({ viewMode }: { viewMode: ViewMode }) {
-  const activeDocId = useStore((s) => s.activeDocId)
-  const activeCodeId = useStore((s) => s.activeCodeId)
-  const activeAssetId = useStore((s) => s.activeAssetId)
-  const activeSheetId = useStore((s) => s.activeSheetId)
+  const open = useOpenEntity()
 
   // Document section: editor · matching inspector. The inspector follows
   // whatever DocumentView actually mounts, so the two can never disagree —
   // docking the document inspector next to a spreadsheet is what made the
   // two views look stacked. Code files and spreadsheets are owned by their
   // own sections and never render here.
-  const docWorkspace =
-    viewMode === 'doc' &&
-    documentPaneFor(viewMode, {
-      activeAssetId,
-      activeCodeId,
-      activeSheetId,
-      activeDocId,
-    }) === 'doc'
+  const docWorkspace = viewMode === 'doc' && documentPaneFor(viewMode, open) === 'doc'
 
   return (
     <>
@@ -238,6 +247,8 @@ function ProjectSurface() {
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar />
+        {/* the project's open entities, above the section they open into */}
+        <EntityTabStrip />
         <ReadOnlyBanner />
         <div className="relative flex min-h-0 flex-1">
           {showSplit ? (

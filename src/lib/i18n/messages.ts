@@ -470,6 +470,15 @@ export const en = {
     },
   },
 
+  /** The open-entity tab strip (Phase 11.3) */
+  tabs: {
+    strip: 'Open in this project',
+    close: (name: string) => `Close ${name}`,
+    next: 'Next tab',
+    previous: 'Previous tab',
+    closeCurrent: 'Close the current tab',
+  },
+
   /** Home — the surface shown when no project is open (Phase 11.2) */
   dashboard: {
     title: 'Home',
@@ -973,6 +982,14 @@ export const it: Catalog = {
       lines: (n) => `${n} righe`,
       editor: 'Editor di codice',
     },
+  },
+
+  tabs: {
+    strip: 'Aperti in questo progetto',
+    close: (name) => `Chiudi ${name}`,
+    next: 'Scheda successiva',
+    previous: 'Scheda precedente',
+    closeCurrent: 'Chiudi la scheda corrente',
   },
 
   dashboard: {
