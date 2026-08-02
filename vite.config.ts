@@ -4,9 +4,30 @@ import { configDefaults } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { fileURLToPath } from 'node:url'
+import { readFileSync } from 'node:fs'
+import { buildNumber, commitRef, composeVersion } from './src/lib/version/buildStamp'
+
+/**
+ * Stamped once per build, not per request: every production deploy ships a
+ * version that is visibly newer than the last, without anyone editing a
+ * file. `package.json` still owns `major.minor`; see buildStamp.ts for why
+ * the tail is a clock and not a commit count.
+ *
+ * `VITE_APP_VERSION` still wins where it is set — a pinned release keeps
+ * whatever it was pinned to.
+ */
+const pkg = JSON.parse(
+  readFileSync(fileURLToPath(new URL('./package.json', import.meta.url)), 'utf8'),
+) as { version: string }
+const APP_VERSION = composeVersion(pkg.version, buildNumber())
+const APP_COMMIT = commitRef(process.env)
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  define: {
+    __APP_VERSION__: JSON.stringify(APP_VERSION),
+    __APP_COMMIT__: JSON.stringify(APP_COMMIT),
+  },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

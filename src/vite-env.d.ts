@@ -13,3 +13,11 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv
 }
+
+/**
+ * Stamped by `vite.config.ts` at build time (see lib/version/buildStamp).
+ * They are compile-time constants, not env vars: nothing can set them at
+ * runtime, and a build that somehow lacks them falls back in `lib/env.ts`.
+ */
+declare const __APP_VERSION__: string
+declare const __APP_COMMIT__: string
