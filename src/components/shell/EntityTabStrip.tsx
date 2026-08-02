@@ -14,6 +14,10 @@ import {
   IcX,
 } from '@/components/Icons'
 
+/** Shared by both states, so the empty bar is the same box as the full one. */
+const STRIP =
+  'flex flex-none items-center gap-0.5 overflow-x-auto border-b border-bord bg-panel2 px-1 pt-1'
+
 const TAB_ICON = {
   note: IcNote,
   doc: IcDoc,
@@ -69,9 +73,22 @@ export function EntityTabStrip() {
       .filter((x): x is { tab: EntityTab; title: string } => !!x)
   }, [session, notes, docs, sheetDocs, presentDocs, codeDocs, assets, boards, projects])
 
-  // no open entities, no bar: an empty strip is a row of chrome that says
-  // nothing, and it would push every section down by its own height
-  if (!tabs.length) return null
+  // The bar belongs to the project, not to what happens to be open in it: it
+  // stays put when the last tab closes, so the workspace underneath never
+  // jumps by a row as you open and close things — and a project you enter on
+  // the Board section still shows where its files would be.
+  //
+  // Empty, it is deliberately NOT a `tablist`: a tab list with no tabs is a
+  // control a screen reader announces and then cannot enter. It carries the
+  // same box as the full strip (`.code-tab` around one line of 11.5px text is
+  // exactly as tall as a tab), so nothing shifts when the first tab arrives.
+  if (!tabs.length) {
+    return (
+      <div className={STRIP} data-project={activeProjectId}>
+        <span className="code-tab cursor-default">{t.empty}</span>
+      </div>
+    )
+  }
 
   const current = session ? activeTab(session) : null
   const currentKey = current ? tabKey(current) : null
@@ -82,7 +99,7 @@ export function EntityTabStrip() {
       role="tablist"
       aria-label={t.strip}
       aria-orientation="horizontal"
-      className="flex flex-none items-center gap-0.5 overflow-x-auto border-b border-bord bg-panel2 px-1 pt-1"
+      className={STRIP}
       onKeyDown={roving.onKeyDown}
       onFocus={roving.onFocus}
       data-project={activeProjectId}

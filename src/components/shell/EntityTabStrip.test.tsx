@@ -27,9 +27,22 @@ function openAMix() {
 }
 
 describe('EntityTabStrip', () => {
-  it('renders nothing when the project has nothing open', () => {
-    const { container } = render(<EntityTabStrip />)
-    expect(container).toBeEmptyDOMElement()
+  it('still draws the bar when the project has nothing open', () => {
+    render(<EntityTabStrip />)
+    expect(screen.getByText('Nothing open yet')).toBeInTheDocument()
+    // an empty tab list is a control a screen reader cannot enter, so the
+    // empty state is text in the same box, not a `tablist` with no tabs
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
+    expect(screen.queryAllByRole('tab')).toHaveLength(0)
+  })
+
+  it('is the same box empty as it is full, so nothing shifts under it', () => {
+    const { container, unmount } = render(<EntityTabStrip />)
+    const empty = container.firstElementChild!.className
+    unmount()
+    openAMix()
+    const full = render(<EntityTabStrip />).container.firstElementChild!.className
+    expect(full).toBe(empty)
   })
 
   it('lists open entities of every kind, not just one section', () => {

@@ -473,6 +473,7 @@ export const en = {
   /** The open-entity tab strip (Phase 11.3) */
   tabs: {
     strip: 'Open in this project',
+    empty: 'Nothing open yet',
     close: (name: string) => `Close ${name}`,
     next: 'Next tab',
     previous: 'Previous tab',
@@ -986,6 +987,7 @@ export const it: Catalog = {
 
   tabs: {
     strip: 'Aperti in questo progetto',
+    empty: 'Ancora niente di aperto',
     close: (name) => `Chiudi ${name}`,
     next: 'Scheda successiva',
     previous: 'Scheda precedente',

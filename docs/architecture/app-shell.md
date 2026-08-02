@@ -118,6 +118,14 @@ chosen over brackets or arrows so the chord needs no AltGr on an Italian layout
 and does not collide with the screen-rotation shortcut some Windows graphics
 drivers still bind to `Ctrl+Alt+Arrow`.
 
+It is drawn **whenever a project is open**, empty session included. Hiding it
+until something was open made it invisible on the path most people take —
+Home, then a project, which lands on the Board section with nothing open — and
+it read as a missing feature rather than as an empty one. Empty, it is not a
+`tablist` (a tab list with no tabs is a control a screen reader announces and
+then cannot enter) but a line of text in the same box, so the workspace below
+does not shift by a row when the first tab arrives.
+
 ## Adding something navigable
 
 1. Can a reload legitimately restore it? If no, it is UI state — stop here.
