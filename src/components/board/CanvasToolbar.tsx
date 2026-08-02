@@ -82,16 +82,21 @@ export function CanvasToolbar() {
     }
   }
 
-  /** Every menu item's tooltip is "Add <thing>", localised in one place. */
+  /**
+   * Every menu item's tooltip is "Add <thing>", localised in one place —
+   * except where the tooltip has to do real work: Note and Document are
+   * both text, so each says what it is FOR instead of restating its name.
+   */
   const item = (
     id: string,
     label: string,
     icon: React.ReactNode,
     run: () => void,
+    description = t.toolbar.board.addTool(label),
   ): ToolbarMenuItem => ({
     id,
     label,
-    description: t.toolbar.board.addTool(label),
+    description,
     icon,
     run,
   })
@@ -113,14 +118,26 @@ export function CanvasToolbar() {
 
   // Creation — document entities that can really be created from the board
   const createItems: ToolbarMenuItem[] = [
-    item('note', t.toolbar.board.note, <IcNote size={16} />, () => insert('note', 'note')),
-    item('richdoc', t.toolbar.board.document, <IcDoc size={16} />, () => {
-      const docId = useStore.getState().createDoc()
-      inserted(
-        addCard('richdoc', centerPos(), { docId, mode: 'compact', color: 'blue' }),
-        'document',
-      )
-    }),
+    item(
+      'note',
+      t.toolbar.board.note,
+      <IcNote size={16} />,
+      () => insert('note', 'note'),
+      t.textEntities.notePurpose,
+    ),
+    item(
+      'richdoc',
+      t.toolbar.board.document,
+      <IcDoc size={16} />,
+      () => {
+        const docId = useStore.getState().createDoc()
+        inserted(
+          addCard('richdoc', centerPos(), { docId, mode: 'compact', color: 'blue' }),
+          'document',
+        )
+      },
+      t.textEntities.documentPurpose,
+    ),
     item('sheet', t.toolbar.board.spreadsheet, <IcTable size={16} />, () => {
       const sheetId = useStore.getState().createSheetDoc()
       inserted(
@@ -144,7 +161,10 @@ export function CanvasToolbar() {
     }),
   ]
 
-  // Media — image / video / 3D / photo / link cards
+  // Media — image / video / 3D / photo / link cards, then the two ways of
+  // bringing outside content onto the board. Web embed and Import used to be
+  // a family of their own; they are here because what they produce is media,
+  // and a menu of two was a group the user had to learn separately.
   const mediaItems: ToolbarMenuItem[] = [
     item('image', t.toolbar.board.image, <IcImage size={16} />, () =>
       imageInput.current?.click(),
@@ -159,10 +179,6 @@ export function CanvasToolbar() {
       insert('photo', 'photo'),
     ),
     item('link', t.toolbar.board.link, <IcLink size={16} />, () => insert('link', 'link')),
-  ]
-
-  // More — the less-frequent external actions
-  const moreItems: ToolbarMenuItem[] = [
     item('web', t.toolbar.board.webEmbed, <IcGlobe size={16} />, promptWebEmbed),
     item('import', t.toolbar.board.import, <ActionIcon.Import size={16} />, () =>
       importInput.current?.click(),
@@ -219,17 +235,6 @@ export function CanvasToolbar() {
           </ToolbarGroup>
         </>
       )}
-
-      <ToolbarSeparator />
-
-      {/* More */}
-      <ToolbarGroup label={t.toolbar.groups.integrate}>
-        <ToolbarSplitButton
-          menuLabel={t.toolbar.board.openImportTools}
-          items={moreItems}
-          defaultItemId="web"
-        />
-      </ToolbarGroup>
 
       <input
         ref={imageInput}

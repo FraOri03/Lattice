@@ -284,6 +284,17 @@ interface AppState {
   deleteNote: (id: string) => void
   openNote: (id: string) => void
   openWikilink: (title: string) => void
+  /**
+   * Promote a note to a document: its markdown becomes a Tiptap body and
+   * the note is consumed, so the same text never exists as both.
+   *
+   * One-way on purpose. A note is capture and a document is the
+   * deliverable, so this is the direction real work travels; the reverse
+   * would have to throw away tables, embeds and page setup to fit back
+   * into markdown. Returns the new document's id, or null if the note is
+   * already gone.
+   */
+  promoteNoteToDoc: (id: string) => Promise<string | null>
 
   addAsset: (asset: AssetDoc) => void
   renameAsset: (id: string, name: string) => void
@@ -1419,6 +1430,22 @@ export const useStore = create<AppState>()(
           navSurface: 'project' as NavSurface,
           recents: pushRecent(s.recents, { kind: 'note', id }),
         })),
+
+      promoteNoteToDoc: async (id) => {
+        const note = get().notes[id]
+        if (!note) return null
+        // the Tiptap schema is heavy and only this path needs it here
+        const { markdownToDocBody } = await import('@/lib/notes/noteToDocument')
+        const docId = get().createDoc({
+          title: note.title,
+          tags: [...note.tags],
+          // spreading an explicit `undefined` would blank the default
+          ...(note.projectId ? { projectId: note.projectId } : {}),
+        })
+        get().persistDocContent(docId, markdownToDocBody(note.content))
+        get().deleteNote(id)
+        return docId
+      },
 
       openWikilink: (title) => {
         const s = get()
