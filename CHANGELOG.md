@@ -22,6 +22,16 @@ All notable changes to Lattice are recorded here. The format follows
 
 ### Changed
 
+- **The displayed version is now a pinned release string: `Alpha v0.11.3.5`.** It used to
+  be composed per build as `major.minor` from `package.json` plus a build number (minutes
+  since 2025-01-01 UTC), which cannot express a four-part release, and the alternative pin
+  (`VITE_APP_VERSION`) lives in a git-ignored `.env` so it cannot be committed. The release
+  string now lives in `PINNED_VERSION` (`src/lib/version/buildStamp.ts`) and is shipped
+  verbatim; clearing it (`''`) restores the automatic stamp, and `VITE_APP_VERSION` still
+  overrides both. The cost of a pin is that two deploys of the same version are no longer
+  distinguishable by it — the short commit sha beside the version in the account menu is
+  what tells them apart. `package.json` moves to `0.11.3` so `major.minor` do not
+  contradict the label, and unpinning cannot send the version backwards.
 - **The tab strip is always drawn in a project**, empty session included. It used to hide
   itself until something was open, which made it invisible on the path most people take —
   Home, then a project, which lands on the Board section with nothing open — so a shipped

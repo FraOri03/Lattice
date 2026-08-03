@@ -14,14 +14,18 @@ isn't done" companion to [features.md](features.md).
 - **Test coverage is minimal** — one unit-test file (a board/presentation round-trip).
   Broad automated testing is roadmap work
   ([#20](https://github.com/FraOri03/Lattice/issues/20)).
-- **The displayed version is stamped per build**: `major.minor` come from `package.json`
-  (`0.8`, Phase 8) and the third number is minutes since 2025-01-01 UTC, so every
-  production deploy shows a higher version than the one before it without anyone editing
-  a file — `Alpha v0.8.833202`. The account menu adds the short commit sha.
-  `VITE_APP_STAGE` still names the stage and a set `VITE_APP_VERSION` still overrides the
-  stamp entirely. **The third number is a build counter, not a semver patch**: it does
-  not mean "0.8 patch 833202", and two builds a minute apart are indistinguishable by it.
-  A git commit count would read better but hosting providers clone shallowly, so it would
+- **The displayed version is currently pinned**: `PINNED_VERSION` in
+  `src/lib/version/buildStamp.ts` holds the release string the app shows verbatim —
+  today `Alpha v0.11.3.5`. Two deploys of the same pin are indistinguishable by version;
+  the short commit sha in the account menu is what tells them apart.
+- **With the pin cleared (`''`) the version goes back to being stamped per build**:
+  `major.minor` come from `package.json` and the third number is minutes since
+  2025-01-01 UTC, so every production deploy shows a higher version than the one before
+  it without anyone editing a file — `Alpha v0.11.833202`. `VITE_APP_STAGE` names the
+  stage either way, and a set `VITE_APP_VERSION` overrides both pin and stamp.
+  **That third number is a build counter, not a semver patch**: it does not mean
+  "0.11 patch 833202", and two builds a minute apart are indistinguishable by it. A git
+  commit count would read better but hosting providers clone shallowly, so it would
   depend on the clone depth rather than the history.
 
 ## Accessibility

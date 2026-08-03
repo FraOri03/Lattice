@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { BUILD_EPOCH_MS, buildNumber, commitRef, composeVersion } from './buildStamp'
+import {
+  BUILD_EPOCH_MS,
+  PINNED_VERSION,
+  buildNumber,
+  commitRef,
+  composeVersion,
+} from './buildStamp'
+import { env } from '../env'
 
 /**
  * The whole point of this module is a number that only ever goes up. If it
@@ -39,6 +46,18 @@ describe('composeVersion', () => {
   it('leaves a version it cannot read alone rather than mangling it', () => {
     expect(composeVersion('nightly', 41)).toBe('nightly')
     expect(composeVersion('', 41)).toBe('')
+  })
+})
+
+describe('the version the app displays', () => {
+  /**
+   * Guards the wiring rather than the literal: a pin has to survive the trip
+   * through vite.config + env.ts, and clearing it has to fall back to a
+   * stamped version instead of to an empty label in the sidebar.
+   */
+  it('is the pin while one is set, and a stamped major.minor.build otherwise', () => {
+    if (PINNED_VERSION) expect(env.appVersion).toBe(PINNED_VERSION)
+    else expect(env.appVersion).toMatch(/^\d+\.\d+\.\d+$/)
   })
 })
 
