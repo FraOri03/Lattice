@@ -5,7 +5,12 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { fileURLToPath } from 'node:url'
 import { readFileSync } from 'node:fs'
-import { buildNumber, commitRef, composeVersion } from './src/lib/version/buildStamp'
+import {
+  PINNED_VERSION,
+  buildNumber,
+  commitRef,
+  composeVersion,
+} from './src/lib/version/buildStamp'
 
 /**
  * Stamped once per build, not per request: every production deploy ships a
@@ -13,13 +18,14 @@ import { buildNumber, commitRef, composeVersion } from './src/lib/version/buildS
  * file. `package.json` still owns `major.minor`; see buildStamp.ts for why
  * the tail is a clock and not a commit count.
  *
- * `VITE_APP_VERSION` still wins where it is set — a pinned release keeps
- * whatever it was pinned to.
+ * A non-empty `PINNED_VERSION` short-circuits all of that and ships the
+ * declared release string as-is; `VITE_APP_VERSION` still wins over both,
+ * for a release pinned from the deploy environment.
  */
 const pkg = JSON.parse(
   readFileSync(fileURLToPath(new URL('./package.json', import.meta.url)), 'utf8'),
 ) as { version: string }
-const APP_VERSION = composeVersion(pkg.version, buildNumber())
+const APP_VERSION = PINNED_VERSION || composeVersion(pkg.version, buildNumber())
 const APP_COMMIT = commitRef(process.env)
 
 export default defineConfig({

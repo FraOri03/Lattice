@@ -168,9 +168,12 @@ keep working with their original file untouched — never a hard failure.
 | `VITE_APP_VERSION` | display | Shown under the app name in the sidebar and in the account menu. |
 | `VITE_APP_STAGE` | display | Release stage next to the version (default `alpha`). |
 
-> **Note on versioning:** the displayed version is composed at build time by
-> `vite.config.ts` — `major.minor` from `package.json` plus a build number that
-> is minutes since 2025-01-01 UTC (see `src/lib/version/buildStamp.ts`). Every
-> production deploy therefore shows a higher version than the last with no file
-> to edit; bump `package.json` only for a real `major.minor` change. Setting
-> `VITE_APP_VERSION` overrides the whole thing, for a pinned release.
+> **Note on versioning:** the displayed version is decided at build time by
+> `vite.config.ts`. A non-empty `PINNED_VERSION` in
+> `src/lib/version/buildStamp.ts` is shipped verbatim — that is the current
+> setup (`0.11.3.5`), so bumping a release means editing that constant. Clear
+> it (`''`) and the version is composed instead from `major.minor` in
+> `package.json` plus a build number that is minutes since 2025-01-01 UTC, so
+> every production deploy shows a higher version than the last with no file to
+> edit. Setting `VITE_APP_VERSION` overrides both, for a release pinned from
+> the deploy environment.

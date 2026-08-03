@@ -5,6 +5,8 @@
  * project (GITHUB_CLIENT_SECRET) is read exclusively by the Vercel
  * serverless function in /api.
  */
+import { PINNED_VERSION } from './version/buildStamp'
+
 export const env = {
   /** Google OAuth Web client id — enables real Google sign-in + Drive sync */
   googleClientId: (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined) ?? '',
@@ -17,18 +19,19 @@ export const env = {
   githubClientId: (import.meta.env.VITE_GITHUB_CLIENT_ID as string | undefined) ?? '',
   appEnv: (import.meta.env.VITE_APP_ENV as string | undefined) || 'development',
   /**
-   * `major.minor` from package.json, then a build number that ticks up on
+   * The release string in `PINNED_VERSION` while one is pinned; otherwise
+   * `major.minor` from package.json plus a build number that ticks up on
    * its own — so the version on screen changes with every production
    * deploy instead of whenever someone remembers to bump a file.
    *
    * Order: an explicitly pinned `VITE_APP_VERSION` wins, then the stamp
-   * `vite.config.ts` compiled in, then a static fallback for any consumer
-   * of this module that is not built by Vite (tests, scripts).
+   * `vite.config.ts` compiled in, then the pin itself for any consumer of
+   * this module that is not built by Vite (tests, scripts).
    */
   appVersion:
     (import.meta.env.VITE_APP_VERSION as string | undefined) ||
     (typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : '') ||
-    '0.8.0',
+    PINNED_VERSION,
   /** Short commit sha of the build, or 'local' outside CI. */
   appCommit: typeof __APP_COMMIT__ === 'string' ? __APP_COMMIT__ : 'local',
   /**

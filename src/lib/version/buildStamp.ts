@@ -16,6 +16,20 @@
  * the version stays a human decision; only the tail is automatic.
  */
 
+/**
+ * Hand-pinned display version. When it is a non-empty string it is what the
+ * app shows, verbatim, everywhere — the automatic `major.minor.<build>`
+ * stamping below applies only while this is `''`.
+ *
+ * A pin is the only way to show a version this repo can name (`package.json`
+ * has to stay valid semver, and `.env` is git-ignored so `VITE_APP_VERSION`
+ * cannot be committed). What a pin costs is the "every deploy looks newer"
+ * property: two deploys of the same pin are indistinguishable by version.
+ * The short commit sha next to the version in the account menu still tells
+ * them apart, which is what that field is for.
+ */
+export const PINNED_VERSION = '0.11.3.5'
+
 /** 2025-01-01T00:00:00Z — chosen so the number stays six digits for years. */
 export const BUILD_EPOCH_MS = Date.UTC(2025, 0, 1)
 
