@@ -14,6 +14,14 @@ All notable changes to Lattice are recorded here. The format follows
 
 ### Added
 
+- **The board inspector can be resized, collapsed and its tips shut.** It is docked in the
+  same flex row as the canvas, so its fixed 280px came straight out of the working area —
+  and the state it sits in most of the time (nothing selected) was seven lines of onboarding
+  tips. The left edge is now a drag handle (220–520px, also operable from the keyboard as a
+  `role="separator"`), the header carries a button that collapses the panel to a 36px rail
+  that still names itself and offers the way back, and the tips are a disclosure that starts
+  shut. Width and collapsed state persist across reloads — unlike the split pane, shutting a
+  panel you find intrusive is a preference, not transient layout state.
 - **Assets group themselves by board section** — the sidebar's asset library now shows a
   read-only group per board section that uses a file, above the flat list. Membership is
   read back from the board (a card's `data.assetId` plus its section `parentId`), so it can
@@ -51,6 +59,23 @@ All notable changes to Lattice are recorded here. The format follows
 
 ### Fixed
 
+- **The Google session was lost every few minutes.** The GIS token flow has no refresh
+  token, so renewal is a `window.open` round-trip needing transient user activation, which
+  background callers do not have. A failed renewal armed a "retry on the next gesture"
+  listener that nothing stopped re-arming — and with Drive polling asking for a token every
+  20s and the sync debounce every 10s, Google's window came back on click after click.
+  Silent requests now carry the account `hint` (without it a browser holding several Google
+  sessions answers with the account chooser, which is a visible sign-in prompt); failures
+  back off (30s → 2m → 8m → 15m) instead of being retried by whichever background caller
+  asks next; transient failures — dead network, blocked or COOP-undetectable popup, a
+  round-trip Google never answered — no longer report the session as expired, so only a lost
+  grant or three failures in a row escalates to "Reconnect Drive"; and a token arriving after
+  its round-trip timed out is kept rather than dropped, which used to leave the app
+  announcing an expired session while the browser held a valid token. Renewal is now
+  scheduled ahead of expiry (re-synced on `visibilitychange`, since timers in a background
+  tab are throttled) instead of being discovered by whoever hits the cliff first. Renewal
+  still costs one brief Google window per token; removing it entirely needs the server-side
+  authorization code flow.
 - **Project calls could not start** — `POST /api/realtime/media-token` answered `500`
   (`TypeError: Cannot convert TrackSource microphone to string`). The LiveKit grant passed
   wire strings where `livekit-server-sdk` requires its numeric `TrackSource` enum, so
