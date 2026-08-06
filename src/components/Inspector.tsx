@@ -17,8 +17,23 @@ import { useMyRole, useOpenCommentCount, useReadOnly } from '@/lib/collab/useCol
 import { ROLE_LABEL } from '@/types/collab'
 import { confirmDialog } from '@/components/ui/ConfirmDialog'
 import { PhotoShotPicker } from '@/components/board/PhotoShotPicker'
-import { IcCopy, IcEdit, IcEye, IcMessage, IcTrash } from '@/components/Icons'
+import { useState } from 'react'
+import {
+  IcChevronDown,
+  IcChevronRight,
+  IcCopy,
+  IcEdit,
+  IcEye,
+  IcMessage,
+  IcTrash,
+} from '@/components/Icons'
 import { ActionIcon } from '@/components/ActionIcons'
+import { SidePanel } from '@/components/shell/SidePanel'
+import {
+  MAX_INSPECTOR_WIDTH,
+  MIN_INSPECTOR_WIDTH,
+  useWorkspaceLayoutStore,
+} from '@/store/workspaceLayoutStore'
 
 const TYPE_LABEL: Record<CardData['type'], string> = {
   note: 'Note card',
@@ -584,6 +599,38 @@ function NodeInspector({ node }: { node: BoardNode }) {
   )
 }
 
+/**
+ * The board hints, shut by default. Seven lines of onboarding are worth one
+ * click to reach and not worth the height they cost on every visit to an
+ * empty selection — which is the state the inspector sits in most of the time.
+ */
+function BoardTips() {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <button
+        className="insp-h flex w-full cursor-pointer items-center gap-1 text-left hover:text-ink"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+      >
+        {open ? <IcChevronDown size={10} /> : <IcChevronRight size={10} />}
+        Tips
+      </button>
+      {open && (
+        <ul className="space-y-1.5 text-[11.5px] leading-relaxed text-muted">
+          <li>· Drag cards by their header bar</li>
+          <li>· Drag the dot on a card's right edge onto another card to link</li>
+          <li>· Double-click a note or asset card to open it</li>
+          <li>· Drop any file — PDF, Office, media, 3D — onto the canvas</li>
+          <li>· Drag notes and assets from the sidebar onto the board</li>
+          <li>· Shift + drag for box select · Delete removes selection</li>
+          <li>· Use [[Note title]] inside markdown to create backlinks</li>
+        </ul>
+      )}
+    </>
+  )
+}
+
 /** Comments summary + entry point for the selected card. */
 function CardCommentsRow({ nodeId }: { nodeId: string }) {
   const count = useOpenCommentCount(nodeId)
@@ -634,11 +681,23 @@ export function Inspector() {
   const board = useStore((s) => s.boards[s.activeBoardId])
   const readOnly = useReadOnly()
   const role = useMyRole()
+  const collapsed = useWorkspaceLayoutStore((s) => s.inspectorCollapsed)
+  const width = useWorkspaceLayoutStore((s) => s.inspectorWidth)
+  const setCollapsed = useWorkspaceLayoutStore((s) => s.setInspectorCollapsed)
+  const setWidth = useWorkspaceLayoutStore((s) => s.setInspectorWidth)
   const selectedNodes = board.nodes.filter((n) => n.selected)
   const selectedEdge = board.edges.find((e) => e.selected)
 
   return (
-    <aside className="w-70 flex-none overflow-y-auto border-l border-bord bg-panel px-4 pb-6">
+    <SidePanel
+      title="Inspector"
+      width={width}
+      collapsed={collapsed}
+      minWidth={MIN_INSPECTOR_WIDTH}
+      maxWidth={MAX_INSPECTOR_WIDTH}
+      onWidth={setWidth}
+      onCollapsedChange={setCollapsed}
+    >
       {readOnly && (
         <div className="mt-3 flex items-center gap-1.5 rounded-md bg-panel2 px-2 py-1.5 text-[10.5px] text-muted">
           <IcEye size={11} className="flex-none" />
@@ -672,19 +731,10 @@ export function Inspector() {
           <div className="mb-3 text-xs text-muted">
             {board.nodes.length} cards · {board.edges.length} connections
           </div>
-          <div className="insp-h">Tips</div>
-          <ul className="space-y-1.5 text-[11.5px] leading-relaxed text-muted">
-            <li>· Drag cards by their header bar</li>
-            <li>· Drag the dot on a card's right edge onto another card to link</li>
-            <li>· Double-click a note or asset card to open it</li>
-            <li>· Drop any file — PDF, Office, media, 3D — onto the canvas</li>
-            <li>· Drag notes and assets from the sidebar onto the board</li>
-            <li>· Shift + drag for box select · Delete removes selection</li>
-            <li>· Use [[Note title]] inside markdown to create backlinks</li>
-          </ul>
+          <BoardTips />
         </>
       )}
       </fieldset>
-    </aside>
+    </SidePanel>
   )
 }
