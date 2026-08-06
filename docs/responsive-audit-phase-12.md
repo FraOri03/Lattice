@@ -247,7 +247,7 @@ Below 768 px the app stays honest rather than complete.
 
 | Step | Work | Closes |
 |---|---|---|
-| **12.1** | `lib/layout` — one tier source of truth (`useViewportTier`), the four thresholds as named tokens, container-query utilities in the theme. Pure part unit-tested. | — |
+| **12.1** | `lib/layout` — one tier source of truth: the thresholds, the rules that read off them (`panelsAreDocked`, `splitAvailable`, `capabilityAt`) and `useViewportTier`. Pure part unit-tested. **Shipped.** The theme side (breakpoint tokens, container-query variants) moved to 12.2, where the `data-tier` writer gives it a consumer — shipping styling affordances ahead of the code that uses them is how `useToolbarOverflow` spent a phase unwired. | — |
 | **12.2** | The shell adapts: sidebar and inspector gain an open/closed state and become overlay drawers below Compact; split disabled below Full; the tab strip scrolls instead of squeezing. Sidebar targets brought to 24 px on the way. | F3, F7 |
 | **12.3** | The top bar folds: breadcrumb gets a minimum, the right cluster collapses into an overflow menu, section labels keyed to the container rather than `lg:`. | F1, F2, F4 |
 | **12.4** | Mode toolbars fold: wire `useToolbarOverflow` on the Board first, then the other five. | F5, [#47](https://github.com/FraOri03/Lattice/issues/47) |
