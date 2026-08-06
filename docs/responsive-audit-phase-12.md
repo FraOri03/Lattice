@@ -144,7 +144,7 @@ hidden`: at 834 the canvas is 314 px, and at mobile widths the toolbar sits
 off and unreachable.
 
 `useToolbarOverflow` and `ToolbarOverflow` already exist, are exported and are
-unit-tested ([`Toolbar.tsx:396`](../src/components/ui/toolbar/Toolbar.tsx:396)).
+unit-tested ([`Toolbar.tsx`](../src/components/ui/toolbar/Toolbar.tsx), line 396).
 They have no consumer. The wiring was deliberately deferred at the end of phase
 11.1 for two open questions, both still open: what a **split button** does once
 it is a menu item (it loses "repeat last tool"), and in **what order** controls
