@@ -28,24 +28,36 @@ interface TokenResponse {
 }
 
 let prompts: string[] = []
+let hints: Array<string | undefined> = []
+/** What Google answers the n-th request with; `null` = it never answers. */
+let respond: (n: number) => TokenResponse | null = (n) => ({
+  access_token: `tok-${n}`,
+  expires_in: 3600,
+})
+/** The stub TokenClient, so a test can deliver a response out of band. */
+let gisClient: { callback?: (resp: TokenResponse) => void }
 
 /** Stub Google Identity Services: loadGis() short-circuits on window.google. */
 function installGis(): void {
   prompts = []
+  hints = []
+  respond = (n) => ({ access_token: `tok-${n}`, expires_in: 3600 })
   const client: {
     callback?: (resp: TokenResponse) => void
-    requestAccessToken: (opts?: { prompt?: string }) => void
+    requestAccessToken: (opts?: { prompt?: string; hint?: string }) => void
   } = {
     requestAccessToken: (opts) => {
       prompts.push(opts?.prompt ?? 'consent')
+      hints.push(opts?.hint)
       const n = prompts.length
       // GIS always answers asynchronously
-      setTimeout(
-        () => client.callback?.({ access_token: `tok-${n}`, expires_in: 3600 }),
-        0,
-      )
+      setTimeout(() => {
+        const resp = respond(n)
+        if (resp) client.callback?.(resp)
+      }, 0)
     },
   }
+  gisClient = client
   ;(window as unknown as { google: unknown }).google = {
     accounts: {
       oauth2: { initTokenClient: () => client, revoke: () => {} },
@@ -167,6 +179,71 @@ describe('background token refresh', () => {
 
     expect(await authService.getAccessToken()).toBe('live')
     expect(prompts).toEqual([])
+  })
+
+  it('preselects the signed-in account so the renewal stays silent', async () => {
+    seedExpiredSession()
+    window.dispatchEvent(new Event('pointerdown'))
+
+    await authService.getAccessToken()
+
+    // without a hint a browser holding several Google sessions answers
+    // `prompt: ''` with the account chooser — a visible sign-in prompt
+    expect(hints).toEqual(['t@example.com'])
+  })
+
+  it('backs off after a failed refresh instead of asking on every click', async () => {
+    seedExpiredSession()
+    respond = () => ({ error: 'server_error' })
+
+    window.dispatchEvent(new Event('pointerdown'))
+    expect(await authService.getAccessToken()).toBeNull()
+    await vi.waitFor(() => expect(prompts).toHaveLength(1))
+
+    // the Drive poll and the sync debounce keep asking; a cooling-down
+    // service must answer them from memory, not with another Google window
+    for (let i = 0; i < 5; i++) {
+      window.dispatchEvent(new Event('pointerdown'))
+      expect(await authService.getAccessToken()).toBeNull()
+    }
+    expect(prompts).toHaveLength(1)
+    // one transient hiccup is not an expired session: don't say it is
+    expect(authService.needsReauth()).toBe(false)
+  })
+
+  it('asks for a reconnect straight away when the grant itself is gone', async () => {
+    seedExpiredSession()
+    respond = () => ({ error: 'access_denied' })
+
+    window.dispatchEvent(new Event('pointerdown'))
+    expect(await authService.getAccessToken()).toBeNull()
+
+    await vi.waitFor(() => expect(authService.needsReauth()).toBe(true))
+  })
+
+  it('keeps a token that lands after its round-trip was abandoned', async () => {
+    vi.useFakeTimers()
+    try {
+      seedExpiredSession()
+      respond = () => null // GIS opened its window and never called back
+
+      window.dispatchEvent(new Event('pointerdown'))
+      const pending = authService.getAccessToken()
+      // the silent round-trip gives up so it can't block the queue forever
+      await vi.advanceTimersByTimeAsync(31_000)
+      expect(await pending).toBeNull()
+
+      // …and then Google answers anyway
+      gisClient.callback?.({ access_token: 'late-tok', expires_in: 3600 })
+      await vi.advanceTimersByTimeAsync(0)
+
+      // dropping it left the app announcing an expired session while the
+      // browser held a perfectly good token
+      expect(authService.peekToken()?.accessToken).toBe('late-tok')
+      expect(authService.needsReauth()).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('reports the session as unrecoverable when consent was never granted', async () => {

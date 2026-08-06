@@ -29,6 +29,16 @@ export function clampRatio(r: number): number {
   return Math.min(MAX_RATIO, Math.max(MIN_RATIO, r))
 }
 
+/** Board inspector rail, in px. Narrow enough to read, wide enough to shrink. */
+export const MIN_INSPECTOR_WIDTH = 220
+export const MAX_INSPECTOR_WIDTH = 520
+export const DEFAULT_INSPECTOR_WIDTH = 280
+
+export function clampInspectorWidth(w: number): number {
+  if (!Number.isFinite(w)) return DEFAULT_INSPECTOR_WIDTH
+  return Math.min(MAX_INSPECTOR_WIDTH, Math.max(MIN_INSPECTOR_WIDTH, Math.round(w)))
+}
+
 interface WorkspaceLayoutState {
   /** Is the second pane open (the "split" layout). */
   split: boolean
@@ -43,8 +53,19 @@ interface WorkspaceLayoutState {
    * while the graph is on screen.
    */
   graphReturnMode: ViewMode
+  /**
+   * The board inspector, shut down to a rail. It is docked beside the canvas
+   * rather than floating over it, so on a laptop it takes its width out of
+   * the board itself — hence a way to get it out of the way.
+   */
+  inspectorCollapsed: boolean
+  /** Width of the board inspector when open, in px. */
+  inspectorWidth: number
 
   setGraphReturnMode: (mode: ViewMode) => void
+  setInspectorCollapsed: (collapsed: boolean) => void
+  toggleInspector: () => void
+  setInspectorWidth: (width: number) => void
   openSplit: (opts?: { secondary?: SecondaryContent; direction?: SplitDirection }) => void
   closeSplit: () => void
   toggleSplit: (opts?: { secondary?: SecondaryContent }) => void
@@ -61,9 +82,15 @@ export const useWorkspaceLayoutStore = create<WorkspaceLayoutState>()(
       ratio: 0.5,
       secondaryContent: 'board',
       graphReturnMode: 'board',
+      inspectorCollapsed: false,
+      inspectorWidth: DEFAULT_INSPECTOR_WIDTH,
 
       setGraphReturnMode: (graphReturnMode) =>
         set({ graphReturnMode: graphReturnMode === 'graph' ? 'board' : graphReturnMode }),
+
+      setInspectorCollapsed: (inspectorCollapsed) => set({ inspectorCollapsed }),
+      toggleInspector: () => set((s) => ({ inspectorCollapsed: !s.inspectorCollapsed })),
+      setInspectorWidth: (width) => set({ inspectorWidth: clampInspectorWidth(width) }),
 
       openSplit: (opts) =>
         set((s) => ({
@@ -93,6 +120,10 @@ export const useWorkspaceLayoutStore = create<WorkspaceLayoutState>()(
         direction: s.direction,
         ratio: s.ratio,
         secondaryContent: s.secondaryContent,
+        // unlike `split`, these two DO survive a reload: shutting a panel you
+        // find intrusive is a preference, not a transient layout state
+        inspectorCollapsed: s.inspectorCollapsed,
+        inspectorWidth: s.inspectorWidth,
         // `split` is intentionally NOT persisted: reopening the app lands in a
         // single pane, matching how a legacy persisted `split` viewMode also
         // degrades to a single section (see useStore migrate v3).

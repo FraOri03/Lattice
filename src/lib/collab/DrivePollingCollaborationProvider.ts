@@ -94,6 +94,11 @@ export class DrivePollingCollaborationProvider implements CollaborationProvider 
 
   private async tick(): Promise<void> {
     if (!this.drive || this.busy || !navigator.onLine) return
+    // No live token → every request below is a guaranteed 401. Skipping the
+    // tick keeps a session waiting on its next renewal from filling the
+    // console with failures, and leaves renewal to AuthService's own
+    // schedule instead of nagging it every 20 seconds.
+    if (!authService.peekToken()) return
     this.busy = true
     try {
       const projectId = useStore.getState().activeProjectId
