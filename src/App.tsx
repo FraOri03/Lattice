@@ -30,6 +30,7 @@ import { CommandPalette } from '@/components/CommandPalette'
 import { Toaster, toast } from '@/components/ui/Toaster'
 import { LiveRegion } from '@/components/a11y/LiveRegion'
 import { useUrlHistory } from '@/lib/nav/useUrlHistory'
+import { useTierAttribute } from '@/lib/layout/useTierAttribute'
 import { DialogHost, confirmDialog } from '@/components/ui/ConfirmDialog'
 import { ShortcutsDialog } from '@/components/ui/ShortcutsDialog'
 import { ShareDialog } from '@/components/collab/ShareDialog'
@@ -315,6 +316,10 @@ function AppShell() {
   useCollaboration()
   useGlobalShortcuts()
   useUrlHistory()
+  // the viewport tier, published on :root for CSS and read by the shell. It
+  // is mounted here for the same reason as the history binding: one writer,
+  // above the surface switch, so it survives the trip to the dashboard.
+  useTierAttribute()
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
