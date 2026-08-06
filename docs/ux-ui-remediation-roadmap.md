@@ -63,6 +63,10 @@ Companion to [`ux-ui-audit-phase-8.md`](./ux-ui-audit-phase-8.md). Priorities: *
 - **Acceptance:** Back/Forward move between recently viewed modes/entities; refresh restores the current view; invite hash still works.
 
 ### P1.6 · Responsive tiers + drawer inspectors + honest blocking (LAT-12, RSP-1/2/3)
+- **Superseded by [`responsive-audit-phase-12.md`](./responsive-audit-phase-12.md) (12.0)**, which
+  measured the baseline and turned this item into a tier model. The headline the audit adds: the
+  breakpoint is not "below ~1100 px" — the project surface overflows a **1440 px laptop**, and on a
+  phone it silently zooms out to 39% instead of degrading.
 - **Rationale:** fixed-width sidebar/inspectors starve the canvas below ~1100 px; there is no mobile story (nothing blocks a phone, but Monaco/Sheet/Presentation are unusable).
 - **Dependencies:** none.
 - **Benefit:** usable on laptops/tablets; honest, non-broken mobile.
