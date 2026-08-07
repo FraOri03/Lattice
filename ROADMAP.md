@@ -49,14 +49,33 @@ An item carries **one** status at a time.
 
 ### Milestones
 
-Milestones group issues by release intent (see the README's own P1/P2/P3 framing):
+**A milestone is a phase.** Development runs in numbered phases, and each one is a
+milestone that holds the issues for its sub-steps
+([all milestones](https://github.com/FraOri03/Lattice/milestones)):
 
-- **Public beta** — the P1 work that must land before a public beta.
-- **Broader adoption** — the P2 work before wider adoption.
-- **Backlog / Future** — P3 polish and larger engine/platform items, not yet scheduled.
+| Milestone | What the phase is |
+|---|---|
+| [Phase 11](https://github.com/FraOri03/Lattice/milestone/4) | Application shell & navigation — **shipped** (closed for the record) |
+| [Phase 12](https://github.com/FraOri03/Lattice/milestone/5) | Adaptive shell — responsive tiers, drawers, folding bars |
+| [Phase 13](https://github.com/FraOri03/Lattice/milestone/6) | New dashboard — design & prototype |
+| [Phase 14](https://github.com/FraOri03/Lattice/milestone/7) | Profile & settings |
+| [Phase 15](https://github.com/FraOri03/Lattice/milestone/8) | New dashboard — implementation |
+| [Phase 16](https://github.com/FraOri03/Lattice/milestone/9) | Identity model |
+| [Phase 17](https://github.com/FraOri03/Lattice/milestone/10) | Supabase backend |
+| [Phase 18](https://github.com/FraOri03/Lattice/milestone/11) | Email invitations |
+| [Phase 19](https://github.com/FraOri03/Lattice/milestone/12) | Surface upgrades |
+| [Phase 20](https://github.com/FraOri03/Lattice/milestone/13) | Suite toolbars |
+| [Phase 21](https://github.com/FraOri03/Lattice/milestone/14) | AI — RunPod serverless + in-house ComfyUI |
+| [Phase 22](https://github.com/FraOri03/Lattice/milestone/15) | Entitlements & billing |
 
-Version numbers are deliberately avoided until a release is actually cut — the app reports
-`0.8.0` today but no tags/releases exist.
+Two release-intent milestones from the Phase 9 pass — **Public beta** and **Broader
+adoption** — are closed: every issue they held is closed.
+[Backlog / Future](https://github.com/FraOri03/Lattice/milestone/3) stays open for larger
+engine and platform items that are not attached to a phase yet.
+
+Version numbers are deliberately avoided until a release is actually cut. The app displays
+a pinned release string (`Alpha v0.11.3.5`), which tracks the phase it was cut in, not a
+published version — no tags or releases exist.
 
 ## Proposing work
 
@@ -69,51 +88,78 @@ New issues start unprioritized and without a status — triage assigns `status:`
 
 ## Now / Next / Later
 
-A snapshot — the [Project](#creating-the-github-project) is authoritative. Each item links
-to its issue.
+A snapshot — the [milestones](https://github.com/FraOri03/Lattice/milestones) are
+authoritative. Each item links to its issue.
 
-### Now (P1 — before public beta)
+### Now — [phase 12](https://github.com/FraOri03/Lattice/milestone/5), the adaptive shell
 
-- Board canvas keyboard accessibility · [#8](https://github.com/FraOri03/Lattice/issues/8)
-- Propagate the realtime "off" state to presence/Share · [#9](https://github.com/FraOri03/Lattice/issues/9)
-- Lazy-load three.js + board virtualization / pause off-screen loops · [#11](https://github.com/FraOri03/Lattice/issues/11)
-- Browser history (back/forward) + entity deep links · [#10](https://github.com/FraOri03/Lattice/issues/10)
-- Responsive tiers + drawer inspectors · [#14](https://github.com/FraOri03/Lattice/issues/14)
+12.0 (measured audit) and 12.1 (viewport tier model) have shipped. What is left:
 
-### Next (P2 — before broader adoption)
+- Sidebar and inspector become overlay drawers below Compact · [#63](https://github.com/FraOri03/Lattice/issues/63)
+- The top bar folds: breadcrumb floor, right-cluster overflow, container queries · [#64](https://github.com/FraOri03/Lattice/issues/64)
+- Board toolbar folds instead of being clipped below ~1060 px · [#47](https://github.com/FraOri03/Lattice/issues/47)
+- The Viewer tier below 768 px · [#65](https://github.com/FraOri03/Lattice/issues/65), with the legacy `.tbtn` surfaces · [#48](https://github.com/FraOri03/Lattice/issues/48)
 
-- Demote Split to a layout toggle; auto-hide single-workspace nesting · [#10](https://github.com/FraOri03/Lattice/issues/10)
-- Presenter / slideshow mode · [#15](https://github.com/FraOri03/Lattice/issues/15)
-- In-sheet save-level co-editing notice · [#17](https://github.com/FraOri03/Lattice/issues/17)
-- Visible board undo/redo (Ctrl/Cmd+Z) · [#16](https://github.com/FraOri03/Lattice/issues/16)
-- Onboarding tour + first-run ownership · [#18](https://github.com/FraOri03/Lattice/issues/18)
-- Exact doc-range comment anchors · [#19](https://github.com/FraOri03/Lattice/issues/19)
-- Status redundancy (color + icon + text) + identity-vs-storage cue · [#8](https://github.com/FraOri03/Lattice/issues/8), [#9](https://github.com/FraOri03/Lattice/issues/9)
-- Expand automated test coverage · [#20](https://github.com/FraOri03/Lattice/issues/20)
+### Next — the dashboard, and settings around it
 
-### Later (P3 + engine/platform)
+- [Phase 13](https://github.com/FraOri03/Lattice/milestone/6) — the new dashboard,
+  design and prototype: IA ([#66](https://github.com/FraOri03/Lattice/issues/66)),
+  prototype ([#67](https://github.com/FraOri03/Lattice/issues/67)), data contract
+  ([#68](https://github.com/FraOri03/Lattice/issues/68)), search and New
+  ([#69](https://github.com/FraOri03/Lattice/issues/69)), acceptance contract
+  ([#70](https://github.com/FraOri03/Lattice/issues/70)).
+- [Phase 14](https://github.com/FraOri03/Lattice/milestone/7) — profile & settings:
+  shell ([#71](https://github.com/FraOri03/Lattice/issues/71)), account
+  ([#72](https://github.com/FraOri03/Lattice/issues/72)), appearance
+  ([#73](https://github.com/FraOri03/Lattice/issues/73)), notifications
+  ([#74](https://github.com/FraOri03/Lattice/issues/74)), connected apps
+  ([#75](https://github.com/FraOri03/Lattice/issues/75)).
+- [Phase 15](https://github.com/FraOri03/Lattice/milestone/8) — building that dashboard
+  ([#76](https://github.com/FraOri03/Lattice/issues/76)–[#80](https://github.com/FraOri03/Lattice/issues/80)).
 
-- Anonymous read-only public viewer / published boards · [#25](https://github.com/FraOri03/Lattice/issues/25)
-- Unified import/export transfer dialog · [#26](https://github.com/FraOri03/Lattice/issues/26)
-- Cell-level spreadsheet CRDT · [#27](https://github.com/FraOri03/Lattice/issues/27)
-- CRDT subdocument partitioning for very large projects · [#28](https://github.com/FraOri03/Lattice/issues/28)
-- File System Access API local vault · [#29](https://github.com/FraOri03/Lattice/issues/29)
-- Plugin API for editors/cards · [#30](https://github.com/FraOri03/Lattice/issues/30)
-- PR-based GitHub sync flow · [#31](https://github.com/FraOri03/Lattice/issues/31)
-- Remote-deletion management UI · [#32](https://github.com/FraOri03/Lattice/issues/32)
-- Polish: "Decks" filter chip ([#21](https://github.com/FraOri03/Lattice/issues/21)), preview→download fallback ([#22](https://github.com/FraOri03/Lattice/issues/22)), dedupe icon maps ([#23](https://github.com/FraOri03/Lattice/issues/23)), slide-level linking ([#24](https://github.com/FraOri03/Lattice/issues/24))
+### Later — the backend jump, then the suites
 
-### Exploring
+- [Phase 16](https://github.com/FraOri03/Lattice/milestone/9) — identity model, and the
+  open decision on where authorisation lives ([#83](https://github.com/FraOri03/Lattice/issues/83)).
+- [Phase 17](https://github.com/FraOri03/Lattice/milestone/10) — Supabase, server sessions,
+  e-mail OTP. Everything to the right of this depends on it.
+- [Phase 18](https://github.com/FraOri03/Lattice/milestone/11) — e-mail invitations, which
+  unlock "Shared with me" and pending invites on the dashboard.
+- [Phase 19](https://github.com/FraOri03/Lattice/milestone/12) — surface upgrades ·
+  [20](https://github.com/FraOri03/Lattice/milestone/13) suite toolbars ·
+  [21](https://github.com/FraOri03/Lattice/milestone/14) AI ·
+  [22](https://github.com/FraOri03/Lattice/milestone/15) entitlements & billing.
+- Not attached to a phase yet, in
+  [Backlog / Future](https://github.com/FraOri03/Lattice/milestone/3): CRDT subdocument
+  partitioning ([#28](https://github.com/FraOri03/Lattice/issues/28)), File System Access
+  vault ([#29](https://github.com/FraOri03/Lattice/issues/29)), plugin API
+  ([#30](https://github.com/FraOri03/Lattice/issues/30)), PR-based GitHub sync
+  ([#31](https://github.com/FraOri03/Lattice/issues/31)), remote-deletion UI
+  ([#32](https://github.com/FraOri03/Lattice/issues/32)).
 
-- AI assistant inside projects · web clipper · billing/subscriptions · dedicated
-  mobile/tablet UI. These are directional ideas, not commitments (`status: exploring`).
+### Dependencies worth knowing
+
+```
+phase 12 ─┐
+phase 13 ─┼─ no external blocker
+phase 14 ─┘
+
+phase 16 ──▶ phase 17 ──┬──▶ phase 18 ──▶ (server-backed dashboard)
+                        └──▶ phase 22
+```
+
+Phases 12–15 can be built on what exists today. Phase 17 is the single biggest
+architectural jump on the roadmap: there is no database yet — the only server state is
+Liveblocks room metadata.
 
 ### Shipped recently
 
-- Presentation-in-Board (decks as first-class board cards) · [#7](https://github.com/FraOri03/Lattice/issues/7)
-- Production realtime multiplayer (Liveblocks + Yjs), server-enforced permissions,
-  workspaces, area comments, notification center, format pipeline (DOCX/PPTX/PDF export).
-  See [CHANGELOG.md](CHANGELOG.md).
+- [Phase 11](https://github.com/FraOri03/Lattice/milestone/4) — dashboard root surface,
+  toolbar normalisation across every surface, the Home screen, and one tab strip per
+  project (the six entity slots retired).
+- Project calls (LiveKit), Graph View, Photo mode, presentation-in-board, production
+  realtime multiplayer, server-enforced permissions, workspaces, area comments, the
+  notification centre and the format pipeline. See [CHANGELOG.md](CHANGELOG.md).
 
 ## Creating the GitHub Project
 
@@ -127,10 +173,9 @@ gh auth refresh -s project
 # 2. Create the Project (owner = your user account):
 gh project create --owner FraOri03 --title "Lattice Roadmap"
 
-# 3. Note the returned project number, then add the roadmap issues:
-for n in 8 9 10 11 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32; do \
-  gh project item-add <PROJECT_NUMBER> --owner FraOri03 \
-    --url https://github.com/FraOri03/Lattice/issues/$n; done
+# 3. Note the returned project number, then add every open issue:
+gh issue list --state open --limit 200 --json url -q '.[].url' \
+  | xargs -n1 gh project item-add <PROJECT_NUMBER> --owner FraOri03 --url
 ```
 
 Then, in the Project UI, add the views described in
