@@ -80,6 +80,8 @@ export const en = {
     shareAria: (scope: string) => `Share project — collaboration reaches ${scope}`,
     themeToLight: 'Switch to light theme',
     themeToDark: 'Switch to dark theme',
+    /** whatever did not fit in the bar (12.3) */
+    more: 'More controls',
   },
 
   /** cloud-sync status chip in the top bar */
@@ -610,6 +612,7 @@ export const it: Catalog = {
     shareAria: (scope) => `Condividi progetto — la collaborazione raggiunge ${scope}`,
     themeToLight: 'Passa al tema chiaro',
     themeToDark: 'Passa al tema scuro',
+    more: 'Altri controlli',
   },
 
   syncChip: {

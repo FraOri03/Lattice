@@ -212,7 +212,12 @@ function Tab({
       }`}
     >
       {icon}
-      <span className="hidden lg:inline">{label}</span>
+      {/* The eight labels cost ~360px, which is the difference between a bar
+          that fits and one that does not. 87.5rem is the width the bar needs
+          to hold everything WITH them (12.0 measured 1400px of content), and
+          it asks the bar — not the window, which is what `lg:` did while the
+          bar lived in a box 240px narrower (F4). */}
+      <span className="hidden @min-[87.5rem]:inline">{label}</span>
     </button>
   )
 }
