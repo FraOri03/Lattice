@@ -17,6 +17,7 @@ import { toast } from '@/components/ui/Toaster'
 import { confirmDialog } from '@/components/ui/ConfirmDialog'
 import { IcTrash } from '@/components/Icons'
 import { ActionIcon } from '@/components/ActionIcons'
+import { InspectorPanel } from '@/components/shell/InspectorPanel'
 import { useSheetSession } from './SheetSession'
 
 function InfoRow({ label, value }: { label: string; value: string }) {
@@ -58,7 +59,7 @@ export function CellInspector() {
   }
 
   return (
-    <aside className="w-70 flex-none overflow-y-auto border-l border-bord bg-panel px-4 pb-6">
+    <InspectorPanel>
       <div className="insp-h">Spreadsheet</div>
       <div className="grid grid-cols-2 gap-x-3 text-[11px] text-muted">
         <span>{body.sheets.length} sheet{body.sheets.length !== 1 ? 's' : ''}</span>
@@ -181,6 +182,6 @@ export function CellInspector() {
       >
         <IcTrash size={12} /> Delete spreadsheet
       </button>
-    </aside>
+    </InspectorPanel>
   )
 }

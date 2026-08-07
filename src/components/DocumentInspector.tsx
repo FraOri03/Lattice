@@ -13,6 +13,7 @@ import { toast } from '@/components/ui/Toaster'
 import { confirmDialog } from '@/components/ui/ConfirmDialog'
 import { IcDrive, IcTrash } from '@/components/Icons'
 import { ActionIcon } from '@/components/ActionIcons'
+import { InspectorPanel } from '@/components/shell/InspectorPanel'
 
 /**
  * Right panel of the document workspace: metadata, outline, linked
@@ -46,7 +47,7 @@ export function DocumentInspector() {
   }
 
   return (
-    <aside className="w-70 flex-none overflow-y-auto border-l border-bord bg-panel px-4 pb-6">
+    <InspectorPanel>
       <div className="insp-h">Document</div>
       <div className="grid grid-cols-2 gap-x-3 text-[11px] text-muted">
         <span>{doc.wordCount} words</span>
@@ -197,6 +198,6 @@ export function DocumentInspector() {
       >
         <IcTrash size={12} /> Delete document
       </button>
-    </aside>
+    </InspectorPanel>
   )
 }

@@ -28,12 +28,7 @@ import {
   IcTrash,
 } from '@/components/Icons'
 import { ActionIcon } from '@/components/ActionIcons'
-import { SidePanel } from '@/components/shell/SidePanel'
-import {
-  MAX_INSPECTOR_WIDTH,
-  MIN_INSPECTOR_WIDTH,
-  useWorkspaceLayoutStore,
-} from '@/store/workspaceLayoutStore'
+import { InspectorPanel } from '@/components/shell/InspectorPanel'
 
 const TYPE_LABEL: Record<CardData['type'], string> = {
   note: 'Note card',
@@ -681,23 +676,11 @@ export function Inspector() {
   const board = useStore((s) => s.boards[s.activeBoardId])
   const readOnly = useReadOnly()
   const role = useMyRole()
-  const collapsed = useWorkspaceLayoutStore((s) => s.inspectorCollapsed)
-  const width = useWorkspaceLayoutStore((s) => s.inspectorWidth)
-  const setCollapsed = useWorkspaceLayoutStore((s) => s.setInspectorCollapsed)
-  const setWidth = useWorkspaceLayoutStore((s) => s.setInspectorWidth)
   const selectedNodes = board.nodes.filter((n) => n.selected)
   const selectedEdge = board.edges.find((e) => e.selected)
 
   return (
-    <SidePanel
-      title="Inspector"
-      width={width}
-      collapsed={collapsed}
-      minWidth={MIN_INSPECTOR_WIDTH}
-      maxWidth={MAX_INSPECTOR_WIDTH}
-      onWidth={setWidth}
-      onCollapsedChange={setCollapsed}
-    >
+    <InspectorPanel>
       {readOnly && (
         <div className="mt-3 flex items-center gap-1.5 rounded-md bg-panel2 px-2 py-1.5 text-[10.5px] text-muted">
           <IcEye size={11} className="flex-none" />
@@ -735,6 +718,6 @@ export function Inspector() {
         </>
       )}
       </fieldset>
-    </SidePanel>
+    </InspectorPanel>
   )
 }

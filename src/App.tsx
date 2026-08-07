@@ -31,6 +31,8 @@ import { Toaster, toast } from '@/components/ui/Toaster'
 import { LiveRegion } from '@/components/a11y/LiveRegion'
 import { useUrlHistory } from '@/lib/nav/useUrlHistory'
 import { useTierAttribute } from '@/lib/layout/useTierAttribute'
+import { splitAvailable } from '@/lib/layout/tiers'
+import { useViewportTier } from '@/lib/layout/useViewportTier'
 import { DialogHost, confirmDialog } from '@/components/ui/ConfirmDialog'
 import { ShortcutsDialog } from '@/components/ui/ShortcutsDialog'
 import { ShareDialog } from '@/components/collab/ShareDialog'
@@ -239,12 +241,26 @@ function ProjectSurface() {
   const ratio = useWorkspaceLayoutStore((s) => s.ratio)
   const secondaryContent = useWorkspaceLayoutStore((s) => s.secondaryContent)
   const setRatio = useWorkspaceLayoutStore((s) => s.setRatio)
+  const closeSplit = useWorkspaceLayoutStore((s) => s.closeSplit)
+
+  // A window that stops being wide enough closes the split rather than
+  // rendering two unusable panes. It is closed in the STORE, not just hidden:
+  // `currentNav` serialises `split` into the URL, so a layout the shell is not
+  // showing must not survive in a link (12.2).
+  const tier = useViewportTier()
+  const fitsSplit = splitAvailable(tier)
+  useEffect(() => {
+    if (!fitsSplit && split) closeSplit()
+  }, [fitsSplit, split, closeSplit])
 
   // Presentation and Photo are full-page sections that do not split.
-  const showSplit = split && viewMode !== 'presentation' && viewMode !== 'photo'
+  const showSplit =
+    split && fitsSplit && viewMode !== 'presentation' && viewMode !== 'photo'
 
   return (
-    <div className="flex h-full">
+    // `relative` so the sidebar can leave the flow below the Compact tier and
+    // overlay the surface instead of being squeezed out of it (12.2)
+    <div className="relative flex h-full">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar />

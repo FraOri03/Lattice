@@ -12,6 +12,7 @@ import { reconciledCode } from '@/lib/crdt/CodeCRDT'
 import { confirmDialog } from '@/components/ui/ConfirmDialog'
 import { IcTrash } from '@/components/Icons'
 import { ActionIcon } from '@/components/ActionIcons'
+import { InspectorPanel } from '@/components/shell/InspectorPanel'
 
 /** Right panel of the code workspace: metadata, source file, backlinks, export. */
 export function CodeInspector() {
@@ -55,7 +56,7 @@ export function CodeInspector() {
   }
 
   return (
-    <aside className="w-70 flex-none overflow-y-auto border-l border-bord bg-panel px-4 pb-6">
+    <InspectorPanel>
       <div className="insp-h">Code file</div>
       <div className="grid grid-cols-2 gap-x-3 text-[11px] text-muted">
         <span>{labelForLang(meta.language)}</span>
@@ -204,6 +205,6 @@ export function CodeInspector() {
       >
         <IcTrash size={12} /> Delete code file
       </button>
-    </aside>
+    </InspectorPanel>
   )
 }

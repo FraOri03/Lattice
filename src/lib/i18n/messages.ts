@@ -57,6 +57,7 @@ export const en = {
     splitOpen: 'Split view — open a second pane beside the current one',
     splitClose: 'Split view — close the second pane',
     splitUnavailable: 'Split view is not available for this section',
+    splitTooNarrow: 'Split view needs a wider window — two panes would leave neither usable',
     graphOpen: 'Graph view — browse relationships instead of the editor',
     graphOpenInPane: 'Graph view — show the relationship browser in the second pane',
     graphClose: 'Graph view — back to the section',
@@ -584,6 +585,8 @@ export const it: Catalog = {
     splitOpen: 'Vista divisa — apri un secondo pannello accanto a quello corrente',
     splitClose: 'Vista divisa — chiudi il secondo pannello',
     splitUnavailable: 'La vista divisa non è disponibile per questa sezione',
+    splitTooNarrow:
+      'La vista divisa richiede una finestra più larga — due riquadri non sarebbero usabili',
     graphOpen: "Vista grafo — esplora le relazioni invece dell'editor",
     graphOpenInPane: 'Vista grafo — mostra le relazioni nel secondo pannello',
     graphClose: 'Vista grafo — torna alla sezione',

@@ -1,6 +1,8 @@
 import { useEffect } from 'react'
 import { useStore } from '@/store/useStore'
 import { useWorkspaceLayoutStore } from '@/store/workspaceLayoutStore'
+import { splitAvailable } from '@/lib/layout/tiers'
+import { useViewportTier } from '@/lib/layout/useViewportTier'
 import type { ViewMode } from '@/types/model'
 import { SECTION_METAS, type WorkspaceSection } from '@/types/workspace'
 import { useI18n } from '@/lib/i18n'
@@ -47,6 +49,7 @@ export function SectionTabs() {
   const setSecondaryContent = useWorkspaceLayoutStore((s) => s.setSecondaryContent)
   const graphReturnMode = useWorkspaceLayoutStore((s) => s.graphReturnMode)
   const setGraphReturnMode = useWorkspaceLayoutStore((s) => s.setGraphReturnMode)
+  const tier = useViewportTier()
   const t = useI18n()
 
   // remember the section the graph is layered over, so leaving Graph goes back
@@ -54,8 +57,12 @@ export function SectionTabs() {
     if (viewMode !== 'graph') setGraphReturnMode(viewMode)
   }, [viewMode, setGraphReturnMode])
 
-  // Presentation and Photo are full-page sections without a split layout
-  const canSplit = viewMode !== 'presentation' && viewMode !== 'photo'
+  // Presentation and Photo are full-page sections without a split layout —
+  // and below the Full tier nothing splits, because two panes at 1100px leave
+  // roughly 290px each once the chrome is paid for, which is under the width
+  // at which any editor is usable (12.0 §F3, settled in the tier model).
+  const fitsSplit = splitAvailable(tier)
+  const canSplit = fitsSplit && viewMode !== 'presentation' && viewMode !== 'photo'
   const graphActive = split ? secondaryContent === 'graph' : viewMode === 'graph'
 
   const onToggleSplit = () => {
@@ -99,11 +106,13 @@ export function SectionTabs() {
           onClick={onToggleSplit}
           ariaLabel={t.topbar.viewSuffix(t.modes.split)}
           title={
-            !canSplit
-              ? t.topbar.splitUnavailable
-              : split
-                ? t.topbar.splitClose
-                : t.topbar.splitOpen
+            !fitsSplit
+              ? t.topbar.splitTooNarrow
+              : !canSplit
+                ? t.topbar.splitUnavailable
+                : split
+                  ? t.topbar.splitClose
+                  : t.topbar.splitOpen
           }
         />
       </Cluster>

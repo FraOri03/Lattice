@@ -114,7 +114,10 @@ export function SidebarCategory<T extends FoldableItem>({
     <>
       <div className="insp-h flex items-center justify-between">
         <button
-          className="flex min-w-0 flex-1 cursor-pointer items-center gap-1 text-left"
+          /* min-h-6: the row's own text is 10px, which made this a 15px-tall
+             target — under the 24px floor of WCAG 2.2 SC 2.5.8, and this is a
+             panel you open with a thumb below the Compact tier (12.2) */
+          className="flex min-h-6 min-w-0 flex-1 cursor-pointer items-center gap-1 text-left"
           onClick={() => toggleCategoryCollapsed(category)}
           aria-expanded={!collapsed}
           title={collapsed ? `Expand ${label}` : `Collapse ${label}`}
@@ -127,7 +130,7 @@ export function SidebarCategory<T extends FoldableItem>({
         </button>
         {!collapsed && mayEditFolders && !flat && (
           <button
-            className="icon-btn h-5 w-5"
+            className="icon-btn h-6 w-6"
             title={`New folder in ${label}`}
             aria-label={`New folder in ${label}`}
             onClick={() => createFolder(category)}
@@ -137,7 +140,7 @@ export function SidebarCategory<T extends FoldableItem>({
         )}
         {!collapsed && onCreate && (
           <button
-            className="icon-btn h-5 w-5"
+            className="icon-btn h-6 w-6"
             title={createLabel}
             aria-label={createLabel}
             onClick={onCreate}
