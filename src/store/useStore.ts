@@ -82,6 +82,7 @@ import {
 import type { GraphViewSettings } from '@/lib/graph/graphTypes'
 import { decodeGraphSettings } from '@/lib/graph/GraphSettingsService'
 import { ENTITY_MODE, type NavSurface, type ResolvedNavigation } from '@/lib/nav/navUrl'
+import { DEFAULT_SETTINGS_SECTION, type SettingsSection } from '@/lib/settings/sections'
 import { useWorkspaceLayoutStore } from './workspaceLayoutStore'
 import {
   DEFAULT_PROJECT_ID,
@@ -254,6 +255,13 @@ interface AppState {
    * returns to that project while the bare root URL lands on the dashboard.
    */
   navSurface: NavSurface
+  /**
+   * The settings section showing over the current surface, or null when the
+   * screen is shut (Phase 14.1). Like `navSurface` the URL owns it — `s=…`
+   * rides alongside the surface params, so a deep link opens the exact panel
+   * and closing settings leaves the surface underneath untouched.
+   */
+  settingsSection: SettingsSection | null
   theme: Theme
   locale: Locale
   search: string
@@ -314,6 +322,10 @@ interface AppState {
   applyNav: (nav: ResolvedNavigation) => void
   /** Leave the project surface for the dashboard (Home). */
   openDashboard: () => void
+  /** Show the settings screen over the current surface. */
+  openSettings: (section?: SettingsSection) => void
+  /** Close settings; the surface underneath was never left. */
+  closeSettings: () => void
 
   setActiveBoard: (id: string) => void
   addBoard: () => void
@@ -573,6 +585,7 @@ export const useStore = create<AppState>()(
       recents: [],
       viewMode: 'board',
       navSurface: 'project',
+      settingsSection: null,
       theme: 'dark',
       locale: detectLocale(),
       search: '',
@@ -986,7 +999,14 @@ export const useStore = create<AppState>()(
 
       openDashboard: () => set({ navSurface: 'dashboard' }),
 
+      openSettings: (section = DEFAULT_SETTINGS_SECTION) =>
+        set({ settingsSection: section }),
+      closeSettings: () => set({ settingsSection: null }),
+
       applyNav: (nav) => {
+        // settings rides over either surface, so it is applied before the
+        // branch — including when an unknown project makes the rest a no-op
+        set({ settingsSection: nav.settings ?? null })
         if (nav.surface === 'dashboard') {
           // Home: the shell leaves the project surface, but the active project
           // and its open entity survive so going back in costs nothing.

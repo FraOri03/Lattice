@@ -27,6 +27,7 @@ import { AuthHandoff, useAuthHandoff } from '@/components/account/AuthHandoff'
 import { GithubDialog } from '@/components/github/GithubDialog'
 import { DriveDialog } from '@/components/account/DriveDialog'
 import { CommandPalette } from '@/components/CommandPalette'
+import { SettingsScreen } from '@/components/settings/SettingsScreen'
 import { Toaster, toast } from '@/components/ui/Toaster'
 import { LiveRegion } from '@/components/a11y/LiveRegion'
 import { useUrlHistory } from '@/lib/nav/useUrlHistory'
@@ -353,6 +354,9 @@ function AppShell() {
   return (
     <>
       {surface === 'dashboard' ? <Dashboard /> : <ProjectSurface />}
+      {/* settings covers the surface it was opened from, so it mounts beside
+          the switch rather than inside either branch (14.1) */}
+      <SettingsScreen />
       <GithubDialog />
       <DriveDialog />
       <CommandPalette />

@@ -527,6 +527,64 @@ export const en = {
     emptyBody: 'A project holds its own boards, notes, documents and files.',
   },
   /**
+   * The settings screen (Phase 14.1). `pending` is deliberately specific: a
+   * panel that is not built yet says what will live there and what it waits
+   * on, rather than "coming soon" — a promise nobody is holding.
+   */
+  settings: {
+    title: 'Settings',
+    open: 'Settings',
+    close: 'Close settings',
+    navLabel: 'Settings sections',
+    sections: {
+      account: 'Account',
+      profile: 'Profile',
+      appearance: 'Appearance',
+      notifications: 'Notifications',
+      security: 'Security',
+      connections: 'Connected apps',
+      storage: 'Storage and sync',
+      billing: 'Plans and billing',
+      developer: 'Developer',
+    },
+    intro: {
+      account: 'Who you are signed in as, and how you leave.',
+      profile: 'How you appear to the people you share with.',
+      appearance: 'Theme and interface language.',
+      notifications: 'Which events reach you, and where.',
+      security: 'Sessions, devices and what protects the vault.',
+      connections: 'The services Lattice talks to, and what each one gets.',
+      storage: 'Where your work lives and whether it is leaving this browser.',
+      billing: 'What this build costs you.',
+      developer: 'Build information and keyboard shortcuts.',
+    },
+    pending: {
+      profile:
+        'Display name, avatar and how you appear on cards, comments and invitations arrive in 14.2.',
+      notifications:
+        'In-app notifications already work. Choosing which events reach you — and, later, which reach your inbox — arrives in 14.4.',
+      security:
+        'Active sessions, devices and revocation are listed here once phases 16 and 17 give them something real to list.',
+      billing:
+        'Plans and billing arrive with phase 22. Nothing in this build is metered or charged.',
+      accountMore:
+        'Linked e-mails, usage type and account deletion depend on the identity model of phase 16.',
+      appearanceMore:
+        'System theme, high contrast, interface density and UI size arrive in 14.3. Reduced motion already follows your operating system.',
+      connectionsMore:
+        'The realtime provider, LiveKit and the conversion backend join this list in 14.5.',
+    },
+    theme: 'Theme',
+    themeDark: 'Dark',
+    themeLight: 'Light',
+    build: 'Build',
+    shortcutsOpen: 'Open the shortcuts overview',
+    notSignedIn: 'Not signed in',
+    notSignedInBody:
+      'Lattice works without an account — everything stays in this browser. Signing in with Google adds Drive sync and lets invitations be delivered.',
+  },
+
+  /**
    * Notes and documents are both text, so the product has to say out loud
    * which one is for what — otherwise the user picks by coin toss and the
    * two drift into the same thing.
@@ -1038,6 +1096,59 @@ export const it: Catalog = {
     emptyTitle: 'Ancora nessun progetto in questo workspace',
     emptyBody: 'Un progetto contiene le sue board, note, documenti e file.',
   },
+  settings: {
+    title: 'Impostazioni',
+    open: 'Impostazioni',
+    close: 'Chiudi le impostazioni',
+    navLabel: 'Sezioni delle impostazioni',
+    sections: {
+      account: 'Account',
+      profile: 'Profilo',
+      appearance: 'Aspetto',
+      notifications: 'Notifiche',
+      security: 'Sicurezza',
+      connections: 'App collegate',
+      storage: 'Archiviazione e sync',
+      billing: 'Piani e fatturazione',
+      developer: 'Sviluppo',
+    },
+    intro: {
+      account: 'Con quale identità hai fatto accesso, e come esci.',
+      profile: 'Come appari alle persone con cui condividi.',
+      appearance: 'Tema e lingua dell’interfaccia.',
+      notifications: 'Quali eventi ti raggiungono, e dove.',
+      security: 'Sessioni, dispositivi e cosa protegge il vault.',
+      connections: 'I servizi con cui Lattice parla, e cosa riceve ciascuno.',
+      storage: 'Dove vive il tuo lavoro e se sta uscendo da questo browser.',
+      billing: 'Quanto ti costa questa build.',
+      developer: 'Informazioni di build e scorciatoie da tastiera.',
+    },
+    pending: {
+      profile:
+        'Nome visualizzato, avatar e come appari su card, commenti e inviti arrivano nella 14.2.',
+      notifications:
+        'Le notifiche in-app funzionano già. Scegliere quali eventi ti raggiungono — e, più avanti, quali arrivano via e-mail — è la 14.4.',
+      security:
+        'Sessioni attive, dispositivi e revoca compaiono qui quando le fasi 16 e 17 daranno loro qualcosa di reale da elencare.',
+      billing:
+        'Piani e fatturazione arrivano con la fase 22. In questa build nulla è misurato o addebitato.',
+      accountMore:
+        'E-mail collegate, tipo di utilizzo ed eliminazione dell’account dipendono dal modello di identità della fase 16.',
+      appearanceMore:
+        'Tema di sistema, contrasto elevato, densità dell’interfaccia e dimensione della UI arrivano nella 14.3. Il movimento ridotto segue già il sistema operativo.',
+      connectionsMore:
+        'Il provider realtime, LiveKit e il backend di conversione entrano in questa lista nella 14.5.',
+    },
+    theme: 'Tema',
+    themeDark: 'Scuro',
+    themeLight: 'Chiaro',
+    build: 'Build',
+    shortcutsOpen: 'Apri il riepilogo delle scorciatoie',
+    notSignedIn: 'Accesso non effettuato',
+    notSignedInBody:
+      'Lattice funziona senza account — tutto resta in questo browser. L’accesso con Google aggiunge la sincronizzazione con Drive e permette di recapitare gli inviti.',
+  },
+
   textEntities: {
     notePurpose: 'Cattura rapida — markdown, link, nessuna formattazione da gestire.',
     documentPurpose: 'Scrittura formattata e strutturata, da finire e consegnare.',
