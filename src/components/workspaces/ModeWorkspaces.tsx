@@ -1,4 +1,4 @@
-import { lazy, Suspense, type ReactNode } from 'react'
+import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
 import { useStore } from '@/store/useStore'
 import { useOpenId } from '@/lib/tabs/openEntity'
 import { useUiStore } from '@/store/useUiStore'
@@ -6,6 +6,13 @@ import { CodeInspector } from '@/components/code/CodeInspector'
 import { FileKindIcon, type FileKind } from '@/lib/registry/fileKinds'
 import { formatBytes } from '@/lib/media'
 import { IcGithub, IcPlus, IcPresentation } from '@/components/Icons'
+import { capabilityAt } from '@/lib/layout/tiers'
+import { useViewportTier } from '@/lib/layout/useViewportTier'
+import { DesktopOnly } from '@/components/shell/DesktopOnly'
+import { storage } from '@/lib/storage/StorageProvider'
+import { yjsManager } from '@/lib/crdt/YjsManager'
+import { reconciledCode } from '@/lib/crdt/CodeCRDT'
+import { labelForLang } from '@/lib/code/languages'
 
 const CodeWorkspacePane = lazy(() => import('@/components/code/CodeWorkspacePane'))
 const SpreadsheetWorkspace = lazy(() => import('@/components/sheet/SpreadsheetWorkspace'))
@@ -54,6 +61,54 @@ function EmptyMode({
   )
 }
 
+/**
+ * The first lines of a code file, read-only (12.5).
+ *
+ * Cheap in the literal sense: this is the same text `CodeInspector`'s download
+ * already reads — the reconciled CRDT state when a room holds one, storage
+ * otherwise — so showing it costs a read, not a Monaco. The grid and the slide
+ * stage have no equivalent, which is why only Code gets a preview and the
+ * other two say what they hold instead of pretending to show it.
+ */
+function CodePreview({ id, projectId }: { id: string; projectId?: string }) {
+  const [text, setText] = useState<string | null>(null)
+
+  useEffect(() => {
+    let alive = true
+    const pid = projectId ?? useStore.getState().activeProjectId
+    const merged = reconciledCode(yjsManager.room(pid), id)
+    if (merged != null) {
+      setText(merged)
+      return
+    }
+    void storage.getDocument(id).then((content) => {
+      if (alive) setText(typeof content === 'string' ? content : '')
+    })
+    return () => {
+      alive = false
+    }
+  }, [id, projectId])
+
+  if (!text) return null
+  const lines = text.split('\n')
+  const head = lines.slice(0, 40)
+  return (
+    <div className="w-full max-w-md text-left">
+      <div className="mb-1 text-[10px] font-semibold tracking-widest text-muted uppercase">
+        First {head.length} line{head.length === 1 ? '' : 's'}
+      </div>
+      <pre className="max-h-72 overflow-auto rounded-lg border border-bord bg-panel2 p-3 text-[11px] leading-relaxed">
+        <code>{head.join('\n')}</code>
+      </pre>
+      {lines.length > head.length && (
+        <p className="mt-1 text-[10.5px] text-muted">
+          …and {lines.length - head.length} more lines.
+        </p>
+      )}
+    </div>
+  )
+}
+
 /** Recently updated entities of one type, for empty-state jump lists. */
 function JumpList<T extends { id: string }>({
   items,
@@ -91,7 +146,17 @@ function JumpList<T extends { id: string }>({
   )
 }
 
+/**
+ * Does this section step aside at this tier? The rule lives in the tier model
+ * (`capabilityAt`), so the four sections that step aside — and the two that do
+ * not — are decided in one place rather than by four copies of a breakpoint.
+ */
+function desktopOnly(mode: Parameters<typeof capabilityAt>[0], tier: ReturnType<typeof useViewportTier>) {
+  return capabilityAt(mode, tier) === 'desktop-only'
+}
+
 export function SheetModeWorkspace() {
+  const tier = useViewportTier()
   const activeSheetId = useOpenId('sheet')
   const sheetDocs = useStore((s) => s.sheetDocs)
   const activeProjectId = useStore((s) => s.activeProjectId)
@@ -100,6 +165,16 @@ export function SheetModeWorkspace() {
 
   const meta = activeSheetId ? sheetDocs[activeSheetId] : undefined
   if (meta) {
+    if (desktopOnly('sheet', tier)) {
+      return (
+        <DesktopOnly
+          kind="sheet"
+          title={meta.title}
+          stats={`${meta.cellCount} cells`}
+          reason="A spreadsheet is a grid you scroll in two directions at once, with a formula bar, a selection and a cell inspector. None of that survives a 390px column, so it is not offered here rather than offered broken."
+        />
+      )
+    }
     return (
       <Suspense fallback={<Loading label="Loading spreadsheet workspace…" />}>
         <SpreadsheetWorkspace meta={meta} />
@@ -132,6 +207,7 @@ export function SheetModeWorkspace() {
 }
 
 export function CodeModeWorkspace() {
+  const tier = useViewportTier()
   const activeCodeId = useOpenId('code')
   const codeDocs = useStore((s) => s.codeDocs)
   const activeProjectId = useStore((s) => s.activeProjectId)
@@ -141,6 +217,17 @@ export function CodeModeWorkspace() {
 
   const meta = activeCodeId ? codeDocs[activeCodeId] : undefined
   if (meta) {
+    if (desktopOnly('code', tier)) {
+      return (
+        <DesktopOnly
+          kind="code"
+          title={`${meta.title}.${meta.extension}`}
+          stats={`${meta.lineCount} lines · ${labelForLang(meta.language)}`}
+          reason="Monaco brings its own scrolling, minimap, multi-cursor and keybindings, and a phone keyboard has none of the keys they are built around. The file is here to read; editing it wants a desktop."
+          preview={<CodePreview id={meta.id} projectId={meta.projectId} />}
+        />
+      )
+    }
     return (
       <>
         <Suspense fallback={<Loading label="Loading code workspace…" />}>
@@ -185,6 +272,16 @@ export function CodeModeWorkspace() {
  * on first open), so unlike the other modes there is no empty state.
  */
 export function PhotoModeWorkspace() {
+  const tier = useViewportTier()
+  if (desktopOnly('photo', tier)) {
+    return (
+      <DesktopOnly
+        kind="image"
+        title="Photo studio"
+        reason="The studio planner is three docked panels around a stage — library, timeline and inspector. It is a planning surface, and planning a shot on a 390px column is not a smaller version of the job."
+      />
+    )
+  }
   return (
     <Suspense fallback={<Loading label="Loading photo workspaceâ€¦" />}>
       <PhotoWorkspace />
@@ -193,6 +290,7 @@ export function PhotoModeWorkspace() {
 }
 
 export function PresentationModeWorkspace() {
+  const tier = useViewportTier()
   const activePresentId = useOpenId('present')
   const presentDocs = useStore((s) => s.presentDocs)
   const assets = useStore((s) => s.assets)
@@ -203,6 +301,16 @@ export function PresentationModeWorkspace() {
 
   const meta = activePresentId ? presentDocs[activePresentId] : undefined
   if (meta) {
+    if (desktopOnly('presentation', tier)) {
+      return (
+        <DesktopOnly
+          kind="presentation"
+          title={meta.title}
+          stats={`${meta.slideCount} slide${meta.slideCount === 1 ? '' : 's'}`}
+          reason="Slides are laid out on a fixed 960×540 stage with a navigator beside it. Shown at a third of its size the stage is not an editor, and scaled to fit the column it is a picture of one."
+        />
+      )
+    }
     return (
       <Suspense fallback={<Loading label="Loading presentation workspace…" />}>
         <PresentationWorkspace meta={meta} />

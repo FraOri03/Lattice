@@ -307,39 +307,67 @@ function EditorInner({
             !editor.isActive('codeBlock')
           }
         >
+          {/* Migrated off `.tbtn` onto the toolbar primitive (12.5, part of
+              #48). Three things change and none of them is cosmetic: every
+              control has a NAME (they were a bare `B`, `I`, `<>` to a screen
+              reader), the pressed state is `aria-pressed` rather than a class,
+              and the primitive draws that state as an underline as well as a
+              tint — `--accent` on `--accent-soft` measures 3.84:1 in dark and
+              2.38:1 in light, so colour alone was never carrying it (WCAG
+              1.4.1). This is the surface that matters most at the Viewer tier:
+              documents stay editable there, so this menu is what formatting on
+              a phone goes through. */}
           <div className="bubble-menu">
             <button
-              className={`tbtn ${editor.isActive('bold') ? 'is-active' : ''}`}
+              className="toolbar-control toolbar-control--sm"
+              aria-pressed={editor.isActive('bold')}
+              aria-label="Bold"
+              title="Bold"
               onClick={() => editor.chain().focus().toggleBold().run()}
             >
-              <b>B</b>
+              <b aria-hidden>B</b>
             </button>
             <button
-              className={`tbtn ${editor.isActive('italic') ? 'is-active' : ''}`}
+              className="toolbar-control toolbar-control--sm"
+              aria-pressed={editor.isActive('italic')}
+              aria-label="Italic"
+              title="Italic"
               onClick={() => editor.chain().focus().toggleItalic().run()}
             >
-              <i>I</i>
+              <i aria-hidden>I</i>
             </button>
             <button
-              className={`tbtn ${editor.isActive('underline') ? 'is-active' : ''}`}
+              className="toolbar-control toolbar-control--sm"
+              aria-pressed={editor.isActive('underline')}
+              aria-label="Underline"
+              title="Underline"
               onClick={() => editor.chain().focus().toggleUnderline().run()}
             >
-              <u>U</u>
+              <u aria-hidden>U</u>
             </button>
             <button
-              className={`tbtn ${editor.isActive('strike') ? 'is-active' : ''}`}
+              className="toolbar-control toolbar-control--sm"
+              aria-pressed={editor.isActive('strike')}
+              aria-label="Strikethrough"
+              title="Strikethrough"
               onClick={() => editor.chain().focus().toggleStrike().run()}
             >
-              <s>S</s>
+              <s aria-hidden>S</s>
             </button>
             <button
-              className={`tbtn ${editor.isActive('code') ? 'is-active' : ''}`}
+              className="toolbar-control toolbar-control--sm"
+              aria-pressed={editor.isActive('code')}
+              aria-label="Inline code"
+              title="Inline code"
               onClick={() => editor.chain().focus().toggleCode().run()}
             >
-              {'<>'}
+              <span aria-hidden>{'<>'}</span>
             </button>
             <button
-              className={`tbtn ${editor.isActive('link') ? 'is-active' : ''}`}
+              className="toolbar-control toolbar-control--sm toolbar-control--icon-text"
+              aria-pressed={editor.isActive('link')}
+              aria-label="Link"
+              title="Link"
               onClick={() => setOrUnsetLink(editor, t)}
             >
               Link
@@ -352,10 +380,10 @@ function EditorInner({
         <FloatingMenu editor={editor} tippyOptions={{ duration: 120, placement: 'left' }}>
           {/* BlockMenu: quick block picker on empty lines */}
           <div className="block-menu">
-            <button className="tbtn" title="Heading 1" onClick={() => editor.chain().focus().setHeading({ level: 1 }).run()}>H1</button>
-            <button className="tbtn" title="Heading 2" onClick={() => editor.chain().focus().setHeading({ level: 2 }).run()}>H2</button>
-            <button className="tbtn" title="Bullet list" onClick={() => editor.chain().focus().toggleBulletList().run()}>•≡</button>
-            <button className="tbtn" title="Checklist" onClick={() => editor.chain().focus().toggleTaskList().run()}>☑</button>
+            <button className="toolbar-control toolbar-control--sm" aria-label="Heading 1" title="Heading 1" onClick={() => editor.chain().focus().setHeading({ level: 1 }).run()}>H1</button>
+            <button className="toolbar-control toolbar-control--sm" aria-label="Heading 2" title="Heading 2" onClick={() => editor.chain().focus().setHeading({ level: 2 }).run()}>H2</button>
+            <button className="toolbar-control toolbar-control--sm" aria-label="Bullet list" title="Bullet list" onClick={() => editor.chain().focus().toggleBulletList().run()}><span aria-hidden>•≡</span></button>
+            <button className="toolbar-control toolbar-control--sm" aria-label="Checklist" title="Checklist" onClick={() => editor.chain().focus().toggleTaskList().run()}><span aria-hidden>☑</span></button>
             <span className="px-1 text-[10px] text-muted">/ for more</span>
           </div>
         </FloatingMenu>

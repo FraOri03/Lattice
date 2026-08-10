@@ -279,7 +279,9 @@ export const en = {
       comment: 'Comment',
       commentTip: 'Comment — click to pin, drag to comment on an area',
       /** menu triggers are named for what they open, never a bare "More" */
-      openCardTools: 'Open card tools',
+      /** the tools that did not fit on the bar (12.4) */
+    moreTools: 'More board tools',
+    openCardTools: 'Open card tools',
       openMediaTools: 'Open media, embed & import tools',
       addTool: (tool: string) => `Add ${tool.toLowerCase()}`,
     },
@@ -803,6 +805,7 @@ export const it: Catalog = {
       import: 'Importa',
       comment: 'Commento',
       commentTip: 'Commento — clic per fissare, trascina per commentare un’area',
+      moreTools: 'Altri strumenti board',
       openCardTools: 'Apri strumenti card',
       openMediaTools: 'Apri strumenti media, incorporamento e importazione',
       addTool: (tool) => `Aggiungi ${tool.toLowerCase()}`,

@@ -3,6 +3,8 @@ import { CommentsPanel } from './CommentsPanel'
 import { ActivityPanel } from './ActivityPanel'
 import { VersionHistoryPanel } from './VersionHistoryPanel'
 import { IcActivity, IcHistory, IcMessage, IcX } from '@/components/Icons'
+import { panelsAreDocked } from '@/lib/layout/tiers'
+import { useViewportTier } from '@/lib/layout/useViewportTier'
 
 /**
  * CollabPanel — right-side drawer hosting Comments / Activity / Versions.
@@ -20,11 +22,25 @@ export function CollabPanel() {
   const panel = useCollabStore((s) => s.panel)
   const setPanel = useCollabStore((s) => s.setPanel)
   const setFocusedThread = useCollabStore((s) => s.setFocusedThread)
+  const docked = panelsAreDocked(useViewportTier())
   if (!panel) return null
 
   return (
+    /**
+     * Docked it takes 288px out of the working area; below the Compact tier
+     * there is no working area left to take it from, so it overlays instead —
+     * the same move the sidebar and the inspector make in 12.2, on the same
+     * threshold. It matters more here than for either of them: reading and
+     * answering a comment is the realistic phone job, and 12.5 promises
+     * comments work at every tier.
+     */
     <aside
-      className="flex w-72 flex-none flex-col border-l border-bord bg-panel"
+      className={
+        docked
+          ? 'flex w-72 flex-none flex-col border-l border-bord bg-panel'
+          : 'side-panel-drawer w-72 max-w-[85vw]'
+      }
+      data-side="right"
       aria-label="Collaboration panel"
     >
       <div className="flex h-9 flex-none items-center gap-0.5 border-b border-bord px-2">
