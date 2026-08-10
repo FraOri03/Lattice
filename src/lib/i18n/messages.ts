@@ -558,9 +558,47 @@ export const en = {
       billing: 'What this build costs you.',
       developer: 'Build information and keyboard shortcuts.',
     },
+    account: {
+      emailLabel: 'Primary e-mail',
+      emailFromGoogle: 'It comes from your Google account and changes there, not here.',
+      emailLocal:
+        'A placeholder for the local account. Nothing is ever sent to it — there is no mail in this build.',
+      methods: 'Sign-in methods',
+      methodGoogle: 'Google',
+      methodGithub: 'GitHub',
+      methodLocal: 'Local account',
+      idLabel: 'Account ID',
+      idHint: 'Quote this in a bug report.',
+      created: 'Created',
+    },
+    profile: {
+      avatar: 'Avatar',
+      avatarHint:
+        'Shown on cards, comments and presence. Downscaled and kept on this device with the rest of the vault — there is nowhere else to put it.',
+      upload: 'Upload a picture',
+      remove: 'Remove',
+      displayName: 'Display name',
+      displayNameHint: 'What people see on cards, comments and invitations.',
+      providerSays: (name: string) => `Google says “${name}”.`,
+      reset: 'Use that instead',
+      saved: 'Profile updated',
+      usage: 'How you use Lattice',
+      usageHint:
+        'Kept with your account so the answer exists before anything needs it. Nothing reads it yet, and it never leaves this device.',
+      usagePersonal: 'Personal',
+      usageWork: 'Work',
+      usageEducation: 'Study',
+      languageAt: 'The interface language is a display preference, so it lives in Appearance.',
+      goAppearance: 'Open Appearance',
+      avatarError: {
+        'not-an-image': 'That file is not an image.',
+        'too-large': 'That image is too large — pick one under 8 MB.',
+        undecodable: 'That image could not be read.',
+      },
+    },
     pending: {
-      profile:
-        'Display name, avatar and how you appear on cards, comments and invitations arrive in 14.2.',
+      profileSignedOut:
+        'A profile needs an account. Sign in from the Account section, or keep working without one — nothing here is required.',
       notifications:
         'In-app notifications already work. Choosing which events reach you — and, later, which reach your inbox — arrives in 14.4.',
       security:
@@ -568,7 +606,7 @@ export const en = {
       billing:
         'Plans and billing arrive with phase 22. Nothing in this build is metered or charged.',
       accountMore:
-        'Linked e-mails, usage type and account deletion depend on the identity model of phase 16.',
+        'A second e-mail address cannot be linked, and the account cannot be deleted, until identity stops being whatever the provider says it is — phase 16. Signing out already removes it from this browser.',
       appearanceMore:
         'System theme, high contrast, interface density and UI size arrive in 14.3. Reduced motion already follows your operating system.',
       connectionsMore:
@@ -1123,9 +1161,47 @@ export const it: Catalog = {
       billing: 'Quanto ti costa questa build.',
       developer: 'Informazioni di build e scorciatoie da tastiera.',
     },
+    account: {
+      emailLabel: 'E-mail principale',
+      emailFromGoogle: 'Arriva dal tuo account Google e si cambia lì, non qui.',
+      emailLocal:
+        'Un segnaposto per l’account locale. Non ci viene mai inviato nulla — in questa build non esiste posta.',
+      methods: 'Metodi di accesso',
+      methodGoogle: 'Google',
+      methodGithub: 'GitHub',
+      methodLocal: 'Account locale',
+      idLabel: 'ID account',
+      idHint: 'Citalo in una segnalazione di bug.',
+      created: 'Creato',
+    },
+    profile: {
+      avatar: 'Avatar',
+      avatarHint:
+        'Compare su card, commenti e presenza. Viene ridimensionato e resta su questo dispositivo insieme al vault — non c’è altro posto dove metterlo.',
+      upload: 'Carica un’immagine',
+      remove: 'Rimuovi',
+      displayName: 'Nome visualizzato',
+      displayNameHint: 'Quello che le persone vedono su card, commenti e inviti.',
+      providerSays: (name) => `Google dice “${name}”.`,
+      reset: 'Usa quello',
+      saved: 'Profilo aggiornato',
+      usage: 'Come usi Lattice',
+      usageHint:
+        'Resta con il tuo account, così la risposta esiste prima che serva a qualcosa. Per ora nessuno la legge, e non esce da questo dispositivo.',
+      usagePersonal: 'Personale',
+      usageWork: 'Lavoro',
+      usageEducation: 'Studio',
+      languageAt: 'La lingua dell’interfaccia è una preferenza di visualizzazione: vive in Aspetto.',
+      goAppearance: 'Apri Aspetto',
+      avatarError: {
+        'not-an-image': 'Quel file non è un’immagine.',
+        'too-large': 'Immagine troppo grande — scegline una sotto gli 8 MB.',
+        undecodable: 'Non è stato possibile leggere quell’immagine.',
+      },
+    },
     pending: {
-      profile:
-        'Nome visualizzato, avatar e come appari su card, commenti e inviti arrivano nella 14.2.',
+      profileSignedOut:
+        'Un profilo ha bisogno di un account. Accedi dalla sezione Account, oppure continua senza — qui non è obbligatorio nulla.',
       notifications:
         'Le notifiche in-app funzionano già. Scegliere quali eventi ti raggiungono — e, più avanti, quali arrivano via e-mail — è la 14.4.',
       security:
@@ -1133,7 +1209,7 @@ export const it: Catalog = {
       billing:
         'Piani e fatturazione arrivano con la fase 22. In questa build nulla è misurato o addebitato.',
       accountMore:
-        'E-mail collegate, tipo di utilizzo ed eliminazione dell’account dipendono dal modello di identità della fase 16.',
+        'Non si può collegare una seconda e-mail, né eliminare l’account, finché l’identità resta quella che dice il provider — fase 16. Uscire lo toglie già da questo browser.',
       appearanceMore:
         'Tema di sistema, contrasto elevato, densità dell’interfaccia e dimensione della UI arrivano nella 14.3. Il movimento ridotto segue già il sistema operativo.',
       connectionsMore:

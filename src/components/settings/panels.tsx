@@ -1,5 +1,8 @@
-import type { ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useAccount } from '@/lib/auth/AccountProvider'
+import { initialsOf, MAX_DISPLAY_NAME } from '@/lib/auth/profile'
+import { AvatarError, avatarDataUrlFrom } from '@/lib/auth/avatar'
+import { announce } from '@/lib/a11y/announcer'
 import { useSyncStore } from '@/lib/sync/syncStore'
 import { syncEngine } from '@/lib/sync/SyncEngine'
 import { githubProvider } from '@/lib/github/GithubCodeProvider'
@@ -8,7 +11,7 @@ import { useUiStore } from '@/store/useUiStore'
 import { useI18n, useLocale, useTimeAgo } from '@/lib/i18n'
 import { nextTheme, setThemeAnimated } from '@/lib/theme/animateTheme'
 import { env } from '@/lib/env'
-import type { Locale } from '@/types/model'
+import type { Account, AuthProviderId, Locale, UsageType } from '@/types/model'
 import type { SettingsSection } from '@/lib/settings/sections'
 import {
   IcCheck,
@@ -18,6 +21,7 @@ import {
   IcKeyboard,
   IcLogOut,
   IcRefresh,
+  IcUpload,
   IcUser,
   IcX,
 } from '@/components/Icons'
@@ -111,8 +115,37 @@ function LinkButton({ label, onClick }: { label: string; onClick: () => void }) 
 
 /* ---------------- account ---------------- */
 
+/** Avatar with the initials fallback every surface should agree on. */
+function Avatar({ account, size }: { account: Account; size: number }) {
+  return (
+    <span
+      className="flex flex-none items-center justify-center overflow-hidden rounded-full border border-bord bg-panel2 font-semibold text-muted"
+      style={{ width: size, height: size, fontSize: Math.round(size * 0.36) }}
+    >
+      {account.avatarUrl ? (
+        <img src={account.avatarUrl} alt="" className="h-full w-full object-cover" />
+      ) : (
+        initialsOf(account.name)
+      )}
+    </span>
+  )
+}
+
+function Field({ label, value, hint }: { label: string; value: string; hint?: string }) {
+  return (
+    <div className="border-b border-bord py-2.5 last:border-b-0">
+      <div className="flex flex-wrap items-baseline gap-x-3">
+        <span className="text-[11px] text-muted">{label}</span>
+        <span className="min-w-0 flex-1 text-[12.5px] break-words">{value}</span>
+      </div>
+      {hint && <p className="mt-1 text-[10.5px] text-muted">{hint}</p>}
+    </div>
+  )
+}
+
 function AccountPanel() {
   const t = useI18n()
+  const timeAgo = useTimeAgo()
   const { account, authKind, signIn, signOut } = useAccount()
 
   if (!account) {
@@ -125,17 +158,17 @@ function AccountPanel() {
     )
   }
 
+  const METHOD: Record<AuthProviderId, string> = {
+    google: t.settings.account.methodGoogle,
+    github: t.settings.account.methodGithub,
+    mock: t.settings.account.methodLocal,
+  }
+
   return (
     <>
       <Card>
         <div className="flex items-center gap-3">
-          <span className="flex h-11 w-11 flex-none items-center justify-center overflow-hidden rounded-full border border-bord bg-panel2">
-            {account.avatarUrl ? (
-              <img src={account.avatarUrl} alt="" className="h-full w-full object-cover" />
-            ) : (
-              <IcUser size={20} className="text-muted" />
-            )}
-          </span>
+          <Avatar account={account} size={44} />
           <div className="min-w-0 flex-1">
             <div className="truncate text-[13.5px] font-semibold">{account.name}</div>
             <div className="truncate text-[11.5px] text-muted">{account.email}</div>
@@ -150,7 +183,157 @@ function AccountPanel() {
           </button>
         </div>
       </Card>
+
+      <Card>
+        <Field
+          label={t.settings.account.emailLabel}
+          value={account.email || '—'}
+          hint={
+            authKind === 'google'
+              ? t.settings.account.emailFromGoogle
+              : t.settings.account.emailLocal
+          }
+        />
+        <Field
+          label={t.settings.account.methods}
+          value={account.providers.map((p) => METHOD[p]).join(' · ')}
+        />
+        <Field
+          label={t.settings.account.idLabel}
+          value={account.id}
+          hint={t.settings.account.idHint}
+        />
+        <Field label={t.settings.account.created} value={timeAgo(account.createdAt)} />
+      </Card>
+
       <Pending>{t.settings.pending.accountMore}</Pending>
+    </>
+  )
+}
+
+function ProfilePanel() {
+  const t = useI18n()
+  const { account, updateProfile } = useAccount()
+  const openSettings = useStore((s) => s.openSettings)
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [draft, setDraft] = useState(account?.name ?? '')
+  const [error, setError] = useState<string | null>(null)
+
+  // the field follows the account when it changes elsewhere (a fresh sign-in,
+  // another tab) but never fights the user mid-edit
+  useEffect(() => setDraft(account?.name ?? ''), [account?.name])
+
+  if (!account) {
+    return <Pending>{t.settings.pending.profileSignedOut}</Pending>
+  }
+
+  const providerName = account.providerProfile?.name
+  const commitName = () => {
+    if (draft === account.name) return
+    updateProfile({ name: draft })
+    announce(t.settings.profile.saved)
+  }
+
+  const pickAvatar = async (file: File | undefined) => {
+    if (!file) return
+    setError(null)
+    try {
+      updateProfile({ avatarUrl: await avatarDataUrlFrom(file) })
+      announce(t.settings.profile.saved)
+    } catch (err) {
+      const reason = err instanceof AvatarError ? err.message : 'undecodable'
+      setError(
+        t.settings.profile.avatarError[reason as keyof typeof t.settings.profile.avatarError] ??
+          t.settings.profile.avatarError.undecodable,
+      )
+    }
+  }
+
+  const usageOptions: { value: UsageType; label: string }[] = [
+    { value: 'personal', label: t.settings.profile.usagePersonal },
+    { value: 'work', label: t.settings.profile.usageWork },
+    { value: 'education', label: t.settings.profile.usageEducation },
+  ]
+
+  return (
+    <>
+      <Card title={t.settings.profile.avatar} body={t.settings.profile.avatarHint}>
+        <div className="flex flex-wrap items-center gap-3">
+          <Avatar account={account} size={56} />
+          <button className="btn" onClick={() => fileRef.current?.click()}>
+            <IcUpload size={12} /> {t.settings.profile.upload}
+          </button>
+          {account.avatarOverridden && (
+            <button className="btn" onClick={() => updateProfile({ avatarUrl: null })}>
+              {t.settings.profile.remove}
+            </button>
+          )}
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              void pickAvatar(e.target.files?.[0])
+              e.target.value = '' // picking the same file twice must still fire
+            }}
+          />
+        </div>
+        {error && <p className="mt-2 text-[11px] text-[#f24822]">{error}</p>}
+      </Card>
+
+      <Card title={t.settings.profile.displayName} body={t.settings.profile.displayNameHint}>
+        <input
+          className="field w-full"
+          value={draft}
+          maxLength={MAX_DISPLAY_NAME}
+          aria-label={t.settings.profile.displayName}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commitName}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') e.currentTarget.blur()
+            if (e.key === 'Escape') setDraft(account.name)
+          }}
+        />
+        {account.nameOverridden && providerName && (
+          <p className="mt-2 flex flex-wrap items-center gap-2 text-[10.5px] text-muted">
+            {t.settings.profile.providerSays(providerName)}
+            <LinkButton
+              label={t.settings.profile.reset}
+              onClick={() => {
+                updateProfile({ name: '' })
+                announce(t.settings.profile.saved)
+              }}
+            />
+          </p>
+        )}
+      </Card>
+
+      <Card title={t.settings.profile.usage} body={t.settings.profile.usageHint}>
+        <div className="flex flex-wrap gap-2">
+          {usageOptions.map((o) => (
+            <button
+              key={o.value}
+              aria-pressed={account.usageType === o.value}
+              className={`min-h-8 flex-1 cursor-pointer rounded-lg border px-3 py-1.5 text-[12px] font-medium ${
+                account.usageType === o.value
+                  ? 'border-accent bg-panel2 text-ink'
+                  : 'border-bord text-muted hover:text-ink'
+              }`}
+              onClick={() => updateProfile({ usageType: o.value })}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      </Card>
+
+      <Card body={t.settings.profile.languageAt}>
+        <LinkButton
+          label={t.settings.profile.goAppearance}
+          onClick={() => openSettings('appearance')}
+        />
+      </Card>
     </>
   )
 }
@@ -370,7 +553,7 @@ export function SettingsPanel({ section }: { section: SettingsSection }) {
     case 'developer':
       return <DeveloperPanel />
     case 'profile':
-      return <Pending>{t.settings.pending.profile}</Pending>
+      return <ProfilePanel />
     case 'notifications':
       return <Pending>{t.settings.pending.notifications}</Pending>
     case 'security':
