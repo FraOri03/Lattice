@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { useReactFlow } from '@xyflow/react'
 import type { CardType } from '@/types/model'
 import { useStore } from '@/store/useStore'
@@ -27,10 +27,12 @@ import { useI18n } from '@/lib/i18n'
 import {
   ToolbarAction,
   ToolbarGroup,
+  ToolbarOverflow,
   ToolbarRoot,
   ToolbarSeparator,
   ToolbarSplitButton,
   ToolbarToggle,
+  useToolbarOverflow,
   type ToolbarMenuItem,
 } from '@/components/ui/toolbar'
 import { announceCardInserted, OPEN_CREATE_MENU_EVENT } from './boardToolEvents'
@@ -53,6 +55,17 @@ export function CanvasToolbar() {
   const mayComment = useCan('comments.add')
   const imageInput = useRef<HTMLInputElement>(null)
   const importInput = useRef<HTMLInputElement>(null)
+  const pillRef = useRef<HTMLDivElement>(null)
+  /**
+   * The room the bar actually has is the canvas pane's, not its own: the pill
+   * is `w-max` inside a shrink-to-fit React Flow panel, so measuring it
+   * against itself would find that everything always fits. The pane is not a
+   * React child of this component, so it is reached the only way it can be.
+   */
+  const paneRef = useRef<HTMLElement | null>(null)
+  useEffect(() => {
+    paneRef.current = pillRef.current?.closest<HTMLElement>('.react-flow') ?? null
+  }, [])
 
   const centerPos = () => {
     const p = screenToFlowPosition({
@@ -185,79 +198,147 @@ export function CanvasToolbar() {
     ),
   ]
 
-  return (
-    <ToolbarRoot
-      label={t.toolbar.board.label}
-      content="icon-label"
-      // w-max: the pill sizes to its tools. React Flow's centred panel is
-      // shrink-to-fit and would otherwise cap the bar below its content — with
-      // longer labels (Italian) the last split painted outside the background.
-      className="w-max gap-1 rounded-xl border border-bord bg-panel p-1 shadow-lg"
-    >
-      {/* Structure */}
-      <ToolbarGroup label={t.toolbar.groups.create}>
+  /**
+   * The bar in fold order: what leaves first is last in this list (12.4).
+   *
+   * Deliberate, and this is the reasoning. **Media folds first** — it is the
+   * secondary of the two families, and everything in it can also arrive by
+   * dropping a file on the canvas. **Create folds next** — it is the primary
+   * "add something", and it is also reachable from the `A` shortcut, so losing
+   * its button is not losing the tool. **Section stays longest** because it is
+   * the cheapest control on the bar (one icon, no menu) and structure is what
+   * a crowded board needs most.
+   *
+   * Comment is not in this list at all: it is a mode, not an insertion, and it
+   * is the one thing on this bar that works at every tier. A toggle you have
+   * to open a menu to reach is a toggle you stop using.
+   *
+   * What a folded split button becomes: **its items, flattened into the
+   * menu**. The alternative — one menu entry that runs the last-used tool —
+   * keeps the split's convenience and loses the other six tools, which is the
+   * wrong half to keep. "Repeat the last tool" only means anything on a
+   * control you can hit without opening anything, and once it is in a menu
+   * that is already gone.
+   */
+  const foldable: { key: string; control: React.ReactNode; items: ToolbarMenuItem[] }[] = [
+    {
+      key: 'section',
+      control: (
         <ToolbarAction
           icon={<IcSection size={16} />}
           label={t.toolbar.board.section}
           description={t.toolbar.board.sectionTip}
           onRun={() => inserted(addSection(centerPos()), 'section')}
         />
-
-        <ToolbarSeparator />
-
-        {/* Creation — also the target of the board's `A` shortcut */}
+      ),
+      items: [
+        item(
+          'section',
+          t.toolbar.board.section,
+          <IcSection size={16} />,
+          () => inserted(addSection(centerPos()), 'section'),
+          t.toolbar.board.sectionTip,
+        ),
+      ],
+    },
+    {
+      key: 'create',
+      control: (
+        // also the target of the board's `A` shortcut
         <ToolbarSplitButton
           menuLabel={t.toolbar.board.openCardTools}
           items={createItems}
           defaultItemId="note"
           openOnEvent={OPEN_CREATE_MENU_EVENT}
         />
+      ),
+      items: createItems,
+    },
+    {
+      key: 'media',
+      control: (
         <ToolbarSplitButton
           menuLabel={t.toolbar.board.openMediaTools}
           items={mediaItems}
           defaultItemId="image"
         />
-      </ToolbarGroup>
+      ),
+      items: mediaItems,
+    },
+  ]
 
-      {/* Annotation */}
-      {mayComment && (
-        <>
-          <ToolbarSeparator />
-          <ToolbarGroup label={t.toolbar.groups.annotate}>
-            <ToolbarToggle
-              icon={<IcMessage size={16} />}
-              label={t.toolbar.board.comment}
-              description={t.toolbar.board.commentTip}
-              shortcut="C"
-              pressed={commentMode}
-              onRun={() => setCommentMode(!commentMode)}
+  const visible = useToolbarOverflow(pillRef, foldable.length, 40, paneRef)
+  const folded = foldable.slice(visible)
+
+  return (
+    <div ref={pillRef}>
+      <ToolbarRoot
+        label={t.toolbar.board.label}
+        content="icon-label"
+        // w-max: the pill sizes to its tools. React Flow's centred panel is
+        // shrink-to-fit and would otherwise cap the bar below its content — with
+        // longer labels (Italian) the last split painted outside the background.
+        className="w-max gap-1 rounded-xl border border-bord bg-panel p-1 shadow-lg"
+      >
+        {/* Structure */}
+        <ToolbarGroup label={t.toolbar.groups.create}>
+          {foldable.slice(0, visible).map((tool, i) => (
+            <span key={tool.key} className="flex flex-none items-center" data-toolbar-item>
+              {/* the separator that used to sit after Section belongs to the
+                  seam between it and the families, so it goes when Section
+                  does rather than leaving a rule against the pill's edge */}
+              {i === 1 && <ToolbarSeparator />}
+              {tool.control}
+            </span>
+          ))}
+          {folded.length > 0 && (
+            <ToolbarOverflow
+              label={t.toolbar.board.moreTools}
+              items={folded.flatMap((tool) => tool.items)}
             />
-          </ToolbarGroup>
-        </>
-      )}
+          )}
+        </ToolbarGroup>
 
-      <input
-        ref={imageInput}
-        type="file"
-        accept="image/*"
-        multiple
-        hidden
-        onChange={(e) => {
-          void importAndPlace(e.target.files)
-          e.target.value = ''
-        }}
-      />
-      <input
-        ref={importInput}
-        data-import-input
-        type="file"
-        multiple
-        hidden
-        onChange={(e) => {
-          void importAndPlace(e.target.files)
-          e.target.value = ''
-        }}
-      />
-    </ToolbarRoot>
+        {/* Annotation */}
+        {mayComment && (
+          <>
+            <ToolbarSeparator />
+            <ToolbarGroup label={t.toolbar.groups.annotate}>
+              <ToolbarToggle
+                icon={<IcMessage size={16} />}
+                label={t.toolbar.board.comment}
+                description={t.toolbar.board.commentTip}
+                shortcut="C"
+                pressed={commentMode}
+                onRun={() => setCommentMode(!commentMode)}
+              />
+            </ToolbarGroup>
+          </>
+        )}
+
+        <input
+          ref={imageInput}
+          type="file"
+          accept="image/*"
+          multiple
+          hidden
+          onChange={(e) => {
+            void importAndPlace(e.target.files)
+            e.target.value = ''
+          }}
+        />
+        <input
+          ref={importInput}
+          data-import-input
+          type="file"
+          multiple
+          hidden
+          onChange={(e) => {
+            void importAndPlace(e.target.files)
+            e.target.value = ''
+          }}
+        />
+      </ToolbarRoot>
+    </div>
   )
 }

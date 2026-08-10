@@ -205,42 +205,17 @@ body {
     padding-inline: 0.25rem;
   }
 
-  /* ---------- .tbtn: a compact control that is NOT in a toolbar ----------
-     After Phase 11.1 every mode's toolbar is built from the primitives above.
-     What still needs this class is the editor's bubble and block menus and the
-     slide element inspector — surfaces that borrow the same compact look
-     without being toolbars. It moved into this layer with the rest, so a
-     per-instance utility finally wins over it. */
-  .tbtn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 24px;
-    height: 24px;
-    padding: 0 5px;
-    border-radius: 6px;
-    font-size: 12px;
-    color: var(--muted);
-    cursor: pointer;
-    user-select: none;
-  }
-  .tbtn:hover {
-    background: var(--panel2);
-    color: var(--ink);
-  }
-  /* Left exactly as it was. `--accent` on `--accent-soft` measures 3.84:1 in
-     dark and 2.38:1 in light — the same failure the toolbar primitive fixed —
-     but these are menus and an inspector, not toolbars, and a cleanup commit
-     is the wrong place to change how shipped surfaces look. Recorded in the
-     audit as the follow-up for whoever migrates them. */
-  .tbtn.is-active {
-    background: var(--accent-soft);
-    color: var(--accent);
-  }
-  .tbtn:disabled {
-    opacity: 0.4;
-    cursor: default;
-  }
+  /* `.tbtn` lived here. Its last three call sites — the rich-text bubble and
+     block menus, and the slide element inspector — moved onto the primitives
+     above in 12.4/12.5, which is what issue #48 asked for: names behind the
+     glyphs, `aria-pressed`, and a pressed state that is a shape and not only
+     `--accent` on `--accent-soft` (3.84:1 in dark, 2.38:1 in light — under
+     what WCAG 1.4.1 and 1.4.11 ask of it).
+
+     A second, UNLAYERED copy of the same rules sat further down this file and
+     was never removed when the class was moved into the layer, so the
+     per-instance utilities that move was supposed to unblock were still
+     losing to it. Both are gone. */
 
   /* ---------- shell panels, undocked (Phase 12.2) ----------
      Below the Compact tier the sidebar and the inspector leave the flex row
@@ -825,31 +800,6 @@ body {
   padding: 4px 8px;
   border-bottom: 1px solid var(--bord);
   background: var(--panel);
-}
-.tbtn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 24px;
-  height: 24px;
-  padding: 0 5px;
-  border-radius: 6px;
-  font-size: 12px;
-  color: var(--muted);
-  cursor: pointer;
-  user-select: none;
-}
-.tbtn:hover {
-  background: var(--panel2);
-  color: var(--ink);
-}
-.tbtn.is-active {
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-.tbtn:disabled {
-  opacity: 0.4;
-  cursor: default;
 }
 /* categorised spreadsheet toolbar: labelled clusters that wrap to width */
 .sheet-toolbar {

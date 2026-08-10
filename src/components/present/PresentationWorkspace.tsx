@@ -724,32 +724,41 @@ function ElementInspector({
                   }
                 />
               </label>
+              {/* Migrated off `.tbtn` onto the toolbar primitive (12.4, closing
+                  #48). These already said `aria-pressed`; what they did not have
+                  was a state anyone could SEE without colour — `--accent` on
+                  `--accent-soft` is 2.38:1 in light, under the 3:1 a state
+                  graphic owes (WCAG 1.4.11) — nor a name behind the glyph, nor
+                  a 24px target. The primitive brings all three. */}
               <div className="mt-1.5 flex gap-1">
                 <button
-                  className={`tbtn font-bold ${selected.bold ? 'is-active' : ''}`}
+                  className="toolbar-control toolbar-control--sm font-bold"
                   title="Bold"
+                  aria-label="Bold"
                   aria-pressed={selected.bold}
                   onClick={() => onPatch((el) => (el.kind === 'text' ? { ...el, bold: !el.bold } : el))}
                 >
-                  B
+                  <span aria-hidden>B</span>
                 </button>
                 <button
-                  className={`tbtn italic ${selected.italic ? 'is-active' : ''}`}
+                  className="toolbar-control toolbar-control--sm italic"
                   title="Italic"
+                  aria-label="Italic"
                   aria-pressed={selected.italic}
                   onClick={() => onPatch((el) => (el.kind === 'text' ? { ...el, italic: !el.italic } : el))}
                 >
-                  I
+                  <span aria-hidden>I</span>
                 </button>
                 {(['left', 'center', 'right'] as const).map((a) => (
                   <button
                     key={a}
-                    className={`tbtn ${selected.align === a ? 'is-active' : ''}`}
+                    className="toolbar-control toolbar-control--sm"
                     title={`Align ${a}`}
+                    aria-label={`Align ${a}`}
                     aria-pressed={selected.align === a}
                     onClick={() => onPatch((el) => (el.kind === 'text' ? { ...el, align: a } : el))}
                   >
-                    {a === 'left' ? '⇤' : a === 'center' ? '↔' : '⇥'}
+                    <span aria-hidden>{a === 'left' ? '⇤' : a === 'center' ? '↔' : '⇥'}</span>
                   </button>
                 ))}
               </div>
@@ -765,11 +774,12 @@ function ElementInspector({
                 />
                 {selected.color && (
                   <button
-                    className="tbtn w-4 text-[9px]"
+                    className="toolbar-control toolbar-control--sm text-[9px]"
                     title="Use theme color"
+                    aria-label="Use theme color"
                     onClick={() => onPatch((el) => (el.kind === 'text' ? { ...el, color: null } : el))}
                   >
-                    ✕
+                    <span aria-hidden>✕</span>
                   </button>
                 )}
               </label>
@@ -790,11 +800,12 @@ function ElementInspector({
                   }
                 />
                 <button
-                  className="tbtn w-4 text-[9px]"
+                  className="toolbar-control toolbar-control--sm text-[9px]"
                   title="No fill"
+                  aria-label="No fill"
                   onClick={() => onPatch((el) => (el.kind === 'shape' ? { ...el, fill: null } : el))}
                 >
-                  ✕
+                  <span aria-hidden>✕</span>
                 </button>
               </label>
               <label className="mt-1 flex items-center gap-2 text-[11px] text-muted">
