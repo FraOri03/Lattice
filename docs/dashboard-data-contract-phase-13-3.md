@@ -149,5 +149,6 @@ Two rules that follow:
 | Server-backed sections stay honest until then | #80 (15.5) |
 | Entity-level starring, longer recents log | #77 (15.2) |
 
-Trash has no issue yet: it needs a soft-delete model before it needs a server,
-and neither is scheduled.
+Trash is the odd one out: it needs a soft-delete model before it needs a server.
+That model is #115 (15.6) — until it lands, Trash presents as *unavailable*, not
+as an empty list.
