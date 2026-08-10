@@ -83,6 +83,7 @@ import type { GraphViewSettings } from '@/lib/graph/graphTypes'
 import { decodeGraphSettings } from '@/lib/graph/GraphSettingsService'
 import { ENTITY_MODE, type NavSurface, type ResolvedNavigation } from '@/lib/nav/navUrl'
 import { DEFAULT_SETTINGS_SECTION, type SettingsSection } from '@/lib/settings/sections'
+import { DEFAULT_APPEARANCE, type Appearance } from '@/lib/theme/appearance'
 import { useWorkspaceLayoutStore } from './workspaceLayoutStore'
 import {
   DEFAULT_PROJECT_ID,
@@ -262,7 +263,14 @@ interface AppState {
    * and closing settings leaves the surface underneath untouched.
    */
   settingsSection: SettingsSection | null
+  /**
+   * The RESOLVED theme — what the document wears and what every consumer
+   * reads. `appearance.theme` is what the user asked for, and when that is
+   * 'system' this field follows the OS live (14.3).
+   */
   theme: Theme
+  /** Appearance preferences (14.3): theme, contrast, density, size, motion. */
+  appearance: Appearance
   locale: Locale
   search: string
   tagFilter: string | null
@@ -279,6 +287,8 @@ interface AppState {
   setSidebarFilter: (f: SidebarFilter) => void
   setViewMode: (m: ViewMode) => void
   setTheme: (t: Theme) => void
+  /** Change one appearance preference; the resolved theme follows. */
+  setAppearance: (patch: Partial<Appearance>) => void
   setLocale: (l: Locale) => void
   /** Merge + clamp a project's graph settings (creates defaults on first use). */
   setGraphSettings: (projectId: string, patch: Partial<GraphViewSettings>) => void
@@ -587,6 +597,7 @@ export const useStore = create<AppState>()(
       navSurface: 'project',
       settingsSection: null,
       theme: 'dark',
+      appearance: DEFAULT_APPEARANCE,
       locale: detectLocale(),
       search: '',
       tagFilter: null,
@@ -607,7 +618,15 @@ export const useStore = create<AppState>()(
         // choosing a section is entering the project: it leaves the dashboard
         set({ viewMode, navSurface: 'project' })
       },
-      setTheme: (theme) => set({ theme }),
+      // setTheme writes the RESOLVED theme. A direct light/dark choice is also
+      // a preference, so it is recorded as one — otherwise the next reload
+      // would resolve 'system' again and undo the click.
+      setTheme: (theme) =>
+        set((s) => ({
+          theme,
+          appearance: s.appearance.theme === 'system' ? s.appearance : { ...s.appearance, theme },
+        })),
+      setAppearance: (patch) => set((s) => ({ appearance: { ...s.appearance, ...patch } })),
       setLocale: (locale) => set({ locale }),
 
       createFolder: (category, name = 'New folder') => {
@@ -2161,6 +2180,10 @@ export const useStore = create<AppState>()(
         tabSessions: s.tabSessions,
         viewMode: s.viewMode,
         theme: s.theme,
+        // the resolved theme is stored so the first paint after a reload is
+        // not a flash of the wrong one; `appearance` is what it was resolved
+        // FROM, and is the thing the user actually chose
+        appearance: s.appearance,
         locale: s.locale,
         graphSettings: s.graphSettings,
         folders: s.folders,

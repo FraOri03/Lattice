@@ -9,7 +9,15 @@ import { githubProvider } from '@/lib/github/GithubCodeProvider'
 import { useStore } from '@/store/useStore'
 import { useUiStore } from '@/store/useUiStore'
 import { useI18n, useLocale, useTimeAgo } from '@/lib/i18n'
-import { nextTheme, setThemeAnimated } from '@/lib/theme/animateTheme'
+import { setThemeAnimated } from '@/lib/theme/animateTheme'
+import { resolveTheme } from '@/lib/theme/appearance'
+import type {
+  ContrastPreference,
+  DensityPreference,
+  MotionPreference,
+  ThemePreference,
+  UiScalePreference,
+} from '@/lib/theme/appearance'
 import { env } from '@/lib/env'
 import type { Account, AuthProviderId, Locale, UsageType } from '@/types/model'
 import type { SettingsSection } from '@/lib/settings/sections'
@@ -98,6 +106,40 @@ function Row({
       </span>
       <span className="min-w-0 flex-1 truncate text-[10.5px] text-muted">{detail}</span>
       {action}
+    </div>
+  )
+}
+
+/**
+ * A row of mutually exclusive options. One component so every preference in
+ * this screen looks and announces the same way — `aria-pressed` carries the
+ * state, and the label is never colour alone.
+ */
+function Choice<T extends string>({
+  value,
+  options,
+  onPick,
+}: {
+  value: T | undefined
+  options: { value: T; label: string }[]
+  onPick: (value: T, event: React.MouseEvent) => void
+}) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {options.map((o) => (
+        <button
+          key={o.value}
+          aria-pressed={value === o.value}
+          className={`min-h-8 flex-1 cursor-pointer rounded-lg border px-3 py-1.5 text-[12px] font-medium whitespace-nowrap ${
+            value === o.value
+              ? 'border-accent bg-panel2 text-ink'
+              : 'border-bord text-muted hover:text-ink'
+          }`}
+          onClick={(e) => onPick(o.value, e)}
+        >
+          {o.label}
+        </button>
+      ))}
     </div>
   )
 }
@@ -310,22 +352,11 @@ function ProfilePanel() {
       </Card>
 
       <Card title={t.settings.profile.usage} body={t.settings.profile.usageHint}>
-        <div className="flex flex-wrap gap-2">
-          {usageOptions.map((o) => (
-            <button
-              key={o.value}
-              aria-pressed={account.usageType === o.value}
-              className={`min-h-8 flex-1 cursor-pointer rounded-lg border px-3 py-1.5 text-[12px] font-medium ${
-                account.usageType === o.value
-                  ? 'border-accent bg-panel2 text-ink'
-                  : 'border-bord text-muted hover:text-ink'
-              }`}
-              onClick={() => updateProfile({ usageType: o.value })}
-            >
-              {o.label}
-            </button>
-          ))}
-        </div>
+        <Choice<UsageType>
+          value={account.usageType}
+          onPick={(usageType) => updateProfile({ usageType })}
+          options={usageOptions}
+        />
       </Card>
 
       <Card body={t.settings.profile.languageAt}>
@@ -342,63 +373,97 @@ function ProfilePanel() {
 
 function AppearancePanel() {
   const t = useI18n()
+  const a = t.settings.appearance
   const theme = useStore((s) => s.theme)
   const setTheme = useStore((s) => s.setTheme)
+  const appearance = useStore((s) => s.appearance)
+  const setAppearance = useStore((s) => s.setAppearance)
   const locale = useLocale()
   const setLocale = useStore((s) => s.setLocale)
-  const locales: { value: Locale; label: string }[] = [
-    { value: 'en', label: t.profile.english },
-    { value: 'it', label: t.profile.italian },
-  ]
+
+  /**
+   * A theme choice is two things: the preference, and the paint. Both run
+   * through the reveal — including "System", which resolves the OS answer
+   * here so following the system still looks like a decision, not a flicker.
+   */
+  const pickTheme = (value: ThemePreference, e: React.MouseEvent) => {
+    const systemDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false
+    const next = resolveTheme(value, systemDark)
+    if (next !== theme) {
+      setThemeAnimated(next, setTheme, { x: e.clientX, y: e.clientY })
+    }
+    setAppearance({ theme: value })
+  }
 
   return (
     <>
-      <Card title={t.settings.theme}>
-        <div className="flex gap-2">
-          {(['dark', 'light'] as const).map((value) => (
-            <button
-              key={value}
-              aria-pressed={theme === value}
-              className={`min-h-8 flex-1 cursor-pointer rounded-lg border px-3 py-1.5 text-[12px] font-medium ${
-                theme === value
-                  ? 'border-accent bg-panel2 text-ink'
-                  : 'border-bord text-muted hover:text-ink'
-              }`}
-              onClick={(e) => {
-                if (theme === value) return
-                // the reveal grows from the control that started it
-                setThemeAnimated(nextTheme(theme), setTheme, {
-                  x: e.clientX,
-                  y: e.clientY,
-                })
-              }}
-            >
-              {value === 'dark' ? t.settings.themeDark : t.settings.themeLight}
-            </button>
-          ))}
-        </div>
+      <Card title={t.settings.theme} body={a.themeHint}>
+        <Choice<ThemePreference>
+          value={appearance.theme}
+          onPick={pickTheme}
+          options={[
+            { value: 'system', label: a.system },
+            { value: 'light', label: t.settings.themeLight },
+            { value: 'dark', label: t.settings.themeDark },
+          ]}
+        />
+      </Card>
+
+      <Card title={a.contrast} body={a.contrastHint}>
+        <Choice<ContrastPreference>
+          value={appearance.contrast}
+          onPick={(contrast) => setAppearance({ contrast })}
+          options={[
+            { value: 'normal', label: a.contrastNormal },
+            { value: 'high', label: a.contrastHigh },
+          ]}
+        />
+      </Card>
+
+      <Card title={a.density} body={a.densityHint}>
+        <Choice<DensityPreference>
+          value={appearance.density}
+          onPick={(density) => setAppearance({ density })}
+          options={[
+            { value: 'comfortable', label: a.densityComfortable },
+            { value: 'compact', label: a.densityCompact },
+          ]}
+        />
+      </Card>
+
+      <Card title={a.size} body={a.sizeHint}>
+        <Choice<UiScalePreference>
+          value={appearance.uiScale}
+          onPick={(uiScale) => setAppearance({ uiScale })}
+          options={[
+            { value: 'small', label: a.sizeSmall },
+            { value: 'default', label: a.sizeDefault },
+            { value: 'large', label: a.sizeLarge },
+          ]}
+        />
+      </Card>
+
+      <Card title={a.motion} body={a.motionHint}>
+        <Choice<MotionPreference>
+          value={appearance.motion}
+          onPick={(motion) => setAppearance({ motion })}
+          options={[
+            { value: 'system', label: a.system },
+            { value: 'reduce', label: a.motionReduce },
+          ]}
+        />
       </Card>
 
       <Card title={t.profile.language}>
-        <div className="flex gap-2">
-          {locales.map((o) => (
-            <button
-              key={o.value}
-              aria-pressed={locale === o.value}
-              className={`min-h-8 flex-1 cursor-pointer rounded-lg border px-3 py-1.5 text-[12px] font-medium ${
-                locale === o.value
-                  ? 'border-accent bg-panel2 text-ink'
-                  : 'border-bord text-muted hover:text-ink'
-              }`}
-              onClick={() => setLocale(o.value)}
-            >
-              {o.label}
-            </button>
-          ))}
-        </div>
+        <Choice<Locale>
+          value={locale}
+          onPick={(value) => setLocale(value)}
+          options={[
+            { value: 'en', label: t.profile.english },
+            { value: 'it', label: t.profile.italian },
+          ]}
+        />
       </Card>
-
-      <Pending>{t.settings.pending.appearanceMore}</Pending>
     </>
   )
 }

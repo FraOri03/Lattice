@@ -550,13 +550,37 @@ export const en = {
     intro: {
       account: 'Who you are signed in as, and how you leave.',
       profile: 'How you appear to the people you share with.',
-      appearance: 'Theme and interface language.',
+      appearance: 'Theme, contrast, density, size, motion and language.',
       notifications: 'Which events reach you, and where.',
       security: 'Sessions, devices and what protects the vault.',
       connections: 'The services Lattice talks to, and what each one gets.',
       storage: 'Where your work lives and whether it is leaving this browser.',
       billing: 'What this build costs you.',
       developer: 'Build information and keyboard shortcuts.',
+    },
+    appearance: {
+      system: 'System',
+      themeHint: 'System follows your operating system and keeps following it.',
+      contrast: 'High contrast',
+      contrastHint:
+        'Stronger borders, brighter secondary text and a thicker focus ring. The colours stay the same — only the distance between them changes.',
+      contrastNormal: 'Normal',
+      contrastHigh: 'High',
+      density: 'Interface density',
+      densityHint:
+        'Compact tightens the controls that repeat down every panel. Tap targets keep their 24 px floor either way.',
+      densityComfortable: 'Comfortable',
+      densityCompact: 'Compact',
+      size: 'UI size',
+      sizeHint:
+        'Scales the interface — panels, toolbars, dialogs. The board keeps its own zoom, so cards stay where you put them.',
+      sizeSmall: 'Small',
+      sizeDefault: 'Default',
+      sizeLarge: 'Large',
+      motion: 'Motion',
+      motionHint:
+        'System already honours “reduce motion” in your operating system. Choose Reduce to calm the app without changing anything outside it.',
+      motionReduce: 'Reduce',
     },
     account: {
       emailLabel: 'Primary e-mail',
@@ -607,8 +631,6 @@ export const en = {
         'Plans and billing arrive with phase 22. Nothing in this build is metered or charged.',
       accountMore:
         'A second e-mail address cannot be linked, and the account cannot be deleted, until identity stops being whatever the provider says it is — phase 16. Signing out already removes it from this browser.',
-      appearanceMore:
-        'System theme, high contrast, interface density and UI size arrive in 14.3. Reduced motion already follows your operating system.',
       connectionsMore:
         'The realtime provider, LiveKit and the conversion backend join this list in 14.5.',
     },
@@ -1153,13 +1175,37 @@ export const it: Catalog = {
     intro: {
       account: 'Con quale identità hai fatto accesso, e come esci.',
       profile: 'Come appari alle persone con cui condividi.',
-      appearance: 'Tema e lingua dell’interfaccia.',
+      appearance: 'Tema, contrasto, densità, dimensione, movimento e lingua.',
       notifications: 'Quali eventi ti raggiungono, e dove.',
       security: 'Sessioni, dispositivi e cosa protegge il vault.',
       connections: 'I servizi con cui Lattice parla, e cosa riceve ciascuno.',
       storage: 'Dove vive il tuo lavoro e se sta uscendo da questo browser.',
       billing: 'Quanto ti costa questa build.',
       developer: 'Informazioni di build e scorciatoie da tastiera.',
+    },
+    appearance: {
+      system: 'Sistema',
+      themeHint: 'Sistema segue il tuo sistema operativo, e continua a seguirlo.',
+      contrast: 'Contrasto elevato',
+      contrastHint:
+        'Bordi più netti, testo secondario più chiaro e anello di focus più spesso. I colori restano gli stessi: cambia solo la distanza tra loro.',
+      contrastNormal: 'Normale',
+      contrastHigh: 'Elevato',
+      density: 'Densità dell’interfaccia',
+      densityHint:
+        'Compatta stringe i controlli che si ripetono in ogni pannello. In entrambi i casi i target restano sopra i 24 px.',
+      densityComfortable: 'Comoda',
+      densityCompact: 'Compatta',
+      size: 'Dimensione UI',
+      sizeHint:
+        'Scala l’interfaccia — pannelli, toolbar, finestre. La board mantiene il proprio zoom, così le card restano dove le hai messe.',
+      sizeSmall: 'Piccola',
+      sizeDefault: 'Predefinita',
+      sizeLarge: 'Grande',
+      motion: 'Movimento',
+      motionHint:
+        'Sistema rispetta già il “riduci movimento” del sistema operativo. Scegli Riduci per calmare l’app senza cambiare nulla fuori.',
+      motionReduce: 'Riduci',
     },
     account: {
       emailLabel: 'E-mail principale',
@@ -1210,8 +1256,6 @@ export const it: Catalog = {
         'Piani e fatturazione arrivano con la fase 22. In questa build nulla è misurato o addebitato.',
       accountMore:
         'Non si può collegare una seconda e-mail, né eliminare l’account, finché l’identità resta quella che dice il provider — fase 16. Uscire lo toglie già da questo browser.',
-      appearanceMore:
-        'Tema di sistema, contrasto elevato, densità dell’interfaccia e dimensione della UI arrivano nella 14.3. Il movimento ridotto segue già il sistema operativo.',
       connectionsMore:
         'Il provider realtime, LiveKit e il backend di conversione entrano in questa lista nella 14.5.',
     },

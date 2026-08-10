@@ -60,7 +60,21 @@ const REVEAL_EASING = 'cubic-bezier(.22, .68, .3, 1)'
  */
 const COVER_SLACK = 1.12
 
+/**
+ * The app's own reduced-motion preference (14.3), when the user set one.
+ *
+ * A stylesheet's `@media (prefers-reduced-motion)` cannot shorten a JS timer,
+ * so the preference has to be readable from code as well — this is where the
+ * two meet. `useAppearance` keeps it in step; nothing else writes it.
+ */
+let motionOverride = false
+
+export function setMotionOverride(reduce: boolean): void {
+  motionOverride = reduce
+}
+
 export function prefersReducedMotion(): boolean {
+  if (motionOverride) return true
   return typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 }
 

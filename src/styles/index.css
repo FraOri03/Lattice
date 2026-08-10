@@ -24,6 +24,30 @@
   --shadow: 0 2px 10px rgba(20, 20, 40, 0.08);
 }
 
+/* ---------- high contrast (14.3) ----------
+   Same hues, harder edges. Muted text is the reason this setting exists: at
+   #97979f on #1b1b1f it is 4.6:1, which passes AA for the 12px+ it is used at
+   and fails AAA everywhere — so contrast mode takes it to the ink it is a
+   quieter version of, and gives every border something to be seen against. */
+:root[data-contrast='high'] {
+  --muted: #c9c9d1;
+  --bord: #6a6a74;
+  --panel2: #34343a;
+  --accent: #4db2ff;
+  --accent-soft: rgba(77, 178, 255, 0.22);
+}
+:root[data-contrast='high'][data-theme='light'] {
+  --muted: #3f3f46;
+  --bord: #9c9ca6;
+  --panel2: #e6e6ea;
+  --accent: #0060b0;
+  --accent-soft: rgba(0, 96, 176, 0.14);
+}
+/* the focus ring is the other half: it has to be visible on every surface */
+:root[data-contrast='high'] :focus-visible {
+  outline-width: 3px;
+}
+
 @theme inline {
   --color-bg: var(--bg);
   --color-panel: var(--panel);
@@ -42,6 +66,10 @@ body,
 }
 body {
   @apply bg-bg text-ink;
+  /* UI size (14.3). `zoom` scales layout, so the app's fixed px sizes follow
+     it — a root font-size would not, because almost nothing here is sized in
+     rem. */
+  zoom: var(--ui-scale, 1);
   font-family:
     Inter,
     ui-sans-serif,
@@ -97,6 +125,23 @@ body {
   }
   .insp-h {
     @apply mt-4 mb-1.5 text-[10px] font-semibold tracking-widest text-muted uppercase;
+  }
+
+  /* ---------- interface density (14.3) ----------
+     Compact tightens the shared primitives — the controls that repeat down
+     every panel and row — and stops there. It never touches the 24px target
+     floor: less padding, same reachability. */
+  :root[data-density='compact'] .field {
+    @apply px-2 py-1;
+  }
+  :root[data-density='compact'] .btn {
+    @apply px-2 py-1;
+  }
+  :root[data-density='compact'] .icon-btn {
+    @apply h-6 w-6;
+  }
+  :root[data-density='compact'] .insp-h {
+    @apply mt-2.5 mb-1;
   }
 
   /* ---------- toolbar primitives (Phase 11.1) ----------
@@ -1077,6 +1122,17 @@ body {
   outline-offset: 2px;
   border-radius: 12px;
 }
+/* ---------- UI size stops at the canvas (14.3) ----------
+   The board is not chrome: it has its own zoom control, and its pointer math
+   compares clientX against the container's rect while its transform is in
+   unzoomed CSS px — an ancestor zoom would put those two in different units
+   and drift every drag. Undoing the zoom here keeps the canvas exactly as it
+   is today whatever the interface size, which is also the right product
+   answer: "UI size" scales the interface, and the board scales itself. */
+.react-flow {
+  zoom: calc(1 / var(--ui-scale, 1));
+}
+
 /* the source card while a keyboard link is being drawn */
 .react-flow__node.is-link-source {
   outline: 2px dashed var(--accent);
@@ -1091,6 +1147,17 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+/* The same collapse, asked for inside the app (14.3). The media query above
+   still covers the OS setting; this covers the preference, because someone can
+   want a calm app on a system they left alone. There is no rule the other way:
+   an OS that asked for less motion is not overruled here. */
+:root[data-motion='reduce'] *,
+:root[data-motion='reduce'] *::before,
+:root[data-motion='reduce'] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
 }
 
 /* ---------- toasts ---------- */
