@@ -14,6 +14,16 @@ All notable changes to Lattice are recorded here. The format follows
 
 ### Added
 
+- **Below 768px Lattice says what it cannot do instead of pretending.** Notes and rich
+  documents stay editable — they are the two editors that work under a thumb. The board
+  stays navigable: pan, zoom, select and open a card, comment; only dragging cards around
+  and drawing connections stop. Spreadsheets, code files, presentations and the photo studio
+  show a panel that names the file, says what is in it and explains the actual constraint —
+  a grid you scroll two ways at once, Monaco's keybindings, a fixed 960×540 stage — rather
+  than rendering an editor that cannot work at that width. A code file gets its first 40
+  lines to read, because that text was already a cheap read; the other two say what they
+  hold instead of faking a preview. Comments reach every tier: the collaboration panel
+  overlays the content below the same threshold as the other panels.
 - **Lattice adapts to the window it is in.** The shell now has four tiers, and below the
   widest one it changes shape rather than overflowing. The sidebar and the inspector stop
   being docked under ~1100px and become drawers that overlay the content, each leaving an
@@ -43,6 +53,13 @@ All notable changes to Lattice are recorded here. The format follows
 
 ### Changed
 
+- **The rich document's bubble and block menus are toolbar controls.** They were the last
+  `.tbtn` surfaces reachable while editing: to a screen reader they were a bare `B`, `I` and
+  `<>`, and their pressed state was carried by colour alone (`--accent` on `--accent-soft`
+  measures 3.84:1 in dark and 2.38:1 in light, under what WCAG 1.4.1 needs). Every control
+  now has a name, `aria-pressed`, and the primitive's underline indicator that survives
+  greyscale. The slide element inspector's remaining six are tracked in
+  [#48](https://github.com/FraOri03/Lattice/issues/48).
 - **The three remaining inspectors (document, spreadsheet, code) behave like the board's.**
   They were still a hard-coded 280px `aside`, repeated three times, so the width, the rail
   and the way to shut the panel only existed on the Board. All four share one wrapper now,

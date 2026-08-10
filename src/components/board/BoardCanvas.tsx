@@ -33,6 +33,8 @@ import { presenceService } from '@/lib/collab/PresenceService'
 import { commentService } from '@/lib/collab/CommentService'
 import { useCollabStore } from '@/lib/collab/collabStore'
 import { usePeers, useReadOnly } from '@/lib/collab/useCollab'
+import { capabilityAt } from '@/lib/layout/tiers'
+import { useViewportTier } from '@/lib/layout/useViewportTier'
 import { BoardPresenceLayer } from '@/components/collab/BoardPresenceLayer'
 import { CommentPins } from '@/components/collab/CommentPins'
 import { CommentAreas, FOCUS_AREA_EVENT } from '@/components/collab/CommentAreas'
@@ -146,6 +148,9 @@ function Canvas() {
   const commentMode = useCollabStore((s) => s.commentMode)
   const setFocusedThread = useCollabStore((s) => s.setFocusedThread)
   const readOnly = useReadOnly()
+  // pan, zoom, open a card and comment survive every tier; dragging cards
+  // around and drawing connections do not below 768px
+  const canLayOut = !readOnly && capabilityAt('board', useViewportTier()) === 'edit'
   const { screenToFlowPosition, fitBounds } = useReactFlow()
   const peers = usePeers()
 
@@ -434,9 +439,14 @@ function Canvas() {
         maxZoom={4}
         connectionMode={ConnectionMode.Loose}
         defaultEdgeOptions={defaultEdgeOptions}
-        nodesDraggable={!readOnly}
-        nodesConnectable={!readOnly}
-        edgesReconnectable={!readOnly}
+        // Two different reasons not to edit, deliberately kept apart: a role
+        // that cannot write, and a viewport where laying a board out is not a
+        // job anyone is doing (12.5). Both stop the same three interactions;
+        // only the first has anything to say about permissions, so the copy
+        // elsewhere still keys off `readOnly` alone.
+        nodesDraggable={canLayOut}
+        nodesConnectable={canLayOut}
+        edgesReconnectable={canLayOut}
         // keyboard delete + arrow-move are owned by useBoardKeyboard (guarded
         // against editor focus, with live announcements); React Flow's own
         // key handling is disabled so nothing double-fires. Nodes stay

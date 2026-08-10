@@ -259,15 +259,24 @@ function ProjectSurface() {
 
   return (
     // `relative` so the sidebar can leave the flow below the Compact tier and
-    // overlay the surface instead of being squeezed out of it (12.2)
-    <div className="relative flex h-full">
+    // overlay the surface instead of being squeezed out of it (12.2).
+    //
+    // `overflow-x-clip` because a drawer arrives by sliding in from its edge,
+    // and for the length of that slide it sits outside its container — where
+    // it extends the document's scrollable width and the page can be dragged
+    // sideways, which is the exact thing this phase exists to remove. `clip`
+    // rather than `hidden`: it does not create a scroll container, so nothing
+    // inside starts scrolling for having been told not to overflow (12.5).
+    <div className="relative flex h-full overflow-x-clip">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar />
         {/* the project's open entities, above the section they open into */}
         <EntityTabStrip />
         <ReadOnlyBanner />
-        <div className="relative flex min-h-0 flex-1">
+        {/* the containing block for the inspector and collaboration drawers —
+            clipped on the inline axis for the same reason as the surface above */}
+        <div className="relative flex min-h-0 flex-1 overflow-x-clip">
           {showSplit ? (
             <div
               className={`flex min-h-0 min-w-0 flex-1 ${
