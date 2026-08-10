@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useStore } from '@/store/useStore'
+import { atLeast } from '@/lib/layout/tiers'
+import { useViewportTier } from '@/lib/layout/useViewportTier'
 import { useOpenId } from '@/lib/tabs/openEntity'
 import { useUiStore } from '@/store/useUiStore'
 import { useWorkspaceLayoutStore } from '@/store/workspaceLayoutStore'
@@ -170,17 +172,23 @@ function ContextBreadcrumb() {
   else if (activeNoteId && notes[activeNoteId]) entity = notes[activeNoteId].title
 
   return (
-    <div className="flex min-w-0 items-center gap-1 text-[12px]">
+    /**
+     * `min-w-24`: the breadcrumb was the only `min-w-0` child of the header,
+     * so flexbox drained it to zero before any other control gave up a pixel —
+     * at 1680, a width where nothing overflows, it was already 11 px wide
+     * (audit F2). It truncates now; it does not vanish.
+     */
+    <div className="flex min-w-24 items-center gap-1 text-[12px]">
       {workspace && (
         <>
           <span
-            className="hidden min-w-0 items-center gap-1 font-medium text-muted lg:flex"
+            className="hidden min-w-0 items-center gap-1 font-medium text-muted @min-[64rem]:flex"
             title={t.topbar.workspaceTitle(workspace.name)}
           >
             <span aria-hidden>{workspace.icon}</span>
             <span className="max-w-24 truncate">{workspace.name}</span>
           </span>
-          <IcChevronRight size={11} className="hidden flex-none text-muted lg:block" />
+          <IcChevronRight size={11} className="hidden flex-none text-muted @min-[64rem]:block" />
         </>
       )}
       {project && (
@@ -256,33 +264,93 @@ function PanelButtons() {
   )
 }
 
+/**
+ * Whatever did not fit in the bar, in a menu (Phase 12.3).
+ *
+ * It takes children rather than a list of menu items, because half of what it
+ * has to hold — presence, the realtime chip, the call button, notifications —
+ * are components with popovers of their own, not actions with a label. They
+ * keep working here: nothing clips them, and the panel closes on a click
+ * outside it, not on a click inside.
+ */
+function TopBarOverflow({ label, children }: { label: string; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false)
+  const root = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e: MouseEvent) => {
+      if (!root.current?.contains(e.target as Node)) setOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    window.addEventListener('mousedown', onDown)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('mousedown', onDown)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
+  return (
+    <div className="relative flex-none" ref={root}>
+      <button
+        className="icon-btn"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={label}
+        title={label}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span aria-hidden className="text-[15px] leading-none">
+          ···
+        </span>
+      </button>
+      {open && (
+        <div className="absolute top-9 right-0 z-50 flex w-max flex-col items-stretch gap-2 rounded-xl border border-bord bg-panel p-2 shadow-xl">
+          {children}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function TopBar() {
   const theme = useStore((s) => s.theme)
   const setTheme = useStore((s) => s.setTheme)
   const setPaletteOpen = useUiStore((s) => s.setPaletteOpen)
   const setShareDialogOpen = useUiStore((s) => s.setShareDialogOpen)
   const collabMode = useCollabMode()
+  const tier = useViewportTier()
   const t = useI18n()
 
-  return (
-    <header className="flex h-11 flex-none items-center gap-2 border-b border-bord bg-panel px-3">
-      <ContextBreadcrumb />
+  /**
+   * What folds, and when. 12.0 measured the bar asking for 1400 px inside a
+   * 1200 px box at a 1440 viewport — so "fits at Full" was never true and the
+   * fix cannot be a single breakpoint. Two groups leave at two different
+   * widths, each rendered ONCE and moved rather than duplicated: mounting
+   * `NotificationCenter` twice and hiding one with CSS would give the project
+   * two of the same state, which is the failure phase 11.3 spent itself
+   * removing.
+   */
+  const foldActions = !atLeast(tier, 'full')
+  const foldStatus = !atLeast(tier, 'compact')
 
-      <div className="flex-1" />
-
-      {/* Centre: [Split] · [Board · Graph] · [Document · Sheet · Presentation ·
-          Code · Photo]. Split stays a layout and Graph a view underneath — see
-          SectionTabs. */}
-      <SectionTabs />
-
-      <div className="flex-1" />
-
-      {/* presence (who is in the project) and the call (who is talking) are
-          deliberately adjacent but distinct states */}
+  // presence (who is in the project) and the call (who is talking) are
+  // deliberately adjacent but distinct states
+  const status = (
+    <>
       <PresenceAvatars />
       <RealtimeStatusChip />
       <JoinCallButton />
       <NotificationCenter />
+      <SyncIndicator />
+    </>
+  )
+
+  const actions = (
+    <>
       <button
         className="btn"
         onClick={() => setShareDialogOpen(true)}
@@ -294,16 +362,16 @@ export function TopBar() {
         aria-label={t.topbar.shareAria(collabMode.scopeLabel)}
       >
         <IcUserPlus size={13} />
-        <span className="hidden lg:inline">{t.topbar.share}</span>
+        <span className="hidden @min-[64rem]:inline">{t.topbar.share}</span>
         {!collabMode.isRealtime && (
-          <span className="hidden rounded bg-panel px-1 text-[9px] font-semibold text-muted xl:inline">
+          <span className="hidden rounded bg-panel px-1 text-[9px] font-semibold text-muted @min-[80rem]:inline">
             {collabMode.shortLabel}
           </span>
         )}
       </button>
       <PanelButtons />
       <button
-        className="btn hidden md:inline-flex"
+        className="btn"
         onClick={() => setPaletteOpen(true)}
         title={t.topbar.commandPalette}
         aria-label={t.topbar.openCommandPalette}
@@ -311,7 +379,6 @@ export function TopBar() {
         <IcCommand size={12} />
         <kbd className="text-[10px] text-muted">Ctrl K</kbd>
       </button>
-      <SyncIndicator />
       {/* the reveal starts from this button, so the new theme visibly comes
           out of the control the user pressed */}
       <button
@@ -333,6 +400,41 @@ export function TopBar() {
           {theme === 'dark' ? <IcSun size={15} /> : <IcMoon size={15} />}
         </span>
       </button>
+    </>
+  )
+
+  return (
+    /**
+     * `@container`: everything inside that hides a label asks THIS box how
+     * wide it is, not the window. The bar lives in the viewport minus the
+     * sidebar — and minus more than that when a pane is split — so `lg:` was
+     * showing eight section labels into a 784 px box at a 1024 viewport, which
+     * is the row in the audit with ten children hanging outside the bar (F4).
+     *
+     * `overflow-x-auto` is the floor, not the mechanism: folding is what
+     * should keep the bar inside its box, but if some locale or some future
+     * control overflows anyway, the bar scrolls and the document does not.
+     */
+    <header className="@container flex h-11 max-w-full min-w-0 flex-none items-center gap-2 overflow-x-auto border-b border-bord bg-panel px-3">
+      <ContextBreadcrumb />
+
+      <div className="flex-1" />
+
+      {/* Centre: [Split] · [Board · Graph] · [Document · Sheet · Presentation ·
+          Code · Photo]. Split stays a layout and Graph a view underneath — see
+          SectionTabs. */}
+      <SectionTabs />
+
+      <div className="flex-1" />
+
+      {!foldStatus && status}
+      {!foldActions && actions}
+      {(foldStatus || foldActions) && (
+        <TopBarOverflow label={t.topbar.more}>
+          {foldStatus && status}
+          {foldActions && actions}
+        </TopBarOverflow>
+      )}
       <ProfileMenu />
     </header>
   )

@@ -241,6 +241,85 @@ body {
     opacity: 0.4;
     cursor: default;
   }
+
+  /* ---------- shell panels, undocked (Phase 12.2) ----------
+     Below the Compact tier the sidebar and the inspector leave the flex row
+     and overlay the content instead, so the canvas keeps the whole width.
+     Which tier that is stays in JS (`panelsAreDocked`); these rules only
+     describe what an undocked panel looks like, so there is no `min-width`
+     here to disagree with it. */
+  .side-panel-drawer {
+    position: absolute;
+    inset-block: 0;
+    z-index: 30;
+    display: flex;
+    flex-direction: column;
+    max-width: 85vw;
+    background: var(--panel);
+    box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.45);
+  }
+  .side-panel-drawer[data-side='left'] {
+    left: 0;
+    border-right: 1px solid var(--bord);
+    animation: drawer-in-left 160ms ease-out;
+  }
+  .side-panel-drawer[data-side='right'] {
+    right: 0;
+    border-left: 1px solid var(--bord);
+    animation: drawer-in-right 160ms ease-out;
+  }
+  /* used only by `chrome="none"` panels, where the children own the box and
+     the way out has nowhere to sit but over them */
+  .side-panel-drawer-close {
+    position: absolute;
+    top: 0.5rem;
+    z-index: 10;
+  }
+  .side-panel-drawer[data-side='left'] > .side-panel-drawer-close {
+    right: 0.5rem;
+  }
+  .side-panel-drawer[data-side='right'] > .side-panel-drawer-close {
+    left: 0.5rem;
+  }
+  .side-panel-scrim {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    background: rgb(0 0 0 / 0.4);
+    animation: fade-in 160ms ease-out;
+  }
+  /* what a closed drawer leaves behind: its own opener, on the edge it will
+     come out of */
+  .side-panel-handle {
+    position: absolute;
+    top: 50%;
+    z-index: 10;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    /* WCAG 2.2 SC 2.5.8 (AA) floor, same as the toolbar primitive */
+    min-width: 1.5rem;
+    min-height: 3rem;
+    transform: translateY(-50%);
+    border: 1px solid var(--bord);
+    background: var(--panel);
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .side-panel-handle:hover {
+    background: var(--panel2);
+    color: var(--ink);
+  }
+  .side-panel-handle[data-side='left'] {
+    left: 0;
+    border-left: none;
+    border-radius: 0 8px 8px 0;
+  }
+  .side-panel-handle[data-side='right'] {
+    right: 0;
+    border-right: none;
+    border-radius: 8px 0 0 8px;
+  }
 }
 
 /* ---------- cards on the canvas ---------- */
@@ -1168,6 +1247,10 @@ body {
 /* ---------- code workspace ---------- */
 .code-tab {
   display: flex;
+  /* the strip scrolls (`overflow-x-auto`); without this the tabs shrink to fit
+     instead, so a sixth open file silently squeezes the other five into
+     unreadable slivers rather than moving off the end of a scrollable strip */
+  flex: none;
   align-items: center;
   gap: 6px;
   padding: 5px 8px 5px 11px;
@@ -1305,6 +1388,24 @@ body {
   }
   to {
     opacity: 0;
+  }
+}
+/* a drawer arrives from the edge it lives on, so where it came from — and
+   therefore where it goes back to — is never in doubt (Phase 12.2) */
+@keyframes drawer-in-left {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes drawer-in-right {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: none;
   }
 }
 @keyframes mark-in {

@@ -14,6 +14,19 @@ All notable changes to Lattice are recorded here. The format follows
 
 ### Added
 
+- **Lattice adapts to the window it is in.** The shell now has four tiers, and below the
+  widest one it changes shape rather than overflowing. The sidebar and the inspector stop
+  being docked under ~1100px and become drawers that overlay the content, each leaving an
+  edge handle behind (focus moves in when one opens and back to the handle when it closes;
+  Escape dismisses). The top bar folds instead of pushing itself off the screen: the
+  breadcrumb has a floor and truncates rather than vanishing, the section labels come back
+  only when the *bar* — not the window — is wide enough for them, and the eleven controls on
+  the right leave in two groups into a `···` menu. Split is disabled below 1440px, with a
+  tooltip that says why, because two panes at 1100px leave neither usable. The measured
+  effect: a 1024px window went from 569px of horizontal page overflow and a 504px board
+  canvas to **no overflow and a 1024px canvas**, and a 390px phone — which used to render
+  1005px of content by silently zooming itself to 39% — now renders at 100%. Baseline,
+  method and the tier model: [docs/responsive-audit-phase-12.md](docs/responsive-audit-phase-12.md).
 - **The board inspector can be resized, collapsed and its tips shut.** It is docked in the
   same flex row as the canvas, so its fixed 280px came straight out of the working area —
   and the state it sits in most of the time (nothing selected) was seven lines of onboarding
@@ -30,6 +43,16 @@ All notable changes to Lattice are recorded here. The format follows
 
 ### Changed
 
+- **The three remaining inspectors (document, spreadsheet, code) behave like the board's.**
+  They were still a hard-coded 280px `aside`, repeated three times, so the width, the rail
+  and the way to shut the panel only existed on the Board. All four share one wrapper now,
+  and one state serves them because only one section is on screen at a time.
+- **The sidebar's small controls clear 24px** (WCAG 2.2 SC 2.5.8): seven 20×20 hover
+  buttons, the 15px category rows and the 21px filter chips. A pointer-only nuisance before;
+  below the Compact tier that panel is opened with a thumb.
+- **The tab strip scrolls instead of squeezing.** It always had `overflow-x-auto`, but the
+  tabs themselves never said `flex: none`, so they shrank to fit and the scroll never
+  happened — a sixth open file quietly compressed the other five.
 - **The displayed version is now a pinned release string: `Alpha v0.11.3.5`.** It used to
   be composed per build as `major.minor` from `package.json` plus a build number (minutes
   since 2025-01-01 UTC), which cannot express a four-part release, and the alternative pin

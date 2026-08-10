@@ -248,8 +248,8 @@ Below 768 px the app stays honest rather than complete.
 | Step | Work | Closes |
 |---|---|---|
 | **12.1** | `lib/layout` — one tier source of truth: the thresholds, the rules that read off them (`panelsAreDocked`, `splitAvailable`, `capabilityAt`) and `useViewportTier`. Pure part unit-tested. **Shipped.** The theme side (breakpoint tokens, container-query variants) moved to 12.2, where the `data-tier` writer gives it a consumer — shipping styling affordances ahead of the code that uses them is how `useToolbarOverflow` spent a phase unwired. | — |
-| **12.2** | The shell adapts: sidebar and inspector gain an open/closed state and become overlay drawers below Compact; split disabled below Full; the tab strip scrolls instead of squeezing. Sidebar targets brought to 24 px on the way. | F3, F7 |
-| **12.3** | The top bar folds: breadcrumb gets a minimum, the right cluster collapses into an overflow menu, section labels keyed to the container rather than `lg:`. | F1, F2, F4 |
+| **12.2** | The shell adapts: sidebar and inspector gain an open/closed state and become overlay drawers below Compact; split disabled below Full; the tab strip scrolls instead of squeezing. Sidebar targets brought to 24 px on the way. **Shipped** — built on `SidePanel`, which gained a `side` prop and the drawer behaviour rather than being duplicated. | F3, F7 |
+| **12.3** | The top bar folds: breadcrumb gets a minimum, the right cluster collapses into an overflow menu, section labels keyed to the container rather than `lg:`. **Shipped** — two groups fold at two tiers, each rendered once and moved rather than duplicated behind a CSS toggle. `overflow-x-auto` on the bar is the floor under the folding, so the document can never scroll sideways again. | F1, F2, F4 |
 | **12.4** | Mode toolbars fold: wire `useToolbarOverflow` on the Board first, then the other five. | F5, [#47](https://github.com/FraOri03/Lattice/issues/47) |
 | **12.5** | The Viewer tier: honest panels for Sheet/Code/Presentation, board read-only, and the legacy `.tbtn` controls migrated so the bubble/block menus fold with everything else. | F6, [#48](https://github.com/FraOri03/Lattice/issues/48) |
 

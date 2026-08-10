@@ -28,6 +28,7 @@ import { SidebarCategory } from '@/components/sidebar/SidebarCategory'
 import { BOARD_DRAG_MIME } from '@/lib/dnd'
 import {
   IcBoard,
+  IcChevronLeft,
   IcClock,
   IcSearch,
   IcTag,
@@ -35,6 +36,13 @@ import {
 } from '@/components/Icons'
 import { ActionIcon } from '@/components/ActionIcons'
 import { LatticeLogotype, LatticeMark } from '@/components/Brand'
+import { SidePanel } from '@/components/shell/SidePanel'
+import { useWorkspaceLayoutStore } from '@/store/workspaceLayoutStore'
+import { panelsAreDocked } from '@/lib/layout/tiers'
+import { useViewportTier } from '@/lib/layout/useViewportTier'
+
+/** The sidebar is a fixed width: unlike the inspector it is not resizable. */
+const SIDEBAR_WIDTH = 240
 
 const FILTERS: { key: SidebarFilter; label: string }[] = [
   { key: 'all', label: 'All' },
@@ -57,6 +65,9 @@ const RECENT_KIND: Record<RecentEntry['kind'], FileKind> = {
 
 export function Sidebar() {
   const t = useI18n()
+  const sidebarCollapsed = useWorkspaceLayoutStore((s) => s.sidebarCollapsed)
+  const setSidebarCollapsed = useWorkspaceLayoutStore((s) => s.setSidebarCollapsed)
+  const docked = panelsAreDocked(useViewportTier())
   const openDashboard = useStore((s) => s.openDashboard)
   const projects = useStore((s) => s.projects)
   const boards = useStore((s) => s.boards)
@@ -303,24 +314,46 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="flex w-60 flex-none flex-col border-r border-bord bg-panel">
-      {/* logo — and the only way back to Home, which is what the product
-          mark means everywhere else on the web */}
-      <button
-        className="flex cursor-pointer items-center gap-2.5 px-4 pt-4 pb-3 text-left hover:opacity-80"
-        onClick={() => openDashboard()}
-        aria-label={t.dashboard.title}
-      >
-        <LatticeMark height={26} className="flex-none" />
-        <div className="min-w-0">
-          <LatticeLogotype height={12} />
-          {/* Release stage + version: the app is pre-1.0, so say so where the
-              user always sees it rather than only in the account menu. */}
-          <div className="mt-1 text-[10px] leading-none tracking-wide text-muted">
-            <span className="capitalize">{env.appStage}</span> v{env.appVersion}
+    <SidePanel
+      side="left"
+      title="Navigation"
+      width={SIDEBAR_WIDTH}
+      collapsed={sidebarCollapsed}
+      onCollapsedChange={setSidebarCollapsed}
+      chrome="none"
+    >
+      <div className="flex items-start">
+        {/* logo — and the only way back to Home, which is what the product
+            mark means everywhere else on the web */}
+        <button
+          className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 px-4 pt-4 pb-3 text-left hover:opacity-80"
+          onClick={() => openDashboard()}
+          aria-label={t.dashboard.title}
+        >
+          <LatticeMark height={26} className="flex-none" />
+          <div className="min-w-0">
+            <LatticeLogotype height={12} />
+            {/* Release stage + version: the app is pre-1.0, so say so where the
+                user always sees it rather than only in the account menu. */}
+            <div className="mt-1 text-[10px] leading-none tracking-wide text-muted">
+              <span className="capitalize">{env.appStage}</span> v{env.appVersion}
+            </div>
           </div>
-        </div>
-      </button>
+        </button>
+        {/* docked, this is how the sidebar gets out of the way; as a drawer it
+            is redundant with the scrim and the panel's own close, so it goes */}
+        {docked && (
+          <button
+            className="icon-btn mt-3 mr-1.5 h-6 w-6"
+            title="Hide navigation"
+            aria-label="Hide navigation"
+            aria-expanded
+            onClick={() => setSidebarCollapsed(true)}
+          >
+            <IcChevronLeft size={13} />
+          </button>
+        )}
+      </div>
 
       {/* project switcher */}
       <ProjectSwitcher />
@@ -346,7 +379,7 @@ export function Sidebar() {
           <button
             key={f.key}
             onClick={() => setSidebarFilter(f.key)}
-            className={`cursor-pointer rounded-full border px-2 py-0.5 text-[10.5px] font-medium ${
+            className={`inline-flex min-h-6 cursor-pointer items-center rounded-full border px-2 py-0.5 text-[10.5px] font-medium ${
               sidebarFilter === f.key
                 ? 'border-accent bg-accent/15 text-accent'
                 : 'border-bord text-muted hover:text-ink'
@@ -407,7 +440,7 @@ export function Sidebar() {
                 <span className="text-[10px] text-muted">{b.nodes.length}</span>
                 {projectBoards.length > 1 && mayDelete && (
                   <button
-                    className="icon-btn hidden h-5 w-5 group-hover:flex"
+                    className="icon-btn hidden h-6 w-6 group-hover:flex"
                     title="Delete board"
                     aria-label={`Delete board ${b.name}`}
                     onClick={async (e) => {
@@ -461,7 +494,7 @@ export function Sidebar() {
                 <span className="text-[10px] text-muted">{d.wordCount}w</span>
                 {mayDelete && (
                   <button
-                    className="icon-btn hidden h-5 w-5 group-hover:flex"
+                    className="icon-btn hidden h-6 w-6 group-hover:flex"
                     title="Delete document"
                     aria-label={`Delete document ${d.title}`}
                     onClick={async (e) => {
@@ -515,7 +548,7 @@ export function Sidebar() {
                 <span className="text-[10px] text-muted">{sh.cellCount}c</span>
                 {mayDelete && (
                   <button
-                    className="icon-btn hidden h-5 w-5 group-hover:flex"
+                    className="icon-btn hidden h-6 w-6 group-hover:flex"
                     title="Delete spreadsheet"
                     aria-label={`Delete spreadsheet ${sh.title}`}
                     onClick={async (e) => {
@@ -568,7 +601,7 @@ export function Sidebar() {
                 <span className="text-[10px] text-muted">{p.slideCount}s</span>
                 {mayDelete && (
                   <button
-                    className="icon-btn hidden h-5 w-5 group-hover:flex"
+                    className="icon-btn hidden h-6 w-6 group-hover:flex"
                     title="Delete presentation"
                     aria-label={`Delete presentation ${p.title}`}
                     onClick={async (e) => {
@@ -623,7 +656,7 @@ export function Sidebar() {
                 <span className="text-[10px] text-muted">{c.lineCount}L</span>
                 {mayDelete && (
                   <button
-                    className="icon-btn hidden h-5 w-5 group-hover:flex"
+                    className="icon-btn hidden h-6 w-6 group-hover:flex"
                     title="Delete code file"
                     aria-label={`Delete code file ${c.title}.${c.extension}`}
                     onClick={async (e) => {
@@ -678,7 +711,7 @@ export function Sidebar() {
                 <span className="min-w-0 flex-1 truncate text-xs">{n.title}</span>
                 {mayDelete && (
                   <button
-                    className="icon-btn hidden h-5 w-5 group-hover:flex"
+                    className="icon-btn hidden h-6 w-6 group-hover:flex"
                     title="Delete note"
                     aria-label={`Delete note ${n.title}`}
                     onClick={async (e) => {
@@ -734,7 +767,7 @@ export function Sidebar() {
                 <span className="text-[10px] text-muted">{formatBytes(a.size)}</span>
                 {mayDelete && (
                   <button
-                    className="icon-btn hidden h-5 w-5 group-hover:flex"
+                    className="icon-btn hidden h-6 w-6 group-hover:flex"
                     title="Delete asset from the vault"
                     aria-label={`Delete asset ${a.name}`}
                     onClick={async (e) => {
@@ -838,6 +871,6 @@ export function Sidebar() {
           }}
         />
       </div>
-    </aside>
+    </SidePanel>
   )
 }

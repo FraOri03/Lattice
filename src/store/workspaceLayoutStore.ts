@@ -61,9 +61,20 @@ interface WorkspaceLayoutState {
   inspectorCollapsed: boolean
   /** Width of the board inspector when open, in px. */
   inspectorWidth: number
+  /**
+   * The project sidebar, shut down to a rail (12.2). Same preference as the
+   * inspector's, on the other edge — and the same reason: docked, its 240 px
+   * come out of the working area.
+   *
+   * Note this is the DOCKED preference only. Below the Compact tier the panel
+   * is a drawer, and whether a drawer is open is owned by `SidePanel` and
+   * deliberately not persisted.
+   */
+  sidebarCollapsed: boolean
 
   setGraphReturnMode: (mode: ViewMode) => void
   setInspectorCollapsed: (collapsed: boolean) => void
+  setSidebarCollapsed: (collapsed: boolean) => void
   toggleInspector: () => void
   setInspectorWidth: (width: number) => void
   openSplit: (opts?: { secondary?: SecondaryContent; direction?: SplitDirection }) => void
@@ -84,11 +95,13 @@ export const useWorkspaceLayoutStore = create<WorkspaceLayoutState>()(
       graphReturnMode: 'board',
       inspectorCollapsed: false,
       inspectorWidth: DEFAULT_INSPECTOR_WIDTH,
+      sidebarCollapsed: false,
 
       setGraphReturnMode: (graphReturnMode) =>
         set({ graphReturnMode: graphReturnMode === 'graph' ? 'board' : graphReturnMode }),
 
       setInspectorCollapsed: (inspectorCollapsed) => set({ inspectorCollapsed }),
+      setSidebarCollapsed: (sidebarCollapsed) => set({ sidebarCollapsed }),
       toggleInspector: () => set((s) => ({ inspectorCollapsed: !s.inspectorCollapsed })),
       setInspectorWidth: (width) => set({ inspectorWidth: clampInspectorWidth(width) }),
 
@@ -124,6 +137,7 @@ export const useWorkspaceLayoutStore = create<WorkspaceLayoutState>()(
         // find intrusive is a preference, not a transient layout state
         inspectorCollapsed: s.inspectorCollapsed,
         inspectorWidth: s.inspectorWidth,
+        sidebarCollapsed: s.sidebarCollapsed,
         // `split` is intentionally NOT persisted: reopening the app lands in a
         // single pane, matching how a legacy persisted `split` viewMode also
         // degrades to a single section (see useStore migrate v3).
