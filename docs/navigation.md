@@ -71,6 +71,8 @@ Going Home does **not** tear the project down — `applyNav({ surface: 'dashboar
 
 > **The dashboard SCREEN landed in Phase 11.2.** The shell switches on `navSurface` in one place (`AppShell` in `src/App.tsx`), and the sidebar's product mark is the explicit Home control. The cross-surface hooks — history, global shortcuts, collaboration — and the overlays are mounted *above* that switch, so going Home neither drops the URL binding nor re-attaches the project's CRDT rooms.
 
+> **Planned, not implemented:** the dashboard grows destinations (Recents, Starred, Shared with me, Invites, Trash) in phase 15, addressed by a single `?d=` token with Home as its absence. The rules — scoping, precedence against `p`, degradation, and what switching workspace does — are settled in [Dashboard information architecture — Phase 13.1](dashboard-ia-phase-13-1.md). Nothing on this page changes until that lands.
+
 ## Examples
 
 | URL | Restores |
