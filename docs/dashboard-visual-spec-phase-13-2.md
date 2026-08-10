@@ -221,4 +221,6 @@ themselves until they are real — settled in
 [dashboard-data-contract-phase-13-3.md](dashboard-data-contract-phase-13-3.md),
 which adds a sixth state (*unavailable*) to the five above; search and the New entry point
 (13.4, #69); acceptance criteria, the EN/IT key list, focus order, live regions,
-target sizes and reduced motion (13.5, #70).
+target sizes and reduced motion —
+[dashboard-acceptance-phase-13-5.md](dashboard-acceptance-phase-13-5.md), which
+carries the reduced-motion rule the skeleton above defers to.

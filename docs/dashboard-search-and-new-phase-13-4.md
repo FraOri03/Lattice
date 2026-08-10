@@ -174,5 +174,7 @@ sheet, from the top bar, since 13.2 removed the floating button.
 
 Focus order inside the palette, `role`/`aria-activedescendant` semantics for the
 result list, the announcement when results change, and the EN/IT keys for every
-string above — all 13.5 (#70). The palette today is a plain overlay with no
-dialog role and no listbox semantics, so this is not a formality.
+string above — all in
+[dashboard-acceptance-phase-13-5.md](dashboard-acceptance-phase-13-5.md). The
+palette today is a plain overlay with no dialog role and no listbox semantics,
+so this is not a formality.
