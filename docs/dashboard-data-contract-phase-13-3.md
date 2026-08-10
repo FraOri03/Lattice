@@ -54,6 +54,7 @@ today, and it is exactly what phase 18 exists to fix.
 | Workspaces row | the user's workspaces + project counts | local | **Ships** | — |
 | Starred | `Project.starred` | local | **Ships for projects only** | no entity carries `starred`; a Starred page spanning kinds needs the model change named in 13.1 |
 | Recent projects · Projects · Archived | `groupProjects()` over the workspace | local | **Ships** | — |
+| Global search | projects, boards, entities | local, via the command palette — see [13.4](dashboard-search-and-new-phase-13-4.md) | **Ships, scoped wrong** | it reaches only what this device holds, and today it filters entities to the active project |
 | Recents page | the same log, grouped by day | `recents` | **Partial** | 15 entries cannot fill a day-grouped page, and no entry records which device or project wrote it |
 | Shared with me | projects other people gave you access to | **nothing** | **Needs a server** (#91) | a project only becomes visible if its data already reaches your browser — same profile, or the same Drive folder |
 | Invites — received | invitations addressed to you | **nothing** | **Needs a server** (#88, #90) | `collabStore.invites` is keyed by project and lives on the **inviter's** device; you learn of an invite by opening its `#invite=` link, so an inbox has no source |
