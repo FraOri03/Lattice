@@ -140,6 +140,7 @@ Ordering reflects current intent, not a schedule: nothing here is a delivery dat
 | [docs/photo-mode.md](docs/photo-mode.md) | Set & lighting planner, board cards, local-only scenes |
 | [docs/responsive-audit-phase-12.md](docs/responsive-audit-phase-12.md) | Measured viewport baseline and the tier model |
 | [docs/dashboard-ia-phase-13-1.md](docs/dashboard-ia-phase-13-1.md) | Dashboard destinations, scoping, URL token and entry rules |
+| [docs/dashboard-visual-spec-phase-13-2.md](docs/dashboard-visual-spec-phase-13-2.md) | Dashboard density, card and row anatomy, state matrix, 390 px contract |
 | [docs/limitations.md](docs/limitations.md) | Known limitations and the security model |
 
 Graph View has its own set: [architecture](docs/graph-view-architecture.md),

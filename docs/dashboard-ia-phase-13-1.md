@@ -190,7 +190,8 @@ Named here so 13.3 can map them and 15.2 can cost them — not decided here.
 
 ## Deliberately not settled here
 
-Card and row anatomy, density, the three states each section owes (13.2); where
+Card and row anatomy, density, the states each section owes — settled next door
+in [dashboard-visual-spec-phase-13-2.md](dashboard-visual-spec-phase-13-2.md); where
 each section's data comes from and how the server-backed ones present
 themselves until they are real (13.3); search and the New entry point (13.4);
 acceptance criteria, the EN/IT key list and the accessibility contract (13.5).
