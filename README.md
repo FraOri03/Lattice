@@ -141,6 +141,7 @@ Ordering reflects current intent, not a schedule: nothing here is a delivery dat
 | [docs/responsive-audit-phase-12.md](docs/responsive-audit-phase-12.md) | Measured viewport baseline and the tier model |
 | [docs/dashboard-ia-phase-13-1.md](docs/dashboard-ia-phase-13-1.md) | Dashboard destinations, scoping, URL token and entry rules |
 | [docs/dashboard-visual-spec-phase-13-2.md](docs/dashboard-visual-spec-phase-13-2.md) | Dashboard density, card and row anatomy, state matrix, 390 px contract |
+| [docs/dashboard-data-contract-phase-13-3.md](docs/dashboard-data-contract-phase-13-3.md) | What each dashboard section is backed by, and how the rest presents itself |
 | [docs/limitations.md](docs/limitations.md) | Known limitations and the security model |
 
 Graph View has its own set: [architecture](docs/graph-view-architecture.md),

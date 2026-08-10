@@ -217,6 +217,8 @@ Ordered by how much they change:
 ## Not settled here
 
 Where each section's data comes from and how the server-backed ones present
-themselves until they are real (13.3, #68); search and the New entry point
+themselves until they are real — settled in
+[dashboard-data-contract-phase-13-3.md](dashboard-data-contract-phase-13-3.md),
+which adds a sixth state (*unavailable*) to the five above; search and the New entry point
 (13.4, #69); acceptance criteria, the EN/IT key list, focus order, live regions,
 target sizes and reduced motion (13.5, #70).
