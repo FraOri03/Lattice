@@ -139,6 +139,11 @@ Ordering reflects current intent, not a schedule: nothing here is a delivery dat
 | [docs/file-formats.md](docs/file-formats.md) | Import/export support matrix and fidelity |
 | [docs/photo-mode.md](docs/photo-mode.md) | Set & lighting planner, board cards, local-only scenes |
 | [docs/responsive-audit-phase-12.md](docs/responsive-audit-phase-12.md) | Measured viewport baseline and the tier model |
+| [docs/dashboard-ia-phase-13-1.md](docs/dashboard-ia-phase-13-1.md) | Dashboard destinations, scoping, URL token and entry rules |
+| [docs/dashboard-visual-spec-phase-13-2.md](docs/dashboard-visual-spec-phase-13-2.md) | Dashboard density, card and row anatomy, state matrix, 390 px contract |
+| [docs/dashboard-data-contract-phase-13-3.md](docs/dashboard-data-contract-phase-13-3.md) | What each dashboard section is backed by, and how the rest presents itself |
+| [docs/dashboard-search-and-new-phase-13-4.md](docs/dashboard-search-and-new-phase-13-4.md) | One search on the command palette, ranking, and where a new entity lands |
+| [docs/dashboard-acceptance-phase-13-5.md](docs/dashboard-acceptance-phase-13-5.md) | Acceptance criteria per section, keyboard and focus, announcements, i18n keys |
 | [docs/limitations.md](docs/limitations.md) | Known limitations and the security model |
 
 Graph View has its own set: [architecture](docs/graph-view-architecture.md),
