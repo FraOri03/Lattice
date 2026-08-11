@@ -22,6 +22,7 @@ import type {
   PresentationDocMeta,
   Project,
   RecentEntry,
+  StarKind,
   Locale,
   RichDocMeta,
   SpreadsheetDocMeta,
@@ -138,12 +139,40 @@ const DEFAULT_EDGE = {
 /** Sidebar file-type filter. */
 export type SidebarFilter = 'all' | 'notes' | 'docs' | 'sheets' | 'code' | 'assets'
 
+/**
+ * How many entries the recents log keeps (15.2).
+ *
+ * 11.2 capped it at 15, which is a sensible depth for a sidebar rail and far
+ * too short for the Recents destination: a page that groups by day cannot fill
+ * a second day out of fifteen entries, so "last week" would always look empty.
+ * 200 is the prototype's number and roughly a fortnight of ordinary use.
+ *
+ * The log stays device-local and unsynced, and the page says so — it is a
+ * machine-written record of what *this browser* opened, not a library.
+ */
+export const RECENTS_CAP = 200
+
+/**
+ * Which store slice holds each starrable entity kind — the one place the seven
+ * maps are named, so `toggleStarred` does not restate the mapping that
+ * `describeEntity` already encodes on the read side.
+ */
+const STAR_SLICE = {
+  note: 'notes',
+  doc: 'docs',
+  sheet: 'sheetDocs',
+  present: 'presentDocs',
+  code: 'codeDocs',
+  asset: 'assets',
+  board: 'boards',
+} as const satisfies Record<Exclude<StarKind, 'project'>, keyof AppState>
+
 function pushRecent(recents: RecentEntry[], entry: Omit<RecentEntry, 'at'>): RecentEntry[] {
   const next = [
     { ...entry, at: Date.now() },
     ...recents.filter((r) => !(r.kind === entry.kind && r.id === entry.id)),
   ]
-  return next.slice(0, 15)
+  return next.slice(0, RECENTS_CAP)
 }
 
 function dropRecent(recents: RecentEntry[], kind: RecentEntry['kind'], id: string) {
@@ -346,6 +375,16 @@ interface AppState {
    * makes "Trash" reachable from inside a project without a second action.
    */
   openDestination: (destination: Destination) => void
+  /**
+   * Put something on the Starred shelf, or take it off (15.2).
+   *
+   * One action for all eight kinds, so the shelf can unstar a row without
+   * knowing which map the row came from — and so starring a document and
+   * starring a project stay the same gesture with the same meaning. Starring
+   * does not touch `updatedAt`: pinning something is not editing it, and the
+   * shelf would reorder itself under the user if it were.
+   */
+  toggleStarred: (kind: StarKind, id: string) => void
   /** Show the settings screen over the current surface. */
   openSettings: (section?: SettingsSection) => void
   /** Close settings; the surface underneath was never left. */
@@ -1046,6 +1085,22 @@ export const useStore = create<AppState>()(
 
       openDestination: (destination) =>
         set({ navSurface: 'dashboard', dashboardDestination: destination }),
+
+      toggleStarred: (kind, id) =>
+        set((s) => {
+          if (kind === 'project') {
+            const p = s.projects[id]
+            if (!p) return {}
+            return { projects: { ...s.projects, [id]: { ...p, starred: !p.starred } } }
+          }
+          const slice = STAR_SLICE[kind]
+          const map = s[slice] as Record<string, { starred?: boolean }>
+          const entity = map[id]
+          if (!entity) return {}
+          return {
+            [slice]: { ...map, [id]: { ...entity, starred: !entity.starred } },
+          } as Partial<AppState>
+        }),
 
       openSettings: (section = DEFAULT_SETTINGS_SECTION) =>
         set({ settingsSection: section }),

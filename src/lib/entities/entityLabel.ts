@@ -10,15 +10,24 @@ import type { NavEntityKind } from '@/lib/nav/navUrl'
  * calling the same file different things.
  */
 
-/** The store slices a lookup reads. Structural, so the store state fits. */
+/**
+ * The store slices a lookup reads. Structural, so the store state fits.
+ *
+ * `starred` is declared here rather than only where the shelves read it (15.2):
+ * every one of these entities carries the field in the model now, and a source
+ * shape that hid it would force each reader to cast its way back to the truth.
+ */
 export interface EntitySources {
-  notes: Record<string, { title: string; projectId?: string }>
-  docs: Record<string, { title: string; projectId?: string }>
-  sheetDocs: Record<string, { title: string; projectId?: string }>
-  presentDocs: Record<string, { title: string; projectId?: string }>
-  codeDocs: Record<string, { title: string; extension: string; projectId?: string }>
-  assets: Record<string, { name: string; projectId?: string }>
-  boards: Record<string, { name: string; projectId?: string }>
+  notes: Record<string, { title: string; projectId?: string; starred?: boolean }>
+  docs: Record<string, { title: string; projectId?: string; starred?: boolean }>
+  sheetDocs: Record<string, { title: string; projectId?: string; starred?: boolean }>
+  presentDocs: Record<string, { title: string; projectId?: string; starred?: boolean }>
+  codeDocs: Record<
+    string,
+    { title: string; extension: string; projectId?: string; starred?: boolean }
+  >
+  assets: Record<string, { name: string; projectId?: string; starred?: boolean }>
+  boards: Record<string, { name: string; projectId?: string; starred?: boolean }>
   projects: Record<string, { name: string }>
 }
 

@@ -9,6 +9,8 @@ import { IcPlus, IcSearch } from '@/components/Icons'
 import { DashboardNav } from './DashboardNav'
 import { DestinationPlaceholder } from './DestinationPlaceholder'
 import { HomeDestination } from './HomeDestination'
+import { RecentsDestination } from './RecentsDestination'
+import { StarredDestination } from './StarredDestination'
 
 /**
  * The dashboard (Phase 15.1) — the shell the six destinations live in.
@@ -91,7 +93,13 @@ export function Dashboard() {
         <main className="min-h-0 flex-1 overflow-y-auto">
           {destination === 'home' ? (
             <HomeDestination />
+          ) : destination === 'recents' ? (
+            <RecentsDestination />
+          ) : destination === 'starred' ? (
+            <StarredDestination />
           ) : (
+            // shared, invites and trash: all three need a source that does not
+            // exist yet, so what they are allowed to say is #80's to settle
             <DestinationPlaceholder destination={destination} />
           )}
         </main>

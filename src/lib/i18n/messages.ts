@@ -561,6 +561,60 @@ export const en = {
     notBuilt: 'This destination is part of the dashboard, and its page is not built yet.',
   },
   /**
+   * The two personal shelves (15.2). Every sentence with a name in it is a
+   * function taking the name — no concatenation at the call site, so Italian
+   * can put the pieces in its own order.
+   */
+  shelves: {
+    today: 'Today',
+    yesterday: 'Yesterday',
+    workspaceFilter: 'Filter by workspace',
+    allWorkspaces: 'All workspaces',
+    noProject: 'No project',
+    noWorkspace: 'No workspace',
+    rowMeta: (project: string, workspace: string, when: string) =>
+      `${project} · ${workspace} · ${when}`,
+    starredMeta: (kind: string, project: string | null, workspace: string) =>
+      project ? `${kind} · ${project} · ${workspace}` : `${kind} · ${workspace}`,
+    kind: {
+      project: 'Project',
+      board: 'Board',
+      doc: 'Document',
+      note: 'Note',
+      sheet: 'Spreadsheet',
+      present: 'Presentation',
+      code: 'Code file',
+      asset: 'File',
+    },
+    recentsNote: (cap: number) =>
+      `Written automatically as you open things, kept on this device only, and capped at the last ${cap} entries. It is not a backup and it does not sync — anything you want to keep in reach belongs in Starred.`,
+    recentsEmptyTitle: 'Nothing opened yet',
+    recentsEmptyBody: 'This list fills itself as you open boards, documents and files.',
+    starredEmptyTitle: 'Nothing starred yet',
+    starredEmptyBody: 'The star on any row or card pins it here, across every workspace.',
+    noResultsTitle: 'Nothing in this workspace',
+    noResultsBody: 'Choose “All workspaces” to see everything again.',
+    selectedCount: (n: number) => `${n} selected`,
+    unstarSelected: 'Unstar selected',
+  },
+  /** Row and card anatomy — the accessible names actions carry (13.5 §8). */
+  cards: {
+    openItem: (name: string) => `Open ${name}`,
+    select: (name: string) => `Select ${name}`,
+    starLabel: (name: string) => `Star ${name}`,
+    unstarLabel: (name: string) => `Unstar ${name}`,
+  },
+  /**
+   * What `announce()` says (13.5 §5). Functions, never concatenated at the call
+   * site — an announcement is a sentence, and sentences do not survive being
+   * glued together across locales.
+   */
+  announcements: {
+    starred: (name: string) => `“${name}” starred`,
+    unstarred: (name: string) => `“${name}” unstarred`,
+    bulkUnstarred: (n: number) => `${n} ${n === 1 ? 'item' : 'items'} unstarred`,
+  },
+  /**
    * The settings screen (Phase 14.1). `pending` is deliberately specific: a
    * panel that is not built yet says what will live there and what it waits
    * on, rather than "coming soon" — a promise nobody is holding.
@@ -1310,6 +1364,49 @@ export const it: Catalog = {
       trash: 'Cosa hai eliminato, e quanto tempo ti resta.',
     },
     notBuilt: 'Questa destinazione fa parte della dashboard, e la sua pagina non è ancora costruita.',
+  },
+  shelves: {
+    today: 'Oggi',
+    yesterday: 'Ieri',
+    workspaceFilter: 'Filtra per workspace',
+    allWorkspaces: 'Tutti i workspace',
+    noProject: 'Nessun progetto',
+    noWorkspace: 'Nessun workspace',
+    rowMeta: (project, workspace, when) => `${project} · ${workspace} · ${when}`,
+    starredMeta: (kind, project, workspace) =>
+      project ? `${kind} · ${project} · ${workspace}` : `${kind} · ${workspace}`,
+    kind: {
+      project: 'Progetto',
+      board: 'Board',
+      doc: 'Documento',
+      note: 'Nota',
+      sheet: 'Foglio di calcolo',
+      present: 'Presentazione',
+      code: 'File di codice',
+      asset: 'File',
+    },
+    recentsNote: (cap) =>
+      `Scritto automaticamente mentre apri le cose, tenuto solo su questo dispositivo e limitato alle ultime ${cap} voci. Non è un backup e non si sincronizza — ciò che vuoi tenere a portata di mano va nei Preferiti.`,
+    recentsEmptyTitle: 'Non hai ancora aperto niente',
+    recentsEmptyBody: 'Questo elenco si riempie da solo mentre apri board, documenti e file.',
+    starredEmptyTitle: 'Nessun preferito',
+    starredEmptyBody:
+      'La stella su una riga o una card lo fissa qui, da tutti i workspace.',
+    noResultsTitle: 'Niente in questo workspace',
+    noResultsBody: 'Scegli “Tutti i workspace” per rivedere tutto.',
+    selectedCount: (n) => `${n} selezionati`,
+    unstarSelected: 'Togli dai preferiti',
+  },
+  cards: {
+    openItem: (name) => `Apri ${name}`,
+    select: (name) => `Seleziona ${name}`,
+    starLabel: (name) => `Aggiungi ${name} ai preferiti`,
+    unstarLabel: (name) => `Togli ${name} dai preferiti`,
+  },
+  announcements: {
+    starred: (name) => `“${name}” aggiunto ai preferiti`,
+    unstarred: (name) => `“${name}” tolto dai preferiti`,
+    bulkUnstarred: (n) => `${n} ${n === 1 ? 'elemento tolto' : 'elementi tolti'} dai preferiti`,
   },
   settings: {
     title: 'Impostazioni',
