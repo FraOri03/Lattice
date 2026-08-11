@@ -533,10 +533,8 @@ export const en = {
    *
    * `description` is the question each destination answers, straight from the
    * IA table — it is what the surface is *for*, and it stays true whether or not
-   * the surface can be filled yet. `notBuilt` is deliberately not an empty
-   * state: 13.3 rules that "nothing here" over a source that cannot answer is a
-   * false negative, so this says the page is missing and claims nothing about
-   * what it would contain.
+   * the surface can be filled yet. What each one is allowed to SAY when it
+   * cannot be filled lives in `honest` below.
    */
   destinations: {
     navLabel: 'Dashboard',
@@ -558,7 +556,58 @@ export const en = {
       invites: 'Who is asking, and what you would be agreeing to.',
       trash: 'What you deleted, and how long you have.',
     },
-    notBuilt: 'This destination is part of the dashboard, and its page is not built yet.',
+  },
+  /**
+   * The three sections that cannot be complete before the server (13.3, 15.5).
+   *
+   * Every `why…` string names **the constraint, not the schedule**: "needs the
+   * server planned for phase 18" is a fact about the product, "coming soon" is
+   * a promise nobody is holding. And none of them says a section is empty —
+   * that is the false negative the whole rule exists to prevent.
+   */
+  honest: {
+    shared: {
+      intro:
+        'Access is granted per project, never workspace-wide: being in someone’s workspace does not give you their other projects.',
+      scopeBrowser: 'This browser',
+      scopeDrive: 'This Google Drive',
+      scopeBrowserWhy: 'Shared inside this browser profile — visible on this device only.',
+      scopeDriveWhy: 'Reaching you through the owner’s Google Drive folder.',
+      unknownOwner: 'Owner not recorded',
+      whyPartial:
+        'Only projects whose data already reaches this browser can be listed — shared inside this profile, or through a Drive folder you both hold. A full index of everything shared with you needs the server planned for phase 18.',
+      empty: 'No one has shared a project into this browser or this Drive folder.',
+      grants: {
+        admin: 'Manages members, roles and project settings. Cannot delete the project.',
+        editor: 'Creates and edits boards, documents, notes, sheets and code.',
+        commenter: 'Reads everything and leaves comments. Cannot change content.',
+        viewer: 'Read-only access. Cannot comment or edit.',
+      },
+      role: (role: string) => `Role: ${role}`,
+    },
+    invites: {
+      received: 'Received',
+      sent: 'Sent',
+      whyNoInbox:
+        'An invitation lives on the sender’s device, keyed to the project it is for, so there is no copy here to list. You learn of one today by opening its link. An inbox needs the server invitation model planned for phase 18.',
+      sentIntro:
+        'Invitations you issued, gathered from the projects this device holds. Delivery is manual: copy the link and send it yourself.',
+      sentEmpty: 'You haven’t invited anyone from this device yet.',
+      copyLink: 'Copy link',
+      copied: 'Link copied',
+      status: {
+        pending: 'Pending',
+        accepted: 'Accepted',
+        revoked: 'Revoked',
+      },
+      /** Said once, so no row implies a delivery or expiry the app cannot see. */
+      noDeliveryClaim:
+        'There is no e-mail backend and no expiry date, so nothing here says delivered, failed or expired.',
+      invitedTo: (email: string, project: string) => `${email} · ${project}`,
+    },
+    trash: {
+      why: 'Deleting is still permanent: nothing records that an item was removed, when, or by whom, so there is no list to show and nothing to restore. Trash needs the soft-delete model tracked in issue #115.',
+    },
   },
   /**
    * The two personal shelves (15.2). Every sentence with a name in it is a
@@ -1470,7 +1519,51 @@ export const it: Catalog = {
       invites: 'Chi ti sta invitando, e a cosa acconsentiresti.',
       trash: 'Cosa hai eliminato, e quanto tempo ti resta.',
     },
-    notBuilt: 'Questa destinazione fa parte della dashboard, e la sua pagina non è ancora costruita.',
+  },
+  honest: {
+    shared: {
+      intro:
+        'L’accesso è concesso per progetto, mai per l’intero workspace: stare nel workspace di qualcuno non ti dà i suoi altri progetti.',
+      scopeBrowser: 'Questo browser',
+      scopeDrive: 'Questo Google Drive',
+      scopeBrowserWhy:
+        'Condiviso dentro questo profilo browser — visibile solo su questo dispositivo.',
+      scopeDriveWhy: 'Ti arriva attraverso la cartella Google Drive del proprietario.',
+      unknownOwner: 'Proprietario non registrato',
+      whyPartial:
+        'Si possono elencare solo i progetti i cui dati arrivano già a questo browser — condivisi dentro questo profilo, o attraverso una cartella Drive che avete entrambi. Un indice completo di tutto ciò che ti è stato condiviso richiede il server previsto per la fase 18.',
+      empty: 'Nessuno ha condiviso un progetto dentro questo browser o questa cartella Drive.',
+      grants: {
+        admin:
+          'Gestisce membri, ruoli e impostazioni del progetto. Non può eliminare il progetto.',
+        editor: 'Crea e modifica board, documenti, note, fogli e codice.',
+        commenter: 'Legge tutto e lascia commenti. Non può cambiare i contenuti.',
+        viewer: 'Accesso in sola lettura. Non può commentare né modificare.',
+      },
+      role: (role) => `Ruolo: ${role}`,
+    },
+    invites: {
+      received: 'Ricevuti',
+      sent: 'Inviati',
+      whyNoInbox:
+        'Un invito vive sul dispositivo di chi lo manda, legato al progetto a cui si riferisce, quindi qui non esiste una copia da elencare. Oggi lo scopri aprendo il suo link. Una casella in arrivo richiede il modello di inviti lato server previsto per la fase 18.',
+      sentIntro:
+        'Gli inviti che hai emesso, raccolti dai progetti che questo dispositivo contiene. La consegna è manuale: copia il link e mandalo tu.',
+      sentEmpty: 'Non hai ancora invitato nessuno da questo dispositivo.',
+      copyLink: 'Copia il link',
+      copied: 'Link copiato',
+      status: {
+        pending: 'In attesa',
+        accepted: 'Accettato',
+        revoked: 'Revocato',
+      },
+      noDeliveryClaim:
+        'Non esiste un backend e-mail né una data di scadenza, quindi qui niente dice consegnato, fallito o scaduto.',
+      invitedTo: (email, project) => `${email} · ${project}`,
+    },
+    trash: {
+      why: 'Eliminare è ancora definitivo: niente registra che un elemento è stato rimosso, quando o da chi, quindi non c’è un elenco da mostrare né niente da ripristinare. Il Cestino richiede il modello di eliminazione reversibile tracciato nella issue #115.',
+    },
   },
   shelves: {
     today: 'Oggi',

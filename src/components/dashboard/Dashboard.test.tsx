@@ -142,18 +142,13 @@ describe('the six destinations', () => {
     expect(nav.getByRole('button', { name: 'Home' })).not.toHaveAttribute('aria-current')
   })
 
-  it('does not claim a destination is empty when its page is simply not built', () => {
+  it('never claims a section is empty when it cannot look (13.3)', () => {
+    // the false negative the whole rule exists to prevent: "nothing shared with
+    // you" over a surface with no index reads as nobody having shared anything
     useStore.setState({ navSurface: 'dashboard', dashboardDestination: 'shared' })
-
     render(<Dashboard />)
 
-    // 13.3: an empty state may only be shown where the section could have had
-    // content. This one says the page is missing, not that nothing is shared.
-    expect(
-      screen.getByText(
-        'This destination is part of the dashboard, and its page is not built yet.',
-      ),
-    ).toBeInTheDocument()
+    expect(screen.getByText(/A full index of everything shared with you/)).toBeInTheDocument()
   })
 })
 

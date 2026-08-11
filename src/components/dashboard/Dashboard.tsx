@@ -7,10 +7,12 @@ import { announce } from '@/lib/a11y/announcer'
 import { SidePanel } from '@/components/shell/SidePanel'
 import { IcPlus, IcSearch } from '@/components/Icons'
 import { DashboardNav } from './DashboardNav'
-import { DestinationPlaceholder } from './DestinationPlaceholder'
 import { HomeDestination } from './HomeDestination'
+import { InvitesDestination } from './InvitesDestination'
 import { RecentsDestination } from './RecentsDestination'
+import { SharedDestination } from './SharedDestination'
 import { StarredDestination } from './StarredDestination'
+import { TrashDestination } from './TrashDestination'
 
 /**
  * The dashboard (Phase 15.1) — the shell the six destinations live in.
@@ -97,10 +99,12 @@ export function Dashboard() {
             <RecentsDestination />
           ) : destination === 'starred' ? (
             <StarredDestination />
+          ) : destination === 'shared' ? (
+            <SharedDestination />
+          ) : destination === 'invites' ? (
+            <InvitesDestination />
           ) : (
-            // shared, invites and trash: all three need a source that does not
-            // exist yet, so what they are allowed to say is #80's to settle
-            <DestinationPlaceholder destination={destination} />
+            <TrashDestination />
           )}
         </main>
       </div>
