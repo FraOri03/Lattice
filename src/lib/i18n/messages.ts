@@ -485,6 +485,21 @@ export const en = {
     closeCurrent: 'Close the current tab',
   },
 
+  /**
+   * The shell's side panels — the sidebar and the inspector (Phase 12.2).
+   *
+   * The verb takes the panel's title instead of being glued to it at the call
+   * site: only the catalog knows how a name sits inside a sentence in its own
+   * language, down to whether it is lowercased at all.
+   */
+  panel: {
+    navigation: 'Navigation',
+    inspector: 'Inspector',
+    show: (title: string) => `Show ${title.toLowerCase()}`,
+    hide: (title: string) => `Hide ${title.toLowerCase()}`,
+    resize: (title: string) => `Resize ${title.toLowerCase()}`,
+  },
+
   /** Home — the surface shown when no project is open (Phase 11.2) */
   dashboard: {
     title: 'Home',
@@ -1216,6 +1231,14 @@ export const it: Catalog = {
     next: 'Scheda successiva',
     previous: 'Scheda precedente',
     closeCurrent: 'Chiudi la scheda corrente',
+  },
+
+  panel: {
+    navigation: 'Navigazione',
+    inspector: 'Ispettore',
+    show: (title) => `Mostra ${title.toLowerCase()}`,
+    hide: (title) => `Nascondi ${title.toLowerCase()}`,
+    resize: (title) => `Ridimensiona ${title.toLowerCase()}`,
   },
 
   dashboard: {

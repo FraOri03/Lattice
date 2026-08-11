@@ -316,7 +316,7 @@ export function Sidebar() {
   return (
     <SidePanel
       side="left"
-      title="Navigation"
+      title={t.panel.navigation}
       width={SIDEBAR_WIDTH}
       collapsed={sidebarCollapsed}
       onCollapsedChange={setSidebarCollapsed}
@@ -345,8 +345,8 @@ export function Sidebar() {
         {docked && (
           <button
             className="icon-btn mt-3 mr-1.5 h-6 w-6"
-            title="Hide navigation"
-            aria-label="Hide navigation"
+            title={t.panel.hide(t.panel.navigation)}
+            aria-label={t.panel.hide(t.panel.navigation)}
             aria-expanded
             onClick={() => setSidebarCollapsed(true)}
           >
