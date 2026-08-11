@@ -620,11 +620,40 @@ export const en = {
         undecodable: 'That image could not be read.',
       },
     },
+    notifications: {
+      intro:
+        'Notifications are worked out on this device from what your projects already say, so what you switch off here is never raised in the first place.',
+      event: 'Event',
+      inApp: 'In app',
+      email: 'E-mail',
+      events: {
+        mentions: 'Mentions',
+        replies: 'Replies',
+        assignments: 'Assignments',
+        resolved: 'Resolved comments',
+        invites: 'Invitations',
+        sync: 'Sync failures',
+        jobs: 'Background jobs',
+        versions: 'Version restores',
+      },
+      eventHints: {
+        mentions: 'Someone writes your name in a comment.',
+        replies: 'A reply on a thread you started or joined.',
+        assignments: 'A comment is assigned to you.',
+        resolved: 'Your comment is resolved or reopened.',
+        invites: 'You are invited to a project.',
+        sync: 'Google Drive or the realtime connection stops working.',
+        jobs: 'GitHub sync and file conversion report back.',
+        versions: 'A version is restored over current work.',
+      },
+      emailDisabled:
+        'E-mail has nowhere to go yet: there is no mail backend in this build, and no verified address to send to. Phase 18 builds both, and these switches are what it will read.',
+      noProducer:
+        'Three events the design asked for are not listed, because nothing raises them yet: due dates (nothing watches a comment’s due date), role changes (a role changes without announcing itself) and administrative activity (the activity log is a log, not a notification). A switch for them would control nothing.',
+    },
     pending: {
       profileSignedOut:
         'A profile needs an account. Sign in from the Account section, or keep working without one — nothing here is required.',
-      notifications:
-        'In-app notifications already work. Choosing which events reach you — and, later, which reach your inbox — arrives in 14.4.',
       security:
         'Active sessions, devices and revocation are listed here once phases 16 and 17 give them something real to list.',
       billing:
@@ -1245,11 +1274,40 @@ export const it: Catalog = {
         undecodable: 'Non è stato possibile leggere quell’immagine.',
       },
     },
+    notifications: {
+      intro:
+        'Le notifiche vengono ricavate su questo dispositivo da ciò che i tuoi progetti già dicono: quello che spegni qui non viene proprio sollevato.',
+      event: 'Evento',
+      inApp: 'In app',
+      email: 'E-mail',
+      events: {
+        mentions: 'Menzioni',
+        replies: 'Risposte',
+        assignments: 'Assegnazioni',
+        resolved: 'Commenti risolti',
+        invites: 'Inviti',
+        sync: 'Errori di sincronizzazione',
+        jobs: 'Lavori in background',
+        versions: 'Ripristini di versione',
+      },
+      eventHints: {
+        mentions: 'Qualcuno scrive il tuo nome in un commento.',
+        replies: 'Una risposta in un thread che hai aperto o a cui partecipi.',
+        assignments: 'Un commento viene assegnato a te.',
+        resolved: 'Un tuo commento viene risolto o riaperto.',
+        invites: 'Vieni invitato a un progetto.',
+        sync: 'Google Drive o la connessione realtime smettono di funzionare.',
+        jobs: 'Sincronizzazione GitHub e conversione file riferiscono l’esito.',
+        versions: 'Una versione viene ripristinata sopra il lavoro corrente.',
+      },
+      emailDisabled:
+        'L’e-mail non ha ancora dove andare: in questa build non c’è un backend di posta, né un indirizzo verificato a cui scrivere. La fase 18 costruisce entrambi, e leggerà proprio questi interruttori.',
+      noProducer:
+        'Tre eventi previsti dal design non compaiono, perché per ora nessuno li solleva: le scadenze (nessuno sorveglia la data di scadenza di un commento), i cambi di ruolo (un ruolo cambia senza annunciarsi) e l’attività amministrativa (il registro attività è un registro, non una notifica). Un interruttore per loro non controllerebbe niente.',
+    },
     pending: {
       profileSignedOut:
         'Un profilo ha bisogno di un account. Accedi dalla sezione Account, oppure continua senza — qui non è obbligatorio nulla.',
-      notifications:
-        'Le notifiche in-app funzionano già. Scegliere quali eventi ti raggiungono — e, più avanti, quali arrivano via e-mail — è la 14.4.',
       security:
         'Sessioni attive, dispositivi e revoca compaiono qui quando le fasi 16 e 17 daranno loro qualcosa di reale da elencare.',
       billing:

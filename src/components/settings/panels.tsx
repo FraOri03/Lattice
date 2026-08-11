@@ -6,6 +6,8 @@ import { announce } from '@/lib/a11y/announcer'
 import { useSyncStore } from '@/lib/sync/syncStore'
 import { syncEngine } from '@/lib/sync/SyncEngine'
 import { githubProvider } from '@/lib/github/GithubCodeProvider'
+import { useCollabStore } from '@/lib/collab/collabStore'
+import { NOTIFICATION_EVENTS } from '@/lib/collab/notificationPrefs'
 import { useStore } from '@/store/useStore'
 import { useUiStore } from '@/store/useUiStore'
 import { useI18n, useLocale, useTimeAgo } from '@/lib/i18n'
@@ -578,6 +580,105 @@ function StoragePanel() {
   )
 }
 
+/* ---------------- notifications ---------------- */
+
+/**
+ * A switch. `role="switch"` rather than a checkbox because that is what it is
+ * — on or off, applied immediately, with no form to submit.
+ */
+function Toggle({
+  on,
+  label,
+  disabled,
+  title,
+  onToggle,
+}: {
+  on: boolean
+  label: string
+  disabled?: boolean
+  title?: string
+  onToggle: () => void
+}) {
+  return (
+    <button
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      title={title}
+      disabled={disabled}
+      onClick={onToggle}
+      className={`relative h-6 w-10 flex-none rounded-full border transition-colors ${
+        disabled
+          ? 'cursor-not-allowed border-bord bg-panel2 opacity-50'
+          : on
+            ? 'cursor-pointer border-accent bg-accent'
+            : 'cursor-pointer border-bord bg-panel2'
+      }`}
+    >
+      <span
+        className={`absolute top-0.5 h-4 w-4 rounded-full bg-panel transition-[left] ${
+          on ? 'left-[18px]' : 'left-0.5'
+        }`}
+      />
+    </button>
+  )
+}
+
+function NotificationsPanel() {
+  const t = useI18n()
+  const n = t.settings.notifications
+  const prefs = useCollabStore((s) => s.notificationPrefs)
+  const setPref = useCollabStore((s) => s.setNotificationPref)
+
+  return (
+    <>
+      <Card body={n.intro}>
+        <div className="mt-1">
+          {/* the channel header, so a row of two switches is readable */}
+          <div className="flex items-center gap-3 border-b border-bord pb-1.5">
+            <span className="min-w-0 flex-1 text-[10px] font-semibold tracking-widest text-muted uppercase">
+              {n.event}
+            </span>
+            <span className="w-10 flex-none text-center text-[10px] font-semibold tracking-widest text-muted uppercase">
+              {n.inApp}
+            </span>
+            <span className="w-10 flex-none text-center text-[10px] font-semibold tracking-widest text-muted uppercase">
+              {n.email}
+            </span>
+          </div>
+
+          {NOTIFICATION_EVENTS.map((event) => (
+            <div key={event} className="flex items-center gap-3 border-b border-bord py-2.5">
+              <span className="min-w-0 flex-1">
+                <span className="block text-[12.5px]">{n.events[event]}</span>
+                <span className="block text-[10.5px] text-muted">{n.eventHints[event]}</span>
+              </span>
+              <Toggle
+                on={prefs.inApp[event]}
+                label={`${n.events[event]} — ${n.inApp}`}
+                onToggle={() => setPref('inApp', event, !prefs.inApp[event])}
+              />
+              {/* e-mail is a preference before it is a route: phase 18 gives it
+                  somewhere to go, and until then the switch says so instead of
+                  storing a consent against an unverified address */}
+              <Toggle
+                on={prefs.email[event]}
+                label={`${n.events[event]} — ${n.email}`}
+                disabled
+                title={n.emailDisabled}
+                onToggle={() => {}}
+              />
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      <Pending>{n.emailDisabled}</Pending>
+      <Pending>{n.noProducer}</Pending>
+    </>
+  )
+}
+
 /* ---------------- developer ---------------- */
 
 function DeveloperPanel() {
@@ -620,7 +721,7 @@ export function SettingsPanel({ section }: { section: SettingsSection }) {
     case 'profile':
       return <ProfilePanel />
     case 'notifications':
-      return <Pending>{t.settings.pending.notifications}</Pending>
+      return <NotificationsPanel />
     case 'security':
       return <Pending>{t.settings.pending.security}</Pending>
     case 'billing':

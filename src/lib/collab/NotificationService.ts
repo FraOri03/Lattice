@@ -3,6 +3,7 @@ import type { AppNotification, CommentThread, NotificationType } from '@/types/c
 import { useCrdtStore } from '@/lib/crdt/crdtStore'
 import { useSyncStore } from '@/lib/sync/syncStore'
 import { useCollabStore } from './collabStore'
+import { allows } from './notificationPrefs'
 import { currentIdentity } from './CollaborationProvider'
 
 /**
@@ -99,7 +100,13 @@ class NotificationService {
     this.started = false
   }
 
-  /** Explicit notifications from flows (GitHub sync, conversion, restore). */
+  /**
+   * Explicit notifications from flows (GitHub sync, conversion, restore).
+   *
+   * Every producer in this file funnels through here, which is why the
+   * preference check lives here and nowhere else (14.4): one gate, and a
+   * muted event is muted whichever code path raised it.
+   */
   notify(
     projectId: string,
     type: NotificationType,
@@ -107,6 +114,7 @@ class NotificationService {
     body: string,
     link?: AppNotification['link'],
   ): void {
+    if (!allows(useCollabStore.getState().notificationPrefs, type, 'inApp')) return
     useCollabStore.getState().pushNotification({
       id: nid('ntf'),
       projectId,
