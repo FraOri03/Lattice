@@ -4,6 +4,8 @@ import { announce } from '@/lib/a11y/announcer'
 import { groupProjects } from '@/lib/projects/ProjectRegistry'
 import { DESTINATIONS, type Destination } from '@/lib/dashboard/destinations'
 import { env } from '@/lib/env'
+import { LatticeLogotype, LatticeMark } from '@/components/Brand'
+import { SidebarStatus } from './SidebarStatus'
 import { IcClock, IcHome, IcMail, IcStar, IcTrash, IcUsers } from '@/components/Icons'
 
 /**
@@ -71,13 +73,17 @@ export function DashboardNav() {
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col">
-      {/* the mark, so a collapsed-to-nothing sidebar still says which app this
-          is — the prototype puts it above the workspace switcher */}
-      <div className="flex flex-none items-baseline gap-2 px-3 pt-3 pb-1">
-        <span className="text-[13px] font-bold tracking-widest">LATTICE</span>
-        <span className="text-[9.5px] text-muted">
-          <span className="capitalize">{env.appStage}</span> v{env.appVersion}
-        </span>
+      {/* the real trademark artwork, the same masthead the project sidebar
+          draws — one brand, drawn once, so the two surfaces cannot drift into
+          showing different marks or different versions */}
+      <div className="flex flex-none items-center gap-2.5 px-4 pt-4 pb-3">
+        <LatticeMark height={26} className="flex-none" />
+        <div className="min-w-0">
+          <LatticeLogotype height={12} />
+          <div className="mt-1 text-[10px] leading-none tracking-wide text-muted">
+            <span className="capitalize">{env.appStage}</span> v{env.appVersion}
+          </div>
+        </div>
       </div>
       {/* the workspace selector 13.1 settles: switching re-scopes the surface
           and never opens or creates a project */}
@@ -131,6 +137,8 @@ export function DashboardNav() {
         {group(t.dashboard.projects, groups.active)}
         {group(t.dashboard.archived, groups.archived)}
       </div>
+
+      <SidebarStatus />
     </div>
   )
 }

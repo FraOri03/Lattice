@@ -670,6 +670,46 @@ export const en = {
     noResultsAction: 'Clear filters',
     unavailableTitle: (what: string) => `${what} isn’t available yet`,
   },
+  /**
+   * The status bars at the foot of the dashboard's navigation (13.3 shape 1).
+   *
+   * Two of the three are mostly reserved, and each `…Why` line says which
+   * constraint holds it there — never a schedule, and never a number the app
+   * could not have measured.
+   */
+  status: {
+    off: 'off',
+    runpod: 'RunPod credit',
+    integration: 'Integration',
+    apiKey: 'API key',
+    balance: 'Balance',
+    jobs: 'Jobs',
+    notImplemented: 'not implemented',
+    notSet: 'not set',
+    disabled: 'disabled',
+    runpodWhy:
+      'Reserved space, deliberately empty: once a key exists this line shows balance, spend today and runway. Nothing is estimated in the meantime.',
+    system: 'System',
+    cpu: 'CPU',
+    memory: 'Memory',
+    gpu: 'GPU',
+    disk: 'Disk',
+    network: 'Network',
+    systemWhy:
+      'The browser can’t read these without a native host, so the row reports nothing rather than a plausible-looking guess.',
+    storage: 'Storage',
+    storageLine: (size: string, synced: boolean) => `${size} · ${synced ? 'Drive' : 'local'}`,
+    localVault: 'Local vault',
+    vaultLine: (size: string, files: number) =>
+      `${size} · ${files} ${files === 1 ? 'file' : 'files'}`,
+    driveMirror: 'Drive mirror',
+    connected: 'connected',
+    notConnected: 'not connected',
+    trash: 'Trash',
+    freeSpace: 'Free space',
+    storageWhy:
+      'The vault’s own size is measured here. The trash figure waits on the soft-delete model (issue #115), and free space is the disk’s — which a browser cannot read.',
+  },
   /** Row and card anatomy — the accessible names actions carry (13.5 §8). */
   cards: {
     openItem: (name: string) => `Open ${name}`,
@@ -1619,6 +1659,38 @@ export const it: Catalog = {
     noResultsBody: 'Nessun elemento rientra in ciò a cui hai ristretto.',
     noResultsAction: 'Azzera i filtri',
     unavailableTitle: (what) => `${what} non è ancora disponibile`,
+  },
+  status: {
+    off: 'off',
+    runpod: 'Credito RunPod',
+    integration: 'Integrazione',
+    apiKey: 'Chiave API',
+    balance: 'Saldo',
+    jobs: 'Job',
+    notImplemented: 'non implementata',
+    notSet: 'non impostata',
+    disabled: 'disattivati',
+    runpodWhy:
+      'Spazio riservato, deliberatamente vuoto: quando esisterà una chiave questa riga mostrerà saldo, spesa di oggi e autonomia. Nel frattempo non si stima niente.',
+    system: 'Sistema',
+    cpu: 'CPU',
+    memory: 'Memoria',
+    gpu: 'GPU',
+    disk: 'Disco',
+    network: 'Rete',
+    systemWhy:
+      'Il browser non può leggerli senza un host nativo, quindi la riga non riporta niente invece di una stima che sembrerebbe vera.',
+    storage: 'Archiviazione',
+    storageLine: (size, synced) => `${size} · ${synced ? 'Drive' : 'locale'}`,
+    localVault: 'Vault locale',
+    vaultLine: (size, files) => `${size} · ${files} file`,
+    driveMirror: 'Copia su Drive',
+    connected: 'connessa',
+    notConnected: 'non connessa',
+    trash: 'Cestino',
+    freeSpace: 'Spazio libero',
+    storageWhy:
+      'La dimensione del vault è misurata qui. Il dato del cestino aspetta il modello di eliminazione reversibile (issue #115), e lo spazio libero è quello del disco — che un browser non può leggere.',
   },
   cards: {
     openItem: (name) => `Apri ${name}`,
