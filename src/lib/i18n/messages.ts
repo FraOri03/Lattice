@@ -620,6 +620,74 @@ export const en = {
         undecodable: 'That image could not be read.',
       },
     },
+    connections: {
+      factsTitle: 'Identity, storage and sync',
+      factsBody:
+        'Three answers, not one. Being signed in with Google says who you are; a connected folder says where files may go; a running sync says whether they are going there now.',
+      identity: 'Identity',
+      identityGoogle: (email: string) => `Signed in with Google as ${email}`,
+      identityLocal: 'A local account — it exists in this browser only',
+      identityNone: 'Not signed in. Everything still works, and stays here.',
+      storage: 'Storage',
+      storageDrive: (folder: string) => `Your Drive, in the ${folder} folder`,
+      storageLocal: 'This browser only. Nothing has been uploaded.',
+      sync: 'Sync',
+      syncOff: 'Not running — there is nowhere to sync to yet',
+      on: 'On',
+      offLabel: 'Off',
+      servicesTitle: 'Services',
+      connect: 'Connect',
+      disconnect: 'Disconnect',
+      states: {
+        connected: 'Connected',
+        available: 'Not connected',
+        unconfigured: 'Not in this build',
+        blocked: 'Needs a Google sign-in',
+      },
+      services: {
+        drive: 'Google Drive',
+        github: 'GitHub',
+        realtime: 'Realtime backend',
+        livekit: 'LiveKit calls',
+        conversion: 'Conversion worker',
+      },
+      gets: {
+        drive:
+          'The files of projects you sync, in a folder you can see. The scope is drive.file, so Lattice can only read what it created — never the rest of your Drive.',
+        github:
+          'Code documents only, committed to a feature branch you name. Notes, boards and everything else never leave for GitHub.',
+        realtime:
+          'Board operations, document and code edits, presence and cursors, relayed while a project is open. Your role is re-checked on the server for every one of them.',
+        livekit:
+          'Audio, camera and screen while a call is running. The media goes to LiveKit, never into the vault.',
+        conversion:
+          'Only the file you ask it to convert, for as long as the conversion takes.',
+      },
+      configuredBy: (variable: string) =>
+        `Decided when this build was made (${variable}), so there is nothing to switch here.`,
+      blocked:
+        'Configured, but it authorises against a Google account and there is none signed in.',
+    },
+    security: {
+      sessionTitle: 'This session',
+      sessionBody:
+        'One session, in this browser. Signing out removes the account from this device; the vault stays where it is.',
+      signedInGoogle: (email: string) => `Signed in with Google as ${email}`,
+      signedInLocal: 'A local account, created in this browser',
+      signedOut: 'Not signed in',
+      revokeTitle: 'Revoke Drive access',
+      revokeBody:
+        'Drops the Google token and asks Google to revoke it. Lattice loses access to the folder immediately; the files that are already there stay in your Drive, and the local vault is untouched.',
+      revoke: 'Revoke access',
+      revokeUnavailable: 'There is no Drive token to revoke.',
+      protectionTitle: 'What protects your work',
+      protectionVault:
+        'The vault lives in this browser profile. Lattice adds no encryption of its own, so anyone who can open this browser can open the vault — encryption at rest is designed and not built.',
+      protectionDrive:
+        'Files mirrored to Drive are protected by your Google account, with whatever second factor it already enforces.',
+      protectionServer:
+        'When realtime is configured, the server verifies your Google token and mints the role itself: the browser’s claim about who it is is never trusted.',
+    },
     notifications: {
       intro:
         'Notifications are worked out on this device from what your projects already say, so what you switch off here is never raised in the first place.',
@@ -1273,6 +1341,74 @@ export const it: Catalog = {
         'too-large': 'Immagine troppo grande — scegline una sotto gli 8 MB.',
         undecodable: 'Non è stato possibile leggere quell’immagine.',
       },
+    },
+    connections: {
+      factsTitle: 'Identità, archiviazione e sincronizzazione',
+      factsBody:
+        'Tre risposte, non una. Aver fatto accesso con Google dice chi sei; una cartella collegata dice dove possono andare i file; una sincronizzazione attiva dice se ci stanno andando adesso.',
+      identity: 'Identità',
+      identityGoogle: (email) => `Accesso con Google come ${email}`,
+      identityLocal: 'Un account locale — esiste solo in questo browser',
+      identityNone: 'Nessun accesso. Tutto funziona lo stesso, e resta qui.',
+      storage: 'Archiviazione',
+      storageDrive: (folder) => `Il tuo Drive, nella cartella ${folder}`,
+      storageLocal: 'Solo questo browser. Non è stato caricato niente.',
+      sync: 'Sincronizzazione',
+      syncOff: 'Non attiva — non c’è ancora dove sincronizzare',
+      on: 'Attiva',
+      offLabel: 'Non attiva',
+      servicesTitle: 'Servizi',
+      connect: 'Collega',
+      disconnect: 'Scollega',
+      states: {
+        connected: 'Collegato',
+        available: 'Non collegato',
+        unconfigured: 'Non in questa build',
+        blocked: 'Richiede l’accesso Google',
+      },
+      services: {
+        drive: 'Google Drive',
+        github: 'GitHub',
+        realtime: 'Backend realtime',
+        livekit: 'Chiamate LiveKit',
+        conversion: 'Worker di conversione',
+      },
+      gets: {
+        drive:
+          'I file dei progetti che sincronizzi, in una cartella che puoi vedere. Lo scope è drive.file: Lattice legge solo ciò che ha creato, mai il resto del tuo Drive.',
+        github:
+          'Solo i documenti di codice, su un branch di lavoro che scegli tu. Note, board e tutto il resto non partono mai verso GitHub.',
+        realtime:
+          'Operazioni su board, modifiche a documenti e codice, presenza e cursori, mentre un progetto è aperto. Il tuo ruolo viene ricontrollato dal server a ogni operazione.',
+        livekit:
+          'Audio, videocamera e schermo mentre una chiamata è in corso. I flussi vanno a LiveKit, mai dentro il vault.',
+        conversion:
+          'Solo il file che chiedi di convertire, per il tempo della conversione.',
+      },
+      configuredBy: (variable) =>
+        `Deciso quando è stata compilata questa build (${variable}): qui non c’è niente da attivare.`,
+      blocked:
+        'Configurato, ma autorizza tramite un account Google e non ce n’è uno collegato.',
+    },
+    security: {
+      sessionTitle: 'Questa sessione',
+      sessionBody:
+        'Una sessione, in questo browser. Uscire rimuove l’account da questo dispositivo; il vault resta dov’è.',
+      signedInGoogle: (email) => `Accesso con Google come ${email}`,
+      signedInLocal: 'Un account locale, creato in questo browser',
+      signedOut: 'Nessun accesso',
+      revokeTitle: 'Revoca l’accesso a Drive',
+      revokeBody:
+        'Elimina il token Google e ne chiede la revoca a Google. Lattice perde subito l’accesso alla cartella; i file già lì restano nel tuo Drive, e il vault locale non viene toccato.',
+      revoke: 'Revoca l’accesso',
+      revokeUnavailable: 'Non c’è nessun token Drive da revocare.',
+      protectionTitle: 'Cosa protegge il tuo lavoro',
+      protectionVault:
+        'Il vault vive in questo profilo del browser. Lattice non aggiunge cifratura propria: chi può aprire questo browser può aprire il vault — la cifratura a riposo è progettata, non realizzata.',
+      protectionDrive:
+        'I file replicati su Drive sono protetti dal tuo account Google, con il secondo fattore che già impone.',
+      protectionServer:
+        'Quando il realtime è configurato, è il server a verificare il tuo token Google e a emettere il ruolo: quello che il browser dichiara di essere non viene mai creduto.',
     },
     notifications: {
       intro:

@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useAccount } from '@/lib/auth/AccountProvider'
+import { authService } from '@/lib/auth/AuthService'
+import {
+  deriveConnections,
+  type ServiceAction,
+  type ServiceId,
+} from '@/lib/settings/connections'
 import { initialsOf, MAX_DISPLAY_NAME } from '@/lib/auth/profile'
 import { AvatarError, avatarDataUrlFrom } from '@/lib/auth/avatar'
 import { announce } from '@/lib/a11y/announcer'
@@ -20,7 +26,13 @@ import type {
   ThemePreference,
   UiScalePreference,
 } from '@/lib/theme/appearance'
-import { env } from '@/lib/env'
+import {
+  env,
+  hasConversionBackend,
+  hasGoogleAuth,
+  hasMediaCalls,
+  hasRealtimeBackend,
+} from '@/lib/env'
 import type { Account, AuthProviderId, Locale, UsageType } from '@/types/model'
 import type { SettingsSection } from '@/lib/settings/sections'
 import {
@@ -29,10 +41,13 @@ import {
   IcDrive,
   IcGithub,
   IcKeyboard,
+  IcLock,
   IcLogOut,
+  IcMic,
   IcRefresh,
   IcUpload,
   IcUser,
+  IcUsers,
   IcX,
 } from '@/components/Icons'
 
@@ -74,40 +89,6 @@ export function Pending({ children }: { children: ReactNode }) {
   return (
     <div className="rounded-xl border border-dashed border-bord p-4 text-[11.5px] leading-relaxed text-muted">
       {children}
-    </div>
-  )
-}
-
-function Row({
-  icon,
-  name,
-  state,
-  ok,
-  detail,
-  action,
-}: {
-  icon: ReactNode
-  name: string
-  state: string
-  ok: boolean
-  detail: string
-  action?: ReactNode
-}) {
-  return (
-    <div className="flex flex-wrap items-center gap-2 border-b border-bord py-2.5 last:border-b-0">
-      <span className="text-muted">{icon}</span>
-      <span className="text-[12.5px] font-medium">{name}</span>
-      {/* state never rests on colour alone: a mark and a word (A11Y-2) */}
-      <span
-        className={`flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
-          ok ? 'bg-[#14ae5c]/15 text-[#14ae5c]' : 'bg-panel2 text-muted'
-        }`}
-      >
-        {ok ? <IcCheck size={9} /> : <IcX size={9} />}
-        {state}
-      </span>
-      <span className="min-w-0 flex-1 truncate text-[10.5px] text-muted">{detail}</span>
-      {action}
     </div>
   )
 }
@@ -472,57 +453,215 @@ function AppearancePanel() {
 
 /* ---------------- connected apps ---------------- */
 
+const SERVICE_ICON: Record<ServiceId, typeof IcDrive> = {
+  drive: IcDrive,
+  github: IcGithub,
+  realtime: IcUsers,
+  livekit: IcMic,
+  conversion: IcRefresh,
+}
+
+/**
+ * The three answers the interface has been collapsing into one. Signed in with
+ * Google says who you are; a connected folder says where files may go; a
+ * running sync says whether they are going there now. Three rows, because a
+ * single "connected" badge has been answering for all three.
+ */
+function IdentityFacts() {
+  const t = useI18n()
+  const c = t.settings.connections
+  const timeAgo = useTimeAgo()
+  const { account, authKind } = useAccount()
+  const sync = useSyncStore()
+  const driveConnected = authKind === 'google' && sync.provider === 'google-drive'
+
+  const facts: { key: string; label: string; value: string; ok: boolean }[] = [
+    {
+      key: 'identity',
+      label: c.identity,
+      value: !account
+        ? c.identityNone
+        : authKind === 'google'
+          ? c.identityGoogle(account.email)
+          : c.identityLocal,
+      ok: !!account,
+    },
+    {
+      key: 'storage',
+      label: c.storage,
+      value: driveConnected ? c.storageDrive(env.driveAppFolder) : c.storageLocal,
+      ok: driveConnected,
+    },
+    {
+      key: 'sync',
+      label: c.sync,
+      value: !driveConnected
+        ? c.syncOff
+        : sync.status === 'error'
+          ? (sync.error ?? t.profile.status.error)
+          : t.profile.lastSync(timeAgo(sync.lastSyncAt), sync.pendingChanges),
+      ok: driveConnected && sync.status !== 'error',
+    },
+  ]
+
+  return (
+    <Card title={c.factsTitle} body={c.factsBody}>
+      {facts.map((f) => (
+        <div key={f.key} className="flex flex-wrap items-baseline gap-x-3 border-b border-bord py-2 last:border-b-0">
+          <span className="w-20 flex-none text-[11px] text-muted">{f.label}</span>
+          <span className="min-w-0 flex-1 text-[12.5px]">{f.value}</span>
+          <span
+            className={`flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
+              f.ok ? 'bg-[#14ae5c]/15 text-[#14ae5c]' : 'bg-panel2 text-muted'
+            }`}
+          >
+            {f.ok ? <IcCheck size={9} /> : <IcX size={9} />}
+            {f.ok ? c.on : c.offLabel}
+          </span>
+        </div>
+      ))}
+    </Card>
+  )
+}
+
 function ConnectionsPanel() {
   const t = useI18n()
-  const { authKind } = useAccount()
+  const c = t.settings.connections
+  const { account, authKind } = useAccount()
   const sync = useSyncStore()
   const setDriveDialogOpen = useUiStore((s) => s.setDriveDialogOpen)
   const setGithubDialogOpen = useUiStore((s) => s.setGithubDialogOpen)
+  const [, force] = useState(0)
   const driveConnected = authKind === 'google' && sync.provider === 'google-drive'
   const githubUser = githubProvider.getCachedUser()
-  const githubConnected = githubProvider.isConnected()
+
+  const services = deriveConnections({
+    googleSignedIn: !!account && account.providers.includes('google'),
+    driveConnected,
+    githubConnected: githubProvider.isConnected(),
+    hasGoogleAuth,
+    hasRealtimeBackend,
+    hasMediaCalls,
+    hasConversionBackend,
+  })
+
+  const act = (id: ServiceId, action: ServiceAction) => {
+    if (id === 'drive') {
+      // disconnecting revokes the Google token as well as dropping it, which
+      // is the only revocation this build can actually perform
+      if (action === 'disconnect') void authService.disconnectDrive().then(() => force((n) => n + 1))
+      else setDriveDialogOpen(true)
+      return
+    }
+    if (id === 'github') {
+      if (action === 'disconnect') {
+        githubProvider.disconnect()
+        force((n) => n + 1)
+      } else setGithubDialogOpen(true)
+    }
+  }
 
   return (
     <>
-      <Card>
-        <Row
-          icon={<IcDrive size={14} />}
-          name="Google Drive"
-          ok={driveConnected}
-          state={driveConnected ? t.profile.connected : t.profile.off}
-          detail={
-            driveConnected
-              ? t.profile.driveFolder(env.driveAppFolder)
-              : authKind === 'mock'
-                ? t.profile.driveNeedsOAuth
-                : sync.status === 'connecting'
-                  ? t.profile.driveConnecting
-                  : t.profile.driveNotConnected
-          }
-          action={
-            <LinkButton
-              label={driveConnected ? t.profile.manage : t.profile.connect}
-              onClick={() => setDriveDialogOpen(true)}
-            />
-          }
-        />
-        <Row
-          icon={<IcGithub size={14} />}
-          name="GitHub"
-          ok={githubConnected}
-          state={githubConnected ? t.profile.connected : t.profile.off}
-          detail={
-            githubUser ? t.profile.githubDetail(githubUser.login) : t.profile.githubCodeOnly
-          }
-          action={
-            <LinkButton
-              label={githubConnected ? t.profile.manage : t.profile.connect}
-              onClick={() => setGithubDialogOpen(true)}
-            />
-          }
-        />
+      <IdentityFacts />
+
+      <Card title={c.servicesTitle}>
+        {services.map((s) => {
+          const Icon = SERVICE_ICON[s.id]
+          const connected = s.state === 'connected'
+          return (
+            <div key={s.id} className="border-b border-bord py-2.5 last:border-b-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-muted">
+                  <Icon size={14} />
+                </span>
+                <span className="text-[12.5px] font-medium">{c.services[s.id]}</span>
+                <span
+                  className={`flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
+                    connected ? 'bg-[#14ae5c]/15 text-[#14ae5c]' : 'bg-panel2 text-muted'
+                  }`}
+                >
+                  {connected ? <IcCheck size={9} /> : <IcX size={9} />}
+                  {c.states[s.state]}
+                </span>
+                <span className="flex-1" />
+                {s.action !== 'none' && (
+                  <LinkButton
+                    label={s.action === 'disconnect' ? c.disconnect : c.connect}
+                    onClick={() => act(s.id, s.action)}
+                  />
+                )}
+              </div>
+              {/* what it gets is the part a connection screen usually leaves out */}
+              <p className="mt-1 text-[10.5px] leading-relaxed text-muted">
+                {c.gets[s.id]}
+                {s.id === 'github' && githubUser ? ` — ${githubUser.login}` : ''}
+              </p>
+              {s.state === 'unconfigured' && s.configuredBy && (
+                <p className="mt-1 text-[10.5px] text-muted">
+                  {c.configuredBy(s.configuredBy)}
+                </p>
+              )}
+              {s.state === 'blocked' && (
+                <p className="mt-1 text-[10.5px] text-muted">{c.blocked}</p>
+              )}
+            </div>
+          )
+        })}
       </Card>
-      <Pending>{t.settings.pending.connectionsMore}</Pending>
+    </>
+  )
+}
+
+/* ---------------- security ---------------- */
+
+function SecurityPanel() {
+  const t = useI18n()
+  const sec = t.settings.security
+  const { account, authKind, signOut } = useAccount()
+  const sync = useSyncStore()
+  const driveConnected = authKind === 'google' && sync.provider === 'google-drive'
+
+  return (
+    <>
+      <Card title={sec.sessionTitle} body={sec.sessionBody}>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="min-w-0 flex-1 text-[12px]">
+            {account
+              ? authKind === 'google'
+                ? sec.signedInGoogle(account.email)
+                : sec.signedInLocal
+              : sec.signedOut}
+          </span>
+          {account && (
+            <button className="btn" onClick={() => void signOut()}>
+              <IcLogOut size={12} /> {t.profile.signOut}
+            </button>
+          )}
+        </div>
+      </Card>
+
+      {/* the one revocation this build can really perform */}
+      <Card title={sec.revokeTitle} body={sec.revokeBody}>
+        <button
+          className="btn"
+          disabled={!driveConnected}
+          title={driveConnected ? undefined : sec.revokeUnavailable}
+          onClick={() => void authService.disconnectDrive()}
+        >
+          <IcLock size={12} /> {sec.revoke}
+        </button>
+      </Card>
+
+      <Card title={sec.protectionTitle}>
+        <ul className="flex flex-col gap-2 text-[11.5px] leading-relaxed text-muted">
+          <li>{sec.protectionVault}</li>
+          <li>{sec.protectionDrive}</li>
+          <li>{sec.protectionServer}</li>
+        </ul>
+      </Card>
+
+      <Pending>{t.settings.pending.security}</Pending>
     </>
   )
 }
@@ -723,7 +862,7 @@ export function SettingsPanel({ section }: { section: SettingsSection }) {
     case 'notifications':
       return <NotificationsPanel />
     case 'security':
-      return <Pending>{t.settings.pending.security}</Pending>
+      return <SecurityPanel />
     case 'billing':
       return <Pending>{t.settings.pending.billing}</Pending>
   }
