@@ -1,5 +1,6 @@
 import { useStore } from '@/store/useStore'
 import { useI18n } from '@/lib/i18n'
+import { announce } from '@/lib/a11y/announcer'
 import { groupProjects } from '@/lib/projects/ProjectRegistry'
 import { DESTINATIONS, type Destination } from '@/lib/dashboard/destinations'
 import { IcClock, IcHome, IcMail, IcStar, IcTrash, IcUsers } from '@/components/Icons'
@@ -77,7 +78,15 @@ export function DashboardNav() {
           <select
             className="field w-full text-[12px]"
             value={activeWorkspaceId}
-            onChange={(e) => setActiveWorkspace(e.target.value)}
+            onChange={(e) => {
+              setActiveWorkspace(e.target.value)
+              // switching re-scopes the whole surface without moving focus, so
+              // the announcement is the only thing that says it happened
+              const next = workspaces[e.target.value]
+              if (next) {
+                announce(t.announcements.workspaceSwitched(next.name, next.projectIds.length))
+              }
+            }}
           >
             {wsList.map((ws) => (
               <option key={ws.id} value={ws.id}>

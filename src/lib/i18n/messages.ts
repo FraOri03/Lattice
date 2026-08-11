@@ -592,10 +592,34 @@ export const en = {
     recentsEmptyBody: 'This list fills itself as you open boards, documents and files.',
     starredEmptyTitle: 'Nothing starred yet',
     starredEmptyBody: 'The star on any row or card pins it here, across every workspace.',
-    noResultsTitle: 'Nothing in this workspace',
     noResultsBody: 'Choose “All workspaces” to see everything again.',
     selectedCount: (n: number) => `${n} selected`,
     unstarSelected: 'Unstar selected',
+  },
+  /**
+   * The state a section shows instead of content (13.2 §5, 13.3).
+   *
+   * Every one follows the same shape: **what happened · what is still safe ·
+   * what to do next**. A state that cannot name a cause is not ready to ship,
+   * which is why `error` says the files are still on disk and `offline` says
+   * the local ones still open.
+   *
+   * `unavailable` is the sixth, and the one the other five cannot express. Its
+   * body is supplied by the caller, because the reason is different for every
+   * section and naming the constraint is the whole point — "needs the server
+   * planned for phase 18" is a fact, "coming soon" is a promise nobody holds.
+   */
+  states: {
+    loading: (what: string) => `Reading ${what}…`,
+    errorTitle: (what: string) => `Couldn’t read ${what}`,
+    errorBody: 'Nothing has been lost — your files are still on this device. Reloading rebuilds the index.',
+    errorAction: 'Reload',
+    offlineTitle: 'You’re offline',
+    offlineBody: 'What lives on this device still opens. Anything stored elsewhere reappears when the connection does.',
+    noResultsTitle: 'Nothing matches these filters',
+    noResultsBody: 'No item matches what you have narrowed to.',
+    noResultsAction: 'Clear filters',
+    unavailableTitle: (what: string) => `${what} isn’t available yet`,
   },
   /** Row and card anatomy — the accessible names actions carry (13.5 §8). */
   cards: {
@@ -616,6 +640,9 @@ export const en = {
     results: (n: number) => `${n} ${n === 1 ? 'result' : 'results'}`,
     created: (kind: string, name: string, project: string) =>
       `Created ${kind} “${name}” in ${project}`,
+    filtersCleared: (n: number) => `Filters cleared — ${n} ${n === 1 ? 'item' : 'items'}`,
+    workspaceSwitched: (name: string, projects: number) =>
+      `${name} — ${projects} ${projects === 1 ? 'project' : 'projects'}`,
   },
   /**
    * The command palette (13.4, built in 15.3). One search and one create list,
@@ -644,6 +671,38 @@ export const en = {
     currentProject: 'current',
     switchProject: 'switch project',
     switchWorkspace: 'switch workspace',
+    /**
+     * The utility commands. 15.3 localized what 13.4 specifies and left these,
+     * which had been English literals since the palette was written; 13.5 §8
+     * makes the whole catalogue this phase's, so they land here.
+     */
+    commands: {
+      graph: 'Open Graph view',
+      split: 'Toggle Split layout',
+      toLight: 'Switch to light theme',
+      toDark: 'Switch to dark theme',
+      github: 'GitHub — sync code',
+      drive: 'Google Drive — connect and diagnostics',
+      share: 'Share — members and invites',
+      comments: 'Comments',
+      activity: 'Activity log',
+      versions: 'Version history',
+      shortcuts: 'Keyboard shortcuts',
+      settings: 'Settings',
+      syncNow: 'Sync now (Google Drive)',
+      /** Sections inside the open project — hinted as `mode` in the list. */
+      goToSection: (section: string) => `Go to ${section}`,
+      modeHint: 'section',
+    },
+    /** The sections of an open project, named for the "Go to …" commands. */
+    viewModes: {
+      board: 'Board',
+      doc: 'Document',
+      sheet: 'Sheet',
+      presentation: 'Presentation',
+      code: 'Code',
+      photo: 'Photo',
+    },
   },
   /** The seven creation actions, and the target question (13.4 §6). */
   create: {
@@ -1440,10 +1499,23 @@ export const it: Catalog = {
     starredEmptyTitle: 'Nessun preferito',
     starredEmptyBody:
       'La stella su una riga o una card lo fissa qui, da tutti i workspace.',
-    noResultsTitle: 'Niente in questo workspace',
     noResultsBody: 'Scegli “Tutti i workspace” per rivedere tutto.',
     selectedCount: (n) => `${n} selezionati`,
     unstarSelected: 'Togli dai preferiti',
+  },
+  states: {
+    loading: (what) => `Lettura di ${what}…`,
+    errorTitle: (what) => `Impossibile leggere ${what}`,
+    errorBody:
+      'Non è andato perso niente — i tuoi file sono ancora su questo dispositivo. Ricaricare ricostruisce l’indice.',
+    errorAction: 'Ricarica',
+    offlineTitle: 'Sei offline',
+    offlineBody:
+      'Ciò che vive su questo dispositivo si apre comunque. Quello archiviato altrove torna appena torna la connessione.',
+    noResultsTitle: 'Nessun elemento corrisponde ai filtri',
+    noResultsBody: 'Nessun elemento rientra in ciò a cui hai ristretto.',
+    noResultsAction: 'Azzera i filtri',
+    unavailableTitle: (what) => `${what} non è ancora disponibile`,
   },
   cards: {
     openItem: (name) => `Apri ${name}`,
@@ -1457,6 +1529,9 @@ export const it: Catalog = {
     bulkUnstarred: (n) => `${n} ${n === 1 ? 'elemento tolto' : 'elementi tolti'} dai preferiti`,
     results: (n) => `${n} ${n === 1 ? 'risultato' : 'risultati'}`,
     created: (kind, name, project) => `Creato: ${kind} “${name}” in ${project}`,
+    filtersCleared: (n) => `Filtri azzerati — ${n} ${n === 1 ? 'elemento' : 'elementi'}`,
+    workspaceSwitched: (name, projects) =>
+      `${name} — ${projects} ${projects === 1 ? 'progetto' : 'progetti'}`,
   },
   palette: {
     placeholder: 'Cerca file, board e progetti — o digita un comando…',
@@ -1480,6 +1555,31 @@ export const it: Catalog = {
     currentProject: 'corrente',
     switchProject: 'cambia progetto',
     switchWorkspace: 'cambia workspace',
+    commands: {
+      graph: 'Apri la vista Grafo',
+      split: 'Attiva/disattiva il layout diviso',
+      toLight: 'Passa al tema chiaro',
+      toDark: 'Passa al tema scuro',
+      github: 'GitHub — sincronizza il codice',
+      drive: 'Google Drive — connessione e diagnostica',
+      share: 'Condivisione — membri e inviti',
+      comments: 'Commenti',
+      activity: 'Registro attività',
+      versions: 'Cronologia versioni',
+      shortcuts: 'Scorciatoie da tastiera',
+      settings: 'Impostazioni',
+      syncNow: 'Sincronizza ora (Google Drive)',
+      goToSection: (section) => `Vai a ${section}`,
+      modeHint: 'sezione',
+    },
+    viewModes: {
+      board: 'Board',
+      doc: 'Documento',
+      sheet: 'Foglio',
+      presentation: 'Presentazione',
+      code: 'Codice',
+      photo: 'Foto',
+    },
   },
   create: {
     kinds: {

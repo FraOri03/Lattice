@@ -139,8 +139,10 @@ describe('Starred', () => {
     fireEvent.change(main().getByRole('combobox'), { target: { value: other } })
 
     expect(main().queryByRole('button', { name: 'Open Pinned' })).toBeNull()
-    // not "nothing starred" — the shelf has content, this workspace does not
-    expect(main().getByText('Nothing in this workspace')).toBeInTheDocument()
+    // not "nothing starred" — the shelf has content, this filter excludes it.
+    // 15.4 made that title shared across every section; the body stays specific.
+    expect(main().getByText('Nothing matches these filters')).toBeInTheDocument()
+    expect(main().getByText('Choose “All workspaces” to see everything again.')).toBeInTheDocument()
   })
 
   it('unstars from the row it is on', () => {

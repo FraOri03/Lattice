@@ -3,8 +3,10 @@ import { useStore } from '@/store/useStore'
 import { useI18n } from '@/lib/i18n'
 import { announce } from '@/lib/a11y/announcer'
 import { collectStarred } from '@/lib/dashboard/shelves'
+import { sectionState } from '@/lib/dashboard/sectionState'
 import { ShelfRow } from './ShelfRow'
-import { WorkspaceFilter, useWorkspaceFilter } from './WorkspaceFilter'
+import { SectionStateBlock } from './SectionStateBlock'
+import { ALL_WORKSPACES, WorkspaceFilter, useWorkspaceFilter } from './WorkspaceFilter'
 
 /**
  * Starred (13.1 · 13.5 §3) — the shelf you curate.
@@ -48,6 +50,14 @@ export function StarredDestination() {
   const items = all.filter((i) => filter.accepts(i.workspaceId))
   const key = (kind: string, id: string) => `${kind}:${id}`
   const selected = items.filter((i) => selection.includes(key(i.kind, i.id)))
+  // the shelf reads local state synchronously, so it is never loading and never
+  // offline — what it can be is empty, or narrowed to nothing
+  const state = sectionState({ total: all.length, filtered: items.length })
+
+  const clearFilters = () => {
+    filter.set(ALL_WORKSPACES)
+    announce(t.announcements.filtersCleared(all.length))
+  }
 
   const unstarSelected = () => {
     for (const item of selected) toggleStarred(item.kind, item.id)
@@ -74,15 +84,18 @@ export function StarredDestination() {
         )}
       </div>
 
-      {items.length === 0 ? (
-        <div className="mt-4 rounded-xl border border-dashed border-bord p-8 text-center">
-          <p className="mb-1 text-[13px] font-semibold">
-            {all.length === 0 ? t.shelves.starredEmptyTitle : t.shelves.noResultsTitle}
-          </p>
-          <p className="text-[11.5px] text-muted">
-            {all.length === 0 ? t.shelves.starredEmptyBody : t.shelves.noResultsBody}
-          </p>
-        </div>
+      {state !== 'content' ? (
+        <SectionStateBlock
+          state={state}
+          what={t.destinations.title.starred}
+          title={t.shelves.starredEmptyTitle}
+          body={state === 'empty' ? t.shelves.starredEmptyBody : t.shelves.noResultsBody}
+          action={
+            state === 'no-results'
+              ? { label: t.states.noResultsAction, onClick: clearFilters }
+              : undefined
+          }
+        />
       ) : (
         <ul className="mt-4 flex flex-col gap-1.5">
           {items.map((item) => {

@@ -163,7 +163,7 @@ export function HomeDestination() {
     return (
       <button
         key={p.id}
-        className="flex cursor-pointer flex-col gap-2 rounded-xl border border-bord bg-panel p-3 text-left hover:border-accent"
+        className="flex h-full w-full cursor-pointer flex-col gap-2 rounded-xl border border-bord bg-panel p-3 text-left hover:border-accent"
         onClick={() => open(p.id)}
         aria-label={t.openProject(p.name)}
       >
@@ -236,8 +236,19 @@ export function HomeDestination() {
         >
           {label}
         </h2>
-        <div className="grid gap-2.5 [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))]">
-          {items.map((p) => card(p, badge))}
+        {/* a list, not a bare grid (13.5 §4): a screen reader announces how
+            many projects a section holds before the user walks into it. The
+            wrapper IS the grid cell — `display: contents` would be tidier and
+            is unreliable with an ARIA role on it. */}
+        <div
+          role="list"
+          className="grid gap-2.5 [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))]"
+        >
+          {items.map((p) => (
+            <div role="listitem" key={p.id}>
+              {card(p, badge)}
+            </div>
+          ))}
         </div>
       </section>
     )
@@ -281,24 +292,28 @@ export function HomeDestination() {
           >
             {t.recentFiles}
           </h2>
-          <div className="grid gap-2.5 [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))]">
+          <div
+            role="list"
+            className="grid gap-2.5 [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))]"
+          >
             {recentFiles.map((r) => {
               const Icon = RECENT_ICON[r.kind]
               return (
-                <button
-                  key={`${r.kind}:${r.id}`}
-                  className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-bord bg-panel px-3 py-2.5 text-left hover:border-accent"
-                  onClick={() => openRecent(r)}
-                  aria-label={t.openRecent(r.title, r.projectName ?? '')}
-                >
-                  <Icon size={14} className="flex-none text-muted" aria-hidden />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[12.5px] font-medium">{r.title}</span>
-                    <span className="block truncate text-[10.5px] text-muted">
-                      {r.projectName} · {timeAgo(r.at)}
+                <div role="listitem" key={`${r.kind}:${r.id}`}>
+                  <button
+                    className="flex h-full w-full cursor-pointer items-center gap-2.5 rounded-xl border border-bord bg-panel px-3 py-2.5 text-left hover:border-accent"
+                    onClick={() => openRecent(r)}
+                    aria-label={t.openRecent(r.title, r.projectName ?? '')}
+                  >
+                    <Icon size={14} className="flex-none text-muted" aria-hidden />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[12.5px] font-medium">{r.title}</span>
+                      <span className="block truncate text-[10.5px] text-muted">
+                        {r.projectName} · {timeAgo(r.at)}
+                      </span>
                     </span>
-                  </span>
-                </button>
+                  </button>
+                </div>
               )
             })}
           </div>

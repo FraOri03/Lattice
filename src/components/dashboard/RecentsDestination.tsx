@@ -3,8 +3,11 @@ import { useStore, RECENTS_CAP } from '@/store/useStore'
 import { useI18n, useTimeAgo, useLocale } from '@/lib/i18n'
 import { resolveRecents } from '@/lib/recents/resolveRecents'
 import { groupByDay, workspaceOfProject, type ShelfItem } from '@/lib/dashboard/shelves'
+import { sectionState } from '@/lib/dashboard/sectionState'
+import { announce } from '@/lib/a11y/announcer'
 import { ShelfRow } from './ShelfRow'
-import { WorkspaceFilter, useWorkspaceFilter } from './WorkspaceFilter'
+import { SectionStateBlock } from './SectionStateBlock'
+import { ALL_WORKSPACES, WorkspaceFilter, useWorkspaceFilter } from './WorkspaceFilter'
 
 /**
  * Recents (13.1 · 13.5 §3) — the log, grouped by day.
@@ -59,6 +62,13 @@ export function RecentsDestination() {
 
   const visible = rows.filter((r) => filter.accepts(r.item.workspaceId))
   const days = useMemo(() => groupByDay(visible, now), [visible, now])
+  // read synchronously from the local store, so never loading and never offline
+  const state = sectionState({ total: rows.length, filtered: visible.length })
+
+  const clearFilters = () => {
+    filter.set(ALL_WORKSPACES)
+    announce(t.announcements.filtersCleared(rows.length))
+  }
 
   // the star lives on the entity, so a Recents row can show and set it too
   const starredOf = (item: ShelfItem): boolean => {
@@ -100,15 +110,18 @@ export function RecentsDestination() {
         <WorkspaceFilter filter={filter} />
       </div>
 
-      {days.length === 0 ? (
-        <div className="mt-4 rounded-xl border border-dashed border-bord p-8 text-center">
-          <p className="mb-1 text-[13px] font-semibold">
-            {rows.length === 0 ? t.shelves.recentsEmptyTitle : t.shelves.noResultsTitle}
-          </p>
-          <p className="text-[11.5px] text-muted">
-            {rows.length === 0 ? t.shelves.recentsEmptyBody : t.shelves.noResultsBody}
-          </p>
-        </div>
+      {state !== 'content' ? (
+        <SectionStateBlock
+          state={state}
+          what={t.destinations.title.recents}
+          title={t.shelves.recentsEmptyTitle}
+          body={state === 'empty' ? t.shelves.recentsEmptyBody : t.shelves.noResultsBody}
+          action={
+            state === 'no-results'
+              ? { label: t.states.noResultsAction, onClick: clearFilters }
+              : undefined
+          }
+        />
       ) : (
         days.map((day) => (
           <section key={day.dayStart} aria-label={dayLabel(day.daysAgo, day.dayStart)} className="mt-5">

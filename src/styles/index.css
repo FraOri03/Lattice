@@ -1146,6 +1146,12 @@ body {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    /* Stagger may delay MOTION, never CONTENT (13.5 §7). `.anim-rise` fills
+       `both` and starts at `opacity: 0`, so a collapsed duration alone leaves
+       the eighth card invisible for its 8 x 55ms delay — present, laid out and
+       unreadable. Zeroing the delay is what makes "immediately" true. */
+    animation-delay: 0ms !important;
+    transition-delay: 0ms !important;
   }
 }
 /* The same collapse, asked for inside the app (14.3). The media query above
@@ -1158,6 +1164,8 @@ body {
   animation-duration: 0.01ms !important;
   animation-iteration-count: 1 !important;
   transition-duration: 0.01ms !important;
+  animation-delay: 0ms !important;
+  transition-delay: 0ms !important;
 }
 
 /* ---------- toasts ---------- */

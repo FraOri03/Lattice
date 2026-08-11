@@ -569,15 +569,16 @@ function usePaletteSections(
 
     /* ---------- utility commands ---------- */
 
+    const cmd = t.palette.commands
     const actions: [string, React.ReactNode, () => void, string?][] = [
-      ['Open Graph view', <IcGraph size={14} />, () => s.setViewMode('graph'), 'G G'],
+      [cmd.graph, <IcGraph size={14} />, () => s.setViewMode('graph'), 'G G'],
       [
-        'Toggle Split layout',
+        cmd.split,
         <IcSplit size={14} />,
         () => useWorkspaceLayoutStore.getState().toggleSplit({ secondary: 'board' }),
       ],
       [
-        s.theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme',
+        s.theme === 'dark' ? cmd.toLight : cmd.toDark,
         s.theme === 'dark' ? <IcSun size={14} /> : <IcMoon size={14} />,
         () =>
           setThemeAnimated(nextTheme(s.theme), s.setTheme, {
@@ -585,28 +586,26 @@ function usePaletteSections(
             y: window.innerHeight / 3,
           }),
       ],
-      ['GitHub — sync code', <IcGithub size={14} />, () => setGithubDialogOpen(true)],
-      ['Google Drive — connect & diagnostics', <IcCloud size={14} />, () => setDriveDialogOpen(true)],
-      ['Share — members & invites', <IcUserPlus size={14} />, () => setShareDialogOpen(true)],
-      ['Comments', <IcMessage size={14} />, () => setPanel('comments')],
-      ['Activity log', <IcActivity size={14} />, () => setPanel('activity')],
-      ['Version history', <IcHistory size={14} />, () => setPanel('versions')],
-      ['Keyboard shortcuts', <IcKeyboard size={14} />, () => setShortcutsOpen(true), 'Ctrl /'],
-      ['Settings', <IcSettings size={14} />, () => s.openSettings()],
+      [cmd.github, <IcGithub size={14} />, () => setGithubDialogOpen(true)],
+      [cmd.drive, <IcCloud size={14} />, () => setDriveDialogOpen(true)],
+      [cmd.share, <IcUserPlus size={14} />, () => setShareDialogOpen(true)],
+      [cmd.comments, <IcMessage size={14} />, () => setPanel('comments')],
+      [cmd.activity, <IcActivity size={14} />, () => setPanel('activity')],
+      [cmd.versions, <IcHistory size={14} />, () => setPanel('versions')],
+      [cmd.shortcuts, <IcKeyboard size={14} />, () => setShortcutsOpen(true), 'Ctrl /'],
+      [cmd.settings, <IcSettings size={14} />, () => s.openSettings()],
     ]
     if (syncProvider === 'google-drive') {
-      actions.push(['Sync now (Google Drive)', <IcCloud size={14} />, () => void syncEngine.syncNow()])
+      actions.push([cmd.syncNow, <IcCloud size={14} />, () => void syncEngine.syncNow()])
     }
-    const MODES: [ViewMode, string][] = [
-      ['board', 'Go to Board'],
-      ['doc', 'Go to Document'],
-      ['sheet', 'Go to Sheet'],
-      ['presentation', 'Go to Presentation'],
-      ['code', 'Go to Code'],
-      ['photo', 'Go to Photo'],
-    ]
-    for (const [mode, label] of MODES) {
-      actions.push([label, <IcBoard size={14} />, () => s.setViewMode(mode), 'mode'])
+    const MODES: ViewMode[] = ['board', 'doc', 'sheet', 'presentation', 'code', 'photo']
+    for (const mode of MODES) {
+      actions.push([
+        cmd.goToSection(t.palette.viewModes[mode as keyof typeof t.palette.viewModes]),
+        <IcBoard size={14} />,
+        () => s.setViewMode(mode),
+        cmd.modeHint,
+      ])
     }
     for (const [label, icon, run, hint] of actions) {
       pool.push({
