@@ -613,6 +613,54 @@ export const en = {
     starred: (name: string) => `“${name}” starred`,
     unstarred: (name: string) => `“${name}” unstarred`,
     bulkUnstarred: (n: number) => `${n} ${n === 1 ? 'item' : 'items'} unstarred`,
+    results: (n: number) => `${n} ${n === 1 ? 'result' : 'results'}`,
+    created: (kind: string, name: string, project: string) =>
+      `Created ${kind} “${name}” in ${project}`,
+  },
+  /**
+   * The command palette (13.4, built in 15.3). One search and one create list,
+   * so these strings are the only place either is named.
+   */
+  palette: {
+    placeholder: 'Search files, boards and projects — or type a command…',
+    label: 'Command palette',
+    results: 'Results',
+    sections: {
+      recent: 'Recently opened',
+      create: 'Create',
+      goto: 'Go to',
+      files: 'Files',
+      boards: 'Boards',
+      projects: 'Projects',
+      workspace: 'Workspace',
+      actions: 'Actions',
+    },
+    noResults: (query: string) => `Nothing matches “${query}”`,
+    /** Search reaches what this device holds — 13.4 §2. Said, not implied. */
+    driveScope:
+      'Search reaches what this device holds. A project that lives only in someone else’s Drive folder has not been read here yet.',
+    createNamed: (kind: string, name: string) => `Create ${kind} “${name}”`,
+    inProject: (project: string) => `in ${project}`,
+    currentProject: 'current',
+    switchProject: 'switch project',
+    switchWorkspace: 'switch workspace',
+  },
+  /** The seven creation actions, and the target question (13.4 §6). */
+  create: {
+    kinds: {
+      project: 'project',
+      board: 'board',
+      doc: 'document',
+      note: 'Markdown note',
+      sheet: 'spreadsheet',
+      present: 'presentation',
+      code: 'code file',
+    },
+    newLabel: (kind: string) => `New ${kind}`,
+    createIn: (project: string) => `Create in ${project}`,
+    chooseTarget: (kind: string) => `Where should the ${kind} go?`,
+    noProjects: 'Create a project first — every file lives in one.',
+    back: 'Back',
   },
   /**
    * The settings screen (Phase 14.1). `pending` is deliberately specific: a
@@ -1407,6 +1455,47 @@ export const it: Catalog = {
     starred: (name) => `“${name}” aggiunto ai preferiti`,
     unstarred: (name) => `“${name}” tolto dai preferiti`,
     bulkUnstarred: (n) => `${n} ${n === 1 ? 'elemento tolto' : 'elementi tolti'} dai preferiti`,
+    results: (n) => `${n} ${n === 1 ? 'risultato' : 'risultati'}`,
+    created: (kind, name, project) => `Creato: ${kind} “${name}” in ${project}`,
+  },
+  palette: {
+    placeholder: 'Cerca file, board e progetti — o digita un comando…',
+    label: 'Palette dei comandi',
+    results: 'Risultati',
+    sections: {
+      recent: 'Aperti di recente',
+      create: 'Crea',
+      goto: 'Vai a',
+      files: 'File',
+      boards: 'Board',
+      projects: 'Progetti',
+      workspace: 'Workspace',
+      actions: 'Azioni',
+    },
+    noResults: (query) => `Nessun risultato per “${query}”`,
+    driveScope:
+      'La ricerca arriva a ciò che questo dispositivo contiene. Un progetto che vive solo nella cartella Drive di qualcun altro non è ancora stato letto qui.',
+    createNamed: (kind, name) => `Crea ${kind} “${name}”`,
+    inProject: (project) => `in ${project}`,
+    currentProject: 'corrente',
+    switchProject: 'cambia progetto',
+    switchWorkspace: 'cambia workspace',
+  },
+  create: {
+    kinds: {
+      project: 'progetto',
+      board: 'board',
+      doc: 'documento',
+      note: 'nota Markdown',
+      sheet: 'foglio di calcolo',
+      present: 'presentazione',
+      code: 'file di codice',
+    },
+    newLabel: (kind) => `Nuovo: ${kind}`,
+    createIn: (project) => `Crea in ${project}`,
+    chooseTarget: (kind) => `Dove va ${kind}?`,
+    noProjects: 'Crea prima un progetto — ogni file vive dentro uno.',
+    back: 'Indietro',
   },
   settings: {
     title: 'Impostazioni',
