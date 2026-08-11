@@ -145,13 +145,32 @@ export interface Folder {
 
 export type AuthProviderId = 'google' | 'github' | 'mock'
 
+/** How someone says they use Lattice. Collected in 14.2; nothing reads it yet. */
+export type UsageType = 'personal' | 'work' | 'education'
+
 export interface Account {
   id: string
+  /**
+   * The EFFECTIVE display name — what cards, comments, presence and
+   * invitations show. It starts as whatever the provider reported and becomes
+   * the user's own the moment they edit it (14.2), which is why every consumer
+   * can keep reading this one field.
+   */
   name: string
   email: string
+  /** The effective avatar, same rule as `name`. */
   avatarUrl: string
   /** which identity/service providers this account has connected */
   providers: AuthProviderId[]
+  /**
+   * What the provider last reported, kept so an override can be undone and so
+   * the UI can say "your Google account says X" instead of guessing.
+   */
+  providerProfile?: { name: string; avatarUrl: string }
+  /** Set once the user edits it: sign-in must then stop overwriting it. */
+  nameOverridden?: boolean
+  avatarOverridden?: boolean
+  usageType?: UsageType
   createdAt: number
   updatedAt: number
 }

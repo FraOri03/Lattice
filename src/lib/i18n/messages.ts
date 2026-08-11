@@ -527,6 +527,221 @@ export const en = {
     emptyBody: 'A project holds its own boards, notes, documents and files.',
   },
   /**
+   * The settings screen (Phase 14.1). `pending` is deliberately specific: a
+   * panel that is not built yet says what will live there and what it waits
+   * on, rather than "coming soon" — a promise nobody is holding.
+   */
+  settings: {
+    title: 'Settings',
+    open: 'Settings',
+    close: 'Close settings',
+    navLabel: 'Settings sections',
+    sections: {
+      account: 'Account',
+      profile: 'Profile',
+      appearance: 'Appearance',
+      notifications: 'Notifications',
+      security: 'Security',
+      connections: 'Connected apps',
+      storage: 'Storage and sync',
+      billing: 'Plans and billing',
+      developer: 'Developer',
+    },
+    intro: {
+      account: 'Who you are signed in as, and how you leave.',
+      profile: 'How you appear to the people you share with.',
+      appearance: 'Theme, contrast, density, size, motion and language.',
+      notifications: 'Which events reach you, and where.',
+      security: 'Sessions, devices and what protects the vault.',
+      connections: 'The services Lattice talks to, and what each one gets.',
+      storage: 'Where your work lives and whether it is leaving this browser.',
+      billing: 'What this build costs you.',
+      developer: 'Build information and keyboard shortcuts.',
+    },
+    appearance: {
+      system: 'System',
+      themeHint: 'System follows your operating system and keeps following it.',
+      contrast: 'High contrast',
+      contrastHint:
+        'Stronger borders, brighter secondary text and a thicker focus ring. The colours stay the same — only the distance between them changes.',
+      contrastNormal: 'Normal',
+      contrastHigh: 'High',
+      density: 'Interface density',
+      densityHint:
+        'Compact tightens the controls that repeat down every panel. Tap targets keep their 24 px floor either way.',
+      densityComfortable: 'Comfortable',
+      densityCompact: 'Compact',
+      size: 'UI size',
+      sizeHint:
+        'Scales the interface — panels, toolbars, dialogs. The board keeps its own zoom, so cards stay where you put them.',
+      sizeSmall: 'Small',
+      sizeDefault: 'Default',
+      sizeLarge: 'Large',
+      motion: 'Motion',
+      motionHint:
+        'System already honours “reduce motion” in your operating system. Choose Reduce to calm the app without changing anything outside it.',
+      motionReduce: 'Reduce',
+    },
+    account: {
+      emailLabel: 'Primary e-mail',
+      emailFromGoogle: 'It comes from your Google account and changes there, not here.',
+      emailLocal:
+        'A placeholder for the local account. Nothing is ever sent to it — there is no mail in this build.',
+      methods: 'Sign-in methods',
+      methodGoogle: 'Google',
+      methodGithub: 'GitHub',
+      methodLocal: 'Local account',
+      idLabel: 'Account ID',
+      idHint: 'Quote this in a bug report.',
+      created: 'Created',
+    },
+    profile: {
+      avatar: 'Avatar',
+      avatarHint:
+        'Shown on cards, comments and presence. Downscaled and kept on this device with the rest of the vault — there is nowhere else to put it.',
+      upload: 'Upload a picture',
+      remove: 'Remove',
+      displayName: 'Display name',
+      displayNameHint: 'What people see on cards, comments and invitations.',
+      providerSays: (name: string) => `Google says “${name}”.`,
+      reset: 'Use that instead',
+      saved: 'Profile updated',
+      usage: 'How you use Lattice',
+      usageHint:
+        'Kept with your account so the answer exists before anything needs it. Nothing reads it yet, and it never leaves this device.',
+      usagePersonal: 'Personal',
+      usageWork: 'Work',
+      usageEducation: 'Study',
+      languageAt: 'The interface language is a display preference, so it lives in Appearance.',
+      goAppearance: 'Open Appearance',
+      avatarError: {
+        'not-an-image': 'That file is not an image.',
+        'too-large': 'That image is too large — pick one under 8 MB.',
+        undecodable: 'That image could not be read.',
+      },
+    },
+    connections: {
+      factsTitle: 'Identity, storage and sync',
+      factsBody:
+        'Three answers, not one. Being signed in with Google says who you are; a connected folder says where files may go; a running sync says whether they are going there now.',
+      identity: 'Identity',
+      identityGoogle: (email: string) => `Signed in with Google as ${email}`,
+      identityLocal: 'A local account — it exists in this browser only',
+      identityNone: 'Not signed in. Everything still works, and stays here.',
+      storage: 'Storage',
+      storageDrive: (folder: string) => `Your Drive, in the ${folder} folder`,
+      storageLocal: 'This browser only. Nothing has been uploaded.',
+      sync: 'Sync',
+      syncOff: 'Not running — there is nowhere to sync to yet',
+      on: 'On',
+      offLabel: 'Off',
+      servicesTitle: 'Services',
+      connect: 'Connect',
+      disconnect: 'Disconnect',
+      states: {
+        connected: 'Connected',
+        available: 'Not connected',
+        unconfigured: 'Not in this build',
+        blocked: 'Needs a Google sign-in',
+      },
+      services: {
+        drive: 'Google Drive',
+        github: 'GitHub',
+        realtime: 'Realtime backend',
+        livekit: 'LiveKit calls',
+        conversion: 'Conversion worker',
+      },
+      gets: {
+        drive:
+          'The files of projects you sync, in a folder you can see. The scope is drive.file, so Lattice can only read what it created — never the rest of your Drive.',
+        github:
+          'Code documents only, committed to a feature branch you name. Notes, boards and everything else never leave for GitHub.',
+        realtime:
+          'Board operations, document and code edits, presence and cursors, relayed while a project is open. Your role is re-checked on the server for every one of them.',
+        livekit:
+          'Audio, camera and screen while a call is running. The media goes to LiveKit, never into the vault.',
+        conversion:
+          'Only the file you ask it to convert, for as long as the conversion takes.',
+      },
+      configuredBy: (variable: string) =>
+        `Decided when this build was made (${variable}), so there is nothing to switch here.`,
+      blocked:
+        'Configured, but it authorises against a Google account and there is none signed in.',
+    },
+    security: {
+      sessionTitle: 'This session',
+      sessionBody:
+        'One session, in this browser. Signing out removes the account from this device; the vault stays where it is.',
+      signedInGoogle: (email: string) => `Signed in with Google as ${email}`,
+      signedInLocal: 'A local account, created in this browser',
+      signedOut: 'Not signed in',
+      revokeTitle: 'Revoke Drive access',
+      revokeBody:
+        'Drops the Google token and asks Google to revoke it. Lattice loses access to the folder immediately; the files that are already there stay in your Drive, and the local vault is untouched.',
+      revoke: 'Revoke access',
+      revokeUnavailable: 'There is no Drive token to revoke.',
+      protectionTitle: 'What protects your work',
+      protectionVault:
+        'The vault lives in this browser profile. Lattice adds no encryption of its own, so anyone who can open this browser can open the vault — encryption at rest is designed and not built.',
+      protectionDrive:
+        'Files mirrored to Drive are protected by your Google account, with whatever second factor it already enforces.',
+      protectionServer:
+        'When realtime is configured, the server verifies your Google token and mints the role itself: the browser’s claim about who it is is never trusted.',
+    },
+    notifications: {
+      intro:
+        'Notifications are worked out on this device from what your projects already say, so what you switch off here is never raised in the first place.',
+      event: 'Event',
+      inApp: 'In app',
+      email: 'E-mail',
+      events: {
+        mentions: 'Mentions',
+        replies: 'Replies',
+        assignments: 'Assignments',
+        resolved: 'Resolved comments',
+        invites: 'Invitations',
+        sync: 'Sync failures',
+        jobs: 'Background jobs',
+        versions: 'Version restores',
+      },
+      eventHints: {
+        mentions: 'Someone writes your name in a comment.',
+        replies: 'A reply on a thread you started or joined.',
+        assignments: 'A comment is assigned to you.',
+        resolved: 'Your comment is resolved or reopened.',
+        invites: 'You are invited to a project.',
+        sync: 'Google Drive or the realtime connection stops working.',
+        jobs: 'GitHub sync and file conversion report back.',
+        versions: 'A version is restored over current work.',
+      },
+      emailDisabled:
+        'E-mail has nowhere to go yet: there is no mail backend in this build, and no verified address to send to. Phase 18 builds both, and these switches are what it will read.',
+      noProducer:
+        'Three events the design asked for are not listed, because nothing raises them yet: due dates (nothing watches a comment’s due date), role changes (a role changes without announcing itself) and administrative activity (the activity log is a log, not a notification). A switch for them would control nothing.',
+    },
+    pending: {
+      profileSignedOut:
+        'A profile needs an account. Sign in from the Account section, or keep working without one — nothing here is required.',
+      security:
+        'Active sessions, devices and revocation are listed here once phases 16 and 17 give them something real to list.',
+      billing:
+        'Plans and billing arrive with phase 22. Nothing in this build is metered or charged.',
+      accountMore:
+        'A second e-mail address cannot be linked, and the account cannot be deleted, until identity stops being whatever the provider says it is — phase 16. Signing out already removes it from this browser.',
+      connectionsMore:
+        'The realtime provider, LiveKit and the conversion backend join this list in 14.5.',
+    },
+    theme: 'Theme',
+    themeDark: 'Dark',
+    themeLight: 'Light',
+    build: 'Build',
+    shortcutsOpen: 'Open the shortcuts overview',
+    notSignedIn: 'Not signed in',
+    notSignedInBody:
+      'Lattice works without an account — everything stays in this browser. Signing in with Google adds Drive sync and lets invitations be delivered.',
+  },
+
+  /**
    * Notes and documents are both text, so the product has to say out loud
    * which one is for what — otherwise the user picks by coin toss and the
    * two drift into the same thing.
@@ -1038,6 +1253,216 @@ export const it: Catalog = {
     emptyTitle: 'Ancora nessun progetto in questo workspace',
     emptyBody: 'Un progetto contiene le sue board, note, documenti e file.',
   },
+  settings: {
+    title: 'Impostazioni',
+    open: 'Impostazioni',
+    close: 'Chiudi le impostazioni',
+    navLabel: 'Sezioni delle impostazioni',
+    sections: {
+      account: 'Account',
+      profile: 'Profilo',
+      appearance: 'Aspetto',
+      notifications: 'Notifiche',
+      security: 'Sicurezza',
+      connections: 'App collegate',
+      storage: 'Archiviazione e sync',
+      billing: 'Piani e fatturazione',
+      developer: 'Sviluppo',
+    },
+    intro: {
+      account: 'Con quale identità hai fatto accesso, e come esci.',
+      profile: 'Come appari alle persone con cui condividi.',
+      appearance: 'Tema, contrasto, densità, dimensione, movimento e lingua.',
+      notifications: 'Quali eventi ti raggiungono, e dove.',
+      security: 'Sessioni, dispositivi e cosa protegge il vault.',
+      connections: 'I servizi con cui Lattice parla, e cosa riceve ciascuno.',
+      storage: 'Dove vive il tuo lavoro e se sta uscendo da questo browser.',
+      billing: 'Quanto ti costa questa build.',
+      developer: 'Informazioni di build e scorciatoie da tastiera.',
+    },
+    appearance: {
+      system: 'Sistema',
+      themeHint: 'Sistema segue il tuo sistema operativo, e continua a seguirlo.',
+      contrast: 'Contrasto elevato',
+      contrastHint:
+        'Bordi più netti, testo secondario più chiaro e anello di focus più spesso. I colori restano gli stessi: cambia solo la distanza tra loro.',
+      contrastNormal: 'Normale',
+      contrastHigh: 'Elevato',
+      density: 'Densità dell’interfaccia',
+      densityHint:
+        'Compatta stringe i controlli che si ripetono in ogni pannello. In entrambi i casi i target restano sopra i 24 px.',
+      densityComfortable: 'Comoda',
+      densityCompact: 'Compatta',
+      size: 'Dimensione UI',
+      sizeHint:
+        'Scala l’interfaccia — pannelli, toolbar, finestre. La board mantiene il proprio zoom, così le card restano dove le hai messe.',
+      sizeSmall: 'Piccola',
+      sizeDefault: 'Predefinita',
+      sizeLarge: 'Grande',
+      motion: 'Movimento',
+      motionHint:
+        'Sistema rispetta già il “riduci movimento” del sistema operativo. Scegli Riduci per calmare l’app senza cambiare nulla fuori.',
+      motionReduce: 'Riduci',
+    },
+    account: {
+      emailLabel: 'E-mail principale',
+      emailFromGoogle: 'Arriva dal tuo account Google e si cambia lì, non qui.',
+      emailLocal:
+        'Un segnaposto per l’account locale. Non ci viene mai inviato nulla — in questa build non esiste posta.',
+      methods: 'Metodi di accesso',
+      methodGoogle: 'Google',
+      methodGithub: 'GitHub',
+      methodLocal: 'Account locale',
+      idLabel: 'ID account',
+      idHint: 'Citalo in una segnalazione di bug.',
+      created: 'Creato',
+    },
+    profile: {
+      avatar: 'Avatar',
+      avatarHint:
+        'Compare su card, commenti e presenza. Viene ridimensionato e resta su questo dispositivo insieme al vault — non c’è altro posto dove metterlo.',
+      upload: 'Carica un’immagine',
+      remove: 'Rimuovi',
+      displayName: 'Nome visualizzato',
+      displayNameHint: 'Quello che le persone vedono su card, commenti e inviti.',
+      providerSays: (name) => `Google dice “${name}”.`,
+      reset: 'Usa quello',
+      saved: 'Profilo aggiornato',
+      usage: 'Come usi Lattice',
+      usageHint:
+        'Resta con il tuo account, così la risposta esiste prima che serva a qualcosa. Per ora nessuno la legge, e non esce da questo dispositivo.',
+      usagePersonal: 'Personale',
+      usageWork: 'Lavoro',
+      usageEducation: 'Studio',
+      languageAt: 'La lingua dell’interfaccia è una preferenza di visualizzazione: vive in Aspetto.',
+      goAppearance: 'Apri Aspetto',
+      avatarError: {
+        'not-an-image': 'Quel file non è un’immagine.',
+        'too-large': 'Immagine troppo grande — scegline una sotto gli 8 MB.',
+        undecodable: 'Non è stato possibile leggere quell’immagine.',
+      },
+    },
+    connections: {
+      factsTitle: 'Identità, archiviazione e sincronizzazione',
+      factsBody:
+        'Tre risposte, non una. Aver fatto accesso con Google dice chi sei; una cartella collegata dice dove possono andare i file; una sincronizzazione attiva dice se ci stanno andando adesso.',
+      identity: 'Identità',
+      identityGoogle: (email) => `Accesso con Google come ${email}`,
+      identityLocal: 'Un account locale — esiste solo in questo browser',
+      identityNone: 'Nessun accesso. Tutto funziona lo stesso, e resta qui.',
+      storage: 'Archiviazione',
+      storageDrive: (folder) => `Il tuo Drive, nella cartella ${folder}`,
+      storageLocal: 'Solo questo browser. Non è stato caricato niente.',
+      sync: 'Sincronizzazione',
+      syncOff: 'Non attiva — non c’è ancora dove sincronizzare',
+      on: 'Attiva',
+      offLabel: 'Non attiva',
+      servicesTitle: 'Servizi',
+      connect: 'Collega',
+      disconnect: 'Scollega',
+      states: {
+        connected: 'Collegato',
+        available: 'Non collegato',
+        unconfigured: 'Non in questa build',
+        blocked: 'Richiede l’accesso Google',
+      },
+      services: {
+        drive: 'Google Drive',
+        github: 'GitHub',
+        realtime: 'Backend realtime',
+        livekit: 'Chiamate LiveKit',
+        conversion: 'Worker di conversione',
+      },
+      gets: {
+        drive:
+          'I file dei progetti che sincronizzi, in una cartella che puoi vedere. Lo scope è drive.file: Lattice legge solo ciò che ha creato, mai il resto del tuo Drive.',
+        github:
+          'Solo i documenti di codice, su un branch di lavoro che scegli tu. Note, board e tutto il resto non partono mai verso GitHub.',
+        realtime:
+          'Operazioni su board, modifiche a documenti e codice, presenza e cursori, mentre un progetto è aperto. Il tuo ruolo viene ricontrollato dal server a ogni operazione.',
+        livekit:
+          'Audio, videocamera e schermo mentre una chiamata è in corso. I flussi vanno a LiveKit, mai dentro il vault.',
+        conversion:
+          'Solo il file che chiedi di convertire, per il tempo della conversione.',
+      },
+      configuredBy: (variable) =>
+        `Deciso quando è stata compilata questa build (${variable}): qui non c’è niente da attivare.`,
+      blocked:
+        'Configurato, ma autorizza tramite un account Google e non ce n’è uno collegato.',
+    },
+    security: {
+      sessionTitle: 'Questa sessione',
+      sessionBody:
+        'Una sessione, in questo browser. Uscire rimuove l’account da questo dispositivo; il vault resta dov’è.',
+      signedInGoogle: (email) => `Accesso con Google come ${email}`,
+      signedInLocal: 'Un account locale, creato in questo browser',
+      signedOut: 'Nessun accesso',
+      revokeTitle: 'Revoca l’accesso a Drive',
+      revokeBody:
+        'Elimina il token Google e ne chiede la revoca a Google. Lattice perde subito l’accesso alla cartella; i file già lì restano nel tuo Drive, e il vault locale non viene toccato.',
+      revoke: 'Revoca l’accesso',
+      revokeUnavailable: 'Non c’è nessun token Drive da revocare.',
+      protectionTitle: 'Cosa protegge il tuo lavoro',
+      protectionVault:
+        'Il vault vive in questo profilo del browser. Lattice non aggiunge cifratura propria: chi può aprire questo browser può aprire il vault — la cifratura a riposo è progettata, non realizzata.',
+      protectionDrive:
+        'I file replicati su Drive sono protetti dal tuo account Google, con il secondo fattore che già impone.',
+      protectionServer:
+        'Quando il realtime è configurato, è il server a verificare il tuo token Google e a emettere il ruolo: quello che il browser dichiara di essere non viene mai creduto.',
+    },
+    notifications: {
+      intro:
+        'Le notifiche vengono ricavate su questo dispositivo da ciò che i tuoi progetti già dicono: quello che spegni qui non viene proprio sollevato.',
+      event: 'Evento',
+      inApp: 'In app',
+      email: 'E-mail',
+      events: {
+        mentions: 'Menzioni',
+        replies: 'Risposte',
+        assignments: 'Assegnazioni',
+        resolved: 'Commenti risolti',
+        invites: 'Inviti',
+        sync: 'Errori di sincronizzazione',
+        jobs: 'Lavori in background',
+        versions: 'Ripristini di versione',
+      },
+      eventHints: {
+        mentions: 'Qualcuno scrive il tuo nome in un commento.',
+        replies: 'Una risposta in un thread che hai aperto o a cui partecipi.',
+        assignments: 'Un commento viene assegnato a te.',
+        resolved: 'Un tuo commento viene risolto o riaperto.',
+        invites: 'Vieni invitato a un progetto.',
+        sync: 'Google Drive o la connessione realtime smettono di funzionare.',
+        jobs: 'Sincronizzazione GitHub e conversione file riferiscono l’esito.',
+        versions: 'Una versione viene ripristinata sopra il lavoro corrente.',
+      },
+      emailDisabled:
+        'L’e-mail non ha ancora dove andare: in questa build non c’è un backend di posta, né un indirizzo verificato a cui scrivere. La fase 18 costruisce entrambi, e leggerà proprio questi interruttori.',
+      noProducer:
+        'Tre eventi previsti dal design non compaiono, perché per ora nessuno li solleva: le scadenze (nessuno sorveglia la data di scadenza di un commento), i cambi di ruolo (un ruolo cambia senza annunciarsi) e l’attività amministrativa (il registro attività è un registro, non una notifica). Un interruttore per loro non controllerebbe niente.',
+    },
+    pending: {
+      profileSignedOut:
+        'Un profilo ha bisogno di un account. Accedi dalla sezione Account, oppure continua senza — qui non è obbligatorio nulla.',
+      security:
+        'Sessioni attive, dispositivi e revoca compaiono qui quando le fasi 16 e 17 daranno loro qualcosa di reale da elencare.',
+      billing:
+        'Piani e fatturazione arrivano con la fase 22. In questa build nulla è misurato o addebitato.',
+      accountMore:
+        'Non si può collegare una seconda e-mail, né eliminare l’account, finché l’identità resta quella che dice il provider — fase 16. Uscire lo toglie già da questo browser.',
+      connectionsMore:
+        'Il provider realtime, LiveKit e il backend di conversione entrano in questa lista nella 14.5.',
+    },
+    theme: 'Tema',
+    themeDark: 'Scuro',
+    themeLight: 'Chiaro',
+    build: 'Build',
+    shortcutsOpen: 'Apri il riepilogo delle scorciatoie',
+    notSignedIn: 'Accesso non effettuato',
+    notSignedInBody:
+      'Lattice funziona senza account — tutto resta in questo browser. L’accesso con Google aggiunge la sincronizzazione con Drive e permette di recapitare gli inviti.',
+  },
+
   textEntities: {
     notePurpose: 'Cattura rapida — markdown, link, nessuna formattazione da gestire.',
     documentPurpose: 'Scrittura formattata e strutturata, da finire e consegnare.',

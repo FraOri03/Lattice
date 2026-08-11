@@ -27,10 +27,12 @@ import { AuthHandoff, useAuthHandoff } from '@/components/account/AuthHandoff'
 import { GithubDialog } from '@/components/github/GithubDialog'
 import { DriveDialog } from '@/components/account/DriveDialog'
 import { CommandPalette } from '@/components/CommandPalette'
+import { SettingsScreen } from '@/components/settings/SettingsScreen'
 import { Toaster, toast } from '@/components/ui/Toaster'
 import { LiveRegion } from '@/components/a11y/LiveRegion'
 import { useUrlHistory } from '@/lib/nav/useUrlHistory'
 import { useTierAttribute } from '@/lib/layout/useTierAttribute'
+import { useAppearance } from '@/lib/theme/useAppearance'
 import { splitAvailable } from '@/lib/layout/tiers'
 import { useViewportTier } from '@/lib/layout/useViewportTier'
 import { DialogHost, confirmDialog } from '@/components/ui/ConfirmDialog'
@@ -335,7 +337,6 @@ function ProjectSurface() {
  * project is what leaves the dashboard again.
  */
 function AppShell() {
-  const theme = useStore((s) => s.theme)
   const surface = useStore((s) => s.navSurface)
 
   useCollaboration()
@@ -345,14 +346,16 @@ function AppShell() {
   // is mounted here for the same reason as the history binding: one writer,
   // above the surface switch, so it survives the trip to the dashboard.
   useTierAttribute()
-
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme
-  }, [theme])
+  // theme, contrast, density, UI scale and motion, published on :root by the
+  // one writer that owns them (14.3) — including the live 'system' theme
+  useAppearance()
 
   return (
     <>
       {surface === 'dashboard' ? <Dashboard /> : <ProjectSurface />}
+      {/* settings covers the surface it was opened from, so it mounts beside
+          the switch rather than inside either branch (14.1) */}
+      <SettingsScreen />
       <GithubDialog />
       <DriveDialog />
       <CommandPalette />

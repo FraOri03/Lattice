@@ -12,6 +12,13 @@ import type {
   VersionEntry,
 } from '@/types/collab'
 import { LOCK_TTL_MS } from '@/types/collab'
+import {
+  DEFAULT_NOTIFICATION_PREFS,
+  withPref,
+  type NotificationChannel,
+  type NotificationEvent,
+  type NotificationPrefs,
+} from './notificationPrefs'
 
 /**
  * Collaboration store (Phase 7).
@@ -36,6 +43,11 @@ interface CollabState {
 
   /* persisted, per device (never synced — read state is personal) */
   notifications: AppNotification[]
+  /**
+   * Which events may reach you, and on which channel (14.4). Personal like
+   * read state, so it stays beside it rather than travelling with the project.
+   */
+  notificationPrefs: NotificationPrefs
 
   /* ephemeral */
   peers: Record<string, PresencePeer> // sessionId → peer
@@ -50,6 +62,11 @@ interface CollabState {
   commentMode: boolean
 
   pushNotification: (n: AppNotification) => void
+  setNotificationPref: (
+    channel: NotificationChannel,
+    event: NotificationEvent,
+    on: boolean,
+  ) => void
   markNotificationRead: (id: string) => void
   markAllNotificationsRead: () => void
   clearNotifications: () => void
@@ -82,6 +99,7 @@ export const useCollabStore = create<CollabState>()(
       activity: {},
       versions: {},
       notifications: [],
+      notificationPrefs: DEFAULT_NOTIFICATION_PREFS,
 
       peers: {},
       locks: {},
@@ -93,6 +111,10 @@ export const useCollabStore = create<CollabState>()(
 
       pushNotification: (n) =>
         set((s) => ({ notifications: [n, ...s.notifications].slice(0, 100) })),
+      setNotificationPref: (channel, event, on) =>
+        set((s) => ({
+          notificationPrefs: withPref(s.notificationPrefs, channel, event, on),
+        })),
       markNotificationRead: (id) =>
         set((s) => ({
           notifications: s.notifications.map((n) =>
@@ -158,6 +180,9 @@ export const useCollabStore = create<CollabState>()(
         activity: s.activity,
         versions: s.versions,
         notifications: s.notifications,
+        // a whitelist: a preference not listed here is a preference that
+        // silently resets on every reload
+        notificationPrefs: s.notificationPrefs,
       }),
     },
   ),

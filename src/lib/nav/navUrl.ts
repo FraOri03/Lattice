@@ -1,4 +1,5 @@
 import type { ViewMode } from '@/types/model'
+import { isSettingsSection, type SettingsSection } from '@/lib/settings/sections'
 
 /**
  * navUrl — the small centralized abstraction for serializing, validating and
@@ -8,6 +9,11 @@ import type { ViewMode } from '@/types/model'
  *
  *   dashboard — no project is open; the URL carries no nav params
  *   project   — a project is open: project · mode · board · one entity
+ *
+ * Settings (Phase 14.1) is neither: it is a screen that opens OVER whichever
+ * surface you were on, so it rides alongside as `s=<section>` instead of
+ * becoming a third surface. That is what lets closing it put you back exactly
+ * where you were — the rest of the URL never went anywhere.
  *
  * Navigable identity inside a project is deliberately coarse: transient things
  * (card selection, drag positions, scroll, panel toggles) are NOT part of it,
@@ -36,11 +42,13 @@ export interface NavState {
 
 /**
  * The validated answer to "where are we?": either the dashboard (no project
- * open) or a project with its full navigable identity.
+ * open) or a project with its full navigable identity — plus, on either one,
+ * the settings section showing over it.
  */
-export type ResolvedNavigation =
+export type ResolvedNavigation = { settings?: SettingsSection } & (
   | { surface: 'dashboard' }
   | ({ surface: 'project' } & NavState)
+)
 
 /** The dashboard surface — a shared constant so identity checks stay cheap. */
 export const DASHBOARD_NAV: ResolvedNavigation = { surface: 'dashboard' }
@@ -94,6 +102,7 @@ export interface RawNav {
   boardId?: string
   entityKind?: string
   entityId?: string
+  settings?: string
 }
 
 /** Parse a URL search string ("?p=…&m=…") into raw parts. */
@@ -116,6 +125,8 @@ export function parseNav(search: string): RawNav {
       raw.entityId = e.slice(sep + 1)
     }
   }
+  const s = q.get('s')
+  if (s) raw.settings = s
   return raw
 }
 
@@ -124,27 +135,37 @@ export function parseNav(search: string): RawNav {
  * param-less root URL, so it serializes to "".
  */
 export function serializeNav(nav: ResolvedNavigation | null): string {
-  if (!nav || nav.surface === 'dashboard' || !nav.projectId) return ''
+  if (!nav) return ''
   const q = new URLSearchParams()
-  q.set('p', nav.projectId)
-  // split is a layout, serialized as the legacy `m=split` token so pre-refactor
-  // links keep resolving; otherwise the section is the mode
-  q.set('m', nav.split ? SPLIT_TOKEN : nav.mode)
-  if (nav.boardId) q.set('b', nav.boardId)
-  if (nav.entity) q.set('e', `${nav.entity.kind}.${nav.entity.id}`)
-  return `?${q.toString()}`
+  if (nav.surface === 'project' && nav.projectId) {
+    q.set('p', nav.projectId)
+    // split is a layout, serialized as the legacy `m=split` token so
+    // pre-refactor links keep resolving; otherwise the section is the mode
+    q.set('m', nav.split ? SPLIT_TOKEN : nav.mode)
+    if (nav.boardId) q.set('b', nav.boardId)
+    if (nav.entity) q.set('e', `${nav.entity.kind}.${nav.entity.id}`)
+  }
+  // settings rides over either surface, so it survives a dashboard URL that is
+  // otherwise empty — `?s=appearance` is a real, shareable address
+  if (nav.settings) q.set('s', nav.settings)
+  const query = q.toString()
+  return query ? `?${query}` : ''
 }
 
 /** Canonical identity string for dedup — two states are the "same place"
  *  iff their keys match (used to avoid pushing duplicate history entries). */
 export function navKey(nav: ResolvedNavigation | null): string {
   if (!nav) return ''
-  if (nav.surface === 'dashboard') return 'dashboard'
+  // opening and closing settings are navigation — Back has to undo them — so
+  // the section is part of the identity on both surfaces
+  const settings = nav.settings ? `settings:${nav.settings}` : ''
+  if (nav.surface === 'dashboard') return settings ? `dashboard|${settings}` : 'dashboard'
   return [
     nav.projectId,
     nav.split ? SPLIT_TOKEN : nav.mode,
     nav.boardId ?? '',
     nav.entity ? `${nav.entity.kind}:${nav.entity.id}` : '',
+    settings,
   ].join('|')
 }
 
@@ -168,9 +189,16 @@ export interface NavSnapshot {
  *   bad mode                           → `board`
  *   board outside the project          → that project's first board
  *   missing entity                     → dropped (its mode still opens, empty)
+ *   unknown settings section           → dropped (settings simply stays shut)
  */
 export function resolveNav(raw: RawNav, snap: NavSnapshot): ResolvedNavigation {
-  if (!raw.projectId || !snap.hasProject(raw.projectId)) return DASHBOARD_NAV
+  // settings is validated on its own: it rides over whichever surface the rest
+  // of the params resolve to, and an unknown section is simply dropped rather
+  // than opening the screen somewhere arbitrary
+  const settings = isSettingsSection(raw.settings) ? raw.settings : undefined
+  if (!raw.projectId || !snap.hasProject(raw.projectId)) {
+    return settings ? { surface: 'dashboard', settings } : DASHBOARD_NAV
+  }
   const projectId = raw.projectId
   const boardId =
     raw.boardId && snap.boardBelongsTo(raw.boardId, projectId)
@@ -201,5 +229,6 @@ export function resolveNav(raw: RawNav, snap: NavSnapshot): ResolvedNavigation {
     split: split || undefined,
     boardId,
     entity,
+    settings,
   }
 }

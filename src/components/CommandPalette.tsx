@@ -22,6 +22,7 @@ import {
   IcMoon,
   IcPlus,
   IcSearch,
+  IcSettings,
   IcSplit,
   IcSun,
   IcUserPlus,
@@ -208,6 +209,9 @@ function usePaletteItems(query: string, close: () => void): PaletteItem[] {
       ['Activity log', <IcActivity size={14} />, () => setPanel('activity')],
       ['Version history', <IcHistory size={14} />, () => setPanel('versions')],
       ['Keyboard shortcuts', <IcKeyboard size={14} />, () => setShortcutsOpen(true), 'Ctrl /'],
+      // one entry, not nine: the palette lists every action while the query is
+      // empty, and the sections are one click away once the screen is open
+      ['Settings', <IcSettings size={14} />, () => s.openSettings()],
     ]
     if (syncProvider === 'google-drive') {
       actions.push(['Sync now (Google Drive)', <IcCloud size={14} />, () => void syncEngine.syncNow()])

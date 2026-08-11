@@ -8,7 +8,8 @@ import {
   type ReactNode,
 } from 'react'
 import type { Account } from '@/types/model'
-import { authService } from './AuthService'
+import { authService, updateStoredAccount } from './AuthService'
+import type { ProfilePatch } from './profile'
 import { hasGoogleAuth } from '@/lib/env'
 import { syncEngine } from '@/lib/sync/SyncEngine'
 
@@ -30,6 +31,12 @@ export interface AccountContextValue {
   signIn: () => Promise<void>
   signOut: () => Promise<void>
   skipLogin: () => void
+  /**
+   * Edit the profile (14.2). Writes the stored account, so the new name and
+   * avatar reach presence, comments and invitations through the same record
+   * `currentIdentity()` already reads.
+   */
+  updateProfile: (patch: ProfilePatch) => void
 }
 
 const AccountContext = createContext<AccountContextValue | null>(null)
@@ -84,6 +91,11 @@ export function AccountProvider({ children }: { children: ReactNode }) {
     setLoginSkipped(true)
   }, [])
 
+  const updateProfile = useCallback((patch: ProfilePatch) => {
+    const next = updateStoredAccount(patch)
+    if (next) setAccount(next)
+  }, [])
+
   const value = useMemo<AccountContextValue>(
     () => ({
       account,
@@ -94,8 +106,9 @@ export function AccountProvider({ children }: { children: ReactNode }) {
       signIn,
       signOut,
       skipLogin,
+      updateProfile,
     }),
-    [account, status, loginSkipped, error, signIn, signOut, skipLogin],
+    [account, status, loginSkipped, error, signIn, signOut, skipLogin, updateProfile],
   )
 
   return <AccountContext.Provider value={value}>{children}</AccountContext.Provider>

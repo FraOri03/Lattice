@@ -22,6 +22,7 @@ import {
   IcPlus,
   IcPresentation,
   IcSearch,
+  IcSettings,
   IcStar,
   IcTable,
 } from '@/components/Icons'
@@ -50,8 +51,11 @@ const RECENT_ICON = {
  * resolve them against yet.
  */
 export function Dashboard() {
-  const t = useI18n().dashboard
+  const messages = useI18n()
+  const t = messages.dashboard
+  const settingsLabel = messages.settings.open
   const timeAgo = useTimeAgo()
+  const openSettings = useStore((s) => s.openSettings)
   const projects = useStore((s) => s.projects)
   const workspaces = useStore((s) => s.workspaces)
   const activeWorkspaceId = useStore((s) => s.activeWorkspaceId)
@@ -261,6 +265,16 @@ export function Dashboard() {
           <div className="flex-1" />
           <button className="btn" onClick={() => setPaletteOpen(true)} title={t.searchHint}>
             <IcSearch size={12} /> {t.search}
+          </button>
+          {/* Home mounts no top bar, so without this the settings screen would
+              be reachable from inside a project only (14.1) */}
+          <button
+            className="icon-btn"
+            onClick={() => openSettings()}
+            title={settingsLabel}
+            aria-label={settingsLabel}
+          >
+            <IcSettings size={14} />
           </button>
           <button
             className="btn"

@@ -82,6 +82,8 @@ import {
 import type { GraphViewSettings } from '@/lib/graph/graphTypes'
 import { decodeGraphSettings } from '@/lib/graph/GraphSettingsService'
 import { ENTITY_MODE, type NavSurface, type ResolvedNavigation } from '@/lib/nav/navUrl'
+import { DEFAULT_SETTINGS_SECTION, type SettingsSection } from '@/lib/settings/sections'
+import { DEFAULT_APPEARANCE, type Appearance } from '@/lib/theme/appearance'
 import { useWorkspaceLayoutStore } from './workspaceLayoutStore'
 import {
   DEFAULT_PROJECT_ID,
@@ -254,7 +256,21 @@ interface AppState {
    * returns to that project while the bare root URL lands on the dashboard.
    */
   navSurface: NavSurface
+  /**
+   * The settings section showing over the current surface, or null when the
+   * screen is shut (Phase 14.1). Like `navSurface` the URL owns it — `s=…`
+   * rides alongside the surface params, so a deep link opens the exact panel
+   * and closing settings leaves the surface underneath untouched.
+   */
+  settingsSection: SettingsSection | null
+  /**
+   * The RESOLVED theme — what the document wears and what every consumer
+   * reads. `appearance.theme` is what the user asked for, and when that is
+   * 'system' this field follows the OS live (14.3).
+   */
   theme: Theme
+  /** Appearance preferences (14.3): theme, contrast, density, size, motion. */
+  appearance: Appearance
   locale: Locale
   search: string
   tagFilter: string | null
@@ -271,6 +287,8 @@ interface AppState {
   setSidebarFilter: (f: SidebarFilter) => void
   setViewMode: (m: ViewMode) => void
   setTheme: (t: Theme) => void
+  /** Change one appearance preference; the resolved theme follows. */
+  setAppearance: (patch: Partial<Appearance>) => void
   setLocale: (l: Locale) => void
   /** Merge + clamp a project's graph settings (creates defaults on first use). */
   setGraphSettings: (projectId: string, patch: Partial<GraphViewSettings>) => void
@@ -314,6 +332,10 @@ interface AppState {
   applyNav: (nav: ResolvedNavigation) => void
   /** Leave the project surface for the dashboard (Home). */
   openDashboard: () => void
+  /** Show the settings screen over the current surface. */
+  openSettings: (section?: SettingsSection) => void
+  /** Close settings; the surface underneath was never left. */
+  closeSettings: () => void
 
   setActiveBoard: (id: string) => void
   addBoard: () => void
@@ -573,7 +595,9 @@ export const useStore = create<AppState>()(
       recents: [],
       viewMode: 'board',
       navSurface: 'project',
+      settingsSection: null,
       theme: 'dark',
+      appearance: DEFAULT_APPEARANCE,
       locale: detectLocale(),
       search: '',
       tagFilter: null,
@@ -594,7 +618,15 @@ export const useStore = create<AppState>()(
         // choosing a section is entering the project: it leaves the dashboard
         set({ viewMode, navSurface: 'project' })
       },
-      setTheme: (theme) => set({ theme }),
+      // setTheme writes the RESOLVED theme. A direct light/dark choice is also
+      // a preference, so it is recorded as one — otherwise the next reload
+      // would resolve 'system' again and undo the click.
+      setTheme: (theme) =>
+        set((s) => ({
+          theme,
+          appearance: s.appearance.theme === 'system' ? s.appearance : { ...s.appearance, theme },
+        })),
+      setAppearance: (patch) => set((s) => ({ appearance: { ...s.appearance, ...patch } })),
       setLocale: (locale) => set({ locale }),
 
       createFolder: (category, name = 'New folder') => {
@@ -986,7 +1018,14 @@ export const useStore = create<AppState>()(
 
       openDashboard: () => set({ navSurface: 'dashboard' }),
 
+      openSettings: (section = DEFAULT_SETTINGS_SECTION) =>
+        set({ settingsSection: section }),
+      closeSettings: () => set({ settingsSection: null }),
+
       applyNav: (nav) => {
+        // settings rides over either surface, so it is applied before the
+        // branch — including when an unknown project makes the rest a no-op
+        set({ settingsSection: nav.settings ?? null })
         if (nav.surface === 'dashboard') {
           // Home: the shell leaves the project surface, but the active project
           // and its open entity survive so going back in costs nothing.
@@ -2141,6 +2180,10 @@ export const useStore = create<AppState>()(
         tabSessions: s.tabSessions,
         viewMode: s.viewMode,
         theme: s.theme,
+        // the resolved theme is stored so the first paint after a reload is
+        // not a flash of the wrong one; `appearance` is what it was resolved
+        // FROM, and is the thing the user actually chose
+        appearance: s.appearance,
         locale: s.locale,
         graphSettings: s.graphSettings,
         folders: s.folders,

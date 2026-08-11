@@ -1,6 +1,7 @@
 import { env, hasGoogleAuth } from '@/lib/env'
 import { nid } from '@/lib/id'
 import type { Account } from '@/types/model'
+import { applyProfilePatch, mergeProviderProfile, type ProfilePatch } from './profile'
 
 /**
  * AuthService — personal account sign-in.
@@ -141,6 +142,21 @@ function loadAccount(): Account | null {
 function saveAccount(account: Account | null) {
   if (account) localStorage.setItem(ACCOUNT_KEY, JSON.stringify(account))
   else localStorage.removeItem(ACCOUNT_KEY)
+}
+
+/**
+ * Persist a profile edit (14.2).
+ *
+ * It writes the same record `currentIdentity()` reads, which is the point:
+ * the name you choose is the name comments, presence and invitations show,
+ * without a second identity to keep in step.
+ */
+export function updateStoredAccount(patch: ProfilePatch): Account | null {
+  const existing = loadAccount()
+  if (!existing) return null
+  const next = applyProfilePatch(existing, patch)
+  saveAccount(next)
+  return next
 }
 
 /* ---------------- Google Identity Services ---------------- */
@@ -575,15 +591,22 @@ class GoogleAuthService implements AuthService {
     }
     const existing = loadAccount()
     const now = Date.now()
-    const account: Account = {
-      id: existing?.id ?? `acc_${info.sub}`,
-      name: info.name ?? 'Google user',
-      email: info.email ?? '',
-      avatarUrl: info.picture ?? '',
-      providers: [...new Set([...(existing?.providers ?? []), 'google' as const])],
-      createdAt: existing?.createdAt ?? now,
-      updatedAt: now,
-    }
+    const provider = { name: info.name ?? 'Google user', avatarUrl: info.picture ?? '' }
+    // the provider is authoritative about the Google account, not about the
+    // name the user chose for themselves — mergeProviderProfile keeps both
+    const account = mergeProviderProfile(
+      existing,
+      {
+        id: existing?.id ?? `acc_${info.sub}`,
+        name: provider.name,
+        email: info.email ?? '',
+        avatarUrl: provider.avatarUrl,
+        providers: [...new Set([...(existing?.providers ?? []), 'google' as const])],
+        createdAt: existing?.createdAt ?? now,
+        updatedAt: now,
+      },
+      provider,
+    )
     saveAccount(account)
     this.setReauthNeeded(false)
     this.notify()
@@ -673,6 +696,9 @@ class MockAuthService implements AuthService {
       email: 'local@lattice.dev',
       avatarUrl: '',
       providers: ['mock'],
+      // there is no provider profile behind a local account, so an edited
+      // name has nothing to be reset to — the panel says so rather than
+      // offering a reset that would do nothing
       createdAt: now,
       updatedAt: now,
     }

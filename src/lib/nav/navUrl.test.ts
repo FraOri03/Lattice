@@ -78,6 +78,51 @@ describe('serialize / parse round-trip', () => {
   })
 })
 
+/**
+ * Settings (14.1) is a screen over a surface, not a surface of its own, so it
+ * has to survive on both and take the rest of the URL with it.
+ */
+describe('settings rides over the surface', () => {
+  it('addresses a section on the otherwise empty dashboard URL', () => {
+    const search = serializeNav({ surface: 'dashboard', settings: 'appearance' })
+    expect(search).toBe('?s=appearance')
+    expect(resolveNav(parseNav(search), snapshot())).toEqual({
+      surface: 'dashboard',
+      settings: 'appearance',
+    })
+  })
+
+  it('keeps the project underneath when settings is open', () => {
+    const search = serializeNav({
+      ...projectNav({ projectId: 'proj_a', mode: 'doc', boardId: 'board_a1' }),
+      settings: 'storage',
+    })
+    expect(search).toContain('p=proj_a')
+    expect(search).toContain('s=storage')
+    const nav = resolveNav(parseNav(search), snapshot())
+    expect(project(nav).projectId).toBe('proj_a')
+    expect(nav.settings).toBe('storage')
+  })
+
+  it('drops an unknown section instead of opening somewhere arbitrary', () => {
+    expect(resolveNav(parseNav('?s=nowhere'), snapshot())).toEqual({ surface: 'dashboard' })
+  })
+
+  it('survives an unknown project, because settings is not the project', () => {
+    const nav = resolveNav(parseNav('?p=ghost&s=account'), snapshot())
+    expect(nav).toEqual({ surface: 'dashboard', settings: 'account' })
+  })
+
+  it('makes opening and closing settings a different place, so Back undoes it', () => {
+    const shut = projectNav({ projectId: 'p', mode: 'board' })
+    const open = { ...shut, settings: 'account' } as const
+    expect(navKey(shut)).not.toBe(navKey(open))
+    expect(navKey({ surface: 'dashboard' })).not.toBe(
+      navKey({ surface: 'dashboard', settings: 'account' }),
+    )
+  })
+})
+
 describe('surfaces — dashboard vs project', () => {
   it('resolves the bare root URL to the dashboard', () => {
     expect(resolveNav(parseNav(''), snapshot())).toEqual({ surface: 'dashboard' })

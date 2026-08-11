@@ -23,7 +23,8 @@ import {
  *
  * Surfaces (Phase 11.0): the bare root URL is the dashboard, `?p=…` is a
  * project. An unknown project id lands on the dashboard rather than guessing
- * a project. The dashboard SCREEN arrives in 11.2 — until then the shell keeps
+ * a project. The settings screen (14.1) rides over either surface as `s=…`,
+ * so it is navigation too: opening it pushes an entry and Back closes it. The dashboard SCREEN arrives in 11.2 — until then the shell keeps
  * rendering the workspace, and the first section/project action re-enters the
  * project surface, so no URL promises a page that does not exist yet.
  *
@@ -41,7 +42,10 @@ import {
  */
 export function currentNav(): ResolvedNavigation {
   const s = useStore.getState()
-  if (s.navSurface === 'dashboard') return DASHBOARD_NAV
+  const settings = s.settingsSection ?? undefined
+  if (s.navSurface === 'dashboard') {
+    return settings ? { ...DASHBOARD_NAV, settings } : DASHBOARD_NAV
+  }
   // The URL's entity is the ACTIVE TAB, read from the session rather than
   // from the six `active*Id` slots. Those are a projection of this same
   // fact (11.3.2), and the priority order this used to walk them in --
@@ -56,6 +60,7 @@ export function currentNav(): ResolvedNavigation {
     split: useWorkspaceLayoutStore.getState().split || undefined,
     boardId: s.activeBoardId,
     entity,
+    settings,
   }
 }
 
