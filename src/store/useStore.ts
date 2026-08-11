@@ -83,6 +83,7 @@ import type { GraphViewSettings } from '@/lib/graph/graphTypes'
 import { decodeGraphSettings } from '@/lib/graph/GraphSettingsService'
 import { ENTITY_MODE, type NavSurface, type ResolvedNavigation } from '@/lib/nav/navUrl'
 import { DEFAULT_SETTINGS_SECTION, type SettingsSection } from '@/lib/settings/sections'
+import { DEFAULT_DESTINATION, type Destination } from '@/lib/dashboard/destinations'
 import { DEFAULT_APPEARANCE, type Appearance } from '@/lib/theme/appearance'
 import { useWorkspaceLayoutStore } from './workspaceLayoutStore'
 import {
@@ -257,6 +258,13 @@ interface AppState {
    */
   navSurface: NavSurface
   /**
+   * Which of the dashboard's six destinations is showing (Phase 13.1, built in
+   * 15.1). Only meaningful while `navSurface` is 'dashboard'. Not persisted for
+   * the same reason as `navSurface`: `d=…` owns it, which is what makes
+   * "refresh keeps you on Trash" true without a special case.
+   */
+  dashboardDestination: Destination
+  /**
    * The settings section showing over the current surface, or null when the
    * screen is shut (Phase 14.1). Like `navSurface` the URL owns it — `s=…`
    * rides alongside the surface params, so a deep link opens the exact panel
@@ -330,8 +338,14 @@ interface AppState {
    * expected to be resolved away by the caller (navUrl.resolveNav).
    */
   applyNav: (nav: ResolvedNavigation) => void
-  /** Leave the project surface for the dashboard (Home). */
+  /** Leave the project surface for the dashboard, at Home. */
   openDashboard: () => void
+  /**
+   * Show a dashboard destination — from the lateral navigation, the palette or
+   * a deep link. Moves the shell off a project if it is on one, which is what
+   * makes "Trash" reachable from inside a project without a second action.
+   */
+  openDestination: (destination: Destination) => void
   /** Show the settings screen over the current surface. */
   openSettings: (section?: SettingsSection) => void
   /** Close settings; the surface underneath was never left. */
@@ -595,6 +609,7 @@ export const useStore = create<AppState>()(
       recents: [],
       viewMode: 'board',
       navSurface: 'project',
+      dashboardDestination: DEFAULT_DESTINATION,
       settingsSection: null,
       theme: 'dark',
       appearance: DEFAULT_APPEARANCE,
@@ -772,21 +787,31 @@ export const useStore = create<AppState>()(
         })
       },
 
+      /**
+       * Switching workspace opens no project and creates none (13.1).
+       *
+       * This used to pick the target workspace's first non-archived project and
+       * open it — and, when the workspace was empty, invent a project so there
+       * would be something to open. Both are implicit fallbacks into a project
+       * the user did not ask for, which is the one thing `docs/navigation.md`
+       * rules out. From a project surface you now land Home in the new
+       * workspace; from a dashboard destination you stay on that destination,
+       * re-scoped. An empty workspace shows Home's empty state, which is a
+       * screen that has to exist anyway.
+       */
       setActiveWorkspace: (id) => {
         const s = get()
         const ws = s.workspaces[id]
         if (!ws || s.activeWorkspaceId === id) return
-        set({ activeWorkspaceId: id })
-        const target =
-          ws.projectIds.map((p) => s.projects[p]).find((p) => p && !p.archived) ??
-          ws.projectIds.map((p) => s.projects[p]).find(Boolean)
-        if (target) {
-          get().setActiveProject(target.id)
-        } else {
-          // a workspace is never empty for long: give it a first project
-          const pid = get().createProject({ name: `${ws.name} project` })
-          get().setActiveProject(pid)
-        }
+        set({
+          activeWorkspaceId: id,
+          ...(s.navSurface === 'project'
+            ? {
+                navSurface: 'dashboard' as NavSurface,
+                dashboardDestination: DEFAULT_DESTINATION,
+              }
+            : {}),
+        })
       },
 
       moveProjectToWorkspace: (projectId, workspaceId) => {
@@ -1016,7 +1041,11 @@ export const useStore = create<AppState>()(
         })
       },
 
-      openDashboard: () => set({ navSurface: 'dashboard' }),
+      openDashboard: () =>
+        set({ navSurface: 'dashboard', dashboardDestination: DEFAULT_DESTINATION }),
+
+      openDestination: (destination) =>
+        set({ navSurface: 'dashboard', dashboardDestination: destination }),
 
       openSettings: (section = DEFAULT_SETTINGS_SECTION) =>
         set({ settingsSection: section }),
@@ -1027,9 +1056,9 @@ export const useStore = create<AppState>()(
         // branch — including when an unknown project makes the rest a no-op
         set({ settingsSection: nav.settings ?? null })
         if (nav.surface === 'dashboard') {
-          // Home: the shell leaves the project surface, but the active project
-          // and its open entity survive so going back in costs nothing.
-          set({ navSurface: 'dashboard' })
+          // The shell leaves the project surface, but the active project and
+          // its open entity survive so going back in costs nothing.
+          set({ navSurface: 'dashboard', dashboardDestination: nav.destination })
           return
         }
         // restore the split layout alongside the section (only for a valid

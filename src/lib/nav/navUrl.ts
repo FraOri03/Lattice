@@ -1,5 +1,10 @@
 import type { ViewMode } from '@/types/model'
 import { isSettingsSection, type SettingsSection } from '@/lib/settings/sections'
+import {
+  destinationToken,
+  resolveDestination,
+  type Destination,
+} from '@/lib/dashboard/destinations'
 
 /**
  * navUrl — the small centralized abstraction for serializing, validating and
@@ -7,8 +12,14 @@ import { isSettingsSection, type SettingsSection } from '@/lib/settings/sections
  *
  * The app has exactly TWO navigable surfaces (Phase 11.0):
  *
- *   dashboard — no project is open; the URL carries no nav params
+ *   dashboard — no project is open; `d=<destination>` says which one
  *   project   — a project is open: project · mode · board · one entity
+ *
+ * The dashboard's six destinations (Phase 13.1) ride as `d=…`, with Home as
+ * the ABSENCE of the token so the bare root URL keeps meaning Home and every
+ * link written before phase 15 keeps resolving. `p` wins over `d`: a URL
+ * carrying a valid project is the project surface, and a stray `d` alongside
+ * it is dropped exactly as `m=doc` without `p` is dropped.
  *
  * Settings (Phase 14.1) is neither: it is a screen that opens OVER whichever
  * surface you were on, so it rides alongside as `s=<section>` instead of
@@ -46,12 +57,13 @@ export interface NavState {
  * the settings section showing over it.
  */
 export type ResolvedNavigation = { settings?: SettingsSection } & (
-  | { surface: 'dashboard' }
+  | { surface: 'dashboard'; destination: Destination }
   | ({ surface: 'project' } & NavState)
 )
 
-/** The dashboard surface — a shared constant so identity checks stay cheap. */
-export const DASHBOARD_NAV: ResolvedNavigation = { surface: 'dashboard' }
+/** The dashboard surface at Home — a shared constant so identity checks stay
+ *  cheap. Any other destination is built by `resolveNav`. */
+export const DASHBOARD_NAV: ResolvedNavigation = { surface: 'dashboard', destination: 'home' }
 
 /** Legacy/compat URL token for the split layout (pre-IA-refactor deep links). */
 const SPLIT_TOKEN = 'split'
@@ -103,6 +115,7 @@ export interface RawNav {
   entityKind?: string
   entityId?: string
   settings?: string
+  destination?: string
 }
 
 /** Parse a URL search string ("?p=…&m=…") into raw parts. */
@@ -127,16 +140,24 @@ export function parseNav(search: string): RawNav {
   }
   const s = q.get('s')
   if (s) raw.settings = s
+  const d = q.get('d')
+  if (d) raw.destination = d
   return raw
 }
 
 /**
- * Serialize nav state to a search string ("?p=…"). The dashboard is the
- * param-less root URL, so it serializes to "".
+ * Serialize nav state to a search string ("?p=…"). The dashboard at Home is
+ * the param-less root URL, so it serializes to "".
  */
 export function serializeNav(nav: ResolvedNavigation | null): string {
   if (!nav) return ''
   const q = new URLSearchParams()
+  if (nav.surface === 'dashboard') {
+    // Home is the absence of the token, so only the other five are written —
+    // `destinationToken` is what makes `?d=home` unrepresentable
+    const d = destinationToken(nav.destination)
+    if (d) q.set('d', d)
+  }
   if (nav.surface === 'project' && nav.projectId) {
     q.set('p', nav.projectId)
     // split is a layout, serialized as the legacy `m=split` token so
@@ -159,7 +180,14 @@ export function navKey(nav: ResolvedNavigation | null): string {
   // opening and closing settings are navigation — Back has to undo them — so
   // the section is part of the identity on both surfaces
   const settings = nav.settings ? `settings:${nav.settings}` : ''
-  if (nav.surface === 'dashboard') return settings ? `dashboard|${settings}` : 'dashboard'
+  if (nav.surface === 'dashboard') {
+    // moving between destinations IS navigation, so the destination is part of
+    // the identity — Home stays the bare `dashboard` key, which keeps every
+    // pre-phase-15 history entry comparing equal to itself
+    return ['dashboard', destinationToken(nav.destination) ?? '', settings]
+      .filter(Boolean)
+      .join('|')
+  }
   return [
     nav.projectId,
     nav.split ? SPLIT_TOKEN : nav.mode,
@@ -186,6 +214,8 @@ export interface NavSnapshot {
  *   no project param / unknown project → the dashboard (there is no "guess a
  *     project" fallback: landing in someone else's or a deleted project would
  *     be a worse answer than Home)
+ *   unknown destination                → Home (never a guess)
+ *   a valid project alongside `d`      → the project; `d` is dropped
  *   bad mode                           → `board`
  *   board outside the project          → that project's first board
  *   missing entity                     → dropped (its mode still opens, empty)
@@ -197,7 +227,13 @@ export function resolveNav(raw: RawNav, snap: NavSnapshot): ResolvedNavigation {
   // than opening the screen somewhere arbitrary
   const settings = isSettingsSection(raw.settings) ? raw.settings : undefined
   if (!raw.projectId || !snap.hasProject(raw.projectId)) {
-    return settings ? { surface: 'dashboard', settings } : DASHBOARD_NAV
+    // the dashboard is where `d` means anything; an unknown value degrades to
+    // Home rather than leaving the surface addressed by a token nobody owns
+    const destination = resolveDestination(raw.destination)
+    if (destination === 'home' && !settings) return DASHBOARD_NAV
+    return settings
+      ? { surface: 'dashboard', destination, settings }
+      : { surface: 'dashboard', destination }
   }
   const projectId = raw.projectId
   const boardId =

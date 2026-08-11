@@ -213,7 +213,7 @@ describe('applyNav — URL/history restore', () => {
  */
 describe('navigation surfaces — dashboard vs project', () => {
   beforeEach(() => {
-    useStore.getState().applyNav({ surface: 'dashboard' })
+    useStore.getState().applyNav({ surface: 'dashboard', destination: 'home' })
   })
 
   it('applyNav(dashboard) moves Home without discarding the open project', () => {
@@ -221,7 +221,7 @@ describe('navigation surfaces — dashboard vs project', () => {
     const pid = s.activeProjectId
     const docId = s.createDoc({ title: 'Still open' })
     s.openDoc(docId)
-    useStore.getState().applyNav({ surface: 'dashboard' })
+    useStore.getState().applyNav({ surface: 'dashboard', destination: 'home' })
     const after = useStore.getState()
     expect(after.navSurface).toBe('dashboard')
     // going back in must be free — nothing was torn down

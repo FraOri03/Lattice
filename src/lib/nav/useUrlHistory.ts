@@ -3,7 +3,6 @@ import { useStore } from '@/store/useStore'
 import { useWorkspaceLayoutStore } from '@/store/workspaceLayoutStore'
 import { activeTab, EMPTY_SESSION } from '@/lib/tabs/tabSession'
 import {
-  DASHBOARD_NAV,
   navKey,
   parseNav,
   resolveNav,
@@ -21,12 +20,12 @@ import {
  *   Back / Forward (popstate)                        ──▶ store.applyNav
  *   direct load / refresh                            ──▶ restore from the URL
  *
- * Surfaces (Phase 11.0): the bare root URL is the dashboard, `?p=…` is a
- * project. An unknown project id lands on the dashboard rather than guessing
+ * Surfaces (Phase 11.0): the bare root URL is the dashboard at Home, `?p=…` is
+ * a project. An unknown project id lands on the dashboard rather than guessing
  * a project. The settings screen (14.1) rides over either surface as `s=…`,
- * so it is navigation too: opening it pushes an entry and Back closes it. The dashboard SCREEN arrives in 11.2 — until then the shell keeps
- * rendering the workspace, and the first section/project action re-enters the
- * project surface, so no URL promises a page that does not exist yet.
+ * so it is navigation too: opening it pushes an entry and Back closes it. The
+ * dashboard's six destinations (13.1, built in 15.1) ride as `d=…`, so Back and
+ * Forward walk them and a refresh on Trash stays on Trash.
  *
  * Loop-safety: an `applying` flag suppresses pushes while we are restoring
  * from the URL, and a `navKey` dedup means only genuine navigation (not the
@@ -44,7 +43,8 @@ export function currentNav(): ResolvedNavigation {
   const s = useStore.getState()
   const settings = s.settingsSection ?? undefined
   if (s.navSurface === 'dashboard') {
-    return settings ? { ...DASHBOARD_NAV, settings } : DASHBOARD_NAV
+    const nav: ResolvedNavigation = { surface: 'dashboard', destination: s.dashboardDestination }
+    return settings ? { ...nav, settings } : nav
   }
   // The URL's entity is the ACTIVE TAB, read from the session rather than
   // from the six `active*Id` slots. Those are a projection of this same

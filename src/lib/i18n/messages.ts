@@ -525,6 +525,40 @@ export const en = {
     noDescription: 'No description',
     emptyTitle: 'No projects in this workspace yet',
     emptyBody: 'A project holds its own boards, notes, documents and files.',
+    workspaces: 'Workspaces',
+    projectCount: (n: number) => `${n} ${n === 1 ? 'project' : 'projects'}`,
+  },
+  /**
+   * The dashboard's six destinations (13.1, built in 15.1).
+   *
+   * `description` is the question each destination answers, straight from the
+   * IA table — it is what the surface is *for*, and it stays true whether or not
+   * the surface can be filled yet. `notBuilt` is deliberately not an empty
+   * state: 13.3 rules that "nothing here" over a source that cannot answer is a
+   * false negative, so this says the page is missing and claims nothing about
+   * what it would contain.
+   */
+  destinations: {
+    navLabel: 'Dashboard',
+    workspaceLabel: 'Active workspace',
+    projectCount: (n: number) => `${n} ${n === 1 ? 'project' : 'projects'}`,
+    title: {
+      home: 'Home',
+      recents: 'Recents',
+      starred: 'Starred',
+      shared: 'Shared with me',
+      invites: 'Invites',
+      trash: 'Trash',
+    },
+    description: {
+      home: 'What is in this workspace, and what you touched last.',
+      recents: 'What you have opened, newest first.',
+      starred: 'What you pinned, and where it is.',
+      shared: 'What someone else has given you access to.',
+      invites: 'Who is asking, and what you would be agreeing to.',
+      trash: 'What you deleted, and how long you have.',
+    },
+    notBuilt: 'This destination is part of the dashboard, and its page is not built yet.',
   },
   /**
    * The settings screen (Phase 14.1). `pending` is deliberately specific: a
@@ -1252,6 +1286,30 @@ export const it: Catalog = {
     noDescription: 'Nessuna descrizione',
     emptyTitle: 'Ancora nessun progetto in questo workspace',
     emptyBody: 'Un progetto contiene le sue board, note, documenti e file.',
+    workspaces: 'Workspace',
+    projectCount: (n) => `${n} ${n === 1 ? 'progetto' : 'progetti'}`,
+  },
+  destinations: {
+    navLabel: 'Dashboard',
+    workspaceLabel: 'Workspace attivo',
+    projectCount: (n) => `${n} ${n === 1 ? 'progetto' : 'progetti'}`,
+    title: {
+      home: 'Home',
+      recents: 'Recenti',
+      starred: 'Preferiti',
+      shared: 'Condivisi con me',
+      invites: 'Inviti',
+      trash: 'Cestino',
+    },
+    description: {
+      home: 'Cosa c’è in questo workspace, e cosa hai aperto per ultimo.',
+      recents: 'Cosa hai aperto, dal più recente.',
+      starred: 'Cosa hai messo tra i preferiti, e dove si trova.',
+      shared: 'A cosa qualcun altro ti ha dato accesso.',
+      invites: 'Chi ti sta invitando, e a cosa acconsentiresti.',
+      trash: 'Cosa hai eliminato, e quanto tempo ti resta.',
+    },
+    notBuilt: 'Questa destinazione fa parte della dashboard, e la sua pagina non è ancora costruita.',
   },
   settings: {
     title: 'Impostazioni',
