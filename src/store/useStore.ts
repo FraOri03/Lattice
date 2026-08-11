@@ -294,6 +294,17 @@ interface AppState {
    */
   dashboardDestination: Destination
   /**
+   * How dense the user wants their project lists (13.2 §3).
+   *
+   * Persisted like theme and locale, and shared by Home and every destination,
+   * because it expresses a preference about the person rather than a fact about
+   * a page. It governs the PROJECT SECTIONS only — the resume rail is always a
+   * rail, the workspace chips are always chips, the stat tiles are always
+   * tiles. A toggle that silently governs half a page is why the prototype's
+   * reads as broken.
+   */
+  dashboardView: 'grid' | 'list'
+  /**
    * The settings section showing over the current surface, or null when the
    * screen is shut (Phase 14.1). Like `navSurface` the URL owns it — `s=…`
    * rides alongside the surface params, so a deep link opens the exact panel
@@ -375,6 +386,7 @@ interface AppState {
    * makes "Trash" reachable from inside a project without a second action.
    */
   openDestination: (destination: Destination) => void
+  setDashboardView: (view: 'grid' | 'list') => void
   /**
    * Put something on the Starred shelf, or take it off (15.2).
    *
@@ -649,6 +661,7 @@ export const useStore = create<AppState>()(
       viewMode: 'board',
       navSurface: 'project',
       dashboardDestination: DEFAULT_DESTINATION,
+      dashboardView: 'grid',
       settingsSection: null,
       theme: 'dark',
       appearance: DEFAULT_APPEARANCE,
@@ -1085,6 +1098,8 @@ export const useStore = create<AppState>()(
 
       openDestination: (destination) =>
         set({ navSurface: 'dashboard', dashboardDestination: destination }),
+
+      setDashboardView: (dashboardView) => set({ dashboardView }),
 
       toggleStarred: (kind, id) =>
         set((s) => {
@@ -2272,6 +2287,8 @@ export const useStore = create<AppState>()(
         graphSettings: s.graphSettings,
         folders: s.folders,
         collapsedCategories: s.collapsedCategories,
+        // a density preference, like theme and locale — not page state
+        dashboardView: s.dashboardView,
       }),
     },
   ),

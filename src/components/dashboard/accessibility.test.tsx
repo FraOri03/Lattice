@@ -3,7 +3,20 @@ import { fireEvent, render, screen, within } from '@testing-library/react'
 import { useStore } from '@/store/useStore'
 import { useAnnouncer } from '@/lib/a11y/announcer'
 import { DESTINATIONS } from '@/lib/dashboard/destinations'
+import { AccountProvider } from '@/lib/auth/AccountProvider'
 import { Dashboard } from './Dashboard'
+
+/**
+ * The dashboard mounts the shell's TopBar (15.7), whose ProfileMenu requires
+ * the account context. The app always provides it; a bare render would be
+ * testing an arrangement that never ships.
+ */
+const renderDashboard = () =>
+  render(
+    <AccountProvider>
+      <Dashboard />
+    </AccountProvider>,
+  )
 
 /**
  * The parts of 13.5 a DOM can prove (§9's "rendered checks").
@@ -29,7 +42,7 @@ const main = () => within(screen.getByRole('main'))
 
 describe('keyboard reach (13.5 §2.9)', () => {
   it('reaches every destination without a pointer', () => {
-    render(<Dashboard />)
+    renderDashboard()
     const nav = within(screen.getByRole('navigation', { name: 'Dashboard' }))
 
     // every destination is a real button, so Tab reaches it and Enter runs it —
@@ -55,7 +68,7 @@ describe('keyboard reach (13.5 §2.9)', () => {
     useStore.getState().toggleStarred('note', id)
     useStore.setState({ navSurface: 'dashboard', dashboardDestination: 'starred' })
 
-    render(<Dashboard />)
+    renderDashboard()
 
     // the row, its checkbox and its star are three separate stops — 13.5 §4
     // accepts the verbosity precisely so none of them needs a pointer
@@ -66,7 +79,7 @@ describe('keyboard reach (13.5 §2.9)', () => {
 
   it('marks the destination it is on with aria-current, and only that one', () => {
     useStore.setState({ dashboardDestination: 'recents' })
-    render(<Dashboard />)
+    renderDashboard()
     const nav = within(screen.getByRole('navigation', { name: 'Dashboard' }))
 
     const current = nav.getAllByRole('button').filter((b) => b.getAttribute('aria-current'))
@@ -82,7 +95,7 @@ describe('structure (13.5 §4)', () => {
     s.createProject({ name: 'Two' })
     useStore.setState({ navSurface: 'dashboard', dashboardDestination: 'home' })
 
-    render(<Dashboard />)
+    renderDashboard()
 
     const lists = main().getAllByRole('list')
     expect(lists.length).toBeGreaterThan(0)
@@ -92,7 +105,7 @@ describe('structure (13.5 §4)', () => {
   })
 
   it('keeps one main and one banner on the surface', () => {
-    render(<Dashboard />)
+    renderDashboard()
     expect(screen.getAllByRole('main')).toHaveLength(1)
     expect(screen.getAllByRole('banner')).toHaveLength(1)
   })
@@ -100,7 +113,7 @@ describe('structure (13.5 §4)', () => {
 
 describe('announcements (13.5 §5)', () => {
   it('says the destination on arrival', () => {
-    render(<Dashboard />)
+    renderDashboard()
     fireEvent.click(
       within(screen.getByRole('navigation', { name: 'Dashboard' })).getByRole('button', {
         name: 'Trash',
@@ -112,7 +125,7 @@ describe('announcements (13.5 §5)', () => {
   it('names the workspace and its size when it is switched', () => {
     const s = useStore.getState()
     const other = s.createWorkspace({ name: 'Studio Nord' })
-    render(<Dashboard />)
+    renderDashboard()
 
     fireEvent.change(screen.getByRole('combobox'), { target: { value: other } })
 
@@ -128,7 +141,7 @@ describe('announcements (13.5 §5)', () => {
     const other = useStore.getState().createWorkspace({ name: 'Elsewhere' })
     useStore.setState({ navSurface: 'dashboard', dashboardDestination: 'starred' })
 
-    render(<Dashboard />)
+    renderDashboard()
     fireEvent.change(main().getByRole('combobox'), { target: { value: other } })
     fireEvent.click(main().getByRole('button', { name: 'Clear filters' }))
 
@@ -148,7 +161,7 @@ describe('both locales render every destination (13.5 §8)', () => {
 
       for (const destination of DESTINATIONS) {
         useStore.setState({ locale, navSurface: 'dashboard', dashboardDestination: destination })
-        const { unmount } = render(<Dashboard />)
+        const { unmount } = renderDashboard()
         // a missing key would render "undefined" rather than throw, so the
         // catalogue is checked by looking for it
         expect(screen.getByRole('main').textContent).not.toMatch(/undefined/)

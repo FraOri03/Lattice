@@ -4,7 +4,20 @@ import { useStore } from '@/store/useStore'
 import { useCollabStore } from '@/lib/collab/collabStore'
 import { currentIdentity } from '@/lib/collab/CollaborationProvider'
 import type { ProjectInvite, ProjectMember } from '@/types/collab'
+import { AccountProvider } from '@/lib/auth/AccountProvider'
 import { Dashboard } from './Dashboard'
+
+/**
+ * The dashboard mounts the shell's TopBar (15.7), whose ProfileMenu requires
+ * the account context. The app always provides it; a bare render would be
+ * testing an arrangement that never ships.
+ */
+const renderDashboard = () =>
+  render(
+    <AccountProvider>
+      <Dashboard />
+    </AccountProvider>,
+  )
 
 /**
  * The three sections that cannot be complete before the server (13.5 §3).
@@ -55,7 +68,7 @@ describe('Shared with me', () => {
     })
     useStore.setState({ navSurface: 'dashboard', dashboardDestination: 'shared' })
 
-    render(<Dashboard />)
+    renderDashboard()
 
     // grouped by owner
     expect(main().getByRole('heading', { name: /Giulia Rossi/ })).toBeInTheDocument()
@@ -75,7 +88,7 @@ describe('Shared with me', () => {
     })
     useStore.setState({ navSurface: 'dashboard', dashboardDestination: 'shared' })
 
-    render(<Dashboard />)
+    renderDashboard()
 
     // no Drive configured in a test vault, so the honest scope is this browser
     expect(main().getByText('This browser')).toBeInTheDocument()
@@ -89,14 +102,14 @@ describe('Shared with me', () => {
     })
     useStore.setState({ navSurface: 'dashboard', dashboardDestination: 'shared' })
 
-    render(<Dashboard />)
+    renderDashboard()
 
     expect(main().queryByRole('button', { name: 'Open project Mine' })).toBeNull()
   })
 
   it('says what it cannot list, whether or not it found anything', () => {
     useStore.setState({ navSurface: 'dashboard', dashboardDestination: 'shared' })
-    render(<Dashboard />)
+    renderDashboard()
 
     expect(main().getByText(/needs the server planned for phase 18/)).toBeInTheDocument()
     // and it does NOT say nobody shared anything
@@ -107,14 +120,14 @@ describe('Shared with me', () => {
 describe('Invites', () => {
   it('opens on Sent, the tab that can answer', () => {
     useStore.setState({ navSurface: 'dashboard', dashboardDestination: 'invites' })
-    render(<Dashboard />)
+    renderDashboard()
 
     expect(screen.getByRole('tab', { name: 'Sent' })).toHaveAttribute('aria-selected', 'true')
   })
 
   it('presents Received as unavailable, naming the constraint', () => {
     useStore.setState({ navSurface: 'dashboard', dashboardDestination: 'invites' })
-    render(<Dashboard />)
+    renderDashboard()
 
     fireEvent.click(screen.getByRole('tab', { name: 'Received' }))
 
@@ -139,7 +152,7 @@ describe('Invites', () => {
     useCollabStore.setState({ invites: { [pid]: [invite] } })
     useStore.setState({ navSurface: 'dashboard', dashboardDestination: 'invites' })
 
-    render(<Dashboard />)
+    renderDashboard()
 
     expect(main().getByText('giulia@example.com · Acme')).toBeInTheDocument()
     expect(main().getByText('Pending')).toBeInTheDocument()
@@ -164,7 +177,7 @@ describe('Invites', () => {
     useCollabStore.setState({ invites: { [pid]: [expired] } })
     useStore.setState({ navSurface: 'dashboard', dashboardDestination: 'invites' })
 
-    render(<Dashboard />)
+    renderDashboard()
 
     // there is no `expiresAt` anywhere, so a row wearing that badge would be
     // claiming a check that never happened
@@ -173,7 +186,7 @@ describe('Invites', () => {
 
   it('shows no count on the navigation, because it cannot compute one', () => {
     useStore.setState({ navSurface: 'dashboard', dashboardDestination: 'invites' })
-    render(<Dashboard />)
+    renderDashboard()
 
     const invites = within(screen.getByRole('navigation', { name: 'Dashboard' })).getByRole(
       'button',
@@ -186,7 +199,7 @@ describe('Invites', () => {
 describe('Trash', () => {
   it('is unavailable because the model is missing, not the page', () => {
     useStore.setState({ navSurface: 'dashboard', dashboardDestination: 'trash' })
-    render(<Dashboard />)
+    renderDashboard()
 
     expect(main().getByText(/nothing records that an item was removed/)).toBeInTheDocument()
     expect(main().getByText(/issue #115/)).toBeInTheDocument()

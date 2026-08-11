@@ -676,6 +676,14 @@ export const en = {
     select: (name: string) => `Select ${name}`,
     starLabel: (name: string) => `Star ${name}`,
     unstarLabel: (name: string) => `Unstar ${name}`,
+    gridView: 'Grid view',
+    listView: 'List view',
+    membersTitle: (n: number) => `${n} ${n === 1 ? 'member' : 'members'} with access`,
+    /** Sync scope on a card — the vault's, stated rather than implied. */
+    syncLocal: 'Local',
+    syncDrive: 'Drive',
+    syncLocalWhy: 'This vault stays in this browser — nothing is uploaded.',
+    syncDriveWhy: 'This vault is mirrored to your Google Drive folder.',
   },
   /**
    * What `announce()` says (13.5 §5). Functions, never concatenated at the call
@@ -692,6 +700,8 @@ export const en = {
     filtersCleared: (n: number) => `Filters cleared — ${n} ${n === 1 ? 'item' : 'items'}`,
     workspaceSwitched: (name: string, projects: number) =>
       `${name} — ${projects} ${projects === 1 ? 'project' : 'projects'}`,
+    gridView: 'Grid view',
+    listView: 'List view',
   },
   /**
    * The command palette (13.4, built in 15.3). One search and one create list,
@@ -1615,6 +1625,13 @@ export const it: Catalog = {
     select: (name) => `Seleziona ${name}`,
     starLabel: (name) => `Aggiungi ${name} ai preferiti`,
     unstarLabel: (name) => `Togli ${name} dai preferiti`,
+    gridView: 'Vista a griglia',
+    listView: 'Vista a elenco',
+    membersTitle: (n) => `${n} ${n === 1 ? 'membro' : 'membri'} con accesso`,
+    syncLocal: 'Locale',
+    syncDrive: 'Drive',
+    syncLocalWhy: 'Questo vault resta in questo browser — non viene caricato niente.',
+    syncDriveWhy: 'Questo vault è replicato nella tua cartella Google Drive.',
   },
   announcements: {
     starred: (name) => `“${name}” aggiunto ai preferiti`,
@@ -1625,6 +1642,8 @@ export const it: Catalog = {
     filtersCleared: (n) => `Filtri azzerati — ${n} ${n === 1 ? 'elemento' : 'elementi'}`,
     workspaceSwitched: (name, projects) =>
       `${name} — ${projects} ${projects === 1 ? 'progetto' : 'progetti'}`,
+    gridView: 'Vista a griglia',
+    listView: 'Vista a elenco',
   },
   palette: {
     placeholder: 'Cerca file, board e progetti — o digita un comando…',

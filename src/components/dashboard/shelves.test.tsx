@@ -2,7 +2,20 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { useStore } from '@/store/useStore'
 import { useAnnouncer } from '@/lib/a11y/announcer'
+import { AccountProvider } from '@/lib/auth/AccountProvider'
 import { Dashboard } from './Dashboard'
+
+/**
+ * The dashboard mounts the shell's TopBar (15.7), whose ProfileMenu requires
+ * the account context. The app always provides it; a bare render would be
+ * testing an arrangement that never ships.
+ */
+const renderDashboard = () =>
+  render(
+    <AccountProvider>
+      <Dashboard />
+    </AccountProvider>,
+  )
 
 /**
  * Recents and Starred, against the criteria 13.5 §3 sets for each.
@@ -47,7 +60,7 @@ describe('Recents', () => {
     seedNote('Field notes')
     useStore.setState({ navSurface: 'dashboard', dashboardDestination: 'recents' })
 
-    render(<Dashboard />)
+    renderDashboard()
 
     expect(main().getByText(/kept on this device only/i)).toBeInTheDocument()
     expect(main().getByText(/last 200 entries/i)).toBeInTheDocument()
@@ -57,7 +70,7 @@ describe('Recents', () => {
     seedNote('Field notes', 'Alpha')
     useStore.setState({ navSurface: 'dashboard', dashboardDestination: 'recents' })
 
-    render(<Dashboard />)
+    renderDashboard()
 
     const row = main().getByRole('button', { name: 'Open Field notes' })
     expect(row).toHaveTextContent('Alpha')
@@ -74,7 +87,7 @@ describe('Recents', () => {
       dashboardDestination: 'recents',
     })
 
-    render(<Dashboard />)
+    renderDashboard()
 
     const headings = main()
       .getAllByRole('heading', { level: 2 })
@@ -88,7 +101,7 @@ describe('Recents', () => {
     useStore.getState().deleteNote(id)
     useStore.setState({ navSurface: 'dashboard', dashboardDestination: 'recents' })
 
-    render(<Dashboard />)
+    renderDashboard()
 
     expect(main().queryByText('Doomed')).toBeNull()
   })
@@ -97,7 +110,7 @@ describe('Recents', () => {
     const { id } = seedNote('Worth keeping')
     useStore.setState({ navSurface: 'dashboard', dashboardDestination: 'recents' })
 
-    render(<Dashboard />)
+    renderDashboard()
     fireEvent.click(main().getByRole('button', { name: 'Star Worth keeping' }))
 
     expect(useStore.getState().notes[id].starred).toBe(true)
@@ -119,7 +132,7 @@ describe('Starred', () => {
     useStore.getState().toggleStarred('note', second)
 
     useStore.setState({ navSurface: 'dashboard', dashboardDestination: 'starred' })
-    render(<Dashboard />)
+    renderDashboard()
 
     // both are visible even though only one workspace is active
     expect(main().getByRole('button', { name: 'Open Pinned' })).toHaveTextContent('Personal')
@@ -134,7 +147,7 @@ describe('Starred', () => {
     const other = useStore.getState().createWorkspace({ name: 'Studio Nord' })
 
     useStore.setState({ navSurface: 'dashboard', dashboardDestination: 'starred' })
-    render(<Dashboard />)
+    renderDashboard()
 
     fireEvent.change(main().getByRole('combobox'), { target: { value: other } })
 
@@ -150,7 +163,7 @@ describe('Starred', () => {
     useStore.getState().toggleStarred('note', id)
     useStore.setState({ navSurface: 'dashboard', dashboardDestination: 'starred' })
 
-    render(<Dashboard />)
+    renderDashboard()
     fireEvent.click(main().getByRole('button', { name: 'Unstar Pinned' }))
 
     expect(useStore.getState().notes[id].starred).toBe(false)
@@ -165,7 +178,7 @@ describe('Starred', () => {
     useStore.getState().toggleStarred('note', b)
 
     useStore.setState({ navSurface: 'dashboard', dashboardDestination: 'starred' })
-    render(<Dashboard />)
+    renderDashboard()
 
     fireEvent.click(main().getByRole('checkbox', { name: 'Select First' }))
     fireEvent.click(main().getByRole('checkbox', { name: 'Select Second' }))
@@ -185,7 +198,7 @@ describe('Starred', () => {
     }
     useStore.setState({ navSurface: 'dashboard', dashboardDestination: 'starred' })
 
-    render(<Dashboard />)
+    renderDashboard()
 
     expect(main().getByText('Nothing starred yet')).toBeInTheDocument()
   })

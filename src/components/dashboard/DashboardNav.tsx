@@ -3,6 +3,7 @@ import { useI18n } from '@/lib/i18n'
 import { announce } from '@/lib/a11y/announcer'
 import { groupProjects } from '@/lib/projects/ProjectRegistry'
 import { DESTINATIONS, type Destination } from '@/lib/dashboard/destinations'
+import { env } from '@/lib/env'
 import { IcClock, IcHome, IcMail, IcStar, IcTrash, IcUsers } from '@/components/Icons'
 
 /**
@@ -70,6 +71,14 @@ export function DashboardNav() {
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col">
+      {/* the mark, so a collapsed-to-nothing sidebar still says which app this
+          is — the prototype puts it above the workspace switcher */}
+      <div className="flex flex-none items-baseline gap-2 px-3 pt-3 pb-1">
+        <span className="text-[13px] font-bold tracking-widest">LATTICE</span>
+        <span className="text-[9.5px] text-muted">
+          <span className="capitalize">{env.appStage}</span> v{env.appVersion}
+        </span>
+      </div>
       {/* the workspace selector 13.1 settles: switching re-scopes the surface
           and never opens or creates a project */}
       <div className="flex-none border-b border-bord p-2">

@@ -7,11 +7,11 @@ import { useRecentProjects } from '@/lib/projects/ProjectStore'
 import { groupProjects } from '@/lib/projects/ProjectRegistry'
 import { openRecent, resolveRecents, type ResolvedRecent } from '@/lib/recents/resolveRecents'
 import { useI18n, useTimeAgo } from '@/lib/i18n'
-import { CARD_COLORS, type Project } from '@/types/model'
+import type { Project } from '@/types/model'
+import { ProjectCard } from './ProjectCard'
+import { ViewToggle } from './ViewToggle'
 import {
-  IcArchive,
   IcBoard,
-  IcClock,
   IcCloud,
   IcCode,
   IcDoc,
@@ -19,7 +19,6 @@ import {
   IcFolder,
   IcNote,
   IcPresentation,
-  IcStar,
   IcTable,
 } from '@/components/Icons'
 
@@ -56,7 +55,7 @@ export function HomeDestination() {
   const workspaces = useStore((s) => s.workspaces)
   const activeWorkspaceId = useStore((s) => s.activeWorkspaceId)
   const setActiveWorkspace = useStore((s) => s.setActiveWorkspace)
-  const setActiveProject = useStore((s) => s.setActiveProject)
+  const view = useStore((s) => s.dashboardView)
   const recent = useRecentProjects(6)
   // decoration only: Home renders with or without a signed-in identity
   const account = useOptionalAccount()
@@ -146,10 +145,6 @@ export function HomeDestination() {
   const recentIds = new Set(recentOnly.map((p) => p.id))
   const activeOnly = groups.active.filter((p) => !recentIds.has(p.id))
 
-  // opening a project is what leaves the dashboard: setActiveProject moves
-  // the surface, so nothing here has to know about navSurface.
-  const open = (id: string) => setActiveProject(id)
-
   const firstName = account?.name?.trim().split(/\s+/)[0] ?? ''
   const syncLine =
     syncProvider === 'none'
@@ -157,50 +152,6 @@ export function HomeDestination() {
       : lastSyncAt
         ? t.syncedAgo(timeAgo(lastSyncAt))
         : t.syncPending
-
-  const card = (p: Project, badge?: 'starred' | 'archived' | 'recent') => {
-    const color = CARD_COLORS[p.color] ?? CARD_COLORS.blue
-    return (
-      <button
-        key={p.id}
-        className="flex h-full w-full cursor-pointer flex-col gap-2 rounded-xl border border-bord bg-panel p-3 text-left hover:border-accent"
-        onClick={() => open(p.id)}
-        aria-label={t.openProject(p.name)}
-      >
-        <span className="flex items-center gap-2">
-          <span
-            className="flex h-7 w-7 flex-none items-center justify-center rounded-md text-[14px]"
-            style={{ background: `${color}22`, border: `1px solid ${color}55` }}
-          >
-            {p.icon}
-          </span>
-          <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">{p.name}</span>
-          {badge === 'starred' && (
-            <IcStar size={12} className="flex-none text-[#ffcd29]" aria-hidden />
-          )}
-          {badge === 'archived' && (
-            <IcArchive size={12} className="flex-none text-muted" aria-hidden />
-          )}
-          {badge === 'recent' && (
-            <IcClock size={12} className="flex-none text-muted" aria-hidden />
-          )}
-        </span>
-        <span className="line-clamp-2 min-h-[2em] text-[11.5px] text-muted">
-          {p.description || t.noDescription}
-        </span>
-        {/* what is actually inside, so a card is a summary and not just a
-            name — counted from the entities the project owns */}
-        <span className="flex items-center gap-1.5 text-[10.5px] text-muted">
-          <IcBoard size={10} aria-hidden />
-          {t.boardCount(tally[p.id]?.boards ?? 0)}
-          <span aria-hidden>·</span>
-          <IcFile size={10} aria-hidden />
-          {t.fileCount(tally[p.id]?.files ?? 0)}
-        </span>
-        <span className="text-[10.5px] text-muted">{t.updated(timeAgo(p.updatedAt))}</span>
-      </button>
-    )
-  }
 
   const stat = (label: string, value: string, icon: ReactNode, index: number) => (
     <div
@@ -240,16 +191,23 @@ export function HomeDestination() {
             many projects a section holds before the user walks into it. The
             wrapper IS the grid cell — `display: contents` would be tidier and
             is unreliable with an ARIA role on it. */}
-        <div
-          role="list"
-          className="grid gap-2.5 [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))]"
+        <ul
+          className={
+            view === 'grid'
+              ? 'grid gap-2.5 [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))]'
+              : 'flex flex-col gap-1.5'
+          }
         >
           {items.map((p) => (
-            <div role="listitem" key={p.id}>
-              {card(p, badge)}
-            </div>
+            <ProjectCard
+              key={p.id}
+              project={p}
+              view={view}
+              counts={tally[p.id] ?? { boards: 0, files: 0 }}
+              badge={badge}
+            />
           ))}
-        </div>
+        </ul>
       </section>
     )
 
@@ -257,7 +215,8 @@ export function HomeDestination() {
     <div className="mx-auto w-full max-w-5xl px-6 py-8">
       {/* a div, not a header: the shell above already owns the page's banner,
           and a second one inside `main` is a landmark that names nothing */}
-      <div className="anim-rise mb-6">
+      <div className="anim-rise mb-6 flex flex-wrap items-start gap-3">
+        <div className="min-w-0 flex-1">
         <h1 className="text-[19px] font-bold tracking-tight">{t.greeting(firstName)}</h1>
         {/* where you are and whether your work is leaving this browser */}
         <p className="mt-1 flex flex-wrap items-center gap-x-2 text-[11.5px] text-muted">
@@ -265,6 +224,8 @@ export function HomeDestination() {
           {workspace && <span aria-hidden>·</span>}
           <span>{syncLine}</span>
         </p>
+        </div>
+        <ViewToggle />
       </div>
 
       <section

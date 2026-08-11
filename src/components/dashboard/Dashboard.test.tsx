@@ -1,7 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { useStore } from '@/store/useStore'
+import { AccountProvider } from '@/lib/auth/AccountProvider'
 import { Dashboard } from './Dashboard'
+
+/**
+ * The dashboard mounts the shell's TopBar (15.7), whose ProfileMenu requires
+ * the account context. The app always provides it; a bare render would be
+ * testing an arrangement that never ships.
+ */
+const renderDashboard = () =>
+  render(
+    <AccountProvider>
+      <Dashboard />
+    </AccountProvider>,
+  )
 
 /**
  * The dashboard (11.2, rebuilt on a shell in 15.1).
@@ -34,7 +47,7 @@ describe('Dashboard', () => {
     s.updateProject(id, { starred: true })
     useStore.setState({ navSurface: 'dashboard' })
 
-    render(<Dashboard />)
+    renderDashboard()
 
     expect(home().getAllByRole('button', { name: 'Open project Solaris' })).toHaveLength(1)
   })
@@ -43,7 +56,7 @@ describe('Dashboard', () => {
     const id = useStore.getState().createProject({ name: 'Kelvin' })
     useStore.setState({ navSurface: 'dashboard' })
 
-    render(<Dashboard />)
+    renderDashboard()
     fireEvent.click(home().getByRole('button', { name: 'Open project Kelvin' }))
 
     expect(useStore.getState().activeProjectId).toBe(id)
@@ -66,7 +79,7 @@ describe('Dashboard', () => {
     useStore.getState().setActiveProject(beta)
     useStore.setState({ navSurface: 'dashboard' })
 
-    render(<Dashboard />)
+    renderDashboard()
 
     // the project name is what tells two identically titled files apart
     expect(home().getByRole('button', { name: 'Open Field notes in Alpha' })).toBeInTheDocument()
@@ -79,9 +92,13 @@ describe('Dashboard', () => {
     useStore.getState().createNote({ title: 'A thought' })
     useStore.setState({ navSurface: 'dashboard' })
 
-    render(<Dashboard />)
+    renderDashboard()
 
-    const card = home().getByRole('button', { name: 'Open project Counted' })
+    // 15.7 split the card into a container with three controls in it, so the
+    // counts live beside the name button rather than inside it
+    const card = home()
+      .getByRole('button', { name: 'Open project Counted' })
+      .closest('li')!
     expect(card).toHaveTextContent('1 board')
     expect(card).toHaveTextContent('1 file')
   })
@@ -91,7 +108,7 @@ describe('Dashboard', () => {
     s.createProject({ name: 'Summarised' })
     useStore.setState({ navSurface: 'dashboard' })
 
-    render(<Dashboard />)
+    renderDashboard()
 
     const overview = screen.getByRole('region', { name: 'Workspace at a glance' })
     expect(overview).toBeInTheDocument()
@@ -106,7 +123,7 @@ describe('Dashboard', () => {
     s.moveProjectToWorkspace(outside, otherWs)
     useStore.setState({ navSurface: 'dashboard' })
 
-    render(<Dashboard />)
+    renderDashboard()
 
     expect(home().getByRole('button', { name: 'Open project Inside' })).toBeInTheDocument()
     expect(home().queryByRole('button', { name: 'Open project Outside' })).toBeNull()
@@ -119,7 +136,7 @@ describe('the six destinations', () => {
     useStore.getState().createProject({ name: 'Anything' })
     useStore.setState({ navSurface: 'dashboard' })
 
-    render(<Dashboard />)
+    renderDashboard()
     const nav = within(screen.getByRole('navigation', { name: 'Dashboard' }))
 
     for (const name of ['Home', 'Recents', 'Starred', 'Shared with me', 'Invites', 'Trash']) {
@@ -135,7 +152,7 @@ describe('the six destinations', () => {
   it('marks the destination it is on, and only that one', () => {
     useStore.setState({ navSurface: 'dashboard', dashboardDestination: 'starred' })
 
-    render(<Dashboard />)
+    renderDashboard()
     const nav = within(screen.getByRole('navigation', { name: 'Dashboard' }))
 
     expect(nav.getByRole('button', { name: 'Starred' })).toHaveAttribute('aria-current', 'page')
@@ -146,7 +163,7 @@ describe('the six destinations', () => {
     // the false negative the whole rule exists to prevent: "nothing shared with
     // you" over a surface with no index reads as nobody having shared anything
     useStore.setState({ navSurface: 'dashboard', dashboardDestination: 'shared' })
-    render(<Dashboard />)
+    renderDashboard()
 
     expect(screen.getByText(/A full index of everything shared with you/)).toBeInTheDocument()
   })

@@ -5,7 +5,8 @@ import { useWorkspaceLayoutStore } from '@/store/workspaceLayoutStore'
 import { useI18n } from '@/lib/i18n'
 import { announce } from '@/lib/a11y/announcer'
 import { SidePanel } from '@/components/shell/SidePanel'
-import { IcPlus, IcSearch } from '@/components/Icons'
+import { TopBar } from '@/components/TopBar'
+import { IcPlus } from '@/components/Icons'
 import { DashboardNav } from './DashboardNav'
 import { HomeDestination } from './HomeDestination'
 import { InvitesDestination } from './InvitesDestination'
@@ -33,10 +34,10 @@ import { TrashDestination } from './TrashDestination'
  * - **The URL owns the destination**, not this component: `d=…` is parsed in
  *   `lib/nav/navUrl` and applied by `applyNav`, which is what makes a refresh on
  *   Trash stay on Trash and lets Back walk the destinations.
- * - **Search and New keep 11.2's behaviour.** The launcher opens the palette,
- *   which 13.4 confirms is the right pattern; making the palette search
- *   globally, rank its results and resolve a target before creating is #78's
- *   work, and doing half of it here would leave two ranking models.
+ * - **The top bar is `TopBar`**, in the dashboard variant it grew in 15.7 —
+ *   not a second bar. Search, notifications, sync, theme and profile were all
+ *   already built and mounted only inside the project surface; what the variant
+ *   drops is everything that names a project which is not open.
  */
 export function Dashboard() {
   const t = useI18n()
@@ -44,7 +45,6 @@ export function Dashboard() {
   const setActiveProject = useStore((s) => s.setActiveProject)
   const createProject = useStore((s) => s.createProject)
   const setProjectDialogOpen = useUiStore((s) => s.setProjectDialogOpen)
-  const setPaletteOpen = useUiStore((s) => s.setPaletteOpen)
   const navCollapsed = useWorkspaceLayoutStore((s) => s.dashboardNavCollapsed)
   const setNavCollapsed = useWorkspaceLayoutStore((s) => s.setDashboardNavCollapsed)
 
@@ -70,27 +70,24 @@ export function Dashboard() {
       </SidePanel>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex flex-none flex-wrap items-center gap-2 border-b border-bord px-4 py-2.5">
-          <span className="min-w-0 flex-1 truncate text-[13px] font-bold">
-            {t.destinations.title[destination]}
-          </span>
-          <button
-            className="btn"
-            onClick={() => setPaletteOpen(true)}
-            title={t.dashboard.searchHint}
-          >
-            <IcSearch size={12} /> {t.dashboard.search}
-          </button>
-          <button
-            className="btn"
-            onClick={() => {
-              setActiveProject(createProject())
-              setProjectDialogOpen(true)
-            }}
-          >
-            <IcPlus size={12} /> {t.dashboard.newProject}
-          </button>
-        </header>
+        {/* the shell's own bar, in its dashboard variant — search, notifications,
+            sync, theme and profile were all already built and mounted only
+            inside the project surface until 15.7 */}
+        <TopBar
+          variant="dashboard"
+          title={t.destinations.title[destination]}
+          trailing={
+            <button
+              className="btn"
+              onClick={() => {
+                setActiveProject(createProject())
+                setProjectDialogOpen(true)
+              }}
+            >
+              <IcPlus size={12} /> {t.dashboard.newProject}
+            </button>
+          }
+        />
 
         <main className="min-h-0 flex-1 overflow-y-auto">
           {destination === 'home' ? (
