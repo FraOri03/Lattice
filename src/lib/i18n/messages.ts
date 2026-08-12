@@ -713,18 +713,27 @@ export const en = {
     systemWhy:
       'The browser can’t read these without a native host, so the row reports nothing rather than a plausible-looking guess.',
     storage: 'Storage',
-    storageLine: (size: string, synced: boolean) => `${size} · ${synced ? 'Drive' : 'local'}`,
+    // "local" whether or not a mirror exists: this headline is the vault on
+    // THIS device, and labelling it "Drive" was the bug
+    storageLine: (size: string, synced: boolean) =>
+      `${size} · ${synced ? 'local, mirrored' : 'local'}`,
     localVault: 'Local vault',
+    assets: 'Assets',
+    documents: 'Documents',
+    documentsLine: (n: number) => `${n} ${n === 1 ? 'file' : 'files'}`,
     vaultLine: (size: string, files: number) =>
       `${size} · ${files} ${files === 1 ? 'file' : 'files'}`,
     driveMirror: 'Drive mirror',
+    driveAccount: 'Google account',
+    quotaLine: (used: string, limit: string) => `${used} of ${limit} used`,
+    measuring: 'measuring…',
     connected: 'connected',
     notConnected: 'not connected',
     trash: 'Trash',
     trashLine: (size: string, n: number) => `${size} · ${n} held`,
     freeSpace: 'Free space',
     storageWhy:
-      'The vault’s own size and its trash are measured here — deleted items keep occupying their bytes until the purge, which is why they get their own line. Free space is the disk’s, which a browser cannot read.',
+      'The vault line is what this origin actually occupies on disk; assets and documents are counted separately because only assets carry a byte size of their own. Deleted items keep occupying their bytes until the purge, which is why the trash gets its own line. Free space is what this browser will still let Lattice use, not the disk’s — that one is unreadable from a browser. The Drive mirror is measured on Drive and is normally larger: it also holds each project’s metadata and a readable copy of every document.',
   },
   /**
    * Trash (15.6). Every string here is careful about two facts the prototype's
@@ -1742,17 +1751,23 @@ export const it: Catalog = {
     systemWhy:
       'Il browser non può leggerli senza un host nativo, quindi la riga non riporta niente invece di una stima che sembrerebbe vera.',
     storage: 'Archiviazione',
-    storageLine: (size, synced) => `${size} · ${synced ? 'Drive' : 'locale'}`,
+    storageLine: (size, synced) => `${size} · ${synced ? 'locale, con copia' : 'locale'}`,
     localVault: 'Vault locale',
+    assets: 'Asset',
+    documents: 'Documenti',
+    documentsLine: (n) => `${n} file`,
     vaultLine: (size, files) => `${size} · ${files} file`,
     driveMirror: 'Copia su Drive',
+    driveAccount: 'Account Google',
+    quotaLine: (used, limit) => `${used} di ${limit} usati`,
+    measuring: 'misurazione…',
     connected: 'connessa',
     notConnected: 'non connessa',
     trash: 'Cestino',
     trashLine: (size, n) => `${size} · ${n} in attesa`,
     freeSpace: 'Spazio libero',
     storageWhy:
-      'Qui sono misurati la dimensione del vault e il suo cestino — gli elementi eliminati continuano a occupare i loro byte fino alla rimozione, ed è per questo che hanno una riga a parte. Lo spazio libero è quello del disco, che un browser non può leggere.',
+      'La riga del vault è ciò che questa origine occupa davvero su disco; asset e documenti sono contati a parte perché solo gli asset hanno una dimensione propria in byte. Gli elementi eliminati continuano a occupare i loro byte fino alla rimozione, ed è per questo che il cestino ha una riga a sé. Lo spazio libero è quello che questo browser concede ancora a Lattice, non quello del disco: il disco un browser non può leggerlo. La copia su Drive è misurata su Drive ed è normalmente più grande, perché contiene anche i metadati di ogni progetto e una copia leggibile di ogni documento.',
   },
   trash: {
     countLine: (n, size) =>

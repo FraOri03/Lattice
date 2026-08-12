@@ -62,6 +62,22 @@ export interface DriveAbout {
   storageQuota?: { limit?: string; usage?: string }
 }
 
+/**
+ * What the mirror actually occupies on Drive, measured rather than inferred
+ * from the local vault. `files` excludes folders — it is the count of real
+ * payloads, to be read against `bytes`.
+ *
+ * `quotaLimit` is the whole Google account's allowance and `quotaUsage` its
+ * whole consumption: those two are NOT Lattice's, and anything showing them
+ * has to say so. `limit` is undefined on accounts with unlimited storage.
+ */
+export interface DriveUsage {
+  bytes: number
+  files: number
+  quotaLimit?: number
+  quotaUsage?: number
+}
+
 export type TokenSupplier = () => Promise<string | null>
 
 /**
@@ -176,6 +192,57 @@ export class GoogleDriveStorageProvider implements StorageProvider {
       `${API}/about?fields=user(displayName,emailAddress),storageQuota(limit,usage)`,
     )
     return (await res.json()) as DriveAbout
+  }
+
+  /**
+   * Measure the mirror: every file Lattice has on Drive, with its real
+   * byte size as Drive itself reports it.
+   *
+   * No folder filter is needed, and that is a property of the scope rather
+   * than an oversight — under `drive.file` a listing can only ever return
+   * files this app created, so "everything visible to us" and "everything
+   * we put there" are the same set. Folders are dropped (they carry no
+   * bytes) and so is anything Drive reports without a `size`, which is how
+   * native Google-editor files appear; Lattice uploads none of those.
+   *
+   * This is deliberately a separate call from the local vault total. The
+   * two genuinely differ — Drive also holds the readable HTML mirror and
+   * each project's project.json — and a mirror figure derived from local
+   * bytes would hide exactly that difference instead of reporting it.
+   */
+  async usage(): Promise<DriveUsage> {
+    const about = await this.about()
+    let bytes = 0
+    let files = 0
+    let pageToken = ''
+    do {
+      const query = `trashed = false and mimeType != '${FOLDER_MIME}'`
+      const res = await this.request(
+        `${API}/files?q=${encodeURIComponent(query)}&fields=nextPageToken,files(size)&pageSize=1000${pageToken ? `&pageToken=${pageToken}` : ''}`,
+      )
+      const data = (await res.json()) as {
+        files: { size?: string }[]
+        nextPageToken?: string
+      }
+      for (const f of data.files) {
+        const size = Number(f.size)
+        if (!Number.isFinite(size)) continue
+        bytes += size
+        files += 1
+      }
+      pageToken = data.nextPageToken ?? ''
+    } while (pageToken)
+
+    const num = (v: string | undefined) => {
+      const n = Number(v)
+      return Number.isFinite(n) ? n : undefined
+    }
+    return {
+      bytes,
+      files,
+      quotaLimit: num(about.storageQuota?.limit),
+      quotaUsage: num(about.storageQuota?.usage),
+    }
   }
 
   /* ---------------- folders ---------------- */

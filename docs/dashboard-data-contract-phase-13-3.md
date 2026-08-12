@@ -66,7 +66,7 @@ today, and it is exactly what phase 18 exists to fix.
 | Sync chip | local · syncing · synced · failed · offline | `syncStore` | **Ships** | realtime states only when the backend is configured |
 | Sidebar — RunPod credit | balance, spend, runway | **nothing** | **Phase 21** | already honest in the prototype: reserved, named, nothing estimated |
 | Sidebar — System | CPU, memory, GPU, disk | **nothing** | **Not planned** | the browser cannot read these without a native host |
-| Sidebar — Storage | vault size, Drive mirror, free space | local (partly) | **Partial** | vault size ships; "free space" and the Drive mirror figure have no source |
+| Sidebar — Storage | vault size, assets, documents, trash, free space, Drive mirror | local + `navigator.storage.estimate()` + Drive | **Ships** | all six readings have a source since 15.8: the vault line and free space come from the origin estimate, and the mirror is measured by a Drive listing (`drive.usage()`) rather than inferred from local bytes |
 
 ---
 
@@ -132,7 +132,10 @@ Two rules that follow:
 5. **Card avatars.** Label them members. A presence-scope tooltip on a Home card
    claims a room that is not attached.
 6. **Storage bar.** "Free space" and the Drive mirror figure have no source —
-   reserve them or drop them.
+   reserve them or drop them. *(Closed in 15.8: free space is the origin's
+   allowance from `navigator.storage.estimate()` — not the disk's, which is
+   still unreadable and still not claimed — and the mirror is measured by a
+   Drive listing. The headline also stopped labelling a local total "Drive".)*
 7. **Recents.** Day grouping needs more than 15 entries; either the cap rises
    (a store change, cheap) or the page presents itself as a short list, which is
    what it is.

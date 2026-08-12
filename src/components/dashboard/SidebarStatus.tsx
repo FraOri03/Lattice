@@ -4,6 +4,7 @@ import { useUiStore } from '@/store/useUiStore'
 import { useSyncStore } from '@/lib/sync/syncStore'
 import { useI18n } from '@/lib/i18n'
 import { formatBytes } from '@/lib/media'
+import { useStorageEstimate } from '@/lib/storage/useStorageEstimate'
 import { collectTrash, trashedBytes } from '@/lib/dashboard/trash'
 import { IcChevronDown, IcInfo, IcSettings } from '@/components/Icons'
 
@@ -24,11 +25,21 @@ import { IcChevronDown, IcInfo, IcSettings } from '@/components/Icons'
  * - **System** (CPU, memory, GPU, disk, network) is marked *not planned* in
  *   13.3: a browser cannot read any of it without a native host. The row says
  *   so instead of reporting a plausible-looking guess.
- * - **Storage** is the partial one, and less partial since 15.6. The vault's
- *   size and file count are computed here, the Drive mirror's state is real,
- *   and the trash figure became real the moment soft delete kept the payload in
- *   place: those bytes are genuinely still occupied. Free space stays reserved —
- *   that is the disk's, which a browser cannot read.
+ * - **Storage** is the partial one, and less partial with every phase. The
+ *   vault's size and file count are computed here, the trash figure became
+ *   real the moment soft delete kept the payload in place, and the Drive
+ *   mirror is now *measured on Drive* rather than inferred from local bytes.
+ *   Free space is the origin's allowance, not the disk's — the disk's is
+ *   still unreadable from a browser and is still not claimed.
+ *
+ * Every reading on the Storage bar names the thing it measured, because the
+ * three totals here legitimately disagree and the disagreement is the
+ * information. The local vault holds asset payloads; Drive additionally
+ * holds each project's `project.json` and the readable HTML mirror of every
+ * document, so the mirror is expected to be BIGGER, with more files. A
+ * single blended "storage" number would have hidden exactly that, which is
+ * why the earlier version of this bar showed a local total labelled
+ * "Drive".
  */
 
 function StatusBar({
@@ -88,6 +99,8 @@ export function SidebarStatus() {
   const openSettings = useStore((s) => s.openSettings)
   const setShortcutsOpen = useUiStore((s) => s.setShortcutsOpen)
   const provider = useSyncStore((s) => s.provider)
+  const driveUsage = useSyncStore((s) => s.driveUsage)
+  const estimate = useStorageEstimate()
   const assets = useStore((s) => s.assets)
   const notes = useStore((s) => s.notes)
   const docs = useStore((s) => s.docs)
@@ -107,15 +120,29 @@ export function SidebarStatus() {
   const trashCount = trash.length
   // the live vault excludes what is waiting to be purged — those bytes are
   // reported on their own line rather than counted twice
-  const bytes = Object.values(assets)
+  const assetBytes = Object.values(assets)
     .filter((a) => !a.deletedAt)
     .reduce((sum, a) => sum + (a.size ?? 0), 0)
   const live = (m: Record<string, { deletedAt?: number }>) =>
     Object.values(m).filter((e) => !e.deletedAt).length
-  const files =
-    live(assets) + live(notes) + live(docs) + live(sheetDocs) + live(presentDocs) + live(codeDocs)
+  const assetFiles = live(assets)
+  /**
+   * Counted apart from the assets, because they are not measured the same
+   * way: an AssetDoc knows its own byte size, a document's cost is whatever
+   * its serialised body takes in IndexedDB and is only visible in the
+   * origin estimate. Adding the two counts while summing only asset bytes
+   * is what produced the old "124.3 MB · 131 files" — a size for 111 things
+   * attributed to 131.
+   */
+  const docFiles = live(notes) + live(docs) + live(sheetDocs) + live(presentDocs) + live(codeDocs)
   const synced = provider !== 'none'
   const dash = '—'
+
+  // the origin's own accounting when the browser offers it: it counts the
+  // documents and indexes an asset-size sum cannot see
+  const onDisk = estimate ? estimate.usage : null
+  const freeSpace = estimate ? Math.max(0, estimate.quota - estimate.usage) : null
+  const headline = onDisk ?? assetBytes
 
   return (
     <div className="flex-none">
@@ -138,18 +165,46 @@ export function SidebarStatus() {
 
       <StatusBar
         label={t.status.storage}
-        value={t.status.storageLine(formatBytes(bytes) || '0 B', synced)}
+        value={t.status.storageLine(formatBytes(headline) || '0 B', synced)}
         accent
       >
-        <Reading label={t.status.localVault} value={t.status.vaultLine(formatBytes(bytes) || '0 B', files)} />
         <Reading
-          label={t.status.driveMirror}
-          value={synced ? t.status.connected : t.status.notConnected}
+          label={t.status.localVault}
+          value={onDisk === null ? dash : formatBytes(onDisk) || '0 B'}
         />
+        <Reading
+          label={t.status.assets}
+          value={t.status.vaultLine(formatBytes(assetBytes) || '0 B', assetFiles)}
+        />
+        <Reading label={t.status.documents} value={t.status.documentsLine(docFiles)} />
         {/* real since 15.6: the payload stays put until a purge, so those bytes
             are genuinely still occupied and can be counted */}
         <Reading label={t.status.trash} value={t.status.trashLine(formatBytes(trashBytes) || '0 B', trashCount)} />
-        <Reading label={t.status.freeSpace} value={dash} />
+        <Reading
+          label={t.status.freeSpace}
+          value={freeSpace === null ? dash : formatBytes(freeSpace) || '0 B'}
+        />
+        {/* measured on Drive, never derived from the local total — the two
+            differ by design and that difference is worth seeing */}
+        <Reading
+          label={t.status.driveMirror}
+          value={
+            !synced
+              ? t.status.notConnected
+              : driveUsage
+                ? t.status.vaultLine(formatBytes(driveUsage.bytes) || '0 B', driveUsage.files)
+                : t.status.measuring
+          }
+        />
+        {synced && driveUsage?.quotaLimit !== undefined && (
+          <Reading
+            label={t.status.driveAccount}
+            value={t.status.quotaLine(
+              formatBytes(driveUsage.quotaUsage ?? 0) || '0 B',
+              formatBytes(driveUsage.quotaLimit) || '0 B',
+            )}
+          />
+        )}
         <Why>{t.status.storageWhy}</Why>
       </StatusBar>
 

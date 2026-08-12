@@ -294,6 +294,21 @@ class SyncEngine {
   }
 
   /** Full round-trip: pull remote changes, then push local ones. */
+  /**
+   * Re-measure what the mirror holds on Drive. Never allowed to fail a
+   * sync: this is a reading for the status panel, so a rate-limited or
+   * flaky listing just leaves the previous measurement in place rather than
+   * blanking it or surfacing an error the user can do nothing about.
+   */
+  private async refreshDriveUsage(): Promise<void> {
+    if (!this.drive) return
+    try {
+      useSyncStore.getState().setDriveUsage(await this.drive.usage())
+    } catch (err) {
+      console.warn('[sync] could not measure Drive usage', err)
+    }
+  }
+
   async syncNow(): Promise<void> {
     if (!this.drive || this.busy) return
     if (!navigator.onLine) {
@@ -308,6 +323,7 @@ class SyncEngine {
       this.meta.lastSyncAt = Date.now()
       this.saveMeta()
       useSyncStore.getState().markSynced(this.meta.lastSyncAt)
+      void this.refreshDriveUsage()
       // activity trail (deduped there); dynamic import avoids a static cycle
       void import('@/lib/collab/ActivityLogService').then(({ activityLog }) =>
         activityLog.log(

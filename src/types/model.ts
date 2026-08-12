@@ -224,6 +224,19 @@ export interface SyncState {
   pendingChanges: number
   conflicts: SyncConflict[]
   error: string | null
+  /**
+   * What the Drive mirror measurably holds, refreshed from Drive itself.
+   * Null until the first measurement lands (or when there is no mirror) —
+   * which is why the status panel must render "not measured yet" rather
+   * than falling back to the local total and calling it Drive.
+   */
+  driveUsage: {
+    bytes: number
+    files: number
+    /** Whole-account figures, not Lattice's. */
+    quotaLimit?: number
+    quotaUsage?: number
+  } | null
 }
 
 /* ---------------- assets ---------------- */

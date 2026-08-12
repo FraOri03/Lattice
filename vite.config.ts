@@ -39,6 +39,18 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  /**
+   * @ffmpeg/ffmpeg must NOT be pre-bundled. It reaches its own inner worker
+   * with `new Worker(new URL('./worker.js', import.meta.url))`, and once
+   * esbuild has rewritten that module into `node_modules/.vite/deps/`, the
+   * URL resolves next to the *bundle* — `/node_modules/.vite/deps/worker.js`,
+   * which 404s. Nothing throws: the worker simply never answers, so in dev
+   * every video upload hangs on "Converting…" indefinitely. Excluding it
+   * keeps the dist layout (and that relative URL) intact.
+   */
+  optimizeDeps: {
+    exclude: ['@ffmpeg/ffmpeg', '@ffmpeg/util'],
+  },
   build: {
     rollupOptions: {
       output: {
