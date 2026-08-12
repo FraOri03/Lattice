@@ -77,9 +77,19 @@ export function hostnameOf(url: string): string {
   }
 }
 
+/**
+ * Note the empty string for 0/undefined: callers that need a real reading
+ * for "nothing" pass a fallback (`formatBytes(n) || '0 B'`). Kept as-is
+ * because file-size labels elsewhere rely on an unknown size rendering as
+ * nothing at all rather than as a confident "0 B".
+ *
+ * The GB tier matters once storage quotas are on screen — a 15 GB Drive
+ * allowance shown as "15360.0 MB" is technically right and unreadable.
+ */
 export function formatBytes(n?: number): string {
   if (!n) return ''
   if (n < 1024) return `${n} B`
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`
-  return `${(n / 1024 / 1024).toFixed(1)} MB`
+  if (n < 1024 * 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)} MB`
+  return `${(n / 1024 / 1024 / 1024).toFixed(1)} GB`
 }

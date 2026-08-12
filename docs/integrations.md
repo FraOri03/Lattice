@@ -148,8 +148,26 @@ session — it is not bundled with the app. This is the pattern ffmpeg.wasm's
 own documentation recommends; self-hosting it as a Vite build asset was
 investigated but has real build friction (Vite's static-asset handling
 doesn't cleanly support the `toBlobURL` loading ffmpeg.wasm needs). If
-jsDelivr is unreachable, conversion is skipped for that session and uploads
-keep working with their original file untouched — never a hard failure.
+jsDelivr is unreachable the conversion fails with a retryable error and the
+upload keeps its original file, still playable — never a lost upload.
+
+Two constraints here are load-bearing and both are easy to undo by
+accident:
+
+- **The `dist/esm` core build, not `dist/umd`.** `@ffmpeg/ffmpeg` always
+  spawns its inner worker with `type: "module"`, where `importScripts()` —
+  the entire reason the umd build exists — throws. Its loader falls back to
+  `await import(coreURL)`, and the umd bundle ends in a UMD wrapper with no
+  ES export, so that import resolves to `default: undefined` and the load
+  dies with *"failed to import ffmpeg-core.js"*. The library self-corrects
+  `/umd/` → `/esm/` only when no `coreURL` is passed at all, so handing it a
+  umd blob URL is precisely what defeats the correction.
+- **`@ffmpeg/ffmpeg` is in `optimizeDeps.exclude`.** It reaches its inner
+  worker with `new Worker(new URL('./worker.js', import.meta.url))`. Once
+  Vite pre-bundles the module into `node_modules/.vite/deps/`, that URL
+  resolves next to the bundle instead — a path that 404s. Nothing throws;
+  the worker simply never answers, so in dev every upload hangs on
+  "Converting…" forever.
 
 ## Full environment-variable reference
 

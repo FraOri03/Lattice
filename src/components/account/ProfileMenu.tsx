@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { useAccount } from '@/lib/auth/AccountProvider'
 import { useSyncStore } from '@/lib/sync/syncStore'
 import { useStore } from '@/store/useStore'
 import { useI18n, useTimeAgo } from '@/lib/i18n'
 import { env } from '@/lib/env'
+import { AnchoredPopover } from '@/components/ui/AnchoredPopover'
 import { IcCloud, IcLogOut, IcSettings, IcUser } from '@/components/Icons'
 
 /**
@@ -21,16 +22,8 @@ export function ProfileMenu() {
   const timeAgo = useTimeAgo()
   const openSettings = useStore((s) => s.openSettings)
   const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!open) return
-    const close = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false)
-    }
-    window.addEventListener('mousedown', close)
-    return () => window.removeEventListener('mousedown', close)
-  }, [open])
+  const avatar = useRef<HTMLButtonElement>(null)
+  const close = useCallback(() => setOpen(false), [])
 
   if (!account) {
     return (
@@ -41,10 +34,12 @@ export function ProfileMenu() {
   }
 
   return (
-    <div className="relative" ref={ref}>
+    <div className="relative flex-none">
       <button
+        ref={avatar}
         className="flex h-7 w-7 cursor-pointer items-center justify-center overflow-hidden rounded-full border border-bord bg-panel2 hover:border-accent"
         onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
         title={t.profile.accountTitle(account.name)}
       >
         {account.avatarUrl ? (
@@ -56,8 +51,16 @@ export function ProfileMenu() {
         )}
       </button>
 
-      {open && (
-        <div className="absolute top-9 right-0 z-50 w-72 rounded-xl border border-bord bg-panel p-3 shadow-xl">
+      {/* portalled out of the top bar, which clips vertically at 43 px —
+          see AnchoredPopover */}
+      <AnchoredPopover
+        anchorRef={avatar}
+        open={open}
+        onClose={close}
+        role="menu"
+        label={t.profile.accountTitle(account.name)}
+        className="w-72 overflow-y-auto p-3"
+      >
           {/* identity */}
           <div className="flex items-center gap-3 border-b border-bord pb-3">
             <span className="flex h-10 w-10 flex-none items-center justify-center overflow-hidden rounded-full border border-bord bg-panel2">
@@ -137,8 +140,7 @@ export function ProfileMenu() {
               <IcLogOut size={12} /> {t.profile.signOut}
             </button>
           </div>
-        </div>
-      )}
+      </AnchoredPopover>
     </div>
   )
 }

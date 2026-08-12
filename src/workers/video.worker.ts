@@ -27,7 +27,29 @@ import type {
 const ctx = self as unknown as DedicatedWorkerGlobalScope
 
 const CORE_VERSION = '0.12.10'
-const CORE_BASE = `https://cdn.jsdelivr.net/npm/@ffmpeg/core@${CORE_VERSION}/dist/umd`
+/**
+ * The **esm** build, not the umd one, and that is load-bearing.
+ *
+ * @ffmpeg/ffmpeg always spawns its own inner worker with `type: "module"`,
+ * so `importScripts()` — the path the umd build exists for — is not
+ * available to it. Its loader tries `importScripts` first, catches, and
+ * falls back to `await import(coreURL)`; the umd bundle ends in a UMD
+ * wrapper with no ES export, so that import yields `default: undefined`
+ * and the load dies with "failed to import ffmpeg-core.js". The esm bundle
+ * ends in `export default createFFmpegCore` and is what that fallback — the
+ * only path this ever takes — actually needs.
+ *
+ * Its own `/umd/` → `/esm/` self-correction only fires when no coreURL is
+ * passed at all, so handing it a umd blob URL is precisely what defeats it.
+ */
+const CORE_BASE = `https://cdn.jsdelivr.net/npm/@ffmpeg/core@${CORE_VERSION}/dist/esm`
+
+/**
+ * A core that never finishes loading would otherwise leave every card
+ * stuck on "Converting…" forever — `load()` has no timeout of its own, and
+ * a worker that fails to boot never answers at all.
+ */
+const LOAD_TIMEOUT_MS = 90_000
 
 let ffmpegPromise: Promise<FFmpeg> | null = null
 
@@ -39,7 +61,26 @@ function loadFFmpeg(): Promise<FFmpeg> {
       toBlobURL(`${CORE_BASE}/ffmpeg-core.js`, 'text/javascript'),
       toBlobURL(`${CORE_BASE}/ffmpeg-core.wasm`, 'application/wasm'),
     ])
-    await ffmpeg.load({ coreURL, wasmURL })
+    let timer: ReturnType<typeof setTimeout> | undefined
+    try {
+      await Promise.race([
+        ffmpeg.load({ coreURL, wasmURL }),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(
+            () => reject(new Error('Timed out loading the video conversion engine')),
+            LOAD_TIMEOUT_MS,
+          )
+        }),
+      ])
+    } catch (err) {
+      // a failed load must not be cached as a permanently rejected promise:
+      // Retry has to be able to try the download again
+      ffmpegPromise = null
+      ffmpeg.terminate()
+      throw err
+    } finally {
+      clearTimeout(timer)
+    }
     return ffmpeg
   })()
   return ffmpegPromise

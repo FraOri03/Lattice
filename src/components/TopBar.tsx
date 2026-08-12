@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useStore } from '@/store/useStore'
 import { atLeast } from '@/lib/layout/tiers'
 import { useViewportTier } from '@/lib/layout/useViewportTier'
@@ -16,6 +16,7 @@ import { PresenceAvatars } from '@/components/collab/PresenceAvatars'
 import { RealtimeStatusChip } from '@/components/collab/RealtimeStatusChip'
 import { NotificationCenter } from '@/components/collab/NotificationCenter'
 import { useCollabMode } from '@/lib/collab/collabPresentation'
+import { AnchoredPopover } from '@/components/ui/AnchoredPopover'
 import { useI18n } from '@/lib/i18n'
 import { nextTheme, setThemeAnimated } from '@/lib/theme/animateTheme'
 import {
@@ -275,27 +276,13 @@ function PanelButtons() {
  */
 function TopBarOverflow({ label, children }: { label: string; children: React.ReactNode }) {
   const [open, setOpen] = useState(false)
-  const root = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!open) return
-    const onDown = (e: MouseEvent) => {
-      if (!root.current?.contains(e.target as Node)) setOpen(false)
-    }
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false)
-    }
-    window.addEventListener('mousedown', onDown)
-    window.addEventListener('keydown', onKey)
-    return () => {
-      window.removeEventListener('mousedown', onDown)
-      window.removeEventListener('keydown', onKey)
-    }
-  }, [open])
+  const trigger = useRef<HTMLButtonElement>(null)
+  const close = useCallback(() => setOpen(false), [])
 
   return (
-    <div className="relative flex-none" ref={root}>
+    <div className="relative flex-none">
       <button
+        ref={trigger}
         className="icon-btn"
         aria-haspopup="menu"
         aria-expanded={open}
@@ -307,11 +294,16 @@ function TopBarOverflow({ label, children }: { label: string; children: React.Re
           ···
         </span>
       </button>
-      {open && (
-        <div className="absolute top-9 right-0 z-50 flex w-max flex-col items-stretch gap-2 rounded-xl border border-bord bg-panel p-2 shadow-xl">
-          {children}
-        </div>
-      )}
+      {/* portalled out of the bar: this header is a scroll container in both
+          axes, so an `absolute` panel here is clipped to the 43 px row */}
+      <AnchoredPopover
+        anchorRef={trigger}
+        open={open}
+        onClose={close}
+        className="flex w-max flex-col items-stretch gap-2 overflow-y-auto p-2"
+      >
+        {children}
+      </AnchoredPopover>
     </div>
   )
 }

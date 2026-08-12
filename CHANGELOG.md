@@ -122,6 +122,41 @@ All notable changes to Lattice are recorded here. The format follows
 
 ### Fixed
 
+- **Every video uploaded to a board failed to convert.** The worker asked jsDelivr for the
+  `dist/umd` build of ffmpeg-core, and that build was never reachable: `@ffmpeg/ffmpeg`
+  always spawns its inner worker as a module, where `importScripts()` — the only thing the
+  umd bundle exists for — throws. Its loader falls back to `await import(coreURL)`, and the
+  umd bundle ends in a UMD wrapper with no ES export, so the import resolved to
+  `default: undefined` and the load died with "failed to import ffmpeg-core.js". Every card
+  showed "Conversion failed", and because the rejected load was cached for the life of the
+  tab, Retry failed instantly too. It now loads the `dist/esm` build, which ends in the
+  `export default` that fallback actually needs; a failed load is no longer cached, so Retry
+  genuinely retries; and a core that never answers times out after 90s instead of leaving
+  the card on "Converting…" forever. In development a second fault hid behind the first:
+  Vite pre-bundled `@ffmpeg/ffmpeg`, which moved the module and left its
+  `new Worker(new URL('./worker.js', import.meta.url))` pointing at a path that 404s — no
+  error, just a worker that never replied. It is excluded from pre-bundling now.
+
+- **Nothing in the top bar could open a menu.** The bar carries `overflow-x-auto` so an
+  overlong bar scrolls instead of pushing the page sideways, but CSS does not let that stay
+  one-dimensional: with either axis set to something other than `visible`, the other axis
+  becomes `auto` too. The bar was therefore a 43px-tall *vertical* scroll container, and
+  every panel anchored inside it — notifications, the ··· overflow menu, the account menu —
+  was clipped to a 1.3px sliver that was not even clickable, since the hit test landed on
+  the dismiss backdrop underneath. The panels now render in a portal outside the bar, where
+  no ancestor's overflow can reach them, positioned from their trigger and clamped to the
+  viewport. They also stack: below the widest tier the notification bell renders inside the
+  ··· menu, so one outside click, or one Escape, closes one layer rather than collapsing
+  both.
+
+- **The storage panel reported the local vault and called it Drive.** The headline read
+  `124.3 MB · Drive` while the number was the sum of local asset sizes — nothing had ever
+  asked Drive anything, and "Drive" only meant a mirror was connected. The vault line also
+  divided asset bytes by a file count that included documents, quoting a size for 111 things
+  against a count of 131. The mirror is now measured on Drive itself, assets and documents
+  are counted separately so each number has a denominator that matches it, and the vault
+  line reports what the origin actually occupies rather than what its assets add up to.
+
 - **The Google session was lost every few minutes.** The GIS token flow has no refresh
   token, so renewal is a `window.open` round-trip needing transient user activation, which
   background callers do not have. A failed renewal armed a "retry on the next gesture"

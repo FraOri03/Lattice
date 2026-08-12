@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { useStore } from '@/store/useStore'
 import { useCollabStore } from '@/lib/collab/collabStore'
+import { AnchoredPopover } from '@/components/ui/AnchoredPopover'
 import { focusAreaOnBoard } from './CommentAreas'
 import type { AppNotification, NotificationType } from '@/types/collab'
 import {
@@ -80,11 +81,14 @@ export function NotificationCenter() {
   const markAllRead = useCollabStore((s) => s.markAllNotificationsRead)
   const clear = useCollabStore((s) => s.clearNotifications)
   const [open, setOpen] = useState(false)
+  const bell = useRef<HTMLButtonElement>(null)
+  const close = useCallback(() => setOpen(false), [])
   const unread = notifications.filter((n) => !n.read).length
 
   return (
-    <div className="relative">
+    <div className="relative flex-none">
       <button
+        ref={bell}
         className="icon-btn relative"
         aria-label={`Notifications — ${unread} unread`}
         title={`Notifications${unread ? ` (${unread} unread)` : ''}`}
@@ -102,72 +106,64 @@ export function NotificationCenter() {
         )}
       </button>
 
-      {open && (
-        <>
-          <button
-            className="fixed inset-0 z-40 cursor-default"
-            aria-label="Close notifications"
-            onClick={() => setOpen(false)}
-          />
-          <div
-            role="dialog"
-            aria-label="Notification center"
-            className="absolute right-0 z-50 mt-1.5 flex max-h-[70vh] w-80 flex-col rounded-xl border border-bord bg-panel shadow-xl"
-          >
-            <div className="flex flex-none items-center gap-2 border-b border-bord px-3 py-2">
-              <span className="text-[12px] font-bold">Notifications</span>
-              <div className="flex-1" />
-              {notifications.length > 0 && (
-                <>
-                  <button className="text-[10.5px] text-muted hover:text-accent" onClick={markAllRead}>
-                    Mark all read
-                  </button>
-                  <button
-                    className="icon-btn h-5 w-5"
-                    title="Clear all"
-                    aria-label="Clear all notifications"
-                    onClick={clear}
-                  >
-                    <IcX size={10} />
-                  </button>
-                </>
-              )}
-            </div>
-            <div className="min-h-0 flex-1 overflow-y-auto p-1.5">
-              {notifications.length === 0 && (
-                <p className="px-3 py-6 text-center text-[11.5px] text-muted">
-                  Nothing yet. Mentions, replies, assignments, invites and sync
-                  problems land here.
-                </p>
-              )}
-              {notifications.map((n) => (
-                <button
-                  key={n.id}
-                  className={`mb-1 flex w-full cursor-pointer gap-2 rounded-lg border p-2 text-left ${
-                    n.read ? 'border-transparent opacity-70' : 'border-bord bg-panel2/50'
-                  } hover:bg-panel2`}
-                  onClick={() => {
-                    markRead(n.id)
-                    openTarget(n)
-                    setOpen(false)
-                  }}
-                >
-                  <span className="mt-0.5 flex-none text-muted">{TYPE_ICON[n.type]}</span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[12px] font-semibold">
-                      {n.title}
-                    </span>
-                    <span className="block truncate text-[11px] text-muted">{n.body}</span>
-                  </span>
-                  <span className="flex-none text-[9.5px] text-muted">
-                    {timeAgo(n.createdAt)}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </>
-      )}
+      {/* portalled: nested in the bar it was clipped to a 1 px sliver — see
+          AnchoredPopover for why the bar clips vertically at all */}
+      <AnchoredPopover
+        anchorRef={bell}
+        open={open}
+        onClose={close}
+        role="dialog"
+        label="Notification center"
+        className="flex w-80 flex-col"
+      >
+        <div className="flex flex-none items-center gap-2 border-b border-bord px-3 py-2">
+          <span className="text-[12px] font-bold">Notifications</span>
+          <div className="flex-1" />
+          {notifications.length > 0 && (
+            <>
+              <button className="text-[10.5px] text-muted hover:text-accent" onClick={markAllRead}>
+                Mark all read
+              </button>
+              <button
+                className="icon-btn h-5 w-5"
+                title="Clear all"
+                aria-label="Clear all notifications"
+                onClick={clear}
+              >
+                <IcX size={10} />
+              </button>
+            </>
+          )}
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-1.5">
+          {notifications.length === 0 && (
+            <p className="px-3 py-6 text-center text-[11.5px] text-muted">
+              Nothing yet. Mentions, replies, assignments, invites and sync problems land
+              here.
+            </p>
+          )}
+          {notifications.map((n) => (
+            <button
+              key={n.id}
+              className={`mb-1 flex w-full cursor-pointer gap-2 rounded-lg border p-2 text-left ${
+                n.read ? 'border-transparent opacity-70' : 'border-bord bg-panel2/50'
+              } hover:bg-panel2`}
+              onClick={() => {
+                markRead(n.id)
+                openTarget(n)
+                setOpen(false)
+              }}
+            >
+              <span className="mt-0.5 flex-none text-muted">{TYPE_ICON[n.type]}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[12px] font-semibold">{n.title}</span>
+                <span className="block truncate text-[11px] text-muted">{n.body}</span>
+              </span>
+              <span className="flex-none text-[9.5px] text-muted">{timeAgo(n.createdAt)}</span>
+            </button>
+          ))}
+        </div>
+      </AnchoredPopover>
     </div>
   )
 }
