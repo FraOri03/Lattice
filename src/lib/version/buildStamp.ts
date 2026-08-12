@@ -28,7 +28,7 @@
  * The short commit sha next to the version in the account menu still tells
  * them apart, which is what that field is for.
  */
-export const PINNED_VERSION = '0.11.3.5'
+export const PINNED_VERSION = '0.15.8'
 
 /** 2025-01-01T00:00:00Z — chosen so the number stays six digits for years. */
 export const BUILD_EPOCH_MS = Date.UTC(2025, 0, 1)

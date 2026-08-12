@@ -525,6 +525,338 @@ export const en = {
     noDescription: 'No description',
     emptyTitle: 'No projects in this workspace yet',
     emptyBody: 'A project holds its own boards, notes, documents and files.',
+    workspaces: 'Workspaces',
+    projectCount: (n: number) => `${n} ${n === 1 ? 'project' : 'projects'}`,
+  },
+  /**
+   * The dashboard's six destinations (13.1, built in 15.1).
+   *
+   * `description` is the question each destination answers, straight from the
+   * IA table — it is what the surface is *for*, and it stays true whether or not
+   * the surface can be filled yet. What each one is allowed to SAY when it
+   * cannot be filled lives in `honest` below.
+   */
+  destinations: {
+    navLabel: 'Dashboard',
+    workspaceLabel: 'Active workspace',
+    projectCount: (n: number) => `${n} ${n === 1 ? 'project' : 'projects'}`,
+    title: {
+      home: 'Home',
+      recents: 'Recents',
+      starred: 'Starred',
+      shared: 'Shared with me',
+      invites: 'Invites',
+      trash: 'Trash',
+    },
+    description: {
+      home: 'What is in this workspace, and what you touched last.',
+      recents: 'What you have opened, newest first.',
+      starred: 'What you pinned, and where it is.',
+      shared: 'What someone else has given you access to.',
+      invites: 'Who is asking, and what you would be agreeing to.',
+      trash: 'What you deleted, and how long you have.',
+    },
+  },
+  /**
+   * The three sections that cannot be complete before the server (13.3, 15.5).
+   *
+   * Every `why…` string names **the constraint, not the schedule**: "needs the
+   * server planned for phase 18" is a fact about the product, "coming soon" is
+   * a promise nobody is holding. And none of them says a section is empty —
+   * that is the false negative the whole rule exists to prevent.
+   */
+  honest: {
+    shared: {
+      intro:
+        'Access is granted per project, never workspace-wide: being in someone’s workspace does not give you their other projects.',
+      scopeBrowser: 'This browser',
+      scopeDrive: 'This Google Drive',
+      scopeBrowserWhy: 'Shared inside this browser profile — visible on this device only.',
+      scopeDriveWhy: 'Reaching you through the owner’s Google Drive folder.',
+      unknownOwner: 'Owner not recorded',
+      whyPartial:
+        'Only projects whose data already reaches this browser can be listed — shared inside this profile, or through a Drive folder you both hold. A full index of everything shared with you needs the server planned for phase 18.',
+      empty: 'No one has shared a project into this browser or this Drive folder.',
+      grants: {
+        admin: 'Manages members, roles and project settings. Cannot delete the project.',
+        editor: 'Creates and edits boards, documents, notes, sheets and code.',
+        commenter: 'Reads everything and leaves comments. Cannot change content.',
+        viewer: 'Read-only access. Cannot comment or edit.',
+      },
+      role: (role: string) => `Role: ${role}`,
+    },
+    invites: {
+      received: 'Received',
+      sent: 'Sent',
+      whyNoInbox:
+        'An invitation lives on the sender’s device, keyed to the project it is for, so there is no copy here to list. You learn of one today by opening its link. An inbox needs the server invitation model planned for phase 18.',
+      sentIntro:
+        'Invitations you issued, gathered from the projects this device holds. Delivery is manual: copy the link and send it yourself.',
+      sentEmpty: 'You haven’t invited anyone from this device yet.',
+      copyLink: 'Copy link',
+      copied: 'Link copied',
+      status: {
+        pending: 'Pending',
+        accepted: 'Accepted',
+        revoked: 'Revoked',
+      },
+      /** Said once, so no row implies a delivery or expiry the app cannot see. */
+      noDeliveryClaim:
+        'There is no e-mail backend and no expiry date, so nothing here says delivered, failed or expired.',
+      invitedTo: (email: string, project: string) => `${email} · ${project}`,
+    },
+    trash: {
+      why: 'Deleting is still permanent: nothing records that an item was removed, when, or by whom, so there is no list to show and nothing to restore. Trash needs the soft-delete model tracked in issue #115.',
+    },
+  },
+  /**
+   * The two personal shelves (15.2). Every sentence with a name in it is a
+   * function taking the name — no concatenation at the call site, so Italian
+   * can put the pieces in its own order.
+   */
+  shelves: {
+    today: 'Today',
+    yesterday: 'Yesterday',
+    workspaceFilter: 'Filter by workspace',
+    allWorkspaces: 'All workspaces',
+    noProject: 'No project',
+    noWorkspace: 'No workspace',
+    rowMeta: (project: string, workspace: string, when: string) =>
+      `${project} · ${workspace} · ${when}`,
+    starredMeta: (kind: string, project: string | null, workspace: string) =>
+      project ? `${kind} · ${project} · ${workspace}` : `${kind} · ${workspace}`,
+    kind: {
+      project: 'Project',
+      board: 'Board',
+      doc: 'Document',
+      note: 'Note',
+      sheet: 'Spreadsheet',
+      present: 'Presentation',
+      code: 'Code file',
+      asset: 'File',
+    },
+    recentsNote: (cap: number) =>
+      `Written automatically as you open things, kept on this device only, and capped at the last ${cap} entries. It is not a backup and it does not sync — anything you want to keep in reach belongs in Starred.`,
+    recentsEmptyTitle: 'Nothing opened yet',
+    recentsEmptyBody: 'This list fills itself as you open boards, documents and files.',
+    starredEmptyTitle: 'Nothing starred yet',
+    starredEmptyBody: 'The star on any row or card pins it here, across every workspace.',
+    noResultsBody: 'Choose “All workspaces” to see everything again.',
+    selectedCount: (n: number) => `${n} selected`,
+    unstarSelected: 'Unstar selected',
+  },
+  /**
+   * The state a section shows instead of content (13.2 §5, 13.3).
+   *
+   * Every one follows the same shape: **what happened · what is still safe ·
+   * what to do next**. A state that cannot name a cause is not ready to ship,
+   * which is why `error` says the files are still on disk and `offline` says
+   * the local ones still open.
+   *
+   * `unavailable` is the sixth, and the one the other five cannot express. Its
+   * body is supplied by the caller, because the reason is different for every
+   * section and naming the constraint is the whole point — "needs the server
+   * planned for phase 18" is a fact, "coming soon" is a promise nobody holds.
+   */
+  states: {
+    loading: (what: string) => `Reading ${what}…`,
+    errorTitle: (what: string) => `Couldn’t read ${what}`,
+    errorBody: 'Nothing has been lost — your files are still on this device. Reloading rebuilds the index.',
+    errorAction: 'Reload',
+    offlineTitle: 'You’re offline',
+    offlineBody: 'What lives on this device still opens. Anything stored elsewhere reappears when the connection does.',
+    noResultsTitle: 'Nothing matches these filters',
+    noResultsBody: 'No item matches what you have narrowed to.',
+    noResultsAction: 'Clear filters',
+    unavailableTitle: (what: string) => `${what} isn’t available yet`,
+  },
+  /**
+   * The status bars at the foot of the dashboard's navigation (13.3 shape 1).
+   *
+   * Two of the three are mostly reserved, and each `…Why` line says which
+   * constraint holds it there — never a schedule, and never a number the app
+   * could not have measured.
+   */
+  status: {
+    off: 'off',
+    runpod: 'RunPod credit',
+    integration: 'Integration',
+    apiKey: 'API key',
+    balance: 'Balance',
+    jobs: 'Jobs',
+    notImplemented: 'not implemented',
+    notSet: 'not set',
+    disabled: 'disabled',
+    runpodWhy:
+      'Reserved space, deliberately empty: once a key exists this line shows balance, spend today and runway. Nothing is estimated in the meantime.',
+    system: 'System',
+    cpu: 'CPU',
+    memory: 'Memory',
+    gpu: 'GPU',
+    disk: 'Disk',
+    network: 'Network',
+    systemWhy:
+      'The browser can’t read these without a native host, so the row reports nothing rather than a plausible-looking guess.',
+    storage: 'Storage',
+    storageLine: (size: string, synced: boolean) => `${size} · ${synced ? 'Drive' : 'local'}`,
+    localVault: 'Local vault',
+    vaultLine: (size: string, files: number) =>
+      `${size} · ${files} ${files === 1 ? 'file' : 'files'}`,
+    driveMirror: 'Drive mirror',
+    connected: 'connected',
+    notConnected: 'not connected',
+    trash: 'Trash',
+    trashLine: (size: string, n: number) => `${size} · ${n} held`,
+    freeSpace: 'Free space',
+    storageWhy:
+      'The vault’s own size and its trash are measured here — deleted items keep occupying their bytes until the purge, which is why they get their own line. Free space is the disk’s, which a browser cannot read.',
+  },
+  /**
+   * Trash (15.6). Every string here is careful about two facts the prototype's
+   * own copy is careful about: the space is not free until the purge, and
+   * Lattice's trash is not Drive's.
+   */
+  trash: {
+    countLine: (n: number, size: string) =>
+      `${n} ${n === 1 ? 'item' : 'items'} · ${size} still occupied until each one’s countdown ends`,
+    nothingLine: (days: number) => `Nothing deleted · ${days}-day retention on this device`,
+    retentionNote: (days: number) =>
+      `Deleted items stay on this device for ${days} days, then Lattice removes them permanently — the countdown on each row is the real remaining time, not a suggestion. Space is only reclaimed after the purge. Anything also held in Google Drive is removed there at the same moment, and never before: emptying this trash is what reaches Drive, not the delete that put it here.`,
+    emptyTrash: 'Empty trash',
+    confirmEmpty: (n: number, size: string) =>
+      `Permanently delete all ${n} ${n === 1 ? 'item' : 'items'} (${size})? This cannot be undone and there is no copy left on this device.`,
+    keepThem: 'Keep them',
+    deletePermanently: 'Delete permanently',
+    emptyTitle: 'Trash is empty',
+    emptyBody: (days: number) =>
+      `Deleted projects and files wait here for ${days} days before Lattice removes them for good. Nothing is waiting right now.`,
+    rowMeta: (kind: string, location: string, when: string, by: string | null) =>
+      by ? `${kind} · was in ${location} · deleted ${when} by ${by}` : `${kind} · was in ${location} · deleted ${when}`,
+    parentDeleted: 'parent deleted',
+    purgingTonight: 'Purging tonight',
+    inDays: (n: number) => `in ${n} ${n === 1 ? 'day' : 'days'}`,
+    purgeOn: (date: string) => `Permanently removed on ${date}. Restore before then to keep it.`,
+    restore: 'Restore',
+    restoreToWhy: (location: string) => `Restore to ${location}`,
+    restoreToTopWhy:
+      'Its project is in the trash too, so this comes back on its own — restore the project to put it back where it was.',
+    deleteForever: (name: string) => `Delete ${name} forever`,
+  },
+  /** Row and card anatomy — the accessible names actions carry (13.5 §8). */
+  cards: {
+    openItem: (name: string) => `Open ${name}`,
+    select: (name: string) => `Select ${name}`,
+    starLabel: (name: string) => `Star ${name}`,
+    unstarLabel: (name: string) => `Unstar ${name}`,
+    gridView: 'Grid view',
+    listView: 'List view',
+    membersTitle: (n: number) => `${n} ${n === 1 ? 'member' : 'members'} with access`,
+    /** Sync scope on a card — the vault's, stated rather than implied. */
+    syncLocal: 'Local',
+    syncDrive: 'Drive',
+    syncLocalWhy: 'This vault stays in this browser — nothing is uploaded.',
+    syncDriveWhy: 'This vault is mirrored to your Google Drive folder.',
+  },
+  /**
+   * What `announce()` says (13.5 §5). Functions, never concatenated at the call
+   * site — an announcement is a sentence, and sentences do not survive being
+   * glued together across locales.
+   */
+  announcements: {
+    starred: (name: string) => `“${name}” starred`,
+    unstarred: (name: string) => `“${name}” unstarred`,
+    bulkUnstarred: (n: number) => `${n} ${n === 1 ? 'item' : 'items'} unstarred`,
+    results: (n: number) => `${n} ${n === 1 ? 'result' : 'results'}`,
+    created: (kind: string, name: string, project: string) =>
+      `Created ${kind} “${name}” in ${project}`,
+    filtersCleared: (n: number) => `Filters cleared — ${n} ${n === 1 ? 'item' : 'items'}`,
+    workspaceSwitched: (name: string, projects: number) =>
+      `${name} — ${projects} ${projects === 1 ? 'project' : 'projects'}`,
+    gridView: 'Grid view',
+    listView: 'List view',
+    restored: (name: string, location: string) => `“${name}” restored to ${location}`,
+    restoredToTop: (name: string) => `“${name}” restored — its project is still in the trash`,
+    purged: (name: string) => `“${name}” permanently deleted`,
+    purgedAll: (n: number) => `${n} ${n === 1 ? 'item' : 'items'} permanently deleted`,
+    purgedOnOpen: (n: number) =>
+      `${n} ${n === 1 ? 'item' : 'items'} passed 30 days and were removed`,
+  },
+  /**
+   * The command palette (13.4, built in 15.3). One search and one create list,
+   * so these strings are the only place either is named.
+   */
+  palette: {
+    placeholder: 'Search files, boards and projects — or type a command…',
+    label: 'Command palette',
+    results: 'Results',
+    sections: {
+      recent: 'Recently opened',
+      create: 'Create',
+      goto: 'Go to',
+      files: 'Files',
+      boards: 'Boards',
+      projects: 'Projects',
+      workspace: 'Workspace',
+      actions: 'Actions',
+    },
+    noResults: (query: string) => `Nothing matches “${query}”`,
+    /** Search reaches what this device holds — 13.4 §2. Said, not implied. */
+    driveScope:
+      'Search reaches what this device holds. A project that lives only in someone else’s Drive folder has not been read here yet.',
+    createNamed: (kind: string, name: string) => `Create ${kind} “${name}”`,
+    inProject: (project: string) => `in ${project}`,
+    currentProject: 'current',
+    switchProject: 'switch project',
+    switchWorkspace: 'switch workspace',
+    /**
+     * The utility commands. 15.3 localized what 13.4 specifies and left these,
+     * which had been English literals since the palette was written; 13.5 §8
+     * makes the whole catalogue this phase's, so they land here.
+     */
+    commands: {
+      graph: 'Open Graph view',
+      split: 'Toggle Split layout',
+      toLight: 'Switch to light theme',
+      toDark: 'Switch to dark theme',
+      github: 'GitHub — sync code',
+      drive: 'Google Drive — connect and diagnostics',
+      share: 'Share — members and invites',
+      comments: 'Comments',
+      activity: 'Activity log',
+      versions: 'Version history',
+      shortcuts: 'Keyboard shortcuts',
+      settings: 'Settings',
+      syncNow: 'Sync now (Google Drive)',
+      /** Sections inside the open project — hinted as `mode` in the list. */
+      goToSection: (section: string) => `Go to ${section}`,
+      modeHint: 'section',
+    },
+    /** The sections of an open project, named for the "Go to …" commands. */
+    viewModes: {
+      board: 'Board',
+      doc: 'Document',
+      sheet: 'Sheet',
+      presentation: 'Presentation',
+      code: 'Code',
+      photo: 'Photo',
+    },
+  },
+  /** The seven creation actions, and the target question (13.4 §6). */
+  create: {
+    kinds: {
+      project: 'project',
+      board: 'board',
+      doc: 'document',
+      note: 'Markdown note',
+      sheet: 'spreadsheet',
+      present: 'presentation',
+      code: 'code file',
+    },
+    newLabel: (kind: string) => `New ${kind}`,
+    createIn: (project: string) => `Create in ${project}`,
+    chooseTarget: (kind: string) => `Where should the ${kind} go?`,
+    noProjects: 'Create a project first — every file lives in one.',
+    back: 'Back',
   },
   /**
    * The settings screen (Phase 14.1). `pending` is deliberately specific: a
@@ -1252,6 +1584,273 @@ export const it: Catalog = {
     noDescription: 'Nessuna descrizione',
     emptyTitle: 'Ancora nessun progetto in questo workspace',
     emptyBody: 'Un progetto contiene le sue board, note, documenti e file.',
+    workspaces: 'Workspace',
+    projectCount: (n) => `${n} ${n === 1 ? 'progetto' : 'progetti'}`,
+  },
+  destinations: {
+    navLabel: 'Dashboard',
+    workspaceLabel: 'Workspace attivo',
+    projectCount: (n) => `${n} ${n === 1 ? 'progetto' : 'progetti'}`,
+    title: {
+      home: 'Home',
+      recents: 'Recenti',
+      starred: 'Preferiti',
+      shared: 'Condivisi con me',
+      invites: 'Inviti',
+      trash: 'Cestino',
+    },
+    description: {
+      home: 'Cosa c’è in questo workspace, e cosa hai aperto per ultimo.',
+      recents: 'Cosa hai aperto, dal più recente.',
+      starred: 'Cosa hai messo tra i preferiti, e dove si trova.',
+      shared: 'A cosa qualcun altro ti ha dato accesso.',
+      invites: 'Chi ti sta invitando, e a cosa acconsentiresti.',
+      trash: 'Cosa hai eliminato, e quanto tempo ti resta.',
+    },
+  },
+  honest: {
+    shared: {
+      intro:
+        'L’accesso è concesso per progetto, mai per l’intero workspace: stare nel workspace di qualcuno non ti dà i suoi altri progetti.',
+      scopeBrowser: 'Questo browser',
+      scopeDrive: 'Questo Google Drive',
+      scopeBrowserWhy:
+        'Condiviso dentro questo profilo browser — visibile solo su questo dispositivo.',
+      scopeDriveWhy: 'Ti arriva attraverso la cartella Google Drive del proprietario.',
+      unknownOwner: 'Proprietario non registrato',
+      whyPartial:
+        'Si possono elencare solo i progetti i cui dati arrivano già a questo browser — condivisi dentro questo profilo, o attraverso una cartella Drive che avete entrambi. Un indice completo di tutto ciò che ti è stato condiviso richiede il server previsto per la fase 18.',
+      empty: 'Nessuno ha condiviso un progetto dentro questo browser o questa cartella Drive.',
+      grants: {
+        admin:
+          'Gestisce membri, ruoli e impostazioni del progetto. Non può eliminare il progetto.',
+        editor: 'Crea e modifica board, documenti, note, fogli e codice.',
+        commenter: 'Legge tutto e lascia commenti. Non può cambiare i contenuti.',
+        viewer: 'Accesso in sola lettura. Non può commentare né modificare.',
+      },
+      role: (role) => `Ruolo: ${role}`,
+    },
+    invites: {
+      received: 'Ricevuti',
+      sent: 'Inviati',
+      whyNoInbox:
+        'Un invito vive sul dispositivo di chi lo manda, legato al progetto a cui si riferisce, quindi qui non esiste una copia da elencare. Oggi lo scopri aprendo il suo link. Una casella in arrivo richiede il modello di inviti lato server previsto per la fase 18.',
+      sentIntro:
+        'Gli inviti che hai emesso, raccolti dai progetti che questo dispositivo contiene. La consegna è manuale: copia il link e mandalo tu.',
+      sentEmpty: 'Non hai ancora invitato nessuno da questo dispositivo.',
+      copyLink: 'Copia il link',
+      copied: 'Link copiato',
+      status: {
+        pending: 'In attesa',
+        accepted: 'Accettato',
+        revoked: 'Revocato',
+      },
+      noDeliveryClaim:
+        'Non esiste un backend e-mail né una data di scadenza, quindi qui niente dice consegnato, fallito o scaduto.',
+      invitedTo: (email, project) => `${email} · ${project}`,
+    },
+    trash: {
+      why: 'Eliminare è ancora definitivo: niente registra che un elemento è stato rimosso, quando o da chi, quindi non c’è un elenco da mostrare né niente da ripristinare. Il Cestino richiede il modello di eliminazione reversibile tracciato nella issue #115.',
+    },
+  },
+  shelves: {
+    today: 'Oggi',
+    yesterday: 'Ieri',
+    workspaceFilter: 'Filtra per workspace',
+    allWorkspaces: 'Tutti i workspace',
+    noProject: 'Nessun progetto',
+    noWorkspace: 'Nessun workspace',
+    rowMeta: (project, workspace, when) => `${project} · ${workspace} · ${when}`,
+    starredMeta: (kind, project, workspace) =>
+      project ? `${kind} · ${project} · ${workspace}` : `${kind} · ${workspace}`,
+    kind: {
+      project: 'Progetto',
+      board: 'Board',
+      doc: 'Documento',
+      note: 'Nota',
+      sheet: 'Foglio di calcolo',
+      present: 'Presentazione',
+      code: 'File di codice',
+      asset: 'File',
+    },
+    recentsNote: (cap) =>
+      `Scritto automaticamente mentre apri le cose, tenuto solo su questo dispositivo e limitato alle ultime ${cap} voci. Non è un backup e non si sincronizza — ciò che vuoi tenere a portata di mano va nei Preferiti.`,
+    recentsEmptyTitle: 'Non hai ancora aperto niente',
+    recentsEmptyBody: 'Questo elenco si riempie da solo mentre apri board, documenti e file.',
+    starredEmptyTitle: 'Nessun preferito',
+    starredEmptyBody:
+      'La stella su una riga o una card lo fissa qui, da tutti i workspace.',
+    noResultsBody: 'Scegli “Tutti i workspace” per rivedere tutto.',
+    selectedCount: (n) => `${n} selezionati`,
+    unstarSelected: 'Togli dai preferiti',
+  },
+  states: {
+    loading: (what) => `Lettura di ${what}…`,
+    errorTitle: (what) => `Impossibile leggere ${what}`,
+    errorBody:
+      'Non è andato perso niente — i tuoi file sono ancora su questo dispositivo. Ricaricare ricostruisce l’indice.',
+    errorAction: 'Ricarica',
+    offlineTitle: 'Sei offline',
+    offlineBody:
+      'Ciò che vive su questo dispositivo si apre comunque. Quello archiviato altrove torna appena torna la connessione.',
+    noResultsTitle: 'Nessun elemento corrisponde ai filtri',
+    noResultsBody: 'Nessun elemento rientra in ciò a cui hai ristretto.',
+    noResultsAction: 'Azzera i filtri',
+    unavailableTitle: (what) => `${what} non è ancora disponibile`,
+  },
+  status: {
+    off: 'off',
+    runpod: 'Credito RunPod',
+    integration: 'Integrazione',
+    apiKey: 'Chiave API',
+    balance: 'Saldo',
+    jobs: 'Job',
+    notImplemented: 'non implementata',
+    notSet: 'non impostata',
+    disabled: 'disattivati',
+    runpodWhy:
+      'Spazio riservato, deliberatamente vuoto: quando esisterà una chiave questa riga mostrerà saldo, spesa di oggi e autonomia. Nel frattempo non si stima niente.',
+    system: 'Sistema',
+    cpu: 'CPU',
+    memory: 'Memoria',
+    gpu: 'GPU',
+    disk: 'Disco',
+    network: 'Rete',
+    systemWhy:
+      'Il browser non può leggerli senza un host nativo, quindi la riga non riporta niente invece di una stima che sembrerebbe vera.',
+    storage: 'Archiviazione',
+    storageLine: (size, synced) => `${size} · ${synced ? 'Drive' : 'locale'}`,
+    localVault: 'Vault locale',
+    vaultLine: (size, files) => `${size} · ${files} file`,
+    driveMirror: 'Copia su Drive',
+    connected: 'connessa',
+    notConnected: 'non connessa',
+    trash: 'Cestino',
+    trashLine: (size, n) => `${size} · ${n} in attesa`,
+    freeSpace: 'Spazio libero',
+    storageWhy:
+      'Qui sono misurati la dimensione del vault e il suo cestino — gli elementi eliminati continuano a occupare i loro byte fino alla rimozione, ed è per questo che hanno una riga a parte. Lo spazio libero è quello del disco, che un browser non può leggere.',
+  },
+  trash: {
+    countLine: (n, size) =>
+      `${n} ${n === 1 ? 'elemento' : 'elementi'} · ${size} ancora occupati finché non scade il conto alla rovescia di ciascuno`,
+    nothingLine: (days) => `Niente di eliminato · conservazione ${days} giorni su questo dispositivo`,
+    retentionNote: (days) =>
+      `Gli elementi eliminati restano su questo dispositivo per ${days} giorni, poi Lattice li rimuove definitivamente — il conto alla rovescia su ogni riga è il tempo reale che resta, non un’indicazione. Lo spazio si libera solo dopo la rimozione. Ciò che sta anche su Google Drive viene rimosso lì nello stesso momento, e mai prima: è svuotare questo cestino ad arrivare a Drive, non l’eliminazione che ce l’ha messo.`,
+    emptyTrash: 'Svuota il cestino',
+    confirmEmpty: (n, size) =>
+      `Eliminare definitivamente tutti i ${n} ${n === 1 ? 'elemento' : 'elementi'} (${size})? Non si può annullare e non resta nessuna copia su questo dispositivo.`,
+    keepThem: 'Tienili',
+    deletePermanently: 'Elimina definitivamente',
+    emptyTitle: 'Il cestino è vuoto',
+    emptyBody: (days) =>
+      `I progetti e i file eliminati aspettano qui ${days} giorni prima che Lattice li rimuova per sempre. Al momento non c’è niente in attesa.`,
+    rowMeta: (kind, location, when, by) =>
+      by ? `${kind} · era in ${location} · eliminato ${when} da ${by}` : `${kind} · era in ${location} · eliminato ${when}`,
+    parentDeleted: 'progetto eliminato',
+    purgingTonight: 'Rimosso stanotte',
+    inDays: (n) => `tra ${n} ${n === 1 ? 'giorno' : 'giorni'}`,
+    purgeOn: (date) => `Rimosso definitivamente il ${date}. Ripristinalo prima per tenerlo.`,
+    restore: 'Ripristina',
+    restoreToWhy: (location) => `Ripristina in ${location}`,
+    restoreToTopWhy:
+      'Anche il suo progetto è nel cestino, quindi torna da solo — ripristina il progetto per rimetterlo dov’era.',
+    deleteForever: (name) => `Elimina ${name} per sempre`,
+  },
+  cards: {
+    openItem: (name) => `Apri ${name}`,
+    select: (name) => `Seleziona ${name}`,
+    starLabel: (name) => `Aggiungi ${name} ai preferiti`,
+    unstarLabel: (name) => `Togli ${name} dai preferiti`,
+    gridView: 'Vista a griglia',
+    listView: 'Vista a elenco',
+    membersTitle: (n) => `${n} ${n === 1 ? 'membro' : 'membri'} con accesso`,
+    syncLocal: 'Locale',
+    syncDrive: 'Drive',
+    syncLocalWhy: 'Questo vault resta in questo browser — non viene caricato niente.',
+    syncDriveWhy: 'Questo vault è replicato nella tua cartella Google Drive.',
+  },
+  announcements: {
+    starred: (name) => `“${name}” aggiunto ai preferiti`,
+    unstarred: (name) => `“${name}” tolto dai preferiti`,
+    bulkUnstarred: (n) => `${n} ${n === 1 ? 'elemento tolto' : 'elementi tolti'} dai preferiti`,
+    results: (n) => `${n} ${n === 1 ? 'risultato' : 'risultati'}`,
+    created: (kind, name, project) => `Creato: ${kind} “${name}” in ${project}`,
+    filtersCleared: (n) => `Filtri azzerati — ${n} ${n === 1 ? 'elemento' : 'elementi'}`,
+    workspaceSwitched: (name, projects) =>
+      `${name} — ${projects} ${projects === 1 ? 'progetto' : 'progetti'}`,
+    gridView: 'Vista a griglia',
+    listView: 'Vista a elenco',
+    restored: (name, location) => `“${name}” ripristinato in ${location}`,
+    restoredToTop: (name) => `“${name}” ripristinato — il suo progetto è ancora nel cestino`,
+    purged: (name) => `“${name}” eliminato definitivamente`,
+    purgedAll: (n) => `${n} ${n === 1 ? 'elemento eliminato' : 'elementi eliminati'} definitivamente`,
+    purgedOnOpen: (n) =>
+      `${n} ${n === 1 ? 'elemento ha superato' : 'elementi hanno superato'} i 30 giorni e ${n === 1 ? 'è stato rimosso' : 'sono stati rimossi'}`,
+  },
+  palette: {
+    placeholder: 'Cerca file, board e progetti — o digita un comando…',
+    label: 'Palette dei comandi',
+    results: 'Risultati',
+    sections: {
+      recent: 'Aperti di recente',
+      create: 'Crea',
+      goto: 'Vai a',
+      files: 'File',
+      boards: 'Board',
+      projects: 'Progetti',
+      workspace: 'Workspace',
+      actions: 'Azioni',
+    },
+    noResults: (query) => `Nessun risultato per “${query}”`,
+    driveScope:
+      'La ricerca arriva a ciò che questo dispositivo contiene. Un progetto che vive solo nella cartella Drive di qualcun altro non è ancora stato letto qui.',
+    createNamed: (kind, name) => `Crea ${kind} “${name}”`,
+    inProject: (project) => `in ${project}`,
+    currentProject: 'corrente',
+    switchProject: 'cambia progetto',
+    switchWorkspace: 'cambia workspace',
+    commands: {
+      graph: 'Apri la vista Grafo',
+      split: 'Attiva/disattiva il layout diviso',
+      toLight: 'Passa al tema chiaro',
+      toDark: 'Passa al tema scuro',
+      github: 'GitHub — sincronizza il codice',
+      drive: 'Google Drive — connessione e diagnostica',
+      share: 'Condivisione — membri e inviti',
+      comments: 'Commenti',
+      activity: 'Registro attività',
+      versions: 'Cronologia versioni',
+      shortcuts: 'Scorciatoie da tastiera',
+      settings: 'Impostazioni',
+      syncNow: 'Sincronizza ora (Google Drive)',
+      goToSection: (section) => `Vai a ${section}`,
+      modeHint: 'sezione',
+    },
+    viewModes: {
+      board: 'Board',
+      doc: 'Documento',
+      sheet: 'Foglio',
+      presentation: 'Presentazione',
+      code: 'Codice',
+      photo: 'Foto',
+    },
+  },
+  create: {
+    kinds: {
+      project: 'progetto',
+      board: 'board',
+      doc: 'documento',
+      note: 'nota Markdown',
+      sheet: 'foglio di calcolo',
+      present: 'presentazione',
+      code: 'file di codice',
+    },
+    newLabel: (kind) => `Nuovo: ${kind}`,
+    createIn: (project) => `Crea in ${project}`,
+    chooseTarget: (kind) => `Dove va ${kind}?`,
+    noProjects: 'Crea prima un progetto — ogni file vive dentro uno.',
+    back: 'Indietro',
   },
   settings: {
     title: 'Impostazioni',

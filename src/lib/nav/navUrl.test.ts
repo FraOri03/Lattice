@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  DASHBOARD_NAV,
   navKey,
   parseNav,
   resolveNav,
@@ -84,10 +85,15 @@ describe('serialize / parse round-trip', () => {
  */
 describe('settings rides over the surface', () => {
   it('addresses a section on the otherwise empty dashboard URL', () => {
-    const search = serializeNav({ surface: 'dashboard', settings: 'appearance' })
+    const search = serializeNav({
+      surface: 'dashboard',
+      destination: 'home',
+      settings: 'appearance',
+    })
     expect(search).toBe('?s=appearance')
     expect(resolveNav(parseNav(search), snapshot())).toEqual({
       surface: 'dashboard',
+      destination: 'home',
       settings: 'appearance',
     })
   })
@@ -105,27 +111,27 @@ describe('settings rides over the surface', () => {
   })
 
   it('drops an unknown section instead of opening somewhere arbitrary', () => {
-    expect(resolveNav(parseNav('?s=nowhere'), snapshot())).toEqual({ surface: 'dashboard' })
+    expect(resolveNav(parseNav('?s=nowhere'), snapshot())).toEqual(DASHBOARD_NAV)
   })
 
   it('survives an unknown project, because settings is not the project', () => {
     const nav = resolveNav(parseNav('?p=ghost&s=account'), snapshot())
-    expect(nav).toEqual({ surface: 'dashboard', settings: 'account' })
+    expect(nav).toEqual({ surface: 'dashboard', destination: 'home', settings: 'account' })
   })
 
   it('makes opening and closing settings a different place, so Back undoes it', () => {
     const shut = projectNav({ projectId: 'p', mode: 'board' })
     const open = { ...shut, settings: 'account' } as const
     expect(navKey(shut)).not.toBe(navKey(open))
-    expect(navKey({ surface: 'dashboard' })).not.toBe(
-      navKey({ surface: 'dashboard', settings: 'account' }),
+    expect(navKey(DASHBOARD_NAV)).not.toBe(
+      navKey({ surface: 'dashboard', destination: 'home', settings: 'account' }),
     )
   })
 })
 
 describe('surfaces — dashboard vs project', () => {
   it('resolves the bare root URL to the dashboard', () => {
-    expect(resolveNav(parseNav(''), snapshot())).toEqual({ surface: 'dashboard' })
+    expect(resolveNav(parseNav(''), snapshot())).toEqual(DASHBOARD_NAV)
   })
 
   it('resolves a valid project link to the project surface', () => {
@@ -145,11 +151,11 @@ describe('surfaces — dashboard vs project', () => {
   })
 
   it('serializes the dashboard to the param-less root URL', () => {
-    expect(serializeNav({ surface: 'dashboard' })).toBe('')
+    expect(serializeNav(DASHBOARD_NAV)).toBe('')
   })
 
   it('navKey tells the dashboard apart from any project', () => {
-    const dash = navKey({ surface: 'dashboard' })
+    const dash = navKey(DASHBOARD_NAV)
     expect(dash).toBe('dashboard')
     expect(dash).not.toBe(navKey(projectNav({ projectId: 'proj_a', mode: 'board' })))
     // and apart from "no state at all", so the two never dedup together
@@ -261,8 +267,72 @@ describe('popstate restoration path (parse → resolve)', () => {
   })
 
   it('handles a malformed search safely (dashboard, never a crash)', () => {
-    expect(resolveNav(parseNav('?p=&m=&e=.'), snapshot())).toEqual({
+    expect(resolveNav(parseNav('?p=&m=&e=.'), snapshot())).toEqual(DASHBOARD_NAV)
+  })
+})
+
+/**
+ * The dashboard's six destinations (13.1, built in 15.1).
+ *
+ * Home is the ABSENCE of the token, which is the whole reason every link
+ * written before phase 15 keeps resolving: the bare root URL still means Home,
+ * and `?d=` only ever names one of the other five.
+ */
+describe('the dashboard destinations ride as d=', () => {
+  it('leaves Home as the param-less root URL', () => {
+    expect(serializeNav(DASHBOARD_NAV)).toBe('')
+    expect(resolveNav(parseNav(''), snapshot())).toEqual(DASHBOARD_NAV)
+  })
+
+  it('round-trips a destination through the URL', () => {
+    const search = serializeNav({ surface: 'dashboard', destination: 'trash' })
+    expect(search).toBe('?d=trash')
+    expect(resolveNav(parseNav(search), snapshot())).toEqual({
       surface: 'dashboard',
+      destination: 'trash',
     })
+  })
+
+  it('never emits d=home, so Home has exactly one address', () => {
+    expect(serializeNav({ surface: 'dashboard', destination: 'home' })).toBe('')
+    // a hand-written ?d=home is still accepted on the way in
+    expect(resolveNav(parseNav('?d=home'), snapshot())).toEqual(DASHBOARD_NAV)
+  })
+
+  it('degrades an unknown destination to Home rather than guessing', () => {
+    expect(resolveNav(parseNav('?d=nowhere'), snapshot())).toEqual(DASHBOARD_NAV)
+  })
+
+  it('lets p win over d: a valid project is the project surface', () => {
+    const nav = resolveNav(parseNav('?p=proj_a&m=board&d=trash'), snapshot())
+    expect(nav.surface).toBe('project')
+    expect(project(nav).projectId).toBe('proj_a')
+    // and the stray token does not come back out
+    expect(serializeNav(nav)).not.toContain('d=')
+  })
+
+  it('falls back to the destination when the project is unknown', () => {
+    expect(resolveNav(parseNav('?p=ghost&d=starred'), snapshot())).toEqual({
+      surface: 'dashboard',
+      destination: 'starred',
+    })
+  })
+
+  it('carries the destination alongside a settings section', () => {
+    const nav: ResolvedNavigation = {
+      surface: 'dashboard',
+      destination: 'recents',
+      settings: 'appearance',
+    }
+    expect(serializeNav(nav)).toBe('?d=recents&s=appearance')
+    expect(resolveNav(parseNav(serializeNav(nav)), snapshot())).toEqual(nav)
+  })
+
+  it('gives each destination its own history identity', () => {
+    const key = (destination: 'home' | 'trash' | 'starred') =>
+      navKey({ surface: 'dashboard', destination })
+    expect(key('home')).toBe('dashboard')
+    expect(key('trash')).toBe('dashboard|trash')
+    expect(new Set([key('home'), key('trash'), key('starred')]).size).toBe(3)
   })
 })

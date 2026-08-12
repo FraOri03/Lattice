@@ -55,7 +55,7 @@ describe('the URL follows the tab session', () => {
 
   it('says nothing about a project when the dashboard is showing', () => {
     useStore.getState().openDashboard()
-    expect(currentNav()).toEqual({ surface: 'dashboard' })
+    expect(currentNav()).toEqual({ surface: 'dashboard', destination: 'home' })
     expect(serializeNav(currentNav())).toBe('')
   })
 })

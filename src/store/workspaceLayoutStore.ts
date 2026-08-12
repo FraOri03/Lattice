@@ -71,10 +71,22 @@ interface WorkspaceLayoutState {
    * deliberately not persisted.
    */
   sidebarCollapsed: boolean
+  /**
+   * The dashboard's lateral navigation, shut down to a rail (15.1).
+   *
+   * Its own preference rather than `sidebarCollapsed`, because the two panels
+   * do different jobs: the project sidebar is a tree you shut to give the
+   * canvas its 240 px back, while this one is the dashboard's *primary*
+   * navigation — the only route to five of the six destinations. Sharing one
+   * flag would mean collapsing the sidebar to draw on a board silently hides
+   * Trash and Starred the next time you go Home.
+   */
+  dashboardNavCollapsed: boolean
 
   setGraphReturnMode: (mode: ViewMode) => void
   setInspectorCollapsed: (collapsed: boolean) => void
   setSidebarCollapsed: (collapsed: boolean) => void
+  setDashboardNavCollapsed: (collapsed: boolean) => void
   toggleInspector: () => void
   setInspectorWidth: (width: number) => void
   openSplit: (opts?: { secondary?: SecondaryContent; direction?: SplitDirection }) => void
@@ -96,12 +108,14 @@ export const useWorkspaceLayoutStore = create<WorkspaceLayoutState>()(
       inspectorCollapsed: false,
       inspectorWidth: DEFAULT_INSPECTOR_WIDTH,
       sidebarCollapsed: false,
+      dashboardNavCollapsed: false,
 
       setGraphReturnMode: (graphReturnMode) =>
         set({ graphReturnMode: graphReturnMode === 'graph' ? 'board' : graphReturnMode }),
 
       setInspectorCollapsed: (inspectorCollapsed) => set({ inspectorCollapsed }),
       setSidebarCollapsed: (sidebarCollapsed) => set({ sidebarCollapsed }),
+      setDashboardNavCollapsed: (dashboardNavCollapsed) => set({ dashboardNavCollapsed }),
       toggleInspector: () => set((s) => ({ inspectorCollapsed: !s.inspectorCollapsed })),
       setInspectorWidth: (width) => set({ inspectorWidth: clampInspectorWidth(width) }),
 
@@ -138,6 +152,7 @@ export const useWorkspaceLayoutStore = create<WorkspaceLayoutState>()(
         inspectorCollapsed: s.inspectorCollapsed,
         inspectorWidth: s.inspectorWidth,
         sidebarCollapsed: s.sidebarCollapsed,
+        dashboardNavCollapsed: s.dashboardNavCollapsed,
         // `split` is intentionally NOT persisted: reopening the app lands in a
         // single pane, matching how a legacy persisted `split` viewMode also
         // degrades to a single section (see useStore migrate v3).

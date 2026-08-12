@@ -38,9 +38,13 @@ export interface ProjectGroups {
 /** Starred first, then active, then archived — each newest-updated first. */
 export function groupProjects(projects: Project[]): ProjectGroups {
   const byRecent = (a: Project, b: Project) => b.updatedAt - a.updatedAt
+  // a trashed project is in none of the three groups (15.6): this is the one
+  // fold Home, the dashboard tree and the project switcher all read, so hiding
+  // it here hides it from every list that is not the trash
+  const live = projects.filter((p) => !p.deletedAt)
   return {
-    starred: projects.filter((p) => p.starred && !p.archived).sort(byRecent),
-    active: projects.filter((p) => !p.starred && !p.archived).sort(byRecent),
-    archived: projects.filter((p) => p.archived).sort(byRecent),
+    starred: live.filter((p) => p.starred && !p.archived).sort(byRecent),
+    active: live.filter((p) => !p.starred && !p.archived).sort(byRecent),
+    archived: live.filter((p) => p.archived).sort(byRecent),
   }
 }

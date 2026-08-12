@@ -369,7 +369,7 @@ function ProjectDialog({
               if (
                 await confirmDialog({
                   title: `Delete project “${project.name}”?`,
-                  body: 'ALL its boards, notes, documents and assets are deleted. This cannot be undone locally — files already synced to Drive are kept there.',
+                  body: 'The project goes to the trash with everything in it, and can be restored for 30 days. Nothing is removed from Google Drive until it is purged.',
                   confirmLabel: 'Delete project',
                   danger: true,
                 })

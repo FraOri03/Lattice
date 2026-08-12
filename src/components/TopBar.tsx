@@ -316,7 +316,30 @@ function TopBarOverflow({ label, children }: { label: string; children: React.Re
   )
 }
 
-export function TopBar() {
+/**
+ * The shell's top bar, on either surface.
+ *
+ * The dashboard variant (15.7) drops what names a project that is not open:
+ * the breadcrumb, the section tabs, the panel buttons, presence, the realtime
+ * chip and the call. **Share goes too** — it acts on `activeProjectId`, which
+ * survives the trip Home, so a Share button on the dashboard would silently
+ * share whichever project you happened to open last. That is the same invisible
+ * inheritance 13.4 §6 removed from creation.
+ *
+ * What stays is what is true with no project open: search, notifications, sync,
+ * theme, profile. One bar rather than two, so the controls are wired once.
+ */
+export function TopBar({
+  variant = 'project',
+  title,
+  trailing,
+}: {
+  variant?: 'project' | 'dashboard'
+  /** Replaces the breadcrumb on the dashboard — the destination's name. */
+  title?: string
+  /** Surface-specific controls, placed before the shared cluster. */
+  trailing?: React.ReactNode
+} = {}) {
   const theme = useStore((s) => s.theme)
   const setTheme = useStore((s) => s.setTheme)
   const setPaletteOpen = useUiStore((s) => s.setPaletteOpen)
@@ -339,11 +362,19 @@ export function TopBar() {
 
   // presence (who is in the project) and the call (who is talking) are
   // deliberately adjacent but distinct states
+  const onDashboard = variant === 'dashboard'
+
   const status = (
     <>
-      <PresenceAvatars />
-      <RealtimeStatusChip />
-      <JoinCallButton />
+      {/* presence, the realtime chip and the call all describe an attached
+          project room; on the dashboard none is attached */}
+      {!onDashboard && (
+        <>
+          <PresenceAvatars />
+          <RealtimeStatusChip />
+          <JoinCallButton />
+        </>
+      )}
       <NotificationCenter />
       <SyncIndicator />
     </>
@@ -351,6 +382,7 @@ export function TopBar() {
 
   const actions = (
     <>
+      {!onDashboard && (
       <button
         className="btn"
         onClick={() => setShareDialogOpen(true)}
@@ -369,7 +401,8 @@ export function TopBar() {
           </span>
         )}
       </button>
-      <PanelButtons />
+      )}
+      {!onDashboard && <PanelButtons />}
       <button
         className="btn"
         onClick={() => setPaletteOpen(true)}
@@ -416,16 +449,22 @@ export function TopBar() {
      * control overflows anyway, the bar scrolls and the document does not.
      */
     <header className="@container flex h-11 max-w-full min-w-0 flex-none items-center gap-2 overflow-x-auto border-b border-bord bg-panel px-3">
-      <ContextBreadcrumb />
+      {onDashboard ? (
+        <span className="min-w-0 truncate text-[13px] font-bold">{title}</span>
+      ) : (
+        <ContextBreadcrumb />
+      )}
 
       <div className="flex-1" />
 
       {/* Centre: [Split] · [Board · Graph] · [Document · Sheet · Presentation ·
           Code · Photo]. Split stays a layout and Graph a view underneath — see
           SectionTabs. */}
-      <SectionTabs />
+      {!onDashboard && <SectionTabs />}
 
       <div className="flex-1" />
+
+      {trailing}
 
       {!foldStatus && status}
       {!foldActions && actions}

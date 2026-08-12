@@ -12,6 +12,23 @@ export interface NoteDoc {
   projectId?: string
   /** sidebar folder inside its category; unset = unfiled */
   folderId?: string
+  /**
+   * On the Starred shelf (15.2). Same concept and same representation as
+   * `Project.starred`, so one star means one thing across every kind; unset
+   * is the same as false, which is why no migration is needed.
+   */
+  starred?: boolean
+  /**
+   * In the trash since this moment (15.6). Absent means live.
+   *
+   * A soft delete HIDES the record rather than moving it: the payload stays
+   * exactly where it was, which is what makes restore free, keeps the bytes
+   * countable while they are still occupied, and leaves the Drive mirror
+   * untouched until a purge actually runs.
+   */
+  deletedAt?: number
+  /** Who put it there — a display name, for the row that says so. */
+  deletedBy?: string
 }
 
 /* ---------------- projects (Phase 6) ---------------- */
@@ -36,6 +53,10 @@ export interface Project {
   updatedAt: number
   archived: boolean
   starred: boolean
+  /** In the trash since this moment (15.6). Absent means live. */
+  deletedAt?: number
+  /** Who put it there — a display name, for the row that says so. */
+  deletedBy?: string
   storageRoot: string
   settings: ProjectSettings
 }
@@ -273,6 +294,23 @@ export interface AssetDoc {
   projectId?: string
   /** sidebar folder inside its category; unset = unfiled */
   folderId?: string
+  /**
+   * On the Starred shelf (15.2). Same concept and same representation as
+   * `Project.starred`, so one star means one thing across every kind; unset
+   * is the same as false, which is why no migration is needed.
+   */
+  starred?: boolean
+  /**
+   * In the trash since this moment (15.6). Absent means live.
+   *
+   * A soft delete HIDES the record rather than moving it: the payload stays
+   * exactly where it was, which is what makes restore free, keeps the bytes
+   * countable while they are still occupied, and leaves the Drive mirror
+   * untouched until a purge actually runs.
+   */
+  deletedAt?: number
+  /** Who put it there — a display name, for the row that says so. */
+  deletedBy?: string
   /** companion files for multi-file formats (GLTF+BIN+textures, OBJ+MTL) */
   bundle?: AssetBundleInfo
   /** video upload → web-conversion state; unset for non-video assets */
@@ -336,6 +374,23 @@ export interface RichDocMeta {
   projectId?: string
   /** sidebar folder inside its category; unset = unfiled */
   folderId?: string
+  /**
+   * On the Starred shelf (15.2). Same concept and same representation as
+   * `Project.starred`, so one star means one thing across every kind; unset
+   * is the same as false, which is why no migration is needed.
+   */
+  starred?: boolean
+  /**
+   * In the trash since this moment (15.6). Absent means live.
+   *
+   * A soft delete HIDES the record rather than moving it: the payload stays
+   * exactly where it was, which is what makes restore free, keeps the bytes
+   * countable while they are still occupied, and leaves the Drive mirror
+   * untouched until a purge actually runs.
+   */
+  deletedAt?: number
+  /** Who put it there — a display name, for the row that says so. */
+  deletedBy?: string
   /** page layout; absent means continuous (the historical default) */
   page?: PageSetup
   /**
@@ -387,6 +442,23 @@ export interface CodeDocMeta {
   projectId?: string
   /** sidebar folder inside its category; unset = unfiled */
   folderId?: string
+  /**
+   * On the Starred shelf (15.2). Same concept and same representation as
+   * `Project.starred`, so one star means one thing across every kind; unset
+   * is the same as false, which is why no migration is needed.
+   */
+  starred?: boolean
+  /**
+   * In the trash since this moment (15.6). Absent means live.
+   *
+   * A soft delete HIDES the record rather than moving it: the payload stays
+   * exactly where it was, which is what makes restore free, keeps the bytes
+   * countable while they are still occupied, and leaves the Drive mirror
+   * untouched until a purge actually runs.
+   */
+  deletedAt?: number
+  /** Who put it there — a display name, for the row that says so. */
+  deletedBy?: string
 }
 
 /* ---------------- spreadsheet documents ---------------- */
@@ -419,6 +491,23 @@ export interface SpreadsheetDocMeta {
   projectId?: string
   /** sidebar folder inside its category; unset = unfiled */
   folderId?: string
+  /**
+   * On the Starred shelf (15.2). Same concept and same representation as
+   * `Project.starred`, so one star means one thing across every kind; unset
+   * is the same as false, which is why no migration is needed.
+   */
+  starred?: boolean
+  /**
+   * In the trash since this moment (15.6). Absent means live.
+   *
+   * A soft delete HIDES the record rather than moving it: the payload stays
+   * exactly where it was, which is what makes restore free, keeps the bytes
+   * countable while they are still occupied, and leaves the Drive mirror
+   * untouched until a purge actually runs.
+   */
+  deletedAt?: number
+  /** Who put it there — a display name, for the row that says so. */
+  deletedBy?: string
 }
 
 /* ---------------- presentations (Phase 8) ---------------- */
@@ -445,6 +534,23 @@ export interface PresentationDocMeta {
   projectId?: string
   /** sidebar folder inside its category; unset = unfiled */
   folderId?: string
+  /**
+   * On the Starred shelf (15.2). Same concept and same representation as
+   * `Project.starred`, so one star means one thing across every kind; unset
+   * is the same as false, which is why no migration is needed.
+   */
+  starred?: boolean
+  /**
+   * In the trash since this moment (15.6). Absent means live.
+   *
+   * A soft delete HIDES the record rather than moving it: the payload stays
+   * exactly where it was, which is what makes restore free, keeps the bytes
+   * countable while they are still occupied, and leaves the Drive mirror
+   * untouched until a purge actually runs.
+   */
+  deletedAt?: number
+  /** Who put it there — a display name, for the row that says so. */
+  deletedBy?: string
 }
 
 /* ---------------- board cards ---------------- */
@@ -570,6 +676,23 @@ export interface Board {
   projectId?: string
   /** sidebar folder inside its category; unset = unfiled */
   folderId?: string
+  /**
+   * On the Starred shelf (15.2). Same concept and same representation as
+   * `Project.starred`, so one star means one thing across every kind; unset
+   * is the same as false, which is why no migration is needed.
+   */
+  starred?: boolean
+  /**
+   * In the trash since this moment (15.6). Absent means live.
+   *
+   * A soft delete HIDES the record rather than moving it: the payload stays
+   * exactly where it was, which is what makes restore free, keeps the bytes
+   * countable while they are still occupied, and leaves the Drive mirror
+   * untouched until a purge actually runs.
+   */
+  deletedAt?: number
+  /** Who put it there — a display name, for the row that says so. */
+  deletedBy?: string
 }
 
 /**
@@ -606,6 +729,16 @@ export interface RecentEntry {
   id: string
   at: number
 }
+
+/**
+ * What can be starred (15.2): every kind the recents log tracks, plus the
+ * project itself — which has carried `starred` since phase 6.
+ *
+ * Folders are deliberately absent. `Folder` has no `starred` field and 13.1
+ * ruled it out of the shelf: a folder is scoped to one category inside one
+ * project, so a cross-project shelf has nowhere to put it.
+ */
+export type StarKind = RecentEntry['kind'] | 'project'
 
 /**
  * Shape of an exported .lattice.json project file.

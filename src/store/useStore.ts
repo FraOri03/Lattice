@@ -22,6 +22,7 @@ import type {
   PresentationDocMeta,
   Project,
   RecentEntry,
+  StarKind,
   Locale,
   RichDocMeta,
   SpreadsheetDocMeta,
@@ -83,6 +84,8 @@ import type { GraphViewSettings } from '@/lib/graph/graphTypes'
 import { decodeGraphSettings } from '@/lib/graph/GraphSettingsService'
 import { ENTITY_MODE, type NavSurface, type ResolvedNavigation } from '@/lib/nav/navUrl'
 import { DEFAULT_SETTINGS_SECTION, type SettingsSection } from '@/lib/settings/sections'
+import { DEFAULT_DESTINATION, type Destination } from '@/lib/dashboard/destinations'
+import { collectTrash, isExpired, type TrashKind } from '@/lib/dashboard/trash'
 import { DEFAULT_APPEARANCE, type Appearance } from '@/lib/theme/appearance'
 import { useWorkspaceLayoutStore } from './workspaceLayoutStore'
 import {
@@ -137,12 +140,88 @@ const DEFAULT_EDGE = {
 /** Sidebar file-type filter. */
 export type SidebarFilter = 'all' | 'notes' | 'docs' | 'sheets' | 'code' | 'assets'
 
+/**
+ * How many entries the recents log keeps (15.2).
+ *
+ * 11.2 capped it at 15, which is a sensible depth for a sidebar rail and far
+ * too short for the Recents destination: a page that groups by day cannot fill
+ * a second day out of fifteen entries, so "last week" would always look empty.
+ * 200 is the prototype's number and roughly a fortnight of ordinary use.
+ *
+ * The log stays device-local and unsynced, and the page says so — it is a
+ * machine-written record of what *this browser* opened, not a library.
+ */
+export const RECENTS_CAP = 200
+
+/**
+ * Who is performing an action, for the trash row that names them.
+ *
+ * Read straight from the stored account the way `currentIdentity` reads it,
+ * rather than importing it: that module pulls in the whole collaboration graph
+ * (Yjs included), and the store is imported by everything.
+ */
+function currentActorName(): string | undefined {
+  try {
+    const raw = localStorage.getItem('lattice-account')
+    if (!raw) return undefined
+    const acc = JSON.parse(raw) as { name?: string }
+    return acc?.name || undefined
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * Which card field points at each entity kind — the same predicates the delete
+ * actions have always used, in one place so trashing and purging cannot start
+ * disagreeing about what a card refers to.
+ */
+const CARD_LINK: Record<
+  Exclude<TrashKind, 'project'>,
+  (d: Record<string, unknown>, id: string) => boolean
+> = {
+  note: (d, id) => d.noteId === id,
+  doc: (d, id) => d.docId === id,
+  sheet: (d, id) => d.sheetId === id,
+  present: (d, id) => d.presentId === id,
+  code: (d, id) => d.codeId === id,
+  asset: (d, id) => d.assetId === id,
+  // a board is not placed on another board
+  board: () => false,
+}
+
+/** Which store slice holds each trashable entity kind. */
+const TRASH_SLICE = {
+  note: 'notes',
+  doc: 'docs',
+  sheet: 'sheetDocs',
+  present: 'presentDocs',
+  code: 'codeDocs',
+  asset: 'assets',
+  board: 'boards',
+} as const satisfies Record<Exclude<TrashKind, 'project'>, keyof AppState>
+
+/**
+ * Which store slice holds each starrable entity kind — the one place the seven
+ * maps are named, so `toggleStarred` does not restate the mapping that
+ * `describeEntity` already encodes on the read side.
+ */
+const STAR_SLICE = {
+  note: 'notes',
+  doc: 'docs',
+  sheet: 'sheetDocs',
+  present: 'presentDocs',
+  code: 'codeDocs',
+  asset: 'assets',
+  board: 'boards',
+} as const satisfies Record<Exclude<StarKind, 'project'>, keyof AppState>
+
 function pushRecent(recents: RecentEntry[], entry: Omit<RecentEntry, 'at'>): RecentEntry[] {
   const next = [
     { ...entry, at: Date.now() },
     ...recents.filter((r) => !(r.kind === entry.kind && r.id === entry.id)),
   ]
-  return next.slice(0, 15)
+  return next.slice(0, RECENTS_CAP)
 }
 
 function dropRecent(recents: RecentEntry[], kind: RecentEntry['kind'], id: string) {
@@ -257,6 +336,24 @@ interface AppState {
    */
   navSurface: NavSurface
   /**
+   * Which of the dashboard's six destinations is showing (Phase 13.1, built in
+   * 15.1). Only meaningful while `navSurface` is 'dashboard'. Not persisted for
+   * the same reason as `navSurface`: `d=…` owns it, which is what makes
+   * "refresh keeps you on Trash" true without a special case.
+   */
+  dashboardDestination: Destination
+  /**
+   * How dense the user wants their project lists (13.2 §3).
+   *
+   * Persisted like theme and locale, and shared by Home and every destination,
+   * because it expresses a preference about the person rather than a fact about
+   * a page. It governs the PROJECT SECTIONS only — the resume rail is always a
+   * rail, the workspace chips are always chips, the stat tiles are always
+   * tiles. A toggle that silently governs half a page is why the prototype's
+   * reads as broken.
+   */
+  dashboardView: 'grid' | 'list'
+  /**
    * The settings section showing over the current surface, or null when the
    * screen is shut (Phase 14.1). Like `navSurface` the URL owns it — `s=…`
    * rides alongside the surface params, so a deep link opens the exact panel
@@ -318,7 +415,10 @@ interface AppState {
 
   createProject: (partial?: Partial<Project>) => string
   updateProject: (id: string, patch: Partial<Omit<Project, 'id'>>) => void
+  /** Move to the trash — recoverable for 30 days (15.6). */
   deleteProject: (id: string) => void
+  /** Remove for good. The trash calls this; nothing else should. */
+  purgeProject: (id: string) => void
   setActiveProject: (id: string) => void
   /**
    * Restore navigable state from the URL / browser history (issue #10).
@@ -330,8 +430,43 @@ interface AppState {
    * expected to be resolved away by the caller (navUrl.resolveNav).
    */
   applyNav: (nav: ResolvedNavigation) => void
-  /** Leave the project surface for the dashboard (Home). */
+  /** Leave the project surface for the dashboard, at Home. */
   openDashboard: () => void
+  /**
+   * Show a dashboard destination — from the lateral navigation, the palette or
+   * a deep link. Moves the shell off a project if it is on one, which is what
+   * makes "Trash" reachable from inside a project without a second action.
+   */
+  openDestination: (destination: Destination) => void
+  setDashboardView: (view: 'grid' | 'list') => void
+  /**
+   * Put something on the Starred shelf, or take it off (15.2).
+   *
+   * One action for all eight kinds, so the shelf can unstar a row without
+   * knowing which map the row came from — and so starring a document and
+   * starring a project stay the same gesture with the same meaning. Starring
+   * does not touch `updatedAt`: pinning something is not editing it, and the
+   * shelf would reorder itself under the user if it were.
+   */
+  toggleStarred: (kind: StarKind, id: string) => void
+  /**
+   * Put something in the trash (15.6). Recoverable for 30 days.
+   *
+   * The record is HIDDEN, not moved: `deletedAt` goes on the entity that is
+   * already there, nothing is copied and `storage.deleteDocument` is not
+   * called. Restore is therefore free, the bytes stay countable while they are
+   * still occupied, and the Drive mirror is untouched until a purge runs — so
+   * Lattice's trash and Drive's never empty one another.
+   */
+  moveToTrash: (kind: TrashKind, id: string) => void
+  /** Take it back out. Its project may be gone; the page says so before you do. */
+  restoreFromTrash: (kind: TrashKind, id: string) => void
+  /** Remove one item for good — this is the destroy the delete actions do. */
+  purgeFromTrash: (kind: TrashKind, id: string) => void
+  /** Sweep everything past its 30 days. Returns how many went. */
+  purgeExpired: (now?: number) => number
+  /** Remove everything currently in the trash. Returns how many went. */
+  emptyTrash: () => number
   /** Show the settings screen over the current surface. */
   openSettings: (section?: SettingsSection) => void
   /** Close settings; the surface underneath was never left. */
@@ -340,7 +475,10 @@ interface AppState {
   setActiveBoard: (id: string) => void
   addBoard: () => void
   renameBoard: (id: string, name: string) => void
+  /** Move to the trash — recoverable for 30 days (15.6). */
   deleteBoard: (id: string) => void
+  /** Remove for good. The trash calls this; nothing else should. */
+  purgeBoard: (id: string) => void
 
   onNodesChange: (changes: NodeChange<BoardNode>[]) => void
   onEdgesChange: (changes: EdgeChange[]) => void
@@ -383,7 +521,10 @@ interface AppState {
 
   createNote: (partial?: Partial<NoteDoc>) => string
   updateNote: (id: string, patch: Partial<Omit<NoteDoc, 'id'>>) => void
+  /** Move to the trash — recoverable for 30 days (15.6). */
   deleteNote: (id: string) => void
+  /** Remove for good. The trash calls this; nothing else should. */
+  purgeNote: (id: string) => void
   openNote: (id: string) => void
   openWikilink: (title: string) => void
   /**
@@ -402,7 +543,10 @@ interface AppState {
   renameAsset: (id: string, name: string) => void
   /** Patch asset fields (e.g. bundle dependency maps after a relink). */
   patchAsset: (id: string, patch: Partial<Omit<AssetDoc, 'id'>>) => void
+  /** Move to the trash — recoverable for 30 days (15.6). */
   deleteAsset: (id: string) => void
+  /** Remove for good. The trash calls this; nothing else should. */
+  purgeAsset: (id: string) => void
   openAsset: (id: string) => void
   closeAsset: () => void
 
@@ -421,7 +565,10 @@ interface AppState {
    * remote CRDT changes that another user already authored.
    */
   persistDocContent: (id: string, body: JSONContent, opts?: { silent?: boolean }) => void
+  /** Move to the trash — recoverable for 30 days (15.6). */
   deleteDoc: (id: string) => void
+  /** Remove for good. The trash calls this; nothing else should. */
+  purgeDoc: (id: string) => void
   openDoc: (id: string) => void
   closeDoc: () => void
 
@@ -432,7 +579,10 @@ interface AppState {
   ) => void
   /** Write a workbook body to storage and refresh its digested metadata. */
   persistSheetBody: (id: string, body: SpreadsheetBody) => void
+  /** Move to the trash — recoverable for 30 days (15.6). */
   deleteSheetDoc: (id: string) => void
+  /** Remove for good. The trash calls this; nothing else should. */
+  purgeSheetDoc: (id: string) => void
   openSheet: (id: string) => void
   closeSheet: () => void
 
@@ -443,7 +593,10 @@ interface AppState {
   ) => void
   /** Write a deck body to storage and refresh its digested metadata. */
   persistPresentBody: (id: string, body: PresentationBody) => void
+  /** Move to the trash — recoverable for 30 days (15.6). */
   deletePresentDoc: (id: string) => void
+  /** Remove for good. The trash calls this; nothing else should. */
+  purgePresentDoc: (id: string) => void
   openPresent: (id: string) => void
   closePresent: () => void
 
@@ -451,7 +604,10 @@ interface AppState {
   updateCodeMeta: (id: string, patch: Partial<Omit<CodeDocMeta, 'id' | 'type'>>) => void
   /** Write code source to storage and refresh its digested metadata. */
   persistCodeContent: (id: string, content: string, opts?: { silent?: boolean }) => void
+  /** Move to the trash — recoverable for 30 days (15.6). */
   deleteCode: (id: string) => void
+  /** Remove for good. The trash calls this; nothing else should. */
+  purgeCode: (id: string) => void
   openCode: (id: string) => void
   closeCode: () => void
   /** Close an open entity in the active project's session (Phase 11.3). */
@@ -595,6 +751,8 @@ export const useStore = create<AppState>()(
       recents: [],
       viewMode: 'board',
       navSurface: 'project',
+      dashboardDestination: DEFAULT_DESTINATION,
+      dashboardView: 'grid',
       settingsSection: null,
       theme: 'dark',
       appearance: DEFAULT_APPEARANCE,
@@ -772,21 +930,31 @@ export const useStore = create<AppState>()(
         })
       },
 
+      /**
+       * Switching workspace opens no project and creates none (13.1).
+       *
+       * This used to pick the target workspace's first non-archived project and
+       * open it — and, when the workspace was empty, invent a project so there
+       * would be something to open. Both are implicit fallbacks into a project
+       * the user did not ask for, which is the one thing `docs/navigation.md`
+       * rules out. From a project surface you now land Home in the new
+       * workspace; from a dashboard destination you stay on that destination,
+       * re-scoped. An empty workspace shows Home's empty state, which is a
+       * screen that has to exist anyway.
+       */
       setActiveWorkspace: (id) => {
         const s = get()
         const ws = s.workspaces[id]
         if (!ws || s.activeWorkspaceId === id) return
-        set({ activeWorkspaceId: id })
-        const target =
-          ws.projectIds.map((p) => s.projects[p]).find((p) => p && !p.archived) ??
-          ws.projectIds.map((p) => s.projects[p]).find(Boolean)
-        if (target) {
-          get().setActiveProject(target.id)
-        } else {
-          // a workspace is never empty for long: give it a first project
-          const pid = get().createProject({ name: `${ws.name} project` })
-          get().setActiveProject(pid)
-        }
+        set({
+          activeWorkspaceId: id,
+          ...(s.navSurface === 'project'
+            ? {
+                navSurface: 'dashboard' as NavSurface,
+                dashboardDestination: DEFAULT_DESTINATION,
+              }
+            : {}),
+        })
       },
 
       moveProjectToWorkspace: (projectId, workspaceId) => {
@@ -882,7 +1050,7 @@ export const useStore = create<AppState>()(
           }
         }),
 
-      deleteProject: (id) => {
+      purgeProject: (id) => {
         const s = get()
         const remaining = Object.values(s.projects).filter((p) => p.id !== id)
         if (!remaining.length) return // never delete the last project
@@ -1016,7 +1184,188 @@ export const useStore = create<AppState>()(
         })
       },
 
-      openDashboard: () => set({ navSurface: 'dashboard' }),
+      openDashboard: () =>
+        set({ navSurface: 'dashboard', dashboardDestination: DEFAULT_DESTINATION }),
+
+      openDestination: (destination) =>
+        set({ navSurface: 'dashboard', dashboardDestination: destination }),
+
+      setDashboardView: (dashboardView) => set({ dashboardView }),
+
+
+      /* Deleting stops being terminal (15.6): every delete affordance in the
+         app now routes here, and the destroy lives on `purge*` for the trash
+         to call. One change point rather than seventeen call sites, so no
+         surface can be left hard-deleting by accident. */
+      deleteNote: (id) => get().moveToTrash('note', id),
+      deleteDoc: (id) => get().moveToTrash('doc', id),
+      deleteSheetDoc: (id) => get().moveToTrash('sheet', id),
+      deletePresentDoc: (id) => get().moveToTrash('present', id),
+      deleteCode: (id) => get().moveToTrash('code', id),
+      deleteAsset: (id) => get().moveToTrash('asset', id),
+      deleteBoard: (id) => get().moveToTrash('board', id),
+      deleteProject: (id) => get().moveToTrash('project', id),
+
+      /* ---------------- trash (15.6) ---------------- */
+
+      moveToTrash: (kind, id) => {
+        const stamp = { deletedAt: Date.now(), deletedBy: currentActorName() }
+        if (kind === 'project') {
+          const s = get()
+          const p = s.projects[id]
+          if (!p || p.deletedAt) return
+          set({ projects: { ...s.projects, [id]: { ...p, ...stamp } } })
+          // trashing the project you are standing in leaves the surface pointing
+          // at something the user just removed; 13.1's landing rule for a
+          // missing project is Home, so that is where this goes too
+          if (s.activeProjectId === id && s.navSurface === 'project') {
+            set({ navSurface: 'dashboard', dashboardDestination: DEFAULT_DESTINATION })
+          }
+          return
+        }
+        set((s) => {
+          const slice = TRASH_SLICE[kind]
+          const map = s[slice] as Record<string, { deletedAt?: number }>
+          const rec = map[id]
+          if (!rec || rec.deletedAt) return {}
+          return {
+            [slice]: { ...map, [id]: { ...rec, ...stamp } },
+            // it stops being somewhere you can return to, so it leaves the tab
+            // strip and the recents log — both of which resolve live records
+            ...withClosedTab(s, s.activeProjectId, { kind, id } as EntityTab),
+            recents: dropRecent(s.recents, kind, id),
+            /**
+             * Cards pointing at it go now, exactly as they did before soft
+             * delete — and they do NOT come back on restore.
+             *
+             * The alternative was leaving them on the board pointing at a
+             * hidden record, which is a dangling card the canvas has no state
+             * for. So the boards stay consistent and the promise shrinks
+             * honestly: the entity is recoverable, its placements are not. The
+             * confirmation says so before you press.
+             */
+            boards: stripCards(s.boards, (d) => CARD_LINK[kind](d, id)),
+          } as Partial<AppState>
+        })
+      },
+
+      restoreFromTrash: (kind, id) => {
+        if (kind === 'project') {
+          set((s) => {
+            const p = s.projects[id]
+            if (!p) return {}
+            const { deletedAt: _at, deletedBy: _by, ...live } = p
+            return { projects: { ...s.projects, [id]: live as Project } }
+          })
+          return
+        }
+        set((s) => {
+          const slice = TRASH_SLICE[kind]
+          const map = s[slice] as Record<string, { deletedAt?: number; deletedBy?: string }>
+          const rec = map[id]
+          if (!rec) return {}
+          const { deletedAt: _at, deletedBy: _by, ...live } = rec
+          return { [slice]: { ...map, [id]: live } } as Partial<AppState>
+        })
+      },
+
+      /**
+       * The destroy, which is exactly what the delete actions already did.
+       *
+       * Reusing them rather than reimplementing eight teardowns is the point:
+       * each one knows its own consequences — stripping cards that referenced
+       * it, releasing an object URL, removing the blob — and a second copy of
+       * that knowledge is how a purge starts leaving something behind.
+       */
+      purgeFromTrash: (kind, id) => {
+        const s = get()
+        switch (kind) {
+          case 'project':
+            return s.purgeProject(id)
+          case 'note':
+            return s.purgeNote(id)
+          case 'doc':
+            return s.purgeDoc(id)
+          case 'sheet':
+            return s.purgeSheetDoc(id)
+          case 'present':
+            return s.purgePresentDoc(id)
+          case 'code':
+            return s.purgeCode(id)
+          case 'asset':
+            return s.purgeAsset(id)
+          case 'board':
+            return s.purgeBoard(id)
+        }
+      },
+
+      purgeExpired: (now = Date.now()) => {
+        const s = get()
+        const due = collectTrash(
+          {
+            notes: s.notes,
+            docs: s.docs,
+            sheetDocs: s.sheetDocs,
+            presentDocs: s.presentDocs,
+            codeDocs: s.codeDocs,
+            assets: s.assets,
+            boards: s.boards,
+            projects: s.projects,
+          },
+          s.workspaces,
+          now,
+        ).filter((i) => isExpired(i.deletedAt, now))
+        // entities first: purging a project takes its entities with it, and a
+        // second pass over ids that no longer exist is a no-op either way
+        for (const item of due.filter((i) => i.kind !== 'project')) {
+          get().purgeFromTrash(item.kind, item.id)
+        }
+        for (const item of due.filter((i) => i.kind === 'project')) {
+          get().purgeFromTrash(item.kind, item.id)
+        }
+        return due.length
+      },
+
+      emptyTrash: () => {
+        const s = get()
+        const all = collectTrash(
+          {
+            notes: s.notes,
+            docs: s.docs,
+            sheetDocs: s.sheetDocs,
+            presentDocs: s.presentDocs,
+            codeDocs: s.codeDocs,
+            assets: s.assets,
+            boards: s.boards,
+            projects: s.projects,
+          },
+          s.workspaces,
+          Date.now(),
+        )
+        for (const item of all.filter((i) => i.kind !== 'project')) {
+          get().purgeFromTrash(item.kind, item.id)
+        }
+        for (const item of all.filter((i) => i.kind === 'project')) {
+          get().purgeFromTrash(item.kind, item.id)
+        }
+        return all.length
+      },
+
+      toggleStarred: (kind, id) =>
+        set((s) => {
+          if (kind === 'project') {
+            const p = s.projects[id]
+            if (!p) return {}
+            return { projects: { ...s.projects, [id]: { ...p, starred: !p.starred } } }
+          }
+          const slice = STAR_SLICE[kind]
+          const map = s[slice] as Record<string, { starred?: boolean }>
+          const entity = map[id]
+          if (!entity) return {}
+          return {
+            [slice]: { ...map, [id]: { ...entity, starred: !entity.starred } },
+          } as Partial<AppState>
+        }),
 
       openSettings: (section = DEFAULT_SETTINGS_SECTION) =>
         set({ settingsSection: section }),
@@ -1027,9 +1376,9 @@ export const useStore = create<AppState>()(
         // branch — including when an unknown project makes the rest a no-op
         set({ settingsSection: nav.settings ?? null })
         if (nav.surface === 'dashboard') {
-          // Home: the shell leaves the project surface, but the active project
-          // and its open entity survive so going back in costs nothing.
-          set({ navSurface: 'dashboard' })
+          // The shell leaves the project surface, but the active project and
+          // its open entity survive so going back in costs nothing.
+          set({ navSurface: 'dashboard', dashboardDestination: nav.destination })
           return
         }
         // restore the split layout alongside the section (only for a valid
@@ -1109,7 +1458,7 @@ export const useStore = create<AppState>()(
 
       renameBoard: (id, name) => set((s) => patchBoard(s, id, { name })),
 
-      deleteBoard: (id) => {
+      purgeBoard: (id) => {
         const s = get()
         const projectBoards = s.boardOrder.filter(
           (b) => s.boards[b]?.projectId === s.boards[id]?.projectId,
@@ -1516,7 +1865,7 @@ export const useStore = create<AppState>()(
           }
         }),
 
-      deleteNote: (id) =>
+      purgeNote: (id) =>
         set((s) => {
           const notes = { ...s.notes }
           delete notes[id]
@@ -1548,7 +1897,10 @@ export const useStore = create<AppState>()(
           ...(note.projectId ? { projectId: note.projectId } : {}),
         })
         get().persistDocContent(docId, markdownToDocBody(note.content))
-        get().deleteNote(id)
+        // purge, not trash: promotion CONSUMES the note — the same text now
+        // lives in the document, and leaving a recoverable copy in the trash
+        // would offer to restore a duplicate of something that still exists
+        get().purgeNote(id)
         return docId
       },
 
@@ -1610,7 +1962,7 @@ export const useStore = create<AppState>()(
           return { assets: { ...s.assets, [id]: { ...asset, ...patch } } }
         }),
 
-      deleteAsset: (id) => {
+      purgeAsset: (id) => {
         releaseAssetUrl(id)
         void storage.deleteBlob(id)
         set((s) => {
@@ -1693,7 +2045,7 @@ export const useStore = create<AppState>()(
         if (!opts?.silent) announceEdit('doc', id, `Edited document “${meta.title}”`)
       },
 
-      deleteDoc: (id) => {
+      purgeDoc: (id) => {
         void storage.deleteDocument(id).catch(console.error)
         const docProject = get().docs[id]?.projectId ?? get().activeProjectId
         void Promise.all([
@@ -1771,7 +2123,7 @@ export const useStore = create<AppState>()(
         announceEdit('sheet', id, `Edited spreadsheet “${meta.title}”`)
       },
 
-      deleteSheetDoc: (id) => {
+      purgeSheetDoc: (id) => {
         void storage.deleteDocument(id).catch(console.error)
         set((s) => {
           const sheetDocs = { ...s.sheetDocs }
@@ -1843,7 +2195,7 @@ export const useStore = create<AppState>()(
         announceEdit('present', id, `Edited presentation “${meta.title}”`)
       },
 
-      deletePresentDoc: (id) => {
+      purgePresentDoc: (id) => {
         void storage.deleteDocument(id).catch(console.error)
         set((s) => {
           const presentDocs = { ...s.presentDocs }
@@ -1924,7 +2276,7 @@ export const useStore = create<AppState>()(
         if (!opts?.silent) announceEdit('code', id, `Edited ${meta.title}.${meta.extension}`)
       },
 
-      deleteCode: (id) => {
+      purgeCode: (id) => {
         void storage.deleteDocument(id).catch(console.error)
         const codeProject = get().codeDocs[id]?.projectId ?? get().activeProjectId
         void Promise.all([
@@ -2188,6 +2540,8 @@ export const useStore = create<AppState>()(
         graphSettings: s.graphSettings,
         folders: s.folders,
         collapsedCategories: s.collapsedCategories,
+        // a density preference, like theme and locale — not page state
+        dashboardView: s.dashboardView,
       }),
     },
   ),

@@ -217,6 +217,12 @@ export const IcFolder = (p: P) => (
     <path d="M3 7V5a2 2 0 0 1 2-2h4l2 3h8a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
   </S>
 )
+export const IcHome = (p: P) => (
+  <S {...p}>
+    <path d="M3 10.5 12 3l9 7.5" />
+    <path d="M5.5 9.5V20a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1V9.5" />
+  </S>
+)
 export const IcStar = (p: P) => (
   <S {...p}>
     <path d="m12 3 2.7 5.6 6.1.8-4.5 4.3 1.1 6.1L12 17l-5.4 2.8 1.1-6.1L3.2 9.4l6.1-.8z" />
