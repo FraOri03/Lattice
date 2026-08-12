@@ -1,10 +1,10 @@
 # Lattice
 
-A **local-first unified creative workspace** — Obsidian-style linked notes, a Figma-style
-infinite board with sections, a Word/Notion-style rich document editor, a VS Code-style
-code workspace with GitHub sync, an Excel-style spreadsheet engine, a slide editor and a
-photographic set planner, all organized into **projects** inside **workspaces**, with
-optional Google Drive cloud sync and CRDT realtime collaboration.
+**Lattice is a local-first unified creative workspace** designed to bring thinking, designing, building, analyzing, and presenting into a single connected environment.
+At its core, Lattice combines linked knowledge, infinite spatial canvases, rich documents, development environments, data spreadsheets, presentations, and photographic production planning within one coherent creative system.
+Everything is organized into projects and workspaces, allowing different tools and content types to coexist, reference each other, and move seamlessly across workflows without breaking context.
+Lattice is built around local ownership and interoperability: projects remain accessible locally while optional cloud synchronization extends them across devices. Integrated versioning and repository synchronization support development workflows, while CRDT-based realtime collaboration enables multiple people to work simultaneously across shared projects.
+Rather than treating creative tools as isolated applications, Lattice treats every document, canvas, dataset, asset, composition, and piece of code as part of the same interconnected project environment — one workspace for the entire creative process.
 
 One vault holds every kind of thing you work with — notes, documents, spreadsheets, decks,
 boards, code and imported files — and every one of them can be a **card** on an infinite
