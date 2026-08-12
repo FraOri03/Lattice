@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { IcChevronLeft, IcChevronRight, IcX } from '@/components/Icons'
+import { useI18n } from '@/lib/i18n'
 import { panelsAreDocked } from '@/lib/layout/tiers'
 import { useViewportTier } from '@/lib/layout/useViewportTier'
 
@@ -51,6 +52,10 @@ export function SidePanel({
 }: {
   /** Which edge the panel lives on. The sidebar is the only `left` today. */
   side?: 'left' | 'right'
+  /**
+   * Already localized: it is shown to the user as the header and the rail, and
+   * the panel feeds it back into the show/hide/resize sentences.
+   */
   title: string
   width: number
   collapsed: boolean
@@ -69,6 +74,7 @@ export function SidePanel({
   chrome?: 'header' | 'none'
   children: ReactNode
 }) {
+  const t = useI18n()
   const ref = useRef<HTMLElement>(null)
   const handle = useRef<HTMLButtonElement>(null)
   const wasOpen = useRef(false)
@@ -104,8 +110,8 @@ export function SidePanel({
     }
   }, [docked, drawerOpen])
 
-  const show = `Show ${title.toLowerCase()}`
-  const hide = `Hide ${title.toLowerCase()}`
+  const show = t.panel.show(title)
+  const hide = t.panel.hide(title)
 
   /* ---------- undocked: an overlay, or the handle that summons it ---------- */
 
@@ -250,7 +256,7 @@ export function SidePanel({
         <div
           role="separator"
           aria-orientation="vertical"
-          aria-label={`Resize ${title.toLowerCase()}`}
+          aria-label={t.panel.resize(title)}
           aria-valuenow={width}
           aria-valuemin={minWidth}
           aria-valuemax={maxWidth}

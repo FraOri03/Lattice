@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { useI18n } from '@/lib/i18n'
 import {
   MAX_INSPECTOR_WIDTH,
   MIN_INSPECTOR_WIDTH,
@@ -21,6 +22,7 @@ import { SidePanel } from './SidePanel'
  * the inspector is a place in the shell, not a possession of a section.
  */
 export function InspectorPanel({ children }: { children: ReactNode }) {
+  const t = useI18n()
   const collapsed = useWorkspaceLayoutStore((s) => s.inspectorCollapsed)
   const width = useWorkspaceLayoutStore((s) => s.inspectorWidth)
   const setCollapsed = useWorkspaceLayoutStore((s) => s.setInspectorCollapsed)
@@ -28,7 +30,7 @@ export function InspectorPanel({ children }: { children: ReactNode }) {
 
   return (
     <SidePanel
-      title="Inspector"
+      title={t.panel.inspector}
       width={width}
       collapsed={collapsed}
       minWidth={MIN_INSPECTOR_WIDTH}
