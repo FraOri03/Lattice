@@ -566,3 +566,23 @@ export const IcPhoneOff = (p: P) => (
     <path d="m3.5 20.5 17-17" />
   </S>
 )
+/** Grab handle of the free call window. */
+export const IcMove = (p: P) => (
+  <S {...p}>
+    <path d="M5 9 2 12l3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3" />
+    <path d="M2 12h20M12 2v20" />
+  </S>
+)
+/** Send the free call window back to its corner. */
+export const IcDock = (p: P) => (
+  <S {...p}>
+    <rect x="3" y="4.5" width="18" height="15" rx="2" />
+    <rect x="12" y="12.5" width="7" height="5" rx="1" fill="currentColor" stroke="none" />
+  </S>
+)
+/** Bottom-right resize corner. */
+export const IcGrip = (p: P) => (
+  <S {...p}>
+    <path d="M21 9 9 21M21 15.5 15.5 21" />
+  </S>
+)

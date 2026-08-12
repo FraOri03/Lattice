@@ -10,9 +10,12 @@ import { IcMicOff, IcScreenShare } from '@/components/Icons'
 export function ParticipantTile({
   trackRef,
   focused = false,
+  fill = false,
 }: {
   trackRef: TrackReference
   focused?: boolean
+  /** take the width of the cell instead of the filmstrip's fixed 96px */
+  fill?: boolean
 }) {
   const participant = trackRef.participant
   const isScreenShare = trackRef.source === Track.Source.ScreenShare
@@ -22,8 +25,8 @@ export function ParticipantTile({
 
   return (
     <div
-      className={`relative flex-none overflow-hidden rounded-lg border bg-panel2 ${
-        focused ? 'aspect-video w-full border-accent/50' : 'aspect-video w-24 border-bord'
+      className={`relative aspect-video flex-none overflow-hidden rounded-lg border bg-panel2 ${
+        focused ? 'w-full border-accent/50' : fill ? 'w-full border-bord' : 'w-24 border-bord'
       }`}
     >
       {hasVideo ? (

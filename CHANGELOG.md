@@ -14,6 +14,18 @@ All notable changes to Lattice are recorded here. The format follows
 
 ### Added
 
+- **The call can leave its corner.** A button in the call bar undocks the island into a free
+  window: drag its bar to move it, drag any edge or corner to resize it, and the video tiles
+  fill whatever space you give it instead of staying 96px wide. It replaces the only way to
+  enlarge a face until now — right-clicking a tile and asking the browser for
+  picture-in-picture, which pops out one video, drops the rest of the call and is invisible
+  to anyone who does not know that menu exists. A second button docks it back; where you put
+  the window and how big you made it survive both the trip to the corner and a reload.
+  Everything a pointer does here a keyboard does too: the grip in the bar moves with the
+  arrow keys, the corner grip resizes with them, Shift is the fine step. The window is
+  clamped to the screen on every move, on every resize and when the viewport itself shrinks,
+  so it can never be dragged somewhere it cannot be dragged back from.
+
 - **Below 768px Lattice says what it cannot do instead of pretending.** Notes and rich
   documents stay editable — they are the two editors that work under a thumb. The board
   stays navigable: pan, zoom, select and open a card, comment; only dragging cards around
