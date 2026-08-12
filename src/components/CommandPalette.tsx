@@ -298,7 +298,7 @@ function usePaletteSections(
       cb.close()
     }
     const onDashboard = s.navSurface === 'dashboard'
-    const projectList = Object.values(s.projects).filter((p) => !p.archived)
+    const projectList = Object.values(s.projects).filter((p) => !p.archived && !p.deletedAt)
 
     /* ---------- the target question, when one is pending ---------- */
 
@@ -523,20 +523,24 @@ function usePaletteSections(
           }),
         })
 
-      for (const n of Object.values(s.notes))
+      // search reaches what this device holds — minus what it has thrown away
+      const live = <T extends { deletedAt?: number }>(m: Record<string, T>) =>
+        Object.values(m).filter((e) => !e.deletedAt)
+
+      for (const n of live(s.notes))
         push(`n:${n.id}`, n.title, 'note', n.projectId, `note:${n.id}`, () => s.openNote(n.id))
-      for (const d of Object.values(s.docs))
+      for (const d of live(s.docs))
         push(`d:${d.id}`, d.title, 'richdoc', d.projectId, `doc:${d.id}`, () => s.openDoc(d.id))
-      for (const sh of Object.values(s.sheetDocs))
+      for (const sh of live(s.sheetDocs))
         push(`s:${sh.id}`, sh.title, 'sheet', sh.projectId, `sheet:${sh.id}`, () => s.openSheet(sh.id))
-      for (const p of Object.values(s.presentDocs))
+      for (const p of live(s.presentDocs))
         push(`pr:${p.id}`, p.title, 'presentation', p.projectId, `present:${p.id}`, () => s.openPresent(p.id))
-      for (const c of Object.values(s.codeDocs))
+      for (const c of live(s.codeDocs))
         push(`c:${c.id}`, `${c.title}.${c.extension}`, 'code', c.projectId, `code:${c.id}`, () => s.openCode(c.id))
-      for (const a of Object.values(s.assets))
+      for (const a of live(s.assets))
         push(`as:${a.id}`, a.name, 'file', a.projectId, `asset:${a.id}`, () => s.openAsset(a.id))
 
-      for (const b of Object.values(s.boards)) {
+      for (const b of live(s.boards)) {
         pool.push({
           key: `b:${b.id}`,
           name: b.name,
@@ -554,7 +558,7 @@ function usePaletteSections(
         })
       }
 
-      for (const p of Object.values(s.projects)) {
+      for (const p of live(s.projects)) {
         pool.push({
           key: `p:${p.id}`,
           name: p.name,

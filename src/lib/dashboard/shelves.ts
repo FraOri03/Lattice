@@ -27,7 +27,7 @@ export interface ShelfItem {
 }
 
 export interface ShelfSources extends EntitySources {
-  projects: Record<string, { name: string; starred?: boolean }>
+  projects: Record<string, { name: string; starred?: boolean; deletedAt?: number }>
 }
 
 /** The seven entity slices, in the order the shelf lists them. */
@@ -86,7 +86,7 @@ export function collectStarred(
   const out: ShelfItem[] = []
 
   for (const [id, project] of Object.entries(src.projects)) {
-    if (!project.starred) continue
+    if (!project.starred || project.deletedAt) continue
     const ws = workspaceOfProject(id, workspaces)
     out.push({
       kind: 'project',
@@ -103,7 +103,8 @@ export function collectStarred(
 
   for (const [kind, slice] of ENTITY_SLICES) {
     for (const [id, entity] of Object.entries(src[slice])) {
-      if (!entity.starred) continue
+      if (!entity.starred || entity.deletedAt) continue
+      // describeEntity also refuses a trashed record; this is the cheaper check
       const hit = describeEntity(kind, id, src)
       if (!hit) continue
       out.push({ kind, id, title: hit.title, ...attribute(hit.projectId, src, workspaces) })

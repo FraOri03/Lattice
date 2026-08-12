@@ -1,5 +1,7 @@
 import { lazy, Suspense, useEffect, useRef } from 'react'
 import { useStore } from '@/store/useStore'
+import { announce } from '@/lib/a11y/announcer'
+import { messages } from '@/lib/i18n'
 import { tabShortcutFor, useOpenEntity } from '@/lib/tabs/openEntity'
 import { useUiStore } from '@/store/useUiStore'
 import { useWorkspaceLayoutStore } from '@/store/workspaceLayoutStore'
@@ -346,6 +348,16 @@ function AppShell() {
   // is mounted here for the same reason as the history binding: one writer,
   // above the surface switch, so it survives the trip to the dashboard.
   useTierAttribute()
+
+  /**
+   * The 30-day sweep (15.6). Nothing schedules a purge while the app is shut,
+   * so it runs on open — which means a device left closed for two months takes
+   * a batch out at once. It says how many rather than quietly shrinking.
+   */
+  useEffect(() => {
+    const removed = useStore.getState().purgeExpired()
+    if (removed > 0) announce(messages[useStore.getState().locale].announcements.purgedOnOpen(removed))
+  }, [])
   // theme, contrast, density, UI scale and motion, published on :root by the
   // one writer that owns them (14.3) — including the live 'system' theme
   useAppearance()

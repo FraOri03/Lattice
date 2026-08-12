@@ -21,7 +21,9 @@ export function useRecentProjects(limit = 5): Project[] {
   const projects = useStore((s) => s.projects)
   return ids
     .map((id) => projects[id])
-    .filter((p): p is Project => !!p && !p.archived)
+    // a trashed project is not "recent", it is deleted (15.6). This list reads
+    // `recentProjectIds` rather than `groupProjects`, so it needs its own check
+    .filter((p): p is Project => !!p && !p.archived && !p.deletedAt)
     .slice(0, limit)
 }
 

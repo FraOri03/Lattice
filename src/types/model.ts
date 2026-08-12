@@ -18,6 +18,17 @@ export interface NoteDoc {
    * is the same as false, which is why no migration is needed.
    */
   starred?: boolean
+  /**
+   * In the trash since this moment (15.6). Absent means live.
+   *
+   * A soft delete HIDES the record rather than moving it: the payload stays
+   * exactly where it was, which is what makes restore free, keeps the bytes
+   * countable while they are still occupied, and leaves the Drive mirror
+   * untouched until a purge actually runs.
+   */
+  deletedAt?: number
+  /** Who put it there — a display name, for the row that says so. */
+  deletedBy?: string
 }
 
 /* ---------------- projects (Phase 6) ---------------- */
@@ -42,6 +53,10 @@ export interface Project {
   updatedAt: number
   archived: boolean
   starred: boolean
+  /** In the trash since this moment (15.6). Absent means live. */
+  deletedAt?: number
+  /** Who put it there — a display name, for the row that says so. */
+  deletedBy?: string
   storageRoot: string
   settings: ProjectSettings
 }
@@ -285,6 +300,17 @@ export interface AssetDoc {
    * is the same as false, which is why no migration is needed.
    */
   starred?: boolean
+  /**
+   * In the trash since this moment (15.6). Absent means live.
+   *
+   * A soft delete HIDES the record rather than moving it: the payload stays
+   * exactly where it was, which is what makes restore free, keeps the bytes
+   * countable while they are still occupied, and leaves the Drive mirror
+   * untouched until a purge actually runs.
+   */
+  deletedAt?: number
+  /** Who put it there — a display name, for the row that says so. */
+  deletedBy?: string
   /** companion files for multi-file formats (GLTF+BIN+textures, OBJ+MTL) */
   bundle?: AssetBundleInfo
   /** video upload → web-conversion state; unset for non-video assets */
@@ -354,6 +380,17 @@ export interface RichDocMeta {
    * is the same as false, which is why no migration is needed.
    */
   starred?: boolean
+  /**
+   * In the trash since this moment (15.6). Absent means live.
+   *
+   * A soft delete HIDES the record rather than moving it: the payload stays
+   * exactly where it was, which is what makes restore free, keeps the bytes
+   * countable while they are still occupied, and leaves the Drive mirror
+   * untouched until a purge actually runs.
+   */
+  deletedAt?: number
+  /** Who put it there — a display name, for the row that says so. */
+  deletedBy?: string
   /** page layout; absent means continuous (the historical default) */
   page?: PageSetup
   /**
@@ -411,6 +448,17 @@ export interface CodeDocMeta {
    * is the same as false, which is why no migration is needed.
    */
   starred?: boolean
+  /**
+   * In the trash since this moment (15.6). Absent means live.
+   *
+   * A soft delete HIDES the record rather than moving it: the payload stays
+   * exactly where it was, which is what makes restore free, keeps the bytes
+   * countable while they are still occupied, and leaves the Drive mirror
+   * untouched until a purge actually runs.
+   */
+  deletedAt?: number
+  /** Who put it there — a display name, for the row that says so. */
+  deletedBy?: string
 }
 
 /* ---------------- spreadsheet documents ---------------- */
@@ -449,6 +497,17 @@ export interface SpreadsheetDocMeta {
    * is the same as false, which is why no migration is needed.
    */
   starred?: boolean
+  /**
+   * In the trash since this moment (15.6). Absent means live.
+   *
+   * A soft delete HIDES the record rather than moving it: the payload stays
+   * exactly where it was, which is what makes restore free, keeps the bytes
+   * countable while they are still occupied, and leaves the Drive mirror
+   * untouched until a purge actually runs.
+   */
+  deletedAt?: number
+  /** Who put it there — a display name, for the row that says so. */
+  deletedBy?: string
 }
 
 /* ---------------- presentations (Phase 8) ---------------- */
@@ -481,6 +540,17 @@ export interface PresentationDocMeta {
    * is the same as false, which is why no migration is needed.
    */
   starred?: boolean
+  /**
+   * In the trash since this moment (15.6). Absent means live.
+   *
+   * A soft delete HIDES the record rather than moving it: the payload stays
+   * exactly where it was, which is what makes restore free, keeps the bytes
+   * countable while they are still occupied, and leaves the Drive mirror
+   * untouched until a purge actually runs.
+   */
+  deletedAt?: number
+  /** Who put it there — a display name, for the row that says so. */
+  deletedBy?: string
 }
 
 /* ---------------- board cards ---------------- */
@@ -612,6 +682,17 @@ export interface Board {
    * is the same as false, which is why no migration is needed.
    */
   starred?: boolean
+  /**
+   * In the trash since this moment (15.6). Absent means live.
+   *
+   * A soft delete HIDES the record rather than moving it: the payload stays
+   * exactly where it was, which is what makes restore free, keeps the bytes
+   * countable while they are still occupied, and leaves the Drive mirror
+   * untouched until a purge actually runs.
+   */
+  deletedAt?: number
+  /** Who put it there — a display name, for the row that says so. */
+  deletedBy?: string
 }
 
 /**

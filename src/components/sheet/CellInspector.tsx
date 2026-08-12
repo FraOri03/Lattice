@@ -172,7 +172,7 @@ export function CellInspector() {
           if (
             await confirmDialog({
               title: `Delete “${meta.title}”?`,
-              body: 'The spreadsheet and its cards on all boards are removed.',
+              body: 'It goes to the trash and can be restored for 30 days. Its cards on all boards are removed now, and those do not come back.',
               confirmLabel: 'Delete spreadsheet',
               danger: true,
             })

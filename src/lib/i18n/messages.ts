@@ -706,9 +706,41 @@ export const en = {
     connected: 'connected',
     notConnected: 'not connected',
     trash: 'Trash',
+    trashLine: (size: string, n: number) => `${size} · ${n} held`,
     freeSpace: 'Free space',
     storageWhy:
-      'The vault’s own size is measured here. The trash figure waits on the soft-delete model (issue #115), and free space is the disk’s — which a browser cannot read.',
+      'The vault’s own size and its trash are measured here — deleted items keep occupying their bytes until the purge, which is why they get their own line. Free space is the disk’s, which a browser cannot read.',
+  },
+  /**
+   * Trash (15.6). Every string here is careful about two facts the prototype's
+   * own copy is careful about: the space is not free until the purge, and
+   * Lattice's trash is not Drive's.
+   */
+  trash: {
+    countLine: (n: number, size: string) =>
+      `${n} ${n === 1 ? 'item' : 'items'} · ${size} still occupied until each one’s countdown ends`,
+    nothingLine: (days: number) => `Nothing deleted · ${days}-day retention on this device`,
+    retentionNote: (days: number) =>
+      `Deleted items stay on this device for ${days} days, then Lattice removes them permanently — the countdown on each row is the real remaining time, not a suggestion. Space is only reclaimed after the purge. Anything also held in Google Drive is removed there at the same moment, and never before: emptying this trash is what reaches Drive, not the delete that put it here.`,
+    emptyTrash: 'Empty trash',
+    confirmEmpty: (n: number, size: string) =>
+      `Permanently delete all ${n} ${n === 1 ? 'item' : 'items'} (${size})? This cannot be undone and there is no copy left on this device.`,
+    keepThem: 'Keep them',
+    deletePermanently: 'Delete permanently',
+    emptyTitle: 'Trash is empty',
+    emptyBody: (days: number) =>
+      `Deleted projects and files wait here for ${days} days before Lattice removes them for good. Nothing is waiting right now.`,
+    rowMeta: (kind: string, location: string, when: string, by: string | null) =>
+      by ? `${kind} · was in ${location} · deleted ${when} by ${by}` : `${kind} · was in ${location} · deleted ${when}`,
+    parentDeleted: 'parent deleted',
+    purgingTonight: 'Purging tonight',
+    inDays: (n: number) => `in ${n} ${n === 1 ? 'day' : 'days'}`,
+    purgeOn: (date: string) => `Permanently removed on ${date}. Restore before then to keep it.`,
+    restore: 'Restore',
+    restoreToWhy: (location: string) => `Restore to ${location}`,
+    restoreToTopWhy:
+      'Its project is in the trash too, so this comes back on its own — restore the project to put it back where it was.',
+    deleteForever: (name: string) => `Delete ${name} forever`,
   },
   /** Row and card anatomy — the accessible names actions carry (13.5 §8). */
   cards: {
@@ -742,6 +774,12 @@ export const en = {
       `${name} — ${projects} ${projects === 1 ? 'project' : 'projects'}`,
     gridView: 'Grid view',
     listView: 'List view',
+    restored: (name: string, location: string) => `“${name}” restored to ${location}`,
+    restoredToTop: (name: string) => `“${name}” restored — its project is still in the trash`,
+    purged: (name: string) => `“${name}” permanently deleted`,
+    purgedAll: (n: number) => `${n} ${n === 1 ? 'item' : 'items'} permanently deleted`,
+    purgedOnOpen: (n: number) =>
+      `${n} ${n === 1 ? 'item' : 'items'} passed 30 days and were removed`,
   },
   /**
    * The command palette (13.4, built in 15.3). One search and one create list,
@@ -1688,9 +1726,36 @@ export const it: Catalog = {
     connected: 'connessa',
     notConnected: 'non connessa',
     trash: 'Cestino',
+    trashLine: (size, n) => `${size} · ${n} in attesa`,
     freeSpace: 'Spazio libero',
     storageWhy:
-      'La dimensione del vault è misurata qui. Il dato del cestino aspetta il modello di eliminazione reversibile (issue #115), e lo spazio libero è quello del disco — che un browser non può leggere.',
+      'Qui sono misurati la dimensione del vault e il suo cestino — gli elementi eliminati continuano a occupare i loro byte fino alla rimozione, ed è per questo che hanno una riga a parte. Lo spazio libero è quello del disco, che un browser non può leggere.',
+  },
+  trash: {
+    countLine: (n, size) =>
+      `${n} ${n === 1 ? 'elemento' : 'elementi'} · ${size} ancora occupati finché non scade il conto alla rovescia di ciascuno`,
+    nothingLine: (days) => `Niente di eliminato · conservazione ${days} giorni su questo dispositivo`,
+    retentionNote: (days) =>
+      `Gli elementi eliminati restano su questo dispositivo per ${days} giorni, poi Lattice li rimuove definitivamente — il conto alla rovescia su ogni riga è il tempo reale che resta, non un’indicazione. Lo spazio si libera solo dopo la rimozione. Ciò che sta anche su Google Drive viene rimosso lì nello stesso momento, e mai prima: è svuotare questo cestino ad arrivare a Drive, non l’eliminazione che ce l’ha messo.`,
+    emptyTrash: 'Svuota il cestino',
+    confirmEmpty: (n, size) =>
+      `Eliminare definitivamente tutti i ${n} ${n === 1 ? 'elemento' : 'elementi'} (${size})? Non si può annullare e non resta nessuna copia su questo dispositivo.`,
+    keepThem: 'Tienili',
+    deletePermanently: 'Elimina definitivamente',
+    emptyTitle: 'Il cestino è vuoto',
+    emptyBody: (days) =>
+      `I progetti e i file eliminati aspettano qui ${days} giorni prima che Lattice li rimuova per sempre. Al momento non c’è niente in attesa.`,
+    rowMeta: (kind, location, when, by) =>
+      by ? `${kind} · era in ${location} · eliminato ${when} da ${by}` : `${kind} · era in ${location} · eliminato ${when}`,
+    parentDeleted: 'progetto eliminato',
+    purgingTonight: 'Rimosso stanotte',
+    inDays: (n) => `tra ${n} ${n === 1 ? 'giorno' : 'giorni'}`,
+    purgeOn: (date) => `Rimosso definitivamente il ${date}. Ripristinalo prima per tenerlo.`,
+    restore: 'Ripristina',
+    restoreToWhy: (location) => `Ripristina in ${location}`,
+    restoreToTopWhy:
+      'Anche il suo progetto è nel cestino, quindi torna da solo — ripristina il progetto per rimetterlo dov’era.',
+    deleteForever: (name) => `Elimina ${name} per sempre`,
   },
   cards: {
     openItem: (name) => `Apri ${name}`,
@@ -1716,6 +1781,12 @@ export const it: Catalog = {
       `${name} — ${projects} ${projects === 1 ? 'progetto' : 'progetti'}`,
     gridView: 'Vista a griglia',
     listView: 'Vista a elenco',
+    restored: (name, location) => `“${name}” ripristinato in ${location}`,
+    restoredToTop: (name) => `“${name}” ripristinato — il suo progetto è ancora nel cestino`,
+    purged: (name) => `“${name}” eliminato definitivamente`,
+    purgedAll: (n) => `${n} ${n === 1 ? 'elemento eliminato' : 'elementi eliminati'} definitivamente`,
+    purgedOnOpen: (n) =>
+      `${n} ${n === 1 ? 'elemento ha superato' : 'elementi hanno superato'} i 30 giorni e ${n === 1 ? 'è stato rimosso' : 'sono stati rimossi'}`,
   },
   palette: {
     placeholder: 'Cerca file, board e progetti — o digita un comando…',

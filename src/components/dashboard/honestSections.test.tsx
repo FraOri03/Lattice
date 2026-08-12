@@ -197,13 +197,13 @@ describe('Invites', () => {
 })
 
 describe('Trash', () => {
-  it('is unavailable because the model is missing, not the page', () => {
+  it('may now say it is empty, because it can finally look', () => {
+    // before 15.6 this said "unavailable": deleting was terminal, so there was
+    // no list to be empty. With the model behind it, empty is a real answer.
     useStore.setState({ navSurface: 'dashboard', dashboardDestination: 'trash' })
     renderDashboard()
 
-    expect(main().getByText(/nothing records that an item was removed/)).toBeInTheDocument()
-    expect(main().getByText(/issue #115/)).toBeInTheDocument()
-    // never "Trash is empty" over data that is already gone
-    expect(main().queryByText(/empty/i)).toBeNull()
+    expect(main().getByText('Trash is empty')).toBeInTheDocument()
+    expect(main().queryByText(/issue #115/)).toBeNull()
   })
 })

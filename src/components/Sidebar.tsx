@@ -448,7 +448,7 @@ export function Sidebar() {
                       if (
                         await confirmDialog({
                           title: `Delete board “${b.name}”?`,
-                          body: 'Cards on this board are removed; notes, documents and assets are kept.',
+                          body: 'The board goes to the trash and can be restored for 30 days. The notes, documents and assets its cards point at are untouched either way.',
                           confirmLabel: 'Delete board',
                           danger: true,
                         })
@@ -502,7 +502,7 @@ export function Sidebar() {
                       if (
                         await confirmDialog({
                           title: `Delete “${d.title}”?`,
-                          body: 'The document and its cards on all boards are removed.',
+                          body: 'It goes to the trash and can be restored for 30 days. Its cards on all boards are removed now, and those do not come back.',
                           confirmLabel: 'Delete document',
                           danger: true,
                         })
@@ -556,7 +556,7 @@ export function Sidebar() {
                       if (
                         await confirmDialog({
                           title: `Delete “${sh.title}”?`,
-                          body: 'The spreadsheet and its cards on all boards are removed.',
+                          body: 'It goes to the trash and can be restored for 30 days. Its cards on all boards are removed now, and those do not come back.',
                           confirmLabel: 'Delete spreadsheet',
                           danger: true,
                         })
@@ -609,7 +609,7 @@ export function Sidebar() {
                       if (
                         await confirmDialog({
                           title: `Delete “${p.title}”?`,
-                          body: 'The presentation is removed. A preserved source file (if any) stays in Files.',
+                          body: 'It goes to the trash and can be restored for 30 days. Its cards on all boards are removed now, and those do not come back.',
                           confirmLabel: 'Delete presentation',
                           danger: true,
                         })
@@ -664,7 +664,7 @@ export function Sidebar() {
                       if (
                         await confirmDialog({
                           title: `Delete “${c.title}.${c.extension}”?`,
-                          body: 'The file and its cards on all boards are removed.',
+                          body: 'It goes to the trash and can be restored for 30 days. Its cards on all boards are removed now, and those do not come back.',
                           confirmLabel: 'Delete file',
                           danger: true,
                         })
@@ -719,7 +719,7 @@ export function Sidebar() {
                       if (
                         await confirmDialog({
                           title: `Delete note “${n.title}”?`,
-                          body: 'The note and its cards on all boards are removed.',
+                          body: 'It goes to the trash and can be restored for 30 days. Its cards on all boards are removed now, and those do not come back.',
                           confirmLabel: 'Delete note',
                           danger: true,
                         })

@@ -4,6 +4,7 @@ import { useUiStore } from '@/store/useUiStore'
 import { useSyncStore } from '@/lib/sync/syncStore'
 import { useI18n } from '@/lib/i18n'
 import { formatBytes } from '@/lib/media'
+import { collectTrash, trashedBytes } from '@/lib/dashboard/trash'
 import { IcChevronDown, IcInfo, IcSettings } from '@/components/Icons'
 
 /**
@@ -23,10 +24,11 @@ import { IcChevronDown, IcInfo, IcSettings } from '@/components/Icons'
  * - **System** (CPU, memory, GPU, disk, network) is marked *not planned* in
  *   13.3: a browser cannot read any of it without a native host. The row says
  *   so instead of reporting a plausible-looking guess.
- * - **Storage** is the partial one. The vault's own size and file count are
- *   real and computed here; the Drive mirror's state is real; the trash figure
- *   waits on the soft-delete model (#115) and free space has no source, so both
- *   are reserved rather than filled with something that reads true.
+ * - **Storage** is the partial one, and less partial since 15.6. The vault's
+ *   size and file count are computed here, the Drive mirror's state is real,
+ *   and the trash figure became real the moment soft delete kept the payload in
+ *   place: those bytes are genuinely still occupied. Free space stays reserved —
+ *   that is the disk's, which a browser cannot read.
  */
 
 function StatusBar({
@@ -92,15 +94,26 @@ export function SidebarStatus() {
   const sheetDocs = useStore((s) => s.sheetDocs)
   const presentDocs = useStore((s) => s.presentDocs)
   const codeDocs = useStore((s) => s.codeDocs)
+  const boards = useStore((s) => s.boards)
+  const projects = useStore((s) => s.projects)
+  const workspaces = useStore((s) => s.workspaces)
 
-  const bytes = Object.values(assets).reduce((sum, a) => sum + (a.size ?? 0), 0)
+  const trash = collectTrash(
+    { notes, docs, sheetDocs, presentDocs, codeDocs, assets, boards, projects },
+    workspaces,
+    Date.now(),
+  )
+  const trashBytes = trashedBytes(trash)
+  const trashCount = trash.length
+  // the live vault excludes what is waiting to be purged — those bytes are
+  // reported on their own line rather than counted twice
+  const bytes = Object.values(assets)
+    .filter((a) => !a.deletedAt)
+    .reduce((sum, a) => sum + (a.size ?? 0), 0)
+  const live = (m: Record<string, { deletedAt?: number }>) =>
+    Object.values(m).filter((e) => !e.deletedAt).length
   const files =
-    Object.keys(assets).length +
-    Object.keys(notes).length +
-    Object.keys(docs).length +
-    Object.keys(sheetDocs).length +
-    Object.keys(presentDocs).length +
-    Object.keys(codeDocs).length
+    live(assets) + live(notes) + live(docs) + live(sheetDocs) + live(presentDocs) + live(codeDocs)
   const synced = provider !== 'none'
   const dash = '—'
 
@@ -133,10 +146,9 @@ export function SidebarStatus() {
           label={t.status.driveMirror}
           value={synced ? t.status.connected : t.status.notConnected}
         />
-        {/* the trash figure and free space are the two readings with no source:
-            one waits on the soft-delete model, the other on nothing a browser
-            can answer about the disk */}
-        <Reading label={t.status.trash} value={dash} />
+        {/* real since 15.6: the payload stays put until a purge, so those bytes
+            are genuinely still occupied and can be counted */}
+        <Reading label={t.status.trash} value={t.status.trashLine(formatBytes(trashBytes) || '0 B', trashCount)} />
         <Reading label={t.status.freeSpace} value={dash} />
         <Why>{t.status.storageWhy}</Why>
       </StatusBar>

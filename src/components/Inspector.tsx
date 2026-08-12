@@ -507,7 +507,7 @@ function NodeInspector({ node }: { node: BoardNode }) {
             if (
               await confirmDialog({
                 title: `Delete asset “${asset.name}”?`,
-                body: 'The file and its cards on all boards are removed from the vault.',
+                body: 'It goes to the trash and can be restored for 30 days. Its cards on all boards are removed now, and those do not come back.',
                 confirmLabel: 'Delete asset',
                 danger: true,
               })
@@ -525,7 +525,7 @@ function NodeInspector({ node }: { node: BoardNode }) {
             if (
               await confirmDialog({
                 title: `Delete “${richdoc.title}”?`,
-                body: 'The document and its cards on all boards are removed.',
+                body: 'It goes to the trash and can be restored for 30 days. Its cards on all boards are removed now, and those do not come back.',
                 confirmLabel: 'Delete document',
                 danger: true,
               })
@@ -543,7 +543,7 @@ function NodeInspector({ node }: { node: BoardNode }) {
             if (
               await confirmDialog({
                 title: `Delete “${codeDoc.title}.${codeDoc.extension}”?`,
-                body: 'The file and its cards on all boards are removed.',
+                body: 'It goes to the trash and can be restored for 30 days. Its cards on all boards are removed now, and those do not come back.',
                 confirmLabel: 'Delete file',
                 danger: true,
               })
@@ -561,7 +561,7 @@ function NodeInspector({ node }: { node: BoardNode }) {
             if (
               await confirmDialog({
                 title: `Delete “${sheetDoc.title}”?`,
-                body: 'The spreadsheet and its cards on all boards are removed.',
+                body: 'It goes to the trash and can be restored for 30 days. Its cards on all boards are removed now, and those do not come back.',
                 confirmLabel: 'Delete spreadsheet',
                 danger: true,
               })
@@ -579,7 +579,7 @@ function NodeInspector({ node }: { node: BoardNode }) {
             if (
               await confirmDialog({
                 title: `Delete “${presentDoc.title}”?`,
-                body: 'The presentation and its cards on all boards are removed. A preserved source file (if any) stays in Files.',
+                body: 'It goes to the trash and can be restored for 30 days. Its cards on all boards are removed now, and those do not come back. A preserved source file (if any) stays in Files.',
                 confirmLabel: 'Delete presentation',
                 danger: true,
               })

@@ -86,9 +86,11 @@ export function HomeDestination() {
 
   const workspace = workspaces[activeWorkspaceId]
   // the dashboard scopes to the active workspace, like the project switcher
-  const wsProjects = workspace
-    ? Object.values(projects).filter((p) => workspace.projectIds.includes(p.id))
-    : Object.values(projects)
+  const wsProjects = (
+    workspace
+      ? Object.values(projects).filter((p) => workspace.projectIds.includes(p.id))
+      : Object.values(projects)
+  ).filter((p) => !p.deletedAt)
   const groups = groupProjects(wsProjects)
   const wsList = Object.values(workspaces).filter(
     (ws) => !ws.archived || ws.id === activeWorkspaceId,
@@ -109,8 +111,9 @@ export function HomeDestination() {
       perProject[projectId] ??= { boards: 0, files: 0 }
       perProject[projectId][key] += 1
     }
-    for (const b of Object.values(boards)) bump(b.projectId, 'boards')
-    const fileMaps: Record<string, { projectId?: string }>[] = [
+    // a trashed entity is not "in" its project any more, so it stops counting
+    for (const b of Object.values(boards)) if (!b.deletedAt) bump(b.projectId, 'boards')
+    const fileMaps: Record<string, { projectId?: string; deletedAt?: number }>[] = [
       notes,
       docs,
       sheetDocs,
@@ -118,7 +121,8 @@ export function HomeDestination() {
       codeDocs,
       assets,
     ]
-    for (const map of fileMaps) for (const e of Object.values(map)) bump(e.projectId, 'files')
+    for (const map of fileMaps)
+      for (const e of Object.values(map)) if (!e.deletedAt) bump(e.projectId, 'files')
     return perProject
   }, [boards, notes, docs, sheetDocs, presentDocs, codeDocs, assets])
 
@@ -132,7 +136,7 @@ export function HomeDestination() {
       fileCount += counts.files
     }
     const bytes = Object.values(assets)
-      .filter((a) => a.projectId && ids.has(a.projectId))
+      .filter((a) => !a.deletedAt && a.projectId && ids.has(a.projectId))
       .reduce((sum, a) => sum + (a.size ?? 0), 0)
     return { projects: wsProjects.length, boards: boardCount, files: fileCount, bytes }
   }, [wsProjects, tally, assets])
