@@ -14,10 +14,14 @@ They sit on the **Lattice Creative Core**, built in phase 22
 ([milestone 16](https://github.com/FraOri03/Lattice/milestone/16), epic
 [#205](https://github.com/FraOri03/Lattice/issues/205)) before any of them starts.
 
-> **Status: none of this exists yet.** As of phase 15 there is no Trace, Forge, Folio or
-> Flux code, and no mockup of any of them, on any branch. Photo mode is a set and lighting
-> planner, not an image editor. Everything below is a plan, and the issues are written so
-> that a plan is never mistaken for an implementation.
+> **Status: no engine exists yet.** As of phase 15 there is no Trace, Forge, Folio or Flux
+> implementation. Photo mode is a set and lighting planner, not an image editor.
+>
+> There *is* a high-fidelity interactive **UI prototype for Trace**, committed at
+> [docs/prototypes/trace/](../prototypes/trace/README.md). It is genuinely good and worth
+> treating as the specification for the creative shell — and it contains 104 no-op handlers,
+> no geometry engine, no Bézier maths, no boolean operations and no undo. Read its README
+> before reading a screenshot as progress.
 
 ## Why a foundation phase comes first
 
@@ -32,6 +36,21 @@ in all four environments — Move/Selection, Hand, Zoom, Eyedropper, Text, Trans
 Color, Assets, History, Comments and Export share one id, one icon, one word, one shortcut
 and one interaction model, and every intentional difference is recorded in a divergence
 register with its reason.
+
+The Trace prototype supplied the decisive evidence while this document was being written.
+It exists in two iterations, by the same author, weeks apart. The first states in its sync
+notes that it *"reused Icons.tsx path data for shared Creative actions"*, and it does — its
+Selection tool carries `IcCursor` verbatim. The second redrew it:
+
+```
+v1  m3 3 7.1 17 2.5-7.4L20 10.1z                ← IcCursor, src/components/Icons.tsx
+v2  M6 3l13 10-5.5.8L16 20l-2.6 1-2.7-6L6.8 19z ← redrawn, silently
+```
+
+One environment, one author, two iterations, and the shared icon was already gone. Nobody
+did anything wrong — there was no registry to reuse, only a convention to remember. Across
+four environments and several years, a convention loses. **Reuse has to be mechanical, not
+cultural.**
 
 ## Phase dependency graph
 
@@ -225,10 +244,19 @@ These are product-level calls made inside phase 22, not implementation details:
 5. **Testing infrastructure** (22.8, [#144](https://github.com/FraOri03/Lattice/issues/144))
    — whether a headless browser and CI become prerequisites. There is no CI in this
    repository today.
-6. **Toolbar form** ([#98](https://github.com/FraOri03/Lattice/issues/98)) — whether the
-   four-mode cluster may expand inline at wide widths, or is always a menu. The top bar
-   already measures ~1400 px of content in Italian inside a box 240 px narrower than the
-   window.
+6. **~~Toolbar form~~ — settled.** The creative cluster **replaces** the section cluster
+   rather than joining it: inside a creative environment, Board, Graph, Document, Sheet,
+   Presentation, Code, Photo and Split are not on screen. The Trace prototype answers this
+   better than the "fourth cluster" originally proposed in
+   [#98](https://github.com/FraOri03/Lattice/issues/98), and it closes the top bar's
+   measurement problem instead of managing it — twelve segmented buttons never exist. What
+   this opens instead: **how do you get back?** See #98.
+7. **Is Flux still in?** ([#98](https://github.com/FraOri03/Lattice/issues/98)) — the Trace
+   prototype's switcher offers three environments, Trace · Forge · Folio, and contains no
+   reference to Flux at all. Phase 26 and epic
+   [#209](https://github.com/FraOri03/Lattice/issues/209) assume four. Either the prototype
+   predates the fourth or Flux was reconsidered. This is the only open question here that
+   changes the shape of the roadmap rather than the shape of a screen.
 
 ## Issue index
 
@@ -241,6 +269,11 @@ These are product-level calls made inside phase 22, not implementation details:
 · [#142](https://github.com/FraOri03/Lattice/issues/142) 22.6 interoperability contract
 · [#143](https://github.com/FraOri03/Lattice/issues/143) 22.7 performance foundation
 · [#144](https://github.com/FraOri03/Lattice/issues/144) 22.8 testing foundation
+· [#211](https://github.com/FraOri03/Lattice/issues/211) 22.9 work modes (Edit/Review/Present)
+· [#212](https://github.com/FraOri03/Lattice/issues/212) 22.10 document status bar
+
+**Prototype** · [docs/prototypes/trace/](../prototypes/trace/README.md) — the Trace UI
+prototype, what is real in it, what is simulated, and what is empty.
 
 **Phase 23 — Trace** ([#206](https://github.com/FraOri03/Lattice/issues/206)) ·
 [#145](https://github.com/FraOri03/Lattice/issues/145)–[#158](https://github.com/FraOri03/Lattice/issues/158)

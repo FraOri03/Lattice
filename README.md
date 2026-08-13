@@ -141,6 +141,7 @@ Ordering reflects current intent, not a schedule: nothing here is a delivery dat
 | [docs/architecture.md](docs/architecture.md) | Data model, stores, services, CRDT layer, source layout |
 | [docs/architecture/app-shell.md](docs/architecture/app-shell.md) | Who owns navigation, tabs, the active project; what the URL defines |
 | [docs/architecture/creative-suite.md](docs/architecture/creative-suite.md) | Trace · Forge · Folio · Flux on the shared Creative Core: phases 22–26, dependencies, open decisions |
+| [docs/prototypes/trace/](docs/prototypes/trace/README.md) | The Trace UI prototype — how to run it, what is real, what is simulated, what is empty |
 | [docs/features.md](docs/features.md) | Status-tagged feature inventory |
 | [docs/setup.md](docs/setup.md) | Install, commands, build, test, deploy, troubleshooting |
 | [docs/integrations.md](docs/integrations.md) | Google, Drive, GitHub, Liveblocks, LiveKit, conversion backend |
