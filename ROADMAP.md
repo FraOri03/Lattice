@@ -39,11 +39,13 @@ An item carries **one** status at a time.
 
 - **`priority:`** — `critical` / `high` / `medium` / `low`.
 - **`area:`** — the product surface (`board`, `documents`, `notes`, `spreadsheets`,
-  `presentations`, `code`, `collaboration`, `sync`, `import-export`, `storage`,
+  `presentations`, `code`, `creative`, `collaboration`, `sync`, `import-export`, `storage`,
   `authentication`, `projects`, `ui-ux`, `accessibility`, `performance`,
-  `developer-experience`).
+  `developer-experience`). `creative` covers the four creative environments — Trace, Forge,
+  Folio and Flux — and their shared core.
 - **`type:`** — `feature` / `bug` / `improvement` / `documentation` / `refactor` /
-  `testing` / `infrastructure` / `security`.
+  `testing` / `infrastructure` / `security` / `epic` (an umbrella issue that holds other
+  issues — see [Issue hierarchy](#issue-hierarchy)).
 - **`stage:`** — release maturity when useful (`exploring` / `prototype` / `alpha` /
   `beta` / `stable`).
 
@@ -66,12 +68,51 @@ milestone that holds the issues for its sub-steps
 | [Phase 19](https://github.com/FraOri03/Lattice/milestone/12) | Surface upgrades |
 | [Phase 20](https://github.com/FraOri03/Lattice/milestone/13) | Suite toolbars |
 | [Phase 21](https://github.com/FraOri03/Lattice/milestone/14) | AI — RunPod serverless + in-house ComfyUI |
-| [Phase 22](https://github.com/FraOri03/Lattice/milestone/15) | Entitlements & billing |
+| [Phase 22](https://github.com/FraOri03/Lattice/milestone/16) | Creative suite foundation — the shared Creative Core |
+| [Phase 23](https://github.com/FraOri03/Lattice/milestone/17) | **Trace** — vector & illustration |
+| [Phase 24](https://github.com/FraOri03/Lattice/milestone/18) | **Forge** — image & painting |
+| [Phase 25](https://github.com/FraOri03/Lattice/milestone/19) | **Folio** — layout & publishing |
+| [Phase 26](https://github.com/FraOri03/Lattice/milestone/20) | **Flux** — video & motion |
+| [Phase 27](https://github.com/FraOri03/Lattice/milestone/15) | Entitlements & billing |
+
+Phases 22–26 are the creative suite: four specialised environments on one shared core, with
+its own map in [docs/architecture/creative-suite.md](docs/architecture/creative-suite.md).
+Entitlements & billing was phase 22 and is now **phase 27** — same milestone, same four
+issues ([#103](https://github.com/FraOri03/Lattice/issues/103)–[#106](https://github.com/FraOri03/Lattice/issues/106)),
+same scope, renumbered because the suite was inserted ahead of it.
 
 Two release-intent milestones from the Phase 9 pass — **Public beta** and **Broader
 adoption** — are closed: every issue they held is closed.
 [Backlog / Future](https://github.com/FraOri03/Lattice/milestone/3) stays open for larger
 engine and platform items that are not attached to a phase yet.
+
+### Issue hierarchy
+
+Most phases are flat: a milestone holds its numbered subphase issues. Phases too large for
+that add one level:
+
+```
+Milestone (the phase)
+     ↓
+Epic issue (type: epic — the environment or programme)
+     ↓
+Subphase issue (23.3 Pen & Bezier editing)
+     ↓
+Implementation issues (spun out when the subphase is picked up)
+```
+
+The epic holds the checklist and the dependency order; the subphase issue holds the
+contract — objective, scope, dependencies, technical considerations, UX requirements,
+acceptance criteria, testing and explicit out-of-scope items. Implementation issues are
+created when work on a subphase starts, so the tracker is not front-loaded with issues
+nobody can act on yet.
+
+The creative suite is the first use of this shape: epics
+[#205](https://github.com/FraOri03/Lattice/issues/205) (Creative Core),
+[#206](https://github.com/FraOri03/Lattice/issues/206) (Trace),
+[#207](https://github.com/FraOri03/Lattice/issues/207) (Forge),
+[#208](https://github.com/FraOri03/Lattice/issues/208) (Folio),
+[#209](https://github.com/FraOri03/Lattice/issues/209) (Flux).
 
 Version numbers are deliberately avoided until a release is actually cut. The app displays
 a pinned release string (`Alpha v0.11.3.5`), which tracks the phase it was cut in, not a
@@ -126,9 +167,16 @@ authoritative. Each item links to its issue.
 - [Phase 18](https://github.com/FraOri03/Lattice/milestone/11) — e-mail invitations, which
   unlock "Shared with me" and pending invites on the dashboard.
 - [Phase 19](https://github.com/FraOri03/Lattice/milestone/12) — surface upgrades ·
-  [20](https://github.com/FraOri03/Lattice/milestone/13) suite toolbars ·
-  [21](https://github.com/FraOri03/Lattice/milestone/14) AI ·
-  [22](https://github.com/FraOri03/Lattice/milestone/15) entitlements & billing.
+  [20](https://github.com/FraOri03/Lattice/milestone/13) suite toolbars, including the
+  four-mode creative switcher ([#98](https://github.com/FraOri03/Lattice/issues/98)) ·
+  [21](https://github.com/FraOri03/Lattice/milestone/14) AI.
+- **The creative suite**, [22](https://github.com/FraOri03/Lattice/milestone/16)–[26](https://github.com/FraOri03/Lattice/milestone/20):
+  the shared Creative Core first, then **Trace** (vector), **Forge** (raster), **Folio**
+  (layout) and **Flux** (video) — four specialised environments on one project model, one
+  asset system, one collaboration model and one type and colour stack. None of it exists
+  yet; the map is [docs/architecture/creative-suite.md](docs/architecture/creative-suite.md).
+- [Phase 27](https://github.com/FraOri03/Lattice/milestone/15) — entitlements & billing,
+  moved behind the suite (it was phase 22; the scope and its issues are unchanged).
 - Not attached to a phase yet, in
   [Backlog / Future](https://github.com/FraOri03/Lattice/milestone/3): CRDT subdocument
   partitioning ([#28](https://github.com/FraOri03/Lattice/issues/28)), File System Access
@@ -145,12 +193,31 @@ phase 13 ─┼─ no external blocker
 phase 14 ─┘
 
 phase 16 ──▶ phase 17 ──┬──▶ phase 18 ──▶ (server-backed dashboard)
-                        └──▶ phase 22
+                        └──▶ phase 27
+
+                 phase 22 — Creative Core
+                            │
+          ┌────────┬────────┼────────┬────────┐
+          ↓        ↓        ↓        ↓        ↓
+        Trace    Forge    Folio    Flux
+      phase 23 phase 24 phase 25 phase 26
+          │        │        │        │
+          └────────┴───┬────┴────────┘
+                       ↓
+              phase 27 — entitlements
 ```
 
 Phases 12–15 can be built on what exists today. Phase 17 is the single biggest
 architectural jump on the roadmap: there is no database yet — the only server state is
 Liveblocks room metadata.
+
+Phase 22 is the second: it builds the Creative Core that all four creative environments
+share. **23–26 are not strictly sequential** — once 22 reaches architectural maturity
+(the Core, the tool registry, the object model and the settled performance requirements)
+they can proceed in partial parallel. What they must not do is start before that, because
+each would then reinvent the same infrastructure differently. Phase 27 gates an environment
+only after its production-hardening subphase passes; gating an unfinished tool is worse
+than not shipping it.
 
 ### Shipped recently
 
