@@ -120,7 +120,17 @@ and the label taxonomy are in [ROADMAP.md](ROADMAP.md); what already shipped is 
 | [19](https://github.com/FraOri03/Lattice/milestone/12) | Surface upgrades — dashboard, graph, documents, sheets, presentations | |
 | [20](https://github.com/FraOri03/Lattice/milestone/13) | Suite toolbars — documents · creative · AI | |
 | [21](https://github.com/FraOri03/Lattice/milestone/14) | AI — RunPod serverless + in-house ComfyUI | |
-| [22](https://github.com/FraOri03/Lattice/milestone/15) | Entitlements & billing | |
+| [22](https://github.com/FraOri03/Lattice/milestone/16) | Creative suite foundation — the shared Creative Core | |
+| [23](https://github.com/FraOri03/Lattice/milestone/17) | **Trace** — vector & illustration | |
+| [24](https://github.com/FraOri03/Lattice/milestone/18) | **Forge** — image & painting | |
+| [25](https://github.com/FraOri03/Lattice/milestone/19) | **Folio** — layout & publishing | |
+| [26](https://github.com/FraOri03/Lattice/milestone/20) | **Flux** — video & motion | |
+| [27](https://github.com/FraOri03/Lattice/milestone/15) | Entitlements & billing | |
+
+Phases 22–26 are the **creative suite**: four specialised environments — Trace, Forge,
+Folio and Flux — on one shared Creative Core, one project model, one asset system and one
+collaboration model. None of it is built yet; the plan is in
+[docs/architecture/creative-suite.md](docs/architecture/creative-suite.md).
 
 Ordering reflects current intent, not a schedule: nothing here is a delivery date.
 
@@ -130,6 +140,8 @@ Ordering reflects current intent, not a schedule: nothing here is a delivery dat
 |---|---|
 | [docs/architecture.md](docs/architecture.md) | Data model, stores, services, CRDT layer, source layout |
 | [docs/architecture/app-shell.md](docs/architecture/app-shell.md) | Who owns navigation, tabs, the active project; what the URL defines |
+| [docs/architecture/creative-suite.md](docs/architecture/creative-suite.md) | Trace · Forge · Folio · Flux on the shared Creative Core: phases 22–26, dependencies, open decisions |
+| [docs/prototypes/trace/](docs/prototypes/trace/README.md) | The Trace UI prototype — how to run it, what is real, what is simulated, what is empty |
 | [docs/features.md](docs/features.md) | Status-tagged feature inventory |
 | [docs/setup.md](docs/setup.md) | Install, commands, build, test, deploy, troubleshooting |
 | [docs/integrations.md](docs/integrations.md) | Google, Drive, GitHub, Liveblocks, LiveKit, conversion backend |

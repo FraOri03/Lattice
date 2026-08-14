@@ -1,0 +1,1240 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    :root{
+      --bg:#1b1b1f; --panel:#232327; --panel2:#2c2c31; --bord:#38383e;
+      --ink:#e8e8ea; --muted:#97979f; --accent:#0d99ff; --accent-soft:rgba(13,153,255,.14);
+      --shadow:0 2px 10px rgba(0,0,0,.25); --warn:#e8a33d; --err:#e8564a; --ok:#3ec98a;
+      --font:-apple-system,"Segoe UI",system-ui,"Helvetica Neue",sans-serif;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;font-size:13px;-webkit-font-smoothing:antialiased}
+    button{font:inherit;color:inherit;background:none;border:none;padding:0;cursor:pointer}
+    input{font:inherit}
+    a{color:var(--accent);text-decoration:none}
+    a:hover{color:#4db2ff}
+    ::-webkit-scrollbar{width:9px;height:9px}
+    ::-webkit-scrollbar-thumb{background:#3c3c43;border-radius:5px;border:2px solid var(--panel)}
+    ::-webkit-scrollbar-track{background:transparent}
+    @keyframes latPulse{0%,100%{opacity:.55}50%{opacity:1}}
+  </style>
+</helmet>
+
+<div style="height:100vh;display:grid;grid-template-rows:44px 40px 1fr 26px;grid-template-columns:minmax(0,1fr);background:var(--bg);overflow:hidden;position:relative">
+
+  <!-- ============ TOPBAR (CreativeShell) ============ -->
+  <div style="display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid var(--bord);background:var(--panel);min-width:0">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="flex:none"><rect x="3.6" y="3.6" width="16.8" height="16.8" rx="4.4" transform="rotate(45 12 12)" fill="#0d99ff"/><rect x="8.6" y="8.6" width="6.8" height="6.8" rx="1.8" transform="rotate(45 12 12)" fill="#1b1b1f"/></svg>
+    <div style="display:flex;align-items:center;gap:4px;min-width:96px;font-size:12px;overflow:hidden">
+      <span style="display:flex;align-items:center;gap:6px;font-weight:500;color:var(--muted);flex:none" title="Studio workspace"><span aria-hidden="true">◇</span><span>Studio</span></span>
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="m9 6 6 6-6 6"/></svg>
+      <span style="font-weight:500;color:var(--muted);max-width:112px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Brand System">Brand System</span>
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="m9 6 6 6-6 6"/></svg>
+      <span style="font-weight:600;min-width:88px;max-width:176px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Lattice Studio Identity">Lattice Studio Identity</span>
+    </div>
+    <span style="flex:none;padding:1px 6px;border:1px solid var(--bord);border-radius:4px;font-size:10px;letter-spacing:.4px;color:var(--accent);background:var(--accent-soft)">VECTOR</span>
+
+    <div style="flex:1"></div>
+
+    <!-- mode switch: Vector / Raster / Editorial (Creative Suite) — Lattice SectionTabs cluster pattern -->
+    <div style="display:flex;flex:none;padding:2px;background:var(--panel2);border:1px solid var(--bord);border-radius:8px">
+      <div style="display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:6px;background:var(--panel);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.28);font-size:12px;font-weight:500">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 3 7.1 17 2.5-7.4L20 10.1z"/></svg>Vector</div>
+      <div title="Raster Mode — planned" style="display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:6px;color:var(--muted);font-size:12px;font-weight:500;opacity:.4;cursor:not-allowed">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="m21 16-4.5-4.5L7 20"/></svg>Raster</div>
+      <div title="Editorial Mode — planned" style="display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:6px;color:var(--muted);font-size:12px;font-weight:500;opacity:.4;cursor:not-allowed">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>Editorial</div>
+    </div>
+
+    <!-- Edit / Review / Present -->
+    <div style="display:flex;flex:none;padding:2px;background:var(--panel2);border:1px solid var(--bord);border-radius:8px">
+      <sc-for list="{{ workModes }}" as="m" hint-placeholder-count="3">
+        <button data-id="{{ m.id }}" onClick="{{ setWorkMode }}" title="{{ m.hint }}" aria-pressed="{{ m.active }}" style="padding:4px 10px;border-radius:6px;font-size:12px;font-weight:500;background:{{ m.bg }};color:{{ m.fg }};box-shadow:{{ m.shadow }}">{{ m.label }}</button>
+      </sc-for>
+    </div>
+
+    <div style="width:1px;height:20px;background:var(--bord)"></div>
+
+    <!-- presence -->
+    <div style="display:flex;align-items:center;flex:none">
+      <sc-for list="{{ presence }}" as="p" hint-placeholder-count="3">
+        <div title="{{ p.title }}" style="width:23px;height:23px;border-radius:50%;margin-left:-6px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:#12121a;border:2px solid var(--panel);background:{{ p.color }}">{{ p.initials }}</div>
+      </sc-for>
+    </div>
+
+    <button onClick="{{ togglePalette }}" title="Command palette" aria-label="Open command palette" style="display:inline-flex;flex:none;align-items:center;justify-content:center;gap:6px;border:1px solid var(--bord);border-radius:6px;background:var(--panel2);padding:6px 10px;font-size:12px;font-weight:500;color:var(--ink)" style-hover="border-color:var(--accent)">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 9V6a3 3 0 1 0-3 3zm0 0v6m0-6h6M9 15H6a3 3 0 1 0 3 3zm6-6V6a3 3 0 1 1 3 3zm0 0v6m0 0h3a3 3 0 1 1-3 3z"/></svg>
+      <kbd style="font-size:10px;color:var(--muted);font-family:inherit;white-space:nowrap">Ctrl K</kbd>
+    </button>
+    <button title="Share this document" aria-label="Share — project members" style="display:inline-flex;flex:none;align-items:center;justify-content:center;gap:6px;border:1px solid var(--bord);border-radius:6px;background:var(--panel2);padding:6px 10px;font-size:12px;font-weight:500;color:var(--ink)" style-hover="border-color:var(--accent)">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="8" r="3.5"/><path d="M3.5 20c0-3.4 2.9-5.5 6.5-5.5 1.4 0 2.7.3 3.8.9"/><path d="M19 13v6M16 16h6"/></svg>Share</button>
+    <button title="Comments" aria-label="Comments — 1 open" style="position:relative;display:flex;flex:none;width:28px;height:28px;align-items:center;justify-content:center;border-radius:6px;color:var(--muted)" style-hover="background:var(--panel2);color:var(--ink)">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.5a8 8 0 0 1-8 8c-1.4 0-2.8-.3-4-.9L3 21l1.4-5.5a8 8 0 1 1 16.6-3z"/></svg>
+      <span style="position:absolute;top:-2px;right:-2px;display:flex;height:14px;min-width:14px;align-items:center;justify-content:center;border-radius:7px;background:var(--accent);padding:0 2px;font-size:8.5px;font-weight:700;color:#fff">1</span>
+    </button>
+    <button title="Version history" aria-label="Version history" style="display:flex;flex:none;width:28px;height:28px;align-items:center;justify-content:center;border-radius:6px;color:var(--muted)" style-hover="background:var(--panel2);color:var(--ink)">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 12a8.5 8.5 0 1 1 2.5 6M3.5 12H2m1.5 0 2-2"/><path d="M12 7.5V12l3 2"/></svg>
+    </button>
+  </div>
+
+  <!-- ============ CONTEXT BAR (CreativeContextBar) ============ -->
+  <div style="display:flex;align-items:center;gap:8px;padding:0 10px;border-bottom:1px solid var(--bord);background:var(--panel);overflow:hidden;white-space:nowrap">
+    <div style="display:flex;align-items:center;gap:6px;min-width:112px">
+      <span style="font-size:10.5px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)">{{ ctxLabel }}</span>
+    </div>
+    <div style="width:1px;height:20px;background:var(--bord)"></div>
+
+    <!-- nothing selected: document + view -->
+    <div style="display:{{ ctxNoneD }}">
+      <div style="display:flex;align-items:center;gap:8px">
+        <button onClick="{{ openColorSettings }}" style="display:flex;align-items:center;gap:6px;height:25px;padding:0 8px;border:1px solid var(--bord);border-radius:6px;background:var(--panel2)" style-hover="border-color:var(--accent)">
+          <span style="width:9px;height:9px;border-radius:2px;background:linear-gradient(135deg,#00aeef,#ec008c 50%,#fff200)"></span>
+          <span style="font-size:11.5px">{{ docColorMode }} · {{ docProfileShort }}</span>
+        </button>
+        <button onClick="{{ toggleSnap }}" style="height:25px;padding:0 9px;border:1px solid var(--bord);border-radius:6px;font-size:11.5px;background:{{ snapBg }};color:{{ snapFg }}">Snap</button>
+        <button onClick="{{ toggleRulers }}" style="height:25px;padding:0 9px;border:1px solid var(--bord);border-radius:6px;font-size:11.5px;background:{{ rulerBg }};color:{{ rulerFg }}">Rulers</button>
+        <button onClick="{{ toggleGuides }}" style="height:25px;padding:0 9px;border:1px solid var(--bord);border-radius:6px;font-size:11.5px;background:{{ guideBg }};color:{{ guideFg }}">Guides</button>
+        <div style="width:1px;height:20px;background:var(--bord)"></div>
+        <button onClick="{{ addArtboard }}" style="display:flex;align-items:center;gap:6px;height:25px;padding:0 9px;border:1px solid var(--bord);border-radius:6px;font-size:11.5px;background:var(--panel2)" style-hover="border-color:var(--accent)">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg>New artboard</button>
+        <span style="font-size:11.5px;color:var(--muted)">{{ artboardCount }} artboards · Bleed 3 mm</span>
+      </div>
+    </div>
+
+    <!-- shape selected -->
+    <div style="display:{{ ctxShapeD }}">
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="display:flex;align-items:center;gap:6px;height:25px;padding:0 8px;border:1px solid var(--bord);border-radius:6px;background:var(--panel2)">
+          <span style="font-size:10.5px;color:var(--muted)">Fill</span>
+          <span style="width:14px;height:14px;border-radius:3px;border:1px solid rgba(255,255,255,.18);background:{{ selFill }}"></span>
+          <span style="font-size:11.5px;font-variant-numeric:tabular-nums">{{ selFillLabel }}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;height:25px;padding:0 8px;border:1px solid var(--bord);border-radius:6px;background:var(--panel2)">
+          <span style="font-size:10.5px;color:var(--muted)">Stroke</span>
+          <span style="width:14px;height:14px;border-radius:3px;border:1px solid rgba(255,255,255,.18);background:{{ selStroke }}"></span>
+          <span style="font-size:11.5px;font-variant-numeric:tabular-nums">{{ selStrokeW }} pt</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:5px;height:25px;padding:0 8px;border:1px solid var(--bord);border-radius:6px;background:var(--panel2)">
+          <span style="font-size:10.5px;color:var(--muted)">Opacity</span>
+          <input type="range" min="0" max="100" value="{{ selOpacity }}" onInput="{{ setOpacity }}" style="width:66px;accent-color:var(--accent)"/>
+          <span style="font-size:11.5px;width:30px;font-variant-numeric:tabular-nums">{{ selOpacity }}%</span>
+        </div>
+        <div style="width:1px;height:20px;background:var(--bord)"></div>
+        <div style="display:flex;align-items:center;gap:8px;font-variant-numeric:tabular-nums;color:var(--muted);font-size:11.5px">
+          <span>X <span style="color:var(--ink)">{{ selX }}</span></span>
+          <span>Y <span style="color:var(--ink)">{{ selY }}</span></span>
+          <span>W <span style="color:var(--ink)">{{ selW }}</span></span>
+          <span>H <span style="color:var(--ink)">{{ selH }}</span></span>
+        </div>
+        <div style="width:1px;height:20px;background:var(--bord)"></div>
+        <div style="display:flex;align-items:center;gap:2px">
+          <sc-for list="{{ boolOps }}" as="b" hint-placeholder-count="4">
+            <button data-id="{{ b.id }}" onClick="{{ applyBoolean }}" title="{{ b.title }}" style="width:26px;height:25px;border-radius:5px;display:flex;align-items:center;justify-content:center;color:var(--muted)" style-hover="background:var(--panel2);color:var(--ink)">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="{{ b.d }}"/><circle cx="9.5" cy="12" r="5"/></svg>
+            </button>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+
+    <!-- text selected -->
+    <div style="display:{{ ctxTextD }}">
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="display:flex;align-items:center;height:25px;padding:0 9px;border:1px solid var(--bord);border-radius:6px;background:var(--panel2);font-size:11.5px">{{ typeFamily }}</div>
+        <div style="display:flex;align-items:center;height:25px;padding:0 9px;border:1px solid var(--bord);border-radius:6px;background:var(--panel2);font-size:11.5px;color:var(--muted)">{{ typeStyle }}</div>
+        <div style="display:flex;align-items:center;gap:6px;height:25px;padding:0 8px;border:1px solid var(--bord);border-radius:6px;background:var(--panel2);font-size:11.5px;font-variant-numeric:tabular-nums"><span style="color:var(--muted);font-size:10.5px">Size</span>{{ typeSize }}</div>
+        <div style="display:flex;align-items:center;gap:6px;height:25px;padding:0 8px;border:1px solid var(--bord);border-radius:6px;background:var(--panel2);font-size:11.5px;font-variant-numeric:tabular-nums"><span style="color:var(--muted);font-size:10.5px">Tracking</span>{{ typeTracking }}</div>
+        <div style="display:flex;align-items:center;gap:6px;height:25px;padding:0 8px;border:1px solid var(--bord);border-radius:6px;background:var(--panel2);font-size:11.5px;font-variant-numeric:tabular-nums"><span style="color:var(--muted);font-size:10.5px">Leading</span>{{ typeLeading }}</div>
+        <div style="display:flex;align-items:center;gap:6px;height:25px;padding:0 8px;border:1px solid var(--bord);border-radius:6px;background:var(--panel2)">
+          <span style="width:14px;height:14px;border-radius:3px;border:1px solid rgba(255,255,255,.18);background:{{ selFill }}"></span>
+          <span style="font-size:11.5px">{{ selFillLabel }}</span>
+        </div>
+        <span style="font-size:11px;color:var(--accent);display:flex;align-items:center;gap:4px">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 15l6-6M10.5 6.5l1.8-1.8a4.2 4.2 0 016 6L16.5 12M7.5 12l-1.8 1.8a4.2 4.2 0 006 6l1.8-1.8"/></svg>
+          Typography / Display</span>
+      </div>
+    </div>
+
+    <!-- multi selection -->
+    <div style="display:{{ ctxMultiD }}">
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="display:flex;align-items:center;gap:1px;padding:2px;border:1px solid var(--bord);border-radius:6px;background:var(--panel2)">
+          <sc-for list="{{ alignOps }}" as="a" hint-placeholder-count="6">
+            <button title="{{ a.title }}" style="width:24px;height:21px;border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--muted)" style-hover="background:var(--bord);color:var(--ink)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="{{ a.d }}"/></svg>
+            </button>
+          </sc-for>
+        </div>
+        <button style="height:25px;padding:0 9px;border:1px solid var(--bord);border-radius:6px;font-size:11.5px;background:var(--panel2)" style-hover="border-color:var(--accent)">Tidy</button>
+        <button onClick="{{ groupSelection }}" style="height:25px;padding:0 9px;border:1px solid var(--bord);border-radius:6px;font-size:11.5px;background:var(--panel2)" style-hover="border-color:var(--accent)">Group</button>
+        <button style="height:25px;padding:0 9px;border:1px solid var(--bord);border-radius:6px;font-size:11.5px;background:var(--panel2)" style-hover="border-color:var(--accent)">Mask</button>
+        <div style="width:1px;height:20px;background:var(--bord)"></div>
+        <span style="font-size:11.5px;color:var(--muted)">Align to <span style="color:var(--ink)">Selection</span></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ MIDDLE: toolbar / canvas / inspector ============ -->
+  <div style="display:grid;grid-template-columns:44px minmax(0,1fr) 280px;min-height:0;min-width:0">
+
+    <!-- VectorToolbar -->
+    <div style="border-right:1px solid var(--bord);background:var(--panel);display:flex;flex-direction:column;align-items:center;padding:6px 0;gap:2px;overflow-y:auto;overflow-x:hidden;min-height:0">
+      <sc-for list="{{ tools }}" as="t" hint-placeholder-count="11">
+        <button data-id="{{ t.id }}" onClick="{{ setTool }}" title="{{ t.title }}" aria-label="{{ t.title }}" aria-pressed="{{ t.active }}" style="position:relative;width:32px;height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center;flex:none;background:{{ t.bg }};color:{{ t.fg }}">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="{{ t.d }}"/></svg>
+          <sc-if value="{{ t.group }}" hint-placeholder-val="{{ false }}">
+            <span style="position:absolute;right:2px;bottom:2px;width:0;height:0;border-left:4px solid transparent;border-bottom:4px solid currentColor;opacity:.6"></span>
+          </sc-if>
+        </button>
+        <sc-if value="{{ t.divider }}" hint-placeholder-val="{{ false }}">
+          <span role="separator" aria-orientation="horizontal" style="display:block;width:16px;height:1px;background:var(--bord);margin:6px 0;flex:none"></span>
+        </sc-if>
+      </sc-for>
+    </div>
+
+    <!-- CANVAS -->
+    <div style="position:relative;background:#141417;overflow:hidden">
+      <svg ref="{{ svgRef }}" width="100%" height="100%" onMouseDown="{{ canvasDown }}" style="display:block;cursor:{{ canvasCursor }}">
+        <defs>
+          <linearGradient id="gBrand" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0d99ff"/><stop offset="1" stop-color="#6f4bff"/></linearGradient>
+          <linearGradient id="gSocial" x1="0" y1="0" x2="0.8" y2="1"><stop offset="0" stop-color="#101018"/><stop offset="1" stop-color="#1d2a5c"/></linearGradient>
+          <pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="8" height="8" fill="#d8d8de"/><line x1="0" y1="0" x2="0" y2="8" stroke="#b9b9c4" stroke-width="3"/></pattern>
+        </defs>
+
+        <g transform="{{ viewTransform }}">
+          <!-- ARTBOARD 1 — Primary logo -->
+          <text x="0" y="-8" font-size="11" fill="#8b8b95" font-family="-apple-system,system-ui,sans-serif">01 · Primary Logo — 560 × 360 px</text>
+          <rect x="0" y="0" width="560" height="360" fill="#ffffff"/>
+          <g data-obj="symbol" onMouseDown="{{ objDown }}" style="cursor:move">
+            <rect x="60" y="105" width="112" height="112" rx="20" transform="rotate(45 116 161)" fill="url(#gBrand)"/>
+            <rect x="94" y="139" width="44" height="44" rx="9" transform="rotate(45 116 161)" fill="#ffffff"/>
+          </g>
+          <text data-obj="wordmark" onMouseDown="{{ objDown }}" x="212" y="172" font-size="46" font-weight="600" letter-spacing="7" fill="#1b1b1f" font-family="-apple-system,system-ui,sans-serif" style="cursor:move">LATTICE</text>
+          <text data-obj="tagline" onMouseDown="{{ objDown }}" x="215" y="200" font-size="12" letter-spacing="6.5" fill="#8a8a94" font-family="-apple-system,system-ui,sans-serif" style="cursor:move">CREATIVE SUITE</text>
+
+          <!-- ARTBOARD 2 — construction -->
+          <text x="600" y="-8" font-size="11" fill="#8b8b95" font-family="-apple-system,system-ui,sans-serif">02 · Logo Construction</text>
+          <rect x="600" y="0" width="360" height="360" fill="#ffffff"/>
+          <g opacity="0.5" stroke="#0d99ff" stroke-width="1">
+            <circle cx="780" cy="180" r="118" fill="none"/><circle cx="780" cy="180" r="84" fill="none"/>
+            <line x1="640" y1="180" x2="920" y2="180"/><line x1="780" y1="40" x2="780" y2="320"/>
+            <line x1="681" y1="81" x2="879" y2="279"/><line x1="879" y1="81" x2="681" y2="279"/>
+          </g>
+          <g data-obj="symbol-c" onMouseDown="{{ objDown }}" style="cursor:move">
+            <rect x="720" y="120" width="120" height="120" rx="22" transform="rotate(45 780 180)" fill="none" stroke="#1b1b1f" stroke-width="2"/>
+            <rect x="756" y="156" width="48" height="48" rx="10" transform="rotate(45 780 180)" fill="none" stroke="#1b1b1f" stroke-width="2"/>
+          </g>
+          <g fill="#0d99ff" font-size="10" font-family="-apple-system,system-ui,sans-serif">
+            <text x="786" y="70">x</text><text x="786" y="128">2x</text><text x="906" y="176">r = 118</text>
+          </g>
+
+          <!-- ARTBOARD 3 — app icon -->
+          <text x="1000" y="-8" font-size="11" fill="#8b8b95" font-family="-apple-system,system-ui,sans-serif">03 · Icon 200</text>
+          <g data-obj="icon-tile" onMouseDown="{{ objDown }}" style="cursor:move">
+            <rect x="1000" y="0" width="200" height="200" rx="44" fill="url(#gBrand)"/>
+            <rect x="1062" y="62" width="76" height="76" rx="14" transform="rotate(45 1100 100)" fill="#ffffff"/>
+            <rect x="1084" y="84" width="32" height="32" rx="6" transform="rotate(45 1100 100)" fill="#0d99ff"/>
+          </g>
+
+          <!-- ARTBOARD 4 — palette -->
+          <text x="0" y="392" font-size="11" fill="#8b8b95" font-family="-apple-system,system-ui,sans-serif">04 · Colour Palette — project swatches</text>
+          <rect x="0" y="400" width="560" height="280" fill="#ffffff"/>
+          <g data-obj="palette" onMouseDown="{{ objDown }}" style="cursor:move" font-family="-apple-system,system-ui,sans-serif">
+            <rect x="40" y="452" width="96" height="120" rx="6" fill="#0d99ff"/>
+            <text x="40" y="592" font-size="11" fill="#1b1b1f" font-weight="600">Brand / Primary</text>
+            <text x="40" y="608" font-size="10" fill="#8a8a94">#0D99FF · 78/40/0/0</text>
+            <rect x="152" y="452" width="96" height="120" rx="6" fill="#6f4bff"/>
+            <text x="152" y="592" font-size="11" fill="#1b1b1f" font-weight="600">Brand / Secondary</text>
+            <text x="152" y="608" font-size="10" fill="#8a8a94">#6F4BFF · 62/72/0/0</text>
+            <rect x="264" y="452" width="96" height="120" rx="6" fill="#e8564a"/>
+            <text x="264" y="592" font-size="11" fill="#1b1b1f" font-weight="600">Spot / Brand Red</text>
+            <text x="264" y="608" font-size="10" fill="#8a8a94">PANTONE 179 C</text>
+            <rect x="376" y="452" width="96" height="120" rx="6" fill="#1b1b1f"/>
+            <text x="376" y="592" font-size="11" fill="#1b1b1f" font-weight="600">Ink / Black</text>
+            <text x="376" y="608" font-size="10" fill="#8a8a94">0/0/0/100</text>
+            <rect x="488" y="452" width="34" height="120" rx="6" fill="#f4f4f6" stroke="#dcdce2"/>
+            <text x="488" y="592" font-size="11" fill="#1b1b1f" font-weight="600">Paper</text>
+          </g>
+
+          <!-- ARTBOARD 5 — social -->
+          <text x="600" y="392" font-size="11" fill="#8b8b95" font-family="-apple-system,system-ui,sans-serif">05 · Social 1080 × 1080</text>
+          <g data-obj="social" onMouseDown="{{ objDown }}" style="cursor:move">
+            <rect x="600" y="400" width="360" height="360" fill="url(#gSocial)"/>
+            <rect x="748" y="484" width="64" height="64" rx="12" transform="rotate(45 780 516)" fill="#ffffff"/>
+            <rect x="768" y="504" width="24" height="24" rx="5" transform="rotate(45 780 516)" fill="#101018"/>
+            <text x="640" y="640" font-size="30" font-weight="600" letter-spacing="2" fill="#ffffff" font-family="-apple-system,system-ui,sans-serif">Identity 2026</text>
+            <text x="640" y="666" font-size="12" letter-spacing="4" fill="#8fb8ff" font-family="-apple-system,system-ui,sans-serif">LATTICE CREATIVE SUITE</text>
+          </g>
+
+          <!-- ARTBOARD 6 — print poster (CMYK) -->
+          <text x="1000" y="232" font-size="11" fill="#8b8b95" font-family="-apple-system,system-ui,sans-serif">06 · Poster A3 — CMYK · bleed 3 mm</text>
+          <rect x="996" y="236" width="308" height="432" fill="none" stroke="#e8564a" stroke-width="1" stroke-dasharray="4 3"/>
+          <rect x="1000" y="240" width="300" height="424" fill="#ffffff"/>
+          <g data-obj="poster-image" onMouseDown="{{ objDown }}" style="cursor:move">
+            <rect x="1024" y="264" width="252" height="196" fill="url(#hatch)"/>
+            <rect x="1024" y="264" width="252" height="196" fill="none" stroke="#0d99ff" stroke-width="1.5"/>
+            <text x="1032" y="452" font-size="10" fill="#4a4a55" font-family="-apple-system,system-ui,sans-serif">studio-portrait.tiff · linked · 214 PPI</text>
+          </g>
+          <text x="1024" y="516" font-size="30" font-weight="600" fill="#1b1b1f" font-family="-apple-system,system-ui,sans-serif">Form</text>
+          <text x="1024" y="548" font-size="30" font-weight="600" fill="#0d99ff" font-family="-apple-system,system-ui,sans-serif">follows</text>
+          <text x="1024" y="580" font-size="30" font-weight="600" fill="#1b1b1f" font-family="-apple-system,system-ui,sans-serif">system</text>
+          <text x="1024" y="624" font-size="10" letter-spacing="3" fill="#8a8a94" font-family="-apple-system,system-ui,sans-serif">LATTICE STUDIO — MILANO</text>
+        </g>
+
+        <!-- selection overlay (screen space) -->
+        <g style="display:{{ selDisplay }}">
+          <g>
+            <rect x="{{ selBox.x }}" y="{{ selBox.y }}" width="{{ selBox.w }}" height="{{ selBox.h }}" fill="none" stroke="#0d99ff" stroke-width="1.5"/>
+            <sc-for list="{{ handles }}" as="h" hint-placeholder-count="8">
+              <rect x="{{ h.x }}" y="{{ h.y }}" width="7" height="7" fill="#ffffff" stroke="#0d99ff" stroke-width="1.5"/>
+            </sc-for>
+            <rect x="{{ selBox.x }}" y="{{ selBadgeY }}" width="{{ selBadgeW }}" height="16" fill="#0d99ff" rx="3"/>
+            <text x="{{ selBadgeTx }}" y="{{ selBadgeTy }}" font-size="10.5" fill="#ffffff" font-family="-apple-system,system-ui,sans-serif">{{ selBadgeLabel }}</text>
+          </g>
+        </g>
+
+        <!-- remote collaborator selection + cursor -->
+        <sc-if value="{{ showRemote }}" hint-placeholder-val="{{ true }}">
+          <g>
+            <rect x="{{ remote.x }}" y="{{ remote.y }}" width="{{ remote.w }}" height="{{ remote.h }}" fill="none" stroke="#f5a524" stroke-width="1.5" stroke-dasharray="5 3"/>
+            <rect x="{{ remote.x }}" y="{{ remote.labelY }}" width="112" height="16" fill="#f5a524" rx="3"/>
+            <text x="{{ remote.textX }}" y="{{ remote.textY }}" font-size="10.5" fill="#1b1b1f" font-family="-apple-system,system-ui,sans-serif">Giulia is editing</text>
+            <path d="{{ remote.cursorPath }}" fill="#f5a524"/>
+          </g>
+        </sc-if>
+      </svg>
+
+      <!-- comment pin -->
+      <div style="position:absolute;left:38%;top:46%;display:flex;align-items:flex-start;gap:0;z-index:2">
+        <button onClick="{{ toggleComment }}" title="Comment on Wordmark" style="width:24px;height:24px;border-radius:12px 12px 12px 2px;background:#3ec98a;color:#0e2418;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow)">GR</button>
+        <sc-if value="{{ commentOpen }}" hint-placeholder-val="{{ false }}">
+          <div style="width:222px;margin-left:8px;background:var(--panel);border:1px solid var(--bord);border-radius:8px;box-shadow:var(--shadow);padding:9px 10px">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">
+              <span style="width:18px;height:18px;border-radius:9px;background:#3ec98a;color:#0e2418;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center">GR</span>
+              <span style="font-size:11.5px;font-weight:550">Giulia Rossi</span>
+              <span style="font-size:10.5px;color:var(--muted);margin-left:auto">10:42</span>
+            </div>
+            <div style="font-size:12px;line-height:1.45;color:var(--ink);text-wrap:pretty">Tracking on the wordmark still feels tight at small sizes — try +8 and re-check against the icon lockup.</div>
+            <div style="margin-top:7px;display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--muted)">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 15l6-6M10.5 6.5l1.8-1.8a4.2 4.2 0 016 6L16.5 12M7.5 12l-1.8 1.8a4.2 4.2 0 006 6l1.8-1.8"/></svg>
+              anchored to object <span style="color:var(--ink)">wordmark</span>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+
+      <!-- linked source update toast -->
+      <sc-if value="{{ sourceToast }}" hint-placeholder-val="{{ true }}">
+        <div style="position:absolute;left:50%;bottom:52px;transform:translateX(-50%);display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--bord);border-left:3px solid var(--accent);border-radius:8px;box-shadow:var(--shadow);padding:9px 11px;white-space:nowrap">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0d99ff" stroke-width="1.8"><path d="M4 12a8 8 0 0113.7-5.6M20 12a8 8 0 01-13.7 5.6"/><path d="M18 4v4h-4M6 20v-4h4"/></svg>
+          <div>
+            <div style="font-size:12px;font-weight:550">Source updated — Brand Mark.vector</div>
+            <div style="font-size:11px;color:var(--muted)">Giulia changed the symbol 2 min ago · used in 3 documents</div>
+          </div>
+          <div style="display:flex;gap:6px;margin-left:6px">
+            <button onClick="{{ dismissToast }}" style="height:24px;padding:0 10px;border-radius:6px;background:var(--accent);color:#fff;font-size:11.5px;font-weight:550">Update</button>
+            <button style="height:24px;padding:0 10px;border-radius:6px;border:1px solid var(--bord);font-size:11.5px">Compare</button>
+            <button onClick="{{ dismissToast }}" style="height:24px;padding:0 8px;border-radius:6px;font-size:11.5px;color:var(--muted)">Ignore</button>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- zoom cluster -->
+      <div style="position:absolute;right:12px;bottom:12px;display:flex;align-items:center;gap:1px;background:var(--panel);border:1px solid var(--bord);border-radius:7px;box-shadow:var(--shadow);padding:2px">
+        <button onClick="{{ zoomOut }}" title="Zoom out" style="width:26px;height:24px;border-radius:5px;color:var(--muted)" style-hover="background:var(--panel2);color:var(--ink)">−</button>
+        <button onClick="{{ zoomFit }}" style="min-width:52px;height:24px;border-radius:5px;font-size:11.5px;font-variant-numeric:tabular-nums" style-hover="background:var(--panel2)">{{ zoomLabel }}</button>
+        <button onClick="{{ zoomIn }}" title="Zoom in" style="width:26px;height:24px;border-radius:5px;color:var(--muted)" style-hover="background:var(--panel2);color:var(--ink)">+</button>
+      </div>
+    </div>
+
+    <!-- INSPECTOR -->
+    <div style="border-left:1px solid var(--bord);background:var(--panel);display:flex;flex-direction:column;min-height:0">
+      <div style="display:flex;align-items:center;flex-wrap:wrap;gap:2px;padding:5px 6px;border-bottom:1px solid var(--bord)">
+        <sc-for list="{{ tabs }}" as="tb" hint-placeholder-count="6">
+          <button data-id="{{ tb.id }}" onClick="{{ setTab }}" style="flex:none;height:24px;padding:0 9px;border-radius:5px;font-size:11.5px;white-space:nowrap;background:{{ tb.bg }};color:{{ tb.fg }}">{{ tb.label }}</button>
+        </sc-for>
+      </div>
+
+      <div style="flex:1;overflow-y:auto;overflow-x:hidden;min-height:0">
+
+        <!-- LAYERS -->
+        <div style="display:{{ tabLayersD }}">
+          <div>
+            <div style="padding:7px 9px;border-bottom:1px solid var(--bord);display:flex;align-items:center;gap:7px">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+              <input placeholder="Filter layers" style="flex:1;background:none;border:none;outline:none;color:var(--ink);font-size:12px"/>
+            </div>
+            <sc-for list="{{ layers }}" as="l" hint-placeholder-count="12">
+              <div data-id="{{ l.id }}" onClick="{{ selectLayer }}" style="display:flex;align-items:center;gap:6px;height:27px;padding-right:8px;padding-left:{{ l.pad }};cursor:default;border-left:2px solid {{ l.mark }};background:{{ l.bg }}" style-hover="background:var(--panel2)">
+                <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="{{ l.caretColor }}" stroke-width="3"><path d="{{ l.caret }}"/></svg>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="{{ l.iconColor }}" stroke-width="1.6" style="flex:none"><path d="{{ l.icon }}"/></svg>
+                <span style="flex:1;min-width:0;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{ l.fg }}">{{ l.name }}</span>
+                <span style="font-size:9.5px;color:var(--muted);opacity:.85">{{ l.badge }}</span>
+                <button data-id="{{ l.id }}" onClick="{{ toggleLock }}" title="Lock" style="width:16px;height:16px;display:flex;align-items:center;justify-content:center;color:{{ l.lockColor }}">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="{{ l.lockShackle }}"/></svg>
+                </button>
+                <button data-id="{{ l.id }}" onClick="{{ toggleVis }}" title="Hide" style="width:16px;height:16px;display:flex;align-items:center;justify-content:center;color:{{ l.visColor }}">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="{{ l.visIcon }}"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+
+        <!-- APPEARANCE -->
+        <div style="display:{{ tabAppearanceD }}">
+          <div style="padding:10px 10px 16px">
+            <div style="font-size:10.5px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Appearance — {{ selName }}</div>
+
+            <div style="border:1px solid var(--bord);border-radius:7px;overflow:hidden;background:var(--panel2)">
+              <div style="display:flex;align-items:center;gap:8px;padding:7px 8px;border-bottom:1px solid var(--bord)">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2"><path d="M8 6h10M8 12h10M8 18h10M4.5 6h.01M4.5 12h.01M4.5 18h.01"/></svg>
+                <span style="width:16px;height:16px;border-radius:4px;border:1px solid rgba(255,255,255,.2);background:{{ selFill }}"></span>
+                <span style="flex:1;font-size:12px">Fill</span>
+                <span style="font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums">{{ selFillLabel }}</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;padding:7px 8px;border-bottom:1px solid var(--bord)">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2"><path d="M8 6h10M8 12h10M8 18h10M4.5 6h.01M4.5 12h.01M4.5 18h.01"/></svg>
+                <span style="width:16px;height:16px;border-radius:4px;border:1px solid rgba(255,255,255,.2);background:{{ selStroke }}"></span>
+                <span style="flex:1;font-size:12px">Stroke</span>
+                <span style="font-size:11px;color:var(--muted)">{{ selStrokeW }} pt · Inside</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;padding:7px 8px;border-bottom:1px solid var(--bord)">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2"><path d="M8 6h10M8 12h10M8 18h10M4.5 6h.01M4.5 12h.01M4.5 18h.01"/></svg>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ink)" stroke-width="1.6"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 010 16z" fill="currentColor" stroke="none" opacity=".45"/></svg>
+                <span style="flex:1;font-size:12px">Effect — Shadow</span>
+                <span style="font-size:11px;color:var(--muted)">Y 4 · Blur 12</span>
+              </div>
+              <div style="display:flex;gap:6px;padding:7px 8px">
+                <button style="height:23px;padding:0 8px;border:1px solid var(--bord);border-radius:5px;font-size:11px;color:var(--muted)" style-hover="color:var(--ink);border-color:var(--accent)">+ Fill</button>
+                <button style="height:23px;padding:0 8px;border:1px solid var(--bord);border-radius:5px;font-size:11px;color:var(--muted)" style-hover="color:var(--ink);border-color:var(--accent)">+ Stroke</button>
+                <button style="height:23px;padding:0 8px;border:1px solid var(--bord);border-radius:5px;font-size:11px;color:var(--muted)" style-hover="color:var(--ink);border-color:var(--accent)">+ Effect</button>
+              </div>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px">
+              <div>
+                <div style="font-size:10.5px;color:var(--muted);margin-bottom:4px">Blend mode</div>
+                <div style="height:26px;display:flex;align-items:center;padding:0 8px;border:1px solid var(--bord);border-radius:6px;background:var(--panel2);font-size:11.5px">Normal</div>
+              </div>
+              <div>
+                <div style="font-size:10.5px;color:var(--muted);margin-bottom:4px">Opacity</div>
+                <div style="height:26px;display:flex;align-items:center;gap:6px;padding:0 8px;border:1px solid var(--bord);border-radius:6px;background:var(--panel2)">
+                  <input type="range" min="0" max="100" value="{{ selOpacity }}" onInput="{{ setOpacity }}" style="flex:1;accent-color:var(--accent)"/>
+                  <span style="font-size:11px;width:28px;font-variant-numeric:tabular-nums">{{ selOpacity }}%</span>
+                </div>
+              </div>
+            </div>
+
+            <div style="margin-top:14px;font-size:10.5px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Transform</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+              <div style="height:26px;display:flex;align-items:center;gap:6px;padding:0 8px;border:1px solid var(--bord);border-radius:6px;background:var(--panel2);font-size:11.5px;font-variant-numeric:tabular-nums"><span style="color:var(--muted)">X</span>{{ selX }}</div>
+              <div style="height:26px;display:flex;align-items:center;gap:6px;padding:0 8px;border:1px solid var(--bord);border-radius:6px;background:var(--panel2);font-size:11.5px;font-variant-numeric:tabular-nums"><span style="color:var(--muted)">Y</span>{{ selY }}</div>
+              <div style="height:26px;display:flex;align-items:center;gap:6px;padding:0 8px;border:1px solid var(--bord);border-radius:6px;background:var(--panel2);font-size:11.5px;font-variant-numeric:tabular-nums"><span style="color:var(--muted)">W</span>{{ selW }}</div>
+              <div style="height:26px;display:flex;align-items:center;gap:6px;padding:0 8px;border:1px solid var(--bord);border-radius:6px;background:var(--panel2);font-size:11.5px;font-variant-numeric:tabular-nums"><span style="color:var(--muted)">H</span>{{ selH }}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- COLOR -->
+        <div style="display:{{ tabColorD }}">
+          <div style="padding:10px 10px 16px">
+            <div style="display:flex;align-items:center;gap:1px;padding:2px;background:var(--panel2);border:1px solid var(--bord);border-radius:6px;margin-bottom:10px">
+              <sc-for list="{{ colorModels }}" as="c" hint-placeholder-count="4">
+                <button data-id="{{ c.id }}" onClick="{{ setColorModel }}" style="flex:1;height:22px;border-radius:4px;font-size:11px;background:{{ c.bg }};color:{{ c.fg }}">{{ c.label }}</button>
+              </sc-for>
+            </div>
+
+            <div style="height:96px;border-radius:7px;border:1px solid var(--bord);background:{{ selFill }};display:flex;align-items:flex-end;justify-content:space-between;padding:7px 9px">
+              <span style="font-size:11px;color:rgba(255,255,255,.85);text-shadow:0 1px 3px rgba(0,0,0,.5)">{{ selFillLabel }}</span>
+              <span style="font-size:10px;color:rgba(255,255,255,.75);text-shadow:0 1px 3px rgba(0,0,0,.5)">{{ gamutNote }}</span>
+            </div>
+
+            <div style="margin-top:10px;display:flex;flex-direction:column;gap:7px">
+              <sc-for list="{{ channels }}" as="ch" hint-placeholder-count="4">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span style="width:14px;font-size:11px;color:var(--muted)">{{ ch.key }}</span>
+                  <div style="flex:1;height:6px;border-radius:3px;background:{{ ch.track }};position:relative">
+                    <span style="position:absolute;top:-3px;width:12px;height:12px;border-radius:6px;background:#fff;border:1px solid rgba(0,0,0,.35);left:{{ ch.pos }}"></span>
+                  </div>
+                  <span style="width:34px;text-align:right;font-size:11px;font-variant-numeric:tabular-nums">{{ ch.val }}</span>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="margin-top:12px;padding:8px;border:1px solid var(--bord);border-radius:7px;background:var(--panel2);display:flex;align-items:center;gap:8px">
+              <span style="width:8px;height:8px;border-radius:4px;background:{{ colorKindDot }}"></span>
+              <div style="flex:1">
+                <div style="font-size:11.5px">{{ colorKind }}</div>
+                <div style="font-size:10.5px;color:var(--muted)">{{ colorKindNote }}</div>
+              </div>
+              <button onClick="{{ publishColor }}" style="height:23px;padding:0 8px;border:1px solid var(--bord);border-radius:5px;font-size:11px" style-hover="border-color:var(--accent);color:var(--accent)">{{ publishLabel }}</button>
+            </div>
+
+            <div style="margin-top:14px;font-size:10.5px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);margin-bottom:7px">Project swatches</div>
+            <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:6px">
+              <sc-for list="{{ swatches }}" as="s" hint-placeholder-count="12">
+                <button data-color="{{ s.hex }}" data-name="{{ s.name }}" onClick="{{ applySwatch }}" title="{{ s.title }}" style="height:28px;border-radius:5px;border:1px solid rgba(255,255,255,.14);position:relative;background:{{ s.hex }}" style-hover="outline:2px solid var(--accent);outline-offset:1px">
+                  <sc-if value="{{ s.spot }}" hint-placeholder-val="{{ false }}">
+                    <span style="position:absolute;right:2px;bottom:2px;width:0;height:0;border-left:6px solid transparent;border-bottom:6px solid #fff"></span>
+                  </sc-if>
+                </button>
+              </sc-for>
+            </div>
+            <div style="margin-top:7px;font-size:10.5px;color:var(--muted);display:flex;gap:10px">
+              <span>◣ spot</span><span>● global</span><span>Document · Project · Workspace</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- TYPE -->
+        <div style="display:{{ tabTypeD }}">
+          <div style="padding:10px 10px 16px">
+            <div style="font-size:10.5px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);margin-bottom:7px">Character</div>
+            <div style="height:28px;display:flex;align-items:center;padding:0 8px;border:1px solid var(--bord);border-radius:6px;background:var(--panel2);font-size:12px;margin-bottom:6px">{{ typeFamily }}</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+              <div style="height:26px;display:flex;align-items:center;padding:0 8px;border:1px solid var(--bord);border-radius:6px;background:var(--panel2);font-size:11.5px;color:var(--muted)">{{ typeStyle }}</div>
+              <div style="height:26px;display:flex;align-items:center;gap:6px;padding:0 8px;border:1px solid var(--bord);border-radius:6px;background:var(--panel2);font-size:11.5px"><span style="color:var(--muted)">Size</span>{{ typeSize }}</div>
+              <div style="height:26px;display:flex;align-items:center;gap:6px;padding:0 8px;border:1px solid var(--bord);border-radius:6px;background:var(--panel2);font-size:11.5px"><span style="color:var(--muted)">Lead</span>{{ typeLeading }}</div>
+              <div style="height:26px;display:flex;align-items:center;gap:6px;padding:0 8px;border:1px solid var(--bord);border-radius:6px;background:var(--panel2);font-size:11.5px"><span style="color:var(--muted)">Track</span>{{ typeTracking }}</div>
+              <div style="height:26px;display:flex;align-items:center;gap:6px;padding:0 8px;border:1px solid var(--bord);border-radius:6px;background:var(--panel2);font-size:11.5px"><span style="color:var(--muted)">Base</span>0</div>
+              <div style="height:26px;display:flex;align-items:center;gap:6px;padding:0 8px;border:1px solid var(--bord);border-radius:6px;background:var(--panel2);font-size:11.5px"><span style="color:var(--muted)">Kern</span>Optical</div>
+            </div>
+
+            <div style="margin-top:12px;font-size:10.5px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Variable axes</div>
+            <div style="display:flex;flex-direction:column;gap:7px">
+              <div style="display:flex;align-items:center;gap:8px"><span style="width:38px;font-size:11px;color:var(--muted)">wght</span><input type="range" min="100" max="900" value="600" style="flex:1;accent-color:var(--accent)"/><span style="width:30px;text-align:right;font-size:11px">600</span></div>
+              <div style="display:flex;align-items:center;gap:8px"><span style="width:38px;font-size:11px;color:var(--muted)">wdth</span><input type="range" min="75" max="125" value="100" style="flex:1;accent-color:var(--accent)"/><span style="width:30px;text-align:right;font-size:11px">100</span></div>
+              <div style="display:flex;align-items:center;gap:8px"><span style="width:38px;font-size:11px;color:var(--muted)">opsz</span><input type="range" min="8" max="72" value="46" style="flex:1;accent-color:var(--accent)"/><span style="width:30px;text-align:right;font-size:11px">46</span></div>
+            </div>
+
+            <div style="margin-top:12px;font-size:10.5px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Paragraph</div>
+            <div style="display:flex;gap:2px;padding:2px;border:1px solid var(--bord);border-radius:6px;background:var(--panel2);width:fit-content">
+              <sc-for list="{{ paraAlign }}" as="pa" hint-placeholder-count="4">
+                <button title="{{ pa.title }}" style="width:26px;height:22px;border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--muted)" style-hover="background:var(--bord);color:var(--ink)">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="{{ pa.d }}"/></svg>
+                </button>
+              </sc-for>
+            </div>
+
+            <div style="margin-top:12px;padding:8px;border:1px solid var(--bord);border-radius:7px;background:var(--panel2)">
+              <div style="display:flex;align-items:center;gap:6px;font-size:11.5px">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8"><path d="M9 15l6-6M10.5 6.5l1.8-1.8a4.2 4.2 0 016 6L16.5 12M7.5 12l-1.8 1.8a4.2 4.2 0 006 6l1.8-1.8"/></svg>
+                Linked to <span style="color:var(--accent)">Typography / Display</span>
+              </div>
+              <div style="font-size:10.5px;color:var(--muted);margin-top:3px">Shared with Editorial, Presentations and Documents.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ASSETS -->
+        <div style="display:{{ tabAssetsD }}">
+          <div style="padding:10px 10px 16px">
+            <div style="display:flex;gap:1px;padding:2px;background:var(--panel2);border:1px solid var(--bord);border-radius:6px;margin-bottom:10px">
+              <sc-for list="{{ assetScopes }}" as="a" hint-placeholder-count="4">
+                <button data-id="{{ a.id }}" onClick="{{ setAssetScope }}" style="flex:1;height:22px;border-radius:4px;font-size:10.5px;background:{{ a.bg }};color:{{ a.fg }}">{{ a.label }}</button>
+              </sc-for>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px">
+              <sc-for list="{{ assets }}" as="as" hint-placeholder-count="6">
+                <div title="{{ as.title }}" style="border:1px solid var(--bord);border-radius:7px;overflow:hidden;background:var(--panel2);cursor:grab" style-hover="border-color:var(--accent)">
+                  <div style="height:52px;display:flex;align-items:center;justify-content:center;background:{{ as.bg }}">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="{{ as.stroke }}" stroke-width="1.5"><path d="{{ as.icon }}"/></svg>
+                  </div>
+                  <div style="padding:4px 6px;font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ as.name }}</div>
+                </div>
+              </sc-for>
+            </div>
+            <div style="display:flex;gap:6px;margin-top:10px">
+              <button style="flex:1;height:26px;border:1px solid var(--bord);border-radius:6px;font-size:11px" style-hover="border-color:var(--accent)">Create from selection</button>
+              <button style="flex:1;height:26px;border-radius:6px;background:var(--accent);color:#fff;font-size:11px;font-weight:550">Publish to project</button>
+            </div>
+
+            <div style="margin-top:16px;font-size:10.5px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Links & resources</div>
+            <sc-for list="{{ links }}" as="lk" hint-placeholder-count="4">
+              <div style="display:flex;align-items:center;gap:8px;padding:6px 7px;border:1px solid var(--bord);border-radius:6px;background:var(--panel2);margin-bottom:5px">
+                <span style="width:7px;height:7px;border-radius:4px;flex:none;background:{{ lk.dot }}"></span>
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ lk.name }}</div>
+                  <div style="font-size:10px;color:var(--muted)">{{ lk.meta }}</div>
+                </div>
+                <button style="height:21px;padding:0 7px;border:1px solid var(--bord);border-radius:5px;font-size:10.5px;color:var(--muted)" style-hover="color:var(--ink);border-color:var(--accent)">{{ lk.action }}</button>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+
+        <!-- EXPORT -->
+        <div style="display:{{ tabExportD }}">
+          <div style="padding:10px 10px 16px">
+            <div style="font-size:10.5px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);margin-bottom:7px">Slices</div>
+            <sc-for list="{{ slices }}" as="sl" hint-placeholder-count="3">
+              <div style="border:1px solid var(--bord);border-radius:7px;background:var(--panel2);margin-bottom:7px;overflow:hidden">
+                <div style="display:flex;align-items:center;gap:7px;padding:7px 8px;border-bottom:1px solid var(--bord)">
+                  <input type="checkbox" checked="{{ sl.on }}" style="accent-color:var(--accent)"/>
+                  <span style="flex:1;font-size:11.5px">{{ sl.name }}</span>
+                  <span style="font-size:10.5px;color:var(--muted)">{{ sl.size }}</span>
+                </div>
+                <div style="display:flex;flex-wrap:wrap;gap:5px;padding:7px 8px">
+                  <sc-for list="{{ sl.formats }}" as="f" hint-placeholder-count="3">
+                    <span style="height:20px;display:flex;align-items:center;padding:0 7px;border:1px solid var(--bord);border-radius:4px;font-size:10.5px;color:var(--muted)">{{ f.label }}</span>
+                  </sc-for>
+                  <button style="height:20px;padding:0 7px;border:1px dashed var(--bord);border-radius:4px;font-size:10.5px;color:var(--muted)" style-hover="color:var(--accent);border-color:var(--accent)">+</button>
+                </div>
+              </div>
+            </sc-for>
+
+            <div style="margin-top:12px;font-size:10.5px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);margin-bottom:7px">Print output</div>
+            <div style="border:1px solid var(--bord);border-radius:7px;background:var(--panel2);padding:8px;display:flex;flex-direction:column;gap:7px">
+              <div style="display:flex;justify-content:space-between;font-size:11.5px"><span style="color:var(--muted)">Preset</span><span>PDF/X-4</span></div>
+              <div style="display:flex;justify-content:space-between;font-size:11.5px"><span style="color:var(--muted)">Output profile</span><span>PSO Coated v3</span></div>
+              <div style="display:flex;justify-content:space-between;font-size:11.5px"><span style="color:var(--muted)">Bleed</span><span>3 mm</span></div>
+              <div style="display:flex;justify-content:space-between;font-size:11.5px"><span style="color:var(--muted)">Marks</span><span>Crop · Registration · Bars</span></div>
+              <div style="display:flex;justify-content:space-between;font-size:11.5px"><span style="color:var(--muted)">Fonts</span><span style="color:var(--ok)">All embeddable</span></div>
+              <div style="display:flex;justify-content:space-between;font-size:11.5px"><span style="color:var(--muted)">Spot colours</span><span>1 preserved</span></div>
+              <div style="display:flex;justify-content:space-between;font-size:11.5px"><span style="color:var(--muted)">Preflight</span><span style="color:var(--warn)">2 warnings</span></div>
+            </div>
+            <div style="margin-top:8px;font-size:10px;color:var(--muted);line-height:1.5">Prototype: export and ICC conversion are simulated — no PDF/X-4 file is produced and no compliance is claimed.</div>
+            <button style="width:100%;height:30px;margin-top:9px;border-radius:6px;background:var(--accent);color:#fff;font-size:12px;font-weight:550">Export all</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ STATUS BAR ============ -->
+  <div style="display:flex;align-items:center;gap:0;border-top:1px solid var(--bord);background:var(--panel);font-size:11px;color:var(--muted);padding:0 4px">
+    <div style="padding:0 8px;font-variant-numeric:tabular-nums">{{ zoomLabel }}</div>
+    <div style="width:1px;height:14px;background:var(--bord)"></div>
+    <button onClick="{{ openColorSettings }}" style="padding:0 8px;height:100%;color:var(--ink)" style-hover="background:var(--panel2)">{{ docColorMode }}</button>
+    <button onClick="{{ openColorSettings }}" style="padding:0 8px;height:100%" style-hover="background:var(--panel2);color:var(--ink)">{{ docProfileShort }}</button>
+    <div style="width:1px;height:14px;background:var(--bord)"></div>
+    <button onClick="{{ togglePreflight }}" style="display:flex;align-items:center;gap:5px;padding:0 8px;height:100%;color:var(--warn)" style-hover="background:var(--panel2)">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17h.01"/></svg>
+      Preflight · 2 warnings</button>
+    <div style="width:1px;height:14px;background:var(--bord)"></div>
+    <button onClick="{{ toggleSeparations }}" style="padding:0 8px;height:100%" style-hover="background:var(--panel2);color:var(--ink)">Separations</button>
+    <button onClick="{{ toggleSnap }}" style="padding:0 8px;height:100%;color:{{ snapStatusFg }}" style-hover="background:var(--panel2)">Snap</button>
+    <div style="flex:1"></div>
+    <div style="padding:0 8px;font-variant-numeric:tabular-nums">X <span style="color:var(--ink)">{{ cursorX }}</span></div>
+    <div style="padding:0 8px;font-variant-numeric:tabular-nums">Y <span style="color:var(--ink)">{{ cursorY }}</span></div>
+    <div style="padding:0 8px;font-variant-numeric:tabular-nums">∠ 0°</div>
+    <div style="width:1px;height:14px;background:var(--bord)"></div>
+    <div style="padding:0 8px">Autosaved · v14</div>
+  </div>
+
+  <!-- ============ PREFLIGHT SHEET ============ -->
+  <div style="display:{{ preflightD }}">
+    <div style="position:absolute;right:280px;bottom:34px;width:352px;background:var(--panel);border:1px solid var(--bord);border-radius:9px;box-shadow:var(--shadow);overflow:hidden">
+      <div style="display:flex;align-items:center;padding:8px 10px;border-bottom:1px solid var(--bord)">
+        <span style="flex:1;font-size:12px;font-weight:550">Preflight</span>
+        <span style="font-size:10.5px;color:var(--muted);margin-right:8px">Profile: Sheetfed CMYK</span>
+        <button onClick="{{ togglePreflight }}" style="color:var(--muted);width:18px;height:18px">✕</button>
+      </div>
+      <div style="max-height:260px;overflow-y:auto">
+        <sc-for list="{{ preflight }}" as="p" hint-placeholder-count="7">
+          <div style="display:flex;gap:8px;padding:7px 10px;border-bottom:1px solid rgba(255,255,255,.05)" style-hover="background:var(--panel2)">
+            <span style="width:14px;text-align:center;font-size:11px;color:{{ p.color }}">{{ p.glyph }}</span>
+            <div style="flex:1">
+              <div style="font-size:11.5px">{{ p.label }}</div>
+              <div style="font-size:10.5px;color:var(--muted)">{{ p.detail }}</div>
+            </div>
+            <sc-if value="{{ p.fixable }}" hint-placeholder-val="{{ false }}">
+              <button style="height:20px;padding:0 7px;border:1px solid var(--bord);border-radius:5px;font-size:10.5px;color:var(--muted);align-self:center" style-hover="color:var(--accent);border-color:var(--accent)">Fix</button>
+            </sc-if>
+          </div>
+        </sc-for>
+      </div>
+      <div style="padding:7px 10px;font-size:10px;color:var(--muted);border-top:1px solid var(--bord)">Checks are simulated in this prototype — ink and resolution values are representative, not measured.</div>
+    </div>
+  </div>
+
+  <!-- ============ SEPARATIONS ============ -->
+  <div style="display:{{ sepD }}">
+    <div style="position:absolute;right:280px;bottom:34px;width:250px;background:var(--panel);border:1px solid var(--bord);border-radius:9px;box-shadow:var(--shadow);overflow:hidden">
+      <div style="display:flex;align-items:center;padding:8px 10px;border-bottom:1px solid var(--bord)">
+        <span style="flex:1;font-size:12px;font-weight:550">Separations</span>
+        <button onClick="{{ toggleSeparations }}" style="color:var(--muted);width:18px;height:18px">✕</button>
+      </div>
+      <sc-for list="{{ plates }}" as="pl" hint-placeholder-count="5">
+        <div style="display:flex;align-items:center;gap:8px;padding:6px 10px">
+          <span style="width:12px;height:12px;border-radius:3px;border:1px solid rgba(255,255,255,.2);background:{{ pl.color }}"></span>
+          <span style="flex:1;font-size:11.5px">{{ pl.name }}</span>
+          <span style="font-size:10.5px;color:var(--muted);font-variant-numeric:tabular-nums">{{ pl.cov }}</span>
+        </div>
+      </sc-for>
+      <div style="padding:7px 10px;border-top:1px solid var(--bord);display:flex;justify-content:space-between;font-size:11px">
+        <span style="color:var(--muted)">Total ink</span><span style="color:var(--warn)">318 % · limit 300 %</span>
+      </div>
+      <div style="padding:0 10px 9px;display:flex;gap:6px">
+        <button style="flex:1;height:23px;border:1px solid var(--bord);border-radius:5px;font-size:10.5px;color:var(--muted)" style-hover="color:var(--ink)">Overprint preview</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ COLOR SETTINGS MODAL ============ -->
+  <div style="display:{{ colorSettingsD }}">
+    <div style="position:absolute;inset:0;background:rgba(10,10,14,.55);display:flex;align-items:center;justify-content:center">
+      <div style="width:460px;background:var(--panel);border:1px solid var(--bord);border-radius:10px;box-shadow:0 18px 50px rgba(0,0,0,.5);overflow:hidden">
+        <div style="display:flex;align-items:center;padding:10px 12px;border-bottom:1px solid var(--bord)">
+          <span style="flex:1;font-size:13px;font-weight:550">Document colour settings</span>
+          <button onClick="{{ closeColorSettings }}" style="color:var(--muted);width:20px;height:20px">✕</button>
+        </div>
+        <div style="padding:12px">
+          <div style="font-size:10.5px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);margin-bottom:7px">Colour mode</div>
+          <div style="display:flex;gap:1px;padding:2px;background:var(--panel2);border:1px solid var(--bord);border-radius:6px;margin-bottom:12px">
+            <sc-for list="{{ docModes }}" as="dm" hint-placeholder-count="2">
+              <button data-id="{{ dm.id }}" onClick="{{ setDocMode }}" style="flex:1;height:24px;border-radius:4px;font-size:11.5px;background:{{ dm.bg }};color:{{ dm.fg }}">{{ dm.label }}</button>
+            </sc-for>
+          </div>
+          <div style="font-size:10.5px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);margin-bottom:7px">ICC profile</div>
+          <button data-id="fogra39" onClick="{{ setProfile }}" style="width:100%;display:flex;align-items:center;gap:9px;padding:8px 9px;border:1px solid var(--bord);border-radius:7px;margin-bottom:6px;text-align:left;background:var(--panel2)" style-hover="border-color:var(--accent)">
+            <div style="flex:1">
+              <div style="font-size:12px">ISO Coated v2</div>
+              <div style="font-size:10.5px;color:var(--muted)">FOGRA39 · coated, legacy standard</div>
+            </div>
+          </button>
+          <button data-id="fogra51" onClick="{{ setProfile }}" style="width:100%;display:flex;align-items:center;gap:9px;padding:8px 9px;border:1px solid var(--accent);border-radius:7px;margin-bottom:6px;text-align:left;background:var(--accent-soft)">
+            <div style="flex:1">
+              <div style="font-size:12px">PSO Coated v3</div>
+              <div style="font-size:10.5px;color:var(--muted)">FOGRA51 · coated, current standard</div>
+            </div>
+          </button>
+          <button data-id="fogra52" onClick="{{ setProfile }}" style="width:100%;display:flex;align-items:center;gap:9px;padding:8px 9px;border:1px solid var(--bord);border-radius:7px;margin-bottom:6px;text-align:left;background:var(--panel2)" style-hover="border-color:var(--accent)">
+            <div style="flex:1">
+              <div style="font-size:12px">PSO Uncoated v3</div>
+              <div style="font-size:10.5px;color:var(--muted)">FOGRA52 · uncoated</div>
+            </div>
+          </button>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:10px">
+            <div>
+              <div style="font-size:10.5px;color:var(--muted);margin-bottom:4px">Rendering intent</div>
+              <div style="height:27px;display:flex;align-items:center;padding:0 8px;border:1px solid var(--bord);border-radius:6px;background:var(--panel2);font-size:11.5px">Relative Colorimetric</div>
+            </div>
+            <div>
+              <div style="font-size:10.5px;color:var(--muted);margin-bottom:4px">Black point comp.</div>
+              <div style="height:27px;display:flex;align-items:center;padding:0 8px;border:1px solid var(--bord);border-radius:6px;background:var(--panel2);font-size:11.5px">On</div>
+            </div>
+          </div>
+          <div style="margin-top:11px;font-size:10px;color:var(--muted);line-height:1.5">Prototype: on-screen colour is a CSS approximation. No ICC transform is applied — production rendering will run through the colour engine.</div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:7px;padding:10px 12px;border-top:1px solid var(--bord)">
+          <button onClick="{{ closeColorSettings }}" style="height:27px;padding:0 12px;border:1px solid var(--bord);border-radius:6px;font-size:12px">Cancel</button>
+          <button onClick="{{ closeColorSettings }}" style="height:27px;padding:0 14px;border-radius:6px;background:var(--accent);color:#fff;font-size:12px;font-weight:550">Apply</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ COMMAND PALETTE ============ -->
+  <div style="display:{{ paletteD }}">
+    <div onClick="{{ togglePalette }}" style="position:absolute;inset:0;background:rgba(10,10,14,.5);display:flex;align-items:flex-start;justify-content:center;padding-top:96px">
+      <div style="width:520px;background:var(--panel);border:1px solid var(--bord);border-radius:10px;box-shadow:0 18px 50px rgba(0,0,0,.5);overflow:hidden">
+        <div style="display:flex;align-items:center;gap:9px;padding:11px 13px;border-bottom:1px solid var(--bord)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+          <input autofocus="{{ true }}" placeholder="Search commands, layers, assets…" style="flex:1;background:none;border:none;outline:none;color:var(--ink);font-size:14px"/>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 13px" style-hover="background:var(--panel2)">
+          <span style="font-size:10px;color:var(--muted);width:56px;text-transform:uppercase;letter-spacing:.5px">Artboard</span>
+          <span style="flex:1;font-size:12.5px">Create artboard — A3 print</span>
+          <span style="font-size:10.5px;color:var(--muted)">⇧A</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 13px" style-hover="background:var(--panel2)">
+          <span style="font-size:10px;color:var(--muted);width:56px;text-transform:uppercase;letter-spacing:.5px">Path</span>
+          <span style="flex:1;font-size:12.5px">Convert to curves</span>
+          <span style="font-size:10.5px;color:var(--muted)">⇧⌘O</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 13px" style-hover="background:var(--panel2)">
+          <span style="font-size:10px;color:var(--muted);width:56px;text-transform:uppercase;letter-spacing:.5px">Asset</span>
+          <span style="flex:1;font-size:12.5px">Create symbol from selection</span>
+          <span style="font-size:10.5px;color:var(--muted)">⌘K</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 13px" style-hover="background:var(--panel2)">
+          <span style="font-size:10px;color:var(--muted);width:56px;text-transform:uppercase;letter-spacing:.5px">Select</span>
+          <span style="flex:1;font-size:12.5px">Select same fill</span>
+          <span style="font-size:10.5px;color:var(--muted)"></span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 13px" style-hover="background:var(--panel2)">
+          <span style="font-size:10px;color:var(--muted);width:56px;text-transform:uppercase;letter-spacing:.5px">Colour</span>
+          <span style="flex:1;font-size:12.5px">Change document profile — FOGRA51</span>
+          <span style="font-size:10.5px;color:var(--muted)"></span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 13px" style-hover="background:var(--panel2)">
+          <span style="font-size:10px;color:var(--muted);width:56px;text-transform:uppercase;letter-spacing:.5px">Export</span>
+          <span style="flex:1;font-size:12.5px">Export PDF/X-4 for print</span>
+          <span style="font-size:10.5px;color:var(--muted)">⇧⌘E</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 13px" style-hover="background:var(--panel2)">
+          <span style="font-size:10px;color:var(--muted);width:56px;text-transform:uppercase;letter-spacing:.5px">Link</span>
+          <span style="flex:1;font-size:12.5px">Open source in Raster</span>
+          <span style="font-size:10.5px;color:var(--muted)"></span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 13px" style-hover="background:var(--panel2)">
+          <span style="font-size:10px;color:var(--muted);width:56px;text-transform:uppercase;letter-spacing:.5px">Colour</span>
+          <span style="flex:1;font-size:12.5px">Publish colour to project library</span>
+          <span style="font-size:10.5px;color:var(--muted)"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;showRemoteCollaborators&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;},&quot;documentColorMode&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;RGB&quot;,&quot;CMYK&quot;],&quot;default&quot;:&quot;CMYK&quot;,&quot;tsType&quot;:&quot;'RGB'|'CMYK'&quot;},&quot;startTab&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;layers&quot;,&quot;appearance&quot;,&quot;color&quot;,&quot;type&quot;,&quot;assets&quot;,&quot;export&quot;],&quot;default&quot;:&quot;layers&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+const OBJ = {
+  symbol:   { name:'Symbol', kind:'group', x:60, y:105, w:112, h:112, fill:'linear-gradient(135deg,#0d99ff,#6f4bff)', fillLabel:'Gradient', stroke:'none', strokeW:0, op:100, type:'shape' },
+  wordmark: { name:'Wordmark', kind:'text', x:212, y:132, w:250, h:48, fill:'#1b1b1f', fillLabel:'#1B1B1F', stroke:'none', strokeW:0, op:100, type:'text' },
+  tagline:  { name:'Tagline', kind:'text', x:215, y:188, w:186, h:16, fill:'#8a8a94', fillLabel:'#8A8A94', stroke:'none', strokeW:0, op:100, type:'text' },
+  'symbol-c':{ name:'Construction Symbol', kind:'path', x:720, y:120, w:120, h:120, fill:'none', fillLabel:'None', stroke:'#1b1b1f', strokeW:2, op:100, type:'shape' },
+  'icon-tile':{ name:'Icon Tile', kind:'group', x:1000, y:0, w:200, h:200, fill:'linear-gradient(135deg,#0d99ff,#6f4bff)', fillLabel:'Gradient', stroke:'none', strokeW:0, op:100, type:'shape' },
+  palette:  { name:'Palette Board', kind:'group', x:40, y:452, w:482, h:160, fill:'#0d99ff', fillLabel:'#0D99FF', stroke:'none', strokeW:0, op:100, type:'shape' },
+  social:   { name:'Social Post', kind:'group', x:600, y:400, w:360, h:360, fill:'#101018', fillLabel:'Gradient', stroke:'none', strokeW:0, op:100, type:'shape' },
+  'poster-image':{ name:'studio-portrait.tiff', kind:'image', x:1024, y:264, w:252, h:196, fill:'#d8d8de', fillLabel:'Linked raster', stroke:'#0d99ff', strokeW:1.5, op:100, type:'shape' }
+};
+
+/* Tools. Shared Creative actions reuse Lattice's own icon paths from
+   src/components/Icons.tsx verbatim (IcCursor, IcHand, IcSearch, IcEdit,
+   IcImage, IcEye); only Vector-specific geometry tools get new glyphs.
+   Grouped so the column fits the shell without clipping — each `group`
+   tool opens a long-press subtool menu and shows the active subtool. */
+const TOOLS = [
+  { id:'select', title:'Selection — V', d:'m3 3 7.1 17 2.5-7.4L20 10.1z' },
+  { id:'node', title:'Direct selection / Node — A', d:'m4 3 6.4 15.3 2.2-6.7L19 9.2z M18.5 15.5h3M20 14v3' },
+  { id:'hand', title:'Hand — H · Zoom — Z', group:true, d:'M18 11V6.5a1.8 1.8 0 0 0-3.6 0V11M14.4 10.5V4.8a1.8 1.8 0 0 0-3.6 0v5.2M10.8 10V6.3a1.8 1.8 0 0 0-3.6 0V14M7.2 14.5l-1.9-1.9a1.9 1.9 0 0 0-2.7 2.7l4.8 5A7 7 0 0 0 12.5 22h1a7 7 0 0 0 7-7v-5', divider:true },
+  { id:'pen', title:'Pen — P · Pencil — N · Line — \\', group:true, d:'M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z' },
+  { id:'shape', title:'Rectangle — M · Ellipse · Polygon · Star', group:true, d:'M4 5h16v14H4z' },
+  { id:'builder', title:'Shape builder — Shift+M', d:'M8 12a4 4 0 118 0 4 4 0 01-8 0zM4 8h6M14 16h6M12 4v4M12 16v4' },
+  { id:'scissors', title:'Scissors / break path — C', d:'M6 4l12 14M18 4L6 18M6.5 19a2.5 2.5 0 100-5 2.5 2.5 0 000 5zM17.5 19a2.5 2.5 0 100-5 2.5 2.5 0 000 5z', divider:true },
+  { id:'text', title:'Text — T', d:'M5 5h14M12 5v14M9 19h6' },
+  { id:'place', title:'Place image — Shift+P', d:'M3 4h18v16H3zM9 10a1.6 1.6 0 1 1-3.2 0 1.6 1.6 0 0 1 3.2 0m12 6-4.5-4.5L7 20' },
+  { id:'gradient', title:'Gradient — G · Eyedropper — I', group:true, d:'M4 5h16v14H4zM8 5v14M12 5v14M16 5v14', divider:true },
+  { id:'artboard', title:'Artboard — Shift+A', d:'M4 8h16M8 4v16M4 4h16v16H4z' }
+];
+
+const LAYERS = [
+  { id:'ab-1', name:'01 · Primary Logo', kind:'artboard', depth:0, badge:'560×360' },
+  { id:'brand-mark', name:'Brand Mark', kind:'symbol', depth:1, badge:'symbol' },
+  { id:'symbol', name:'Symbol', kind:'boolean', depth:2, badge:'subtract' },
+  { id:'sym-outer', name:'Outer Shape', kind:'path', depth:3 },
+  { id:'sym-inner', name:'Inner Shape', kind:'path', depth:3 },
+  { id:'wordmark', name:'Wordmark', kind:'text', depth:2 },
+  { id:'tagline', name:'Tagline', kind:'text', depth:2 },
+  { id:'ab-4', name:'04 · Colour Palette', kind:'artboard', depth:0, badge:'560×280' },
+  { id:'palette', name:'Swatch Grid', kind:'group', depth:1 },
+  { id:'ab-6', name:'06 · Poster A3', kind:'artboard', depth:0, badge:'CMYK' },
+  { id:'poster-image', name:'studio-portrait.tiff', kind:'image', depth:1, badge:'linked' },
+  { id:'poster-type', name:'Headline', kind:'text', depth:1 },
+  { id:'poster-mask', name:'Clipping Mask', kind:'mask', depth:1, badge:'mask' }
+];
+
+const KIND_ICON = {
+  artboard:'M4 8h16M8 4v16M4 4h16v16H4z',
+  symbol:'M12 3l9 9-9 9-9-9z',
+  boolean:'M4 8h8v8H4zM12 12a4 4 0 108 0 4 4 0 00-8 0z',
+  group:'M4 4h7v7H4zM13 13h7v7h-7z',
+  path:'M4 18C8 6 16 18 20 6M4 18h.01M20 6h.01',
+  text:'M5 6h14M12 6v12M9 18h6',
+  image:'M4 5h16v14H4zM4 16l4.5-4.5 4 4 3-2.5L20 17M15 9h.01',
+  mask:'M4 12a8 8 0 1016 0 8 8 0 00-16 0zM12 4v16'
+};
+
+class Component extends DCLogic {
+  state = {
+    tool: 'select',
+    sel: ['wordmark'],
+    tab: 'layers',
+    colorModel: 'cmyk',
+    docMode: 'CMYK',
+    profile: 'fogra51',
+    zoom: 0.62,
+    pan: { x: 84, y: 60 },
+    hidden: {},
+    locked: { 'symbol-c': true },
+    snap: true,
+    rulers: true,
+    guides: true,
+    workMode: 'edit',
+    preflightOpen: false,
+    sepOpen: false,
+    colorSettingsOpen: false,
+    paletteOpen: false,
+    commentOpen: false,
+    sourceToast: true,
+    opacity: 100,
+    fillOverride: null,
+    cursor: { x: 42, y: 18 },
+    published: false
+  };
+
+  componentDidMount() {
+    this._key = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); this.setState(s => ({ paletteOpen: !s.paletteOpen })); return; }
+      if (e.key === 'Escape') { this.setState({ paletteOpen: false, colorSettingsOpen: false, sel: [] }); return; }
+      const map = { v:'select', a:'node', h:'hand', z:'zoom', p:'pen', n:'pencil', m:'shape', t:'text', g:'gradient', i:'eyedropper' };
+      if (!e.metaKey && !e.ctrlKey && map[e.key.toLowerCase()]) this.setState({ tool: map[e.key.toLowerCase()] });
+    };
+    window.addEventListener('keydown', this._key);
+  }
+  componentWillUnmount() { window.removeEventListener('keydown', this._key); }
+
+  toScreen(x, y) {
+    const { zoom, pan } = this.state;
+    return { x: x * zoom + pan.x, y: y * zoom + pan.y };
+  }
+
+  primary() { return this.state.sel[0] ? OBJ[this.state.sel[0]] : null; }
+
+  renderVals() {
+    const st = this.state;
+    const on = (a, b) => a ? b : 'transparent';
+    const sel = this.primary();
+    const selCount = st.sel.length;
+    const fill = st.fillOverride || (sel ? sel.fill : '#0d99ff');
+    const fillLabel = st.fillOverride ? st.fillOverride.toUpperCase() : (sel ? sel.fillLabel : '—');
+
+    const box = sel ? (() => {
+      const p = this.toScreen(sel.x, sel.y);
+      return { x: Math.round(p.x), y: Math.round(p.y), w: Math.round(sel.w * st.zoom), h: Math.round(sel.h * st.zoom) };
+    })() : { x: 0, y: 0, w: 0, h: 0 };
+
+    const handles = sel ? [[0,0],[.5,0],[1,0],[0,.5],[1,.5],[0,1],[.5,1],[1,1]].map(([fx,fy]) => ({
+      x: box.x + box.w * fx - 3.5, y: box.y + box.h * fy - 3.5
+    })) : [];
+
+    const rp = this.toScreen(600, 400);
+    const remote = {
+      x: Math.round(rp.x), y: Math.round(rp.y),
+      w: Math.round(360 * st.zoom), h: Math.round(360 * st.zoom),
+      labelY: Math.round(rp.y) - 18, textX: Math.round(rp.x) + 6, textY: Math.round(rp.y) - 6,
+      cursorPath: `M${Math.round(rp.x)+96} ${Math.round(rp.y)+72}l0 15 3.6-3.6 2.4 5 2.6-1.2-2.4-5 5-.6z`
+    };
+
+    const cmykOf = (hex) => {
+      const h = (hex || '#0d99ff').replace('#',''); if (h.length < 6) return [0,0,0,0];
+      const r = parseInt(h.slice(0,2),16)/255, g = parseInt(h.slice(2,4),16)/255, b = parseInt(h.slice(4,6),16)/255;
+      const k = 1 - Math.max(r,g,b);
+      if (k === 1) return [0,0,0,100];
+      return [((1-r-k)/(1-k))*100, ((1-g-k)/(1-k))*100, ((1-b-k)/(1-k))*100, k*100].map(Math.round);
+    };
+    const hexOnly = /^#[0-9a-f]{6}$/i.test(fill) ? fill : '#0d99ff';
+    const rgb = [parseInt(hexOnly.slice(1,3),16), parseInt(hexOnly.slice(3,5),16), parseInt(hexOnly.slice(5,7),16)];
+    const cmyk = cmykOf(hexOnly);
+
+    const channels = st.colorModel === 'cmyk'
+      ? ['C','M','Y','K'].map((k,i) => ({ key:k, val: cmyk[i] + '%', pos: `calc(${cmyk[i]}% - 6px)`,
+          track:`linear-gradient(90deg,#fff,${['#00aeef','#ec008c','#fff200','#000'][i]})` }))
+      : st.colorModel === 'rgb'
+      ? ['R','G','B'].map((k,i) => ({ key:k, val: rgb[i], pos:`calc(${(rgb[i]/255)*100}% - 6px)`,
+          track:`linear-gradient(90deg,#000,${['#f00','#0f0','#00f'][i]})` }))
+      : st.colorModel === 'lab'
+      ? [{key:'L',val:56,pos:'calc(56% - 6px)',track:'linear-gradient(90deg,#000,#fff)'},
+         {key:'a',val:-6,pos:'calc(47% - 6px)',track:'linear-gradient(90deg,#3ec98a,#e8564a)'},
+         {key:'b',val:-58,pos:'calc(21% - 6px)',track:'linear-gradient(90deg,#0d99ff,#fff200)'}]
+      : [{key:'H',val:204,pos:'calc(57% - 6px)',track:'linear-gradient(90deg,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00)'},
+         {key:'S',val:'100%',pos:'calc(100% - 6px)',track:`linear-gradient(90deg,#888,${hexOnly})`},
+         {key:'L',val:'52%',pos:'calc(52% - 6px)',track:`linear-gradient(90deg,#000,${hexOnly},#fff)`}];
+
+    const profileName = { fogra39:'ISO Coated v2', fogra51:'PSO Coated v3', fogra52:'PSO Uncoated v3' }[st.profile];
+    const profileShort = { fogra39:'FOGRA39', fogra51:'FOGRA51', fogra52:'FOGRA52' }[st.profile];
+
+    return {
+      tools: TOOLS.map(t => ({ ...t, active: st.tool === t.id,
+        bg: st.tool === t.id ? 'var(--accent)' : 'transparent',
+        fg: st.tool === t.id ? '#fff' : 'var(--muted)' })),
+      setTool: (e) => this.setState({ tool: e.currentTarget.dataset.id }),
+
+      workModes: [
+        { id:'edit', label:'Edit', hint:'Full editing' },
+        { id:'review', label:'Review', hint:'Comments and approvals only' },
+        { id:'present', label:'Present', hint:'Clean full-canvas presentation' }
+      ].map(m => ({ ...m, active: st.workMode === m.id,
+        bg: st.workMode === m.id ? 'var(--panel)' : 'transparent',
+        fg: st.workMode === m.id ? 'var(--ink)' : 'var(--muted)',
+        shadow: st.workMode === m.id ? '0 1px 2px rgba(0,0,0,.28)' : 'none' })),
+      setWorkMode: (e) => this.setState({ workMode: e.currentTarget.dataset.id }),
+
+      presence: [
+        { initials:'FO', color:'#0d99ff', title:'Francesco Ori — you' },
+        { initials:'GR', color:'#3ec98a', title:'Giulia Rossi — editing Social Post' },
+        { initials:'ML', color:'#f5a524', title:'Marco Levi — viewing' }
+      ],
+
+      ctxLabel: selCount === 0 ? 'Document' : selCount > 1 ? selCount + ' objects' : (sel && sel.type === 'text' ? 'Text' : sel ? sel.kind : ''),
+      ctxNone: selCount === 0,
+      ctxShape: selCount === 1 && sel && sel.type === 'shape',
+      ctxText: selCount === 1 && sel && sel.type === 'text',
+      ctxMulti: selCount > 1,
+      ctxNoneD: selCount === 0 ? 'block' : 'none',
+      ctxShapeD: (selCount === 1 && sel && sel.type === 'shape') ? 'block' : 'none',
+      ctxTextD: (selCount === 1 && sel && sel.type === 'text') ? 'block' : 'none',
+      ctxMultiD: selCount > 1 ? 'block' : 'none',
+      tabLayersD: st.tab === 'layers' ? 'block' : 'none',
+      tabAppearanceD: st.tab === 'appearance' ? 'block' : 'none',
+      tabColorD: st.tab === 'color' ? 'block' : 'none',
+      tabTypeD: st.tab === 'type' ? 'block' : 'none',
+      tabAssetsD: st.tab === 'assets' ? 'block' : 'none',
+      tabExportD: st.tab === 'export' ? 'block' : 'none',
+      preflightD: st.preflightOpen ? 'block' : 'none',
+      sepD: st.sepOpen ? 'block' : 'none',
+      colorSettingsD: st.colorSettingsOpen ? 'block' : 'none',
+      paletteD: st.paletteOpen ? 'block' : 'none',
+      selDisplay: sel ? 'inline' : 'none',
+
+      selName: sel ? sel.name : 'No selection',
+      selFill: fill, selFillLabel: fillLabel,
+      selStroke: sel && sel.stroke !== 'none' ? sel.stroke : 'repeating-linear-gradient(45deg,#3a3a42 0 3px,#4a4a54 3px 6px)',
+      selStrokeW: sel ? sel.strokeW : 0,
+      selOpacity: st.opacity,
+      setOpacity: (e) => {
+        const v = +e.target.value; this.setState({ opacity: v });
+        const el = this._svg && this._svg.querySelector(`[data-obj="${st.sel[0]}"]`);
+        if (el) el.style.opacity = v / 100;
+      },
+      selX: sel ? Math.round(sel.x) : 0, selY: sel ? Math.round(sel.y) : 0,
+      selW: sel ? Math.round(sel.w) : 0, selH: sel ? Math.round(sel.h) : 0,
+
+      hasSelection: !!sel, selBox: box, handles,
+      selBadgeY: box.y - 19, selBadgeW: sel ? Math.max(58, sel.name.length * 6 + 14) : 0,
+      selBadgeTx: box.x + 5, selBadgeTy: box.y - 7,
+      selBadgeLabel: sel ? sel.name : '',
+
+      showRemote: true, remote,
+
+      boolOps: [
+        { id:'union', title:'Union', d:'M10 7h9v9h-9z' },
+        { id:'subtract', title:'Subtract', d:'M10 7h9v9h-9z' },
+        { id:'intersect', title:'Intersect', d:'M10 7h9v9h-9z' },
+        { id:'exclude', title:'Exclude', d:'M10 7h9v9h-9z' }
+      ],
+      applyBoolean: () => {},
+      alignOps: [
+        { title:'Align left', d:'M4 4v16M8 8h9M8 15h6' },
+        { title:'Align horizontal centres', d:'M12 4v16M7 8h10M9 15h6' },
+        { title:'Align right', d:'M20 4v16M7 8h9M10 15h6' },
+        { title:'Align top', d:'M4 4h16M8 8v9M15 8v6' },
+        { title:'Align vertical centres', d:'M4 12h16M8 7v10M15 9v6' },
+        { title:'Distribute horizontally', d:'M4 4v16M20 4v16M11 8v8' }
+      ],
+      groupSelection: () => {},
+
+      typeFamily: 'Söhne Breit', typeStyle: 'Semibold', typeSize: 46, typeTracking: 7, typeLeading: 52,
+      paraAlign: [
+        { title:'Left', d:'M4 6h16M4 11h10M4 16h14' },
+        { title:'Centre', d:'M4 6h16M7 11h10M5 16h14' },
+        { title:'Right', d:'M4 6h16M10 11h10M6 16h14' },
+        { title:'Justify', d:'M4 6h16M4 11h16M4 16h16' }
+      ],
+
+      tabs: [
+        { id:'layers', label:'Layers' }, { id:'appearance', label:'Appearance' }, { id:'color', label:'Colour' },
+        { id:'type', label:'Type' }, { id:'assets', label:'Assets' }, { id:'export', label:'Export' }
+      ].map(t => ({ ...t, bg: st.tab === t.id ? 'var(--panel2)' : 'transparent', fg: st.tab === t.id ? 'var(--ink)' : 'var(--muted)' })),
+      setTab: (e) => this.setState({ tab: e.currentTarget.dataset.id }),
+      tabLayers: st.tab === 'layers', tabAppearance: st.tab === 'appearance', tabColor: st.tab === 'color',
+      tabType: st.tab === 'type', tabAssets: st.tab === 'assets', tabExport: st.tab === 'export',
+
+      layers: LAYERS.map(l => {
+        const selected = st.sel.includes(l.id);
+        const hidden = !!st.hidden[l.id], locked = !!st.locked[l.id];
+        return {
+          ...l,
+          pad: (8 + l.depth * 13) + 'px',
+          bg: selected ? 'var(--accent-soft)' : 'transparent',
+          mark: selected ? 'var(--accent)' : 'transparent',
+          fg: hidden ? 'var(--muted)' : 'var(--ink)',
+          icon: KIND_ICON[l.kind] || KIND_ICON.path,
+          iconColor: l.kind === 'artboard' ? 'var(--muted)' : selected ? 'var(--accent)' : 'var(--muted)',
+          caret: l.depth < 2 && l.kind !== 'image' && l.kind !== 'text' ? 'M8 5l8 7-8 7' : '',
+          caretColor: 'var(--muted)',
+          badge: l.badge || '',
+          visIcon: hidden ? 'M4 12s3.5-6 8-6 8 6 8 6-3.5 6-8 6-8-6-8-6M4 4l16 16' : 'M4 12s3.5-6 8-6 8 6 8 6-3.5 6-8 6-8-6-8-6',
+          visColor: hidden ? 'var(--ink)' : 'rgba(151,151,159,.45)',
+          lockShackle: locked ? 'M8.5 11V8.5a3.5 3.5 0 017 0V11' : 'M8.5 11V8.5a3.5 3.5 0 016.6-1.6',
+          lockColor: locked ? 'var(--ink)' : 'rgba(151,151,159,.35)'
+        };
+      }),
+      selectLayer: (e) => {
+        const id = e.currentTarget.dataset.id;
+        this.setState(s => ({ sel: OBJ[id] ? (e.shiftKey ? [...s.sel, id] : [id]) : [], opacity: 100, fillOverride: null }));
+      },
+      toggleVis: (e) => { e.stopPropagation(); const id = e.currentTarget.dataset.id;
+        this.setState(s => ({ hidden: { ...s.hidden, [id]: !s.hidden[id] } })); },
+      toggleLock: (e) => { e.stopPropagation(); const id = e.currentTarget.dataset.id;
+        this.setState(s => ({ locked: { ...s.locked, [id]: !s.locked[id] } })); },
+
+      svgRef: (el) => { this._svg = el; },
+      canvasCursor: st.tool === 'hand' ? 'grab' : st.tool === 'zoom' ? 'zoom-in' : 'default',
+      viewTransform: `translate(${st.pan.x},${st.pan.y}) scale(${st.zoom})`,
+      canvasDown: (e) => {
+        if (e.target.closest('[data-obj]')) return;
+        this.setState({ sel: [] });
+        const sx = e.clientX, sy = e.clientY, p0 = { ...st.pan };
+        const move = (ev) => this.setState({ pan: { x: p0.x + ev.clientX - sx, y: p0.y + ev.clientY - sy } });
+        const up = () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); };
+        window.addEventListener('mousemove', move); window.addEventListener('mouseup', up);
+      },
+      objDown: (e) => {
+        e.stopPropagation();
+        const g = e.currentTarget, id = g.dataset.obj;
+        if (this.state.locked[id]) return;
+        this.setState(s => ({ sel: e.shiftKey ? (s.sel.includes(id) ? s.sel : [...s.sel, id]) : [id],
+          opacity: 100, fillOverride: null }));
+        const sx = e.clientX, sy = e.clientY, z = this.state.zoom;
+        const base = OBJ[id], bx = base.x, by = base.y;
+        const move = (ev) => {
+          const dx = (ev.clientX - sx) / z, dy = (ev.clientY - sy) / z;
+          g.setAttribute('transform', `translate(${dx},${dy})`);
+          base.x = bx + dx; base.y = by + dy;
+          this.forceUpdate();
+        };
+        const up = () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); };
+        window.addEventListener('mousemove', move); window.addEventListener('mouseup', up);
+      },
+
+      zoomLabel: Math.round(st.zoom * 100) + '%',
+      zoomIn: () => this.setState(s => ({ zoom: Math.min(8, s.zoom * 1.25) })),
+      zoomOut: () => this.setState(s => ({ zoom: Math.max(0.08, s.zoom / 1.25) })),
+      zoomFit: () => this.setState({ zoom: 0.62, pan: { x: 84, y: 60 } }),
+      cursorX: st.cursor.x + ' mm', cursorY: st.cursor.y + ' mm',
+
+      colorModels: ['rgb','hsl','cmyk','lab'].map(id => ({
+        id, label: id.toUpperCase(),
+        bg: st.colorModel === id ? 'var(--accent)' : 'transparent',
+        fg: st.colorModel === id ? '#fff' : 'var(--muted)'
+      })),
+      setColorModel: (e) => this.setState({ colorModel: e.currentTarget.dataset.id }),
+      gamutNote: st.docMode === 'CMYK' && st.colorModel !== 'cmyk' ? 'out of CMYK gamut — simulated' : profileShort,
+      colorKind: st.published ? 'Global · Brand / Primary' : 'Process colour',
+      colorKindDot: st.published ? 'var(--accent)' : 'var(--muted)',
+      colorKindNote: st.published ? 'Linked to project library — updates everywhere' : 'Document-local, not yet shared',
+      publishLabel: st.published ? 'Linked' : 'Publish to project',
+      publishColor: () => this.setState(s => ({ published: !s.published })),
+
+      swatches: [
+        { name:'Brand / Primary', hex:'#0d99ff', title:'Brand / Primary — global' },
+        { name:'Brand / Secondary', hex:'#6f4bff', title:'Brand / Secondary — global' },
+        { name:'Brand / Accent', hex:'#3ec98a', title:'Brand / Accent — global' },
+        { name:'Spot / Brand Red', hex:'#e8564a', spot:true, title:'Spot — PANTONE 179 C' },
+        { name:'Ink / Black', hex:'#1b1b1f', title:'0/0/0/100' },
+        { name:'Paper', hex:'#f4f4f6', title:'Paper' },
+        { name:'Warm', hex:'#f5a524', title:'Document colour' },
+        { name:'Slate', hex:'#4a5568', title:'Document colour' },
+        { name:'Sand', hex:'#d8cbb4', title:'Document colour' },
+        { name:'Deep', hex:'#101018', title:'Document colour' },
+        { name:'Mist', hex:'#c9d6e5', title:'Document colour' },
+        { name:'Registration', hex:'#000000', spot:true, title:'Registration — all plates' }
+      ],
+      applySwatch: (e) => {
+        const c = e.currentTarget.dataset.color;
+        this.setState({ fillOverride: c });
+        const id = this.state.sel[0];
+        const el = this._svg && this._svg.querySelector(`[data-obj="${id}"]`);
+        if (el) { const t = el.tagName === 'g' ? el.querySelector('rect,path,circle') : el; if (t) t.setAttribute('fill', c); }
+      },
+
+      assetScopes: ['Document','Project','Workspace','Libraries'].map((l,i) => ({
+        id: l.toLowerCase(), label: l,
+        bg: i === 1 ? 'var(--accent)' : 'transparent', fg: i === 1 ? '#fff' : 'var(--muted)'
+      })),
+      setAssetScope: () => {},
+      assets: [
+        { name:'Brand Mark', bg:'linear-gradient(135deg,#0d99ff,#6f4bff)', stroke:'#fff', icon:'M12 3l9 9-9 9-9-9z', title:'Symbol — published' },
+        { name:'Wordmark', bg:'var(--panel)', stroke:'var(--muted)', icon:'M5 6h14M12 6v12M9 18h6', title:'Vector asset' },
+        { name:'Icon 200', bg:'var(--panel)', stroke:'var(--muted)', icon:'M4 4h16v16H4z', title:'Vector asset' },
+        { name:'Grid System', bg:'var(--panel)', stroke:'var(--muted)', icon:'M4 4h16v16H4zM4 10h16M4 15h16M10 4v16M15 4v16', title:'Layout asset' },
+        { name:'Portrait', bg:'var(--panel)', stroke:'var(--muted)', icon:'M4 5h16v14H4zM4 16l4.5-4.5 4 4 3-2.5L20 17', title:'Raster — linked' },
+        { name:'Poster A3', bg:'var(--panel)', stroke:'var(--muted)', icon:'M6 3h12v18H6z', title:'Artboard snapshot' }
+      ],
+      links: [
+        { name:'studio-portrait.tiff', meta:'Linked · 214 PPI · RGB in CMYK doc', dot:'var(--warn)', action:'Relink' },
+        { name:'Brand Mark.vector', meta:'Linked · source updated 2 min ago', dot:'var(--accent)', action:'Update' },
+        { name:'texture-paper.png', meta:'Embedded · 1.4 MB', dot:'var(--ok)', action:'Reveal' },
+        { name:'client-logo.svg', meta:'Missing · last seen 3 Aug', dot:'var(--err)', action:'Locate' }
+      ],
+
+      slices: [
+        { name:'Logo Master', size:'560 × 360', on:true, formats:[{label:'SVG'},{label:'PNG @1x'},{label:'PNG @2x'},{label:'PDF'}] },
+        { name:'Icon 200', size:'200 × 200', on:true, formats:[{label:'SVG'},{label:'PNG @2x'},{label:'PNG @3x'}] },
+        { name:'Social 1080', size:'1080 × 1080', on:true, formats:[{label:'JPEG'},{label:'WebP'}] },
+        { name:'Poster A3', size:'297 × 420 mm', on:true, formats:[{label:'PDF/X-4'}] }
+      ],
+
+      docColorMode: st.docMode, docProfileShort: profileShort, docProfileName: profileName,
+      artboardCount: 6,
+      snapBg: on(st.snap, 'var(--accent-soft)'), snapFg: st.snap ? 'var(--accent)' : 'var(--muted)',
+      snapStatusFg: st.snap ? 'var(--ink)' : 'var(--muted)',
+      rulerBg: on(st.rulers, 'var(--accent-soft)'), rulerFg: st.rulers ? 'var(--accent)' : 'var(--muted)',
+      guideBg: on(st.guides, 'var(--accent-soft)'), guideFg: st.guides ? 'var(--accent)' : 'var(--muted)',
+      toggleSnap: () => this.setState(s => ({ snap: !s.snap })),
+      toggleRulers: () => this.setState(s => ({ rulers: !s.rulers })),
+      toggleGuides: () => this.setState(s => ({ guides: !s.guides })),
+      addArtboard: () => {},
+
+      preflightOpen: st.preflightOpen,
+      togglePreflight: () => this.setState(s => ({ preflightOpen: !s.preflightOpen, sepOpen: false })),
+      preflight: [
+        { glyph:'✓', color:'var(--ok)', label:'Fonts available', detail:'2 families · all embeddable' },
+        { glyph:'✓', color:'var(--ok)', label:'Bleed configured', detail:'3 mm on all print artboards' },
+        { glyph:'✓', color:'var(--ok)', label:'Spot colours', detail:'1 spot preserved — PANTONE 179 C' },
+        { glyph:'⚠', color:'var(--warn)', label:'RGB image in CMYK document', detail:'studio-portrait.tiff on artboard 06', fixable:true },
+        { glyph:'⚠', color:'var(--warn)', label:'Total ink 318 %', detail:'exceeds 300 % limit for FOGRA51', fixable:true },
+        { glyph:'✕', color:'var(--err)', label:'Missing linked asset', detail:'client-logo.svg — not found', fixable:true },
+        { glyph:'✓', color:'var(--ok)', label:'Minimum stroke width', detail:'no hairlines below 0.25 pt' }
+      ],
+
+      sepOpen: st.sepOpen,
+      toggleSeparations: () => this.setState(s => ({ sepOpen: !s.sepOpen, preflightOpen: false })),
+      plates: [
+        { name:'Cyan', color:'#00aeef', cov:'84 %' },
+        { name:'Magenta', color:'#ec008c', cov:'62 %' },
+        { name:'Yellow', color:'#fff200', cov:'41 %' },
+        { name:'Black', color:'#000000', cov:'96 %' },
+        { name:'Spot — Brand Red', color:'#e8564a', cov:'35 %' }
+      ],
+
+      colorSettingsOpen: st.colorSettingsOpen,
+      openColorSettings: () => this.setState({ colorSettingsOpen: true }),
+      closeColorSettings: () => this.setState({ colorSettingsOpen: false }),
+      docModes: ['RGB','CMYK'].map(m => ({ id:m, label:m,
+        bg: st.docMode === m ? 'var(--accent)' : 'transparent', fg: st.docMode === m ? '#fff' : 'var(--muted)' })),
+      setDocMode: (e) => this.setState({ docMode: e.currentTarget.dataset.id }),
+      profiles: [
+        { id:'fogra39', profName:'ISO Coated v2', note:'FOGRA39 · coated, legacy standard' },
+        { id:'fogra51', profName:'PSO Coated v3', note:'FOGRA51 · coated, current standard' },
+        { id:'fogra52', profName:'PSO Uncoated v3', note:'FOGRA52 · uncoated' }
+      ].map(p => ({ ...p,
+        bg: st.profile === p.id ? 'var(--accent-soft)' : 'var(--panel2)',
+        bord: st.profile === p.id ? 'var(--accent)' : 'var(--bord)',
+        dot: st.profile === p.id ? 'var(--accent)' : 'transparent' })),
+      setProfile: (e) => this.setState({ profile: e.currentTarget.dataset.id }),
+
+      paletteOpen: st.paletteOpen,
+      togglePalette: () => this.setState(s => ({ paletteOpen: !s.paletteOpen })),
+      commands: [
+        { group:'Artboard', label:'Create artboard — A3 print', shortcut:'⇧A' },
+        { group:'Path', label:'Convert to curves', shortcut:'⇧⌘O' },
+        { group:'Asset', label:'Create symbol from selection', shortcut:'⌘K' },
+        { group:'Select', label:'Select same fill', shortcut:'' },
+        { group:'Colour', label:'Change document profile — FOGRA51', shortcut:'' },
+        { group:'Export', label:'Export PDF/X-4 for print', shortcut:'⇧⌘E' },
+        { group:'Link', label:'Open source in Raster', shortcut:'' },
+        { group:'Colour', label:'Publish colour to project library', shortcut:'' }
+      ],
+
+      commentOpen: st.commentOpen,
+      toggleComment: () => this.setState(s => ({ commentOpen: !s.commentOpen })),
+      sourceToast: st.sourceToast,
+      dismissToast: () => this.setState({ sourceToast: false })
+    };
+  }
+}
+</script>
+</body>
+</html>
