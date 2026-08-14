@@ -249,11 +249,12 @@ describe('membership statements', () => {
     expect(calls.some((c) => c.op === 'delete')).toBe(true)
   })
 
-  it('keeps the address out of a PostgREST or-filter when listing projects', async () => {
+  it('keeps addresses out of a PostgREST or-filter when listing slots', async () => {
     const { client, calls } = fakeClient(() => ok([]))
     const db = new SupabaseRepositories(client)
-    await db.memberships.projectsOf(['usr_grace'], 'grace@example.com')
-    // two plain queries, never a composed filter expression
+    await db.memberships.slotsOf(['usr_grace'], ['grace@example.com', 'work@example.com'])
+    // two plain queries, never a composed filter expression — the address
+    // list rides in `.in()` as a parameter rather than as text
     expect(calls).toHaveLength(2)
     for (const call of calls) expect(filterNames(call)).not.toContain('or')
   })

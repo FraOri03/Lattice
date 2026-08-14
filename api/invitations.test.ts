@@ -725,7 +725,8 @@ describe('acceptance (18.3)', () => {
 
     // project_memberships.user_id is a foreign key to users, so the id that
     // belongs there is the caller's real one
-    expect(await db.memberships.projectsOf(['usr_grace'], '')).toContain('proj_1')
+    const slots = await db.memberships.slotsOf(['usr_grace'], [])
+    expect(slots.map((s) => s.projectId)).toContain('proj_1')
   })
 })
 

@@ -165,7 +165,11 @@ describe('the six destinations', () => {
     useStore.setState({ navSurface: 'dashboard', dashboardDestination: 'shared' })
     renderDashboard()
 
-    expect(screen.getByText(/A full index of everything shared with you/)).toBeInTheDocument()
+    // 18.4 has an index, but this test renders without a reachable server —
+    // so the caveat still stands, and now names the actual constraint
+    expect(
+      screen.getByText(/needs a database and a signed-in session/),
+    ).toBeInTheDocument()
   })
 })
 

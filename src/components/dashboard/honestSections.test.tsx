@@ -111,7 +111,9 @@ describe('Shared with me', () => {
     useStore.setState({ navSurface: 'dashboard', dashboardDestination: 'shared' })
     renderDashboard()
 
-    expect(main().getByText(/needs the server planned for phase 18/)).toBeInTheDocument()
+    // the index exists from 18.4; with no server reachable here the page
+    // still says what it cannot list, naming the real reason
+    expect(main().getByText(/needs a database and a signed-in session/)).toBeInTheDocument()
     // and it does NOT say nobody shared anything
     expect(main().queryByText(/Nothing shared/i)).toBeNull()
   })
@@ -131,10 +133,12 @@ describe('Invites', () => {
 
     fireEvent.click(screen.getByRole('tab', { name: 'Received' }))
 
-    // 18.1 moved the constraint rather than removing it: the record is on the
-    // server now, and what is missing is the index that answers "what is
-    // waiting for my address" (18.4, #91)
-    expect(main().getByText(/that index is phase 18.4/)).toBeInTheDocument()
+    // 18.4 reads this tab from the server. With none reachable the section is
+    // unavailable rather than empty — "nothing is waiting for you" is a claim
+    // this render is in no position to make
+    expect(
+      main().getByText(/needs a database and a signed-in session/),
+    ).toBeInTheDocument()
   })
 
   it('lists sent invitations, and still claims no delivery', () => {

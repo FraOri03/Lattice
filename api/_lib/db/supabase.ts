@@ -19,6 +19,7 @@ import type {
   InvitationRepository,
   MailSendRepository,
   MembershipRepository,
+  MembershipSlot,
   OtpRepository,
   Repositories,
   SessionRepository,
@@ -386,40 +387,65 @@ class SupabaseMembershipRepository implements MembershipRepository {
   }
 
   /**
-   * Two queries rather than one `or(...)` filter: the address goes into a
+   * Two queries rather than one `or(...)` filter: an address goes into a
    * PostgREST filter expression as text, and keeping it out of one avoids
-   * having to reason about quoting rules for a value a stranger chose.
+   * having to reason about quoting rules for values a stranger chose.
+   *
+   * `.in()` takes the list as a parameter rather than splicing it into an
+   * expression, which is why the address query is safe with several.
    */
-  async projectsOf(userIds: string[], email: string): Promise<string[]> {
-    const clean = email.toLowerCase()
-    type ProjectIdRow = { project_id: string }
-    const queries: PromiseLike<ProjectIdRow[]>[] = []
+  async slotsOf(userIds: string[], emails: string[]): Promise<MembershipSlot[]> {
+    const clean = emails.map((e) => e.toLowerCase()).filter(Boolean)
+    const queries: PromiseLike<MembershipRow[]>[] = []
 
     if (userIds.length) {
       queries.push(
         this.db
           .from(MEMBERSHIPS)
-          .select('project_id')
+          .select('*')
           .in('user_id', userIds)
-          .then((r) => unwrap<ProjectIdRow[]>(r as Result<ProjectIdRow[]>, 'projects by userId') ?? []),
+          .then((r) => unwrap<MembershipRow[]>(r as Result<MembershipRow[]>, 'slots by userId') ?? []),
       )
     }
-    if (clean) {
+    if (clean.length) {
       queries.push(
         this.db
           .from(MEMBERSHIPS)
-          .select('project_id')
-          .eq('email', clean)
+          .select('*')
+          .in('email', clean)
+          // unclaimed only: a slot somebody else has claimed answers to
+          // their userId now, not to the address it was opened with
           .is('user_id', null)
-          .then((r) => unwrap<ProjectIdRow[]>(r as Result<ProjectIdRow[]>, 'projects by address') ?? []),
+          .then((r) => unwrap<MembershipRow[]>(r as Result<MembershipRow[]>, 'slots by address') ?? []),
       )
     }
 
     const rows = (await Promise.all(queries)).flat()
     return dedupe(
-      rows.map((r) => r.project_id),
-      (id) => id,
+      rows.map((r) => ({
+        projectId: r.project_id,
+        email: r.email,
+        role: r.role as CollabRole,
+        userId: r.user_id,
+      })),
+      (slot) => `${slot.projectId}:${slot.email}`,
     )
+  }
+
+  async ownersOf(projectIds: string[]): Promise<Record<string, string>> {
+    if (!projectIds.length) return {}
+    const rows =
+      unwrap<MembershipRow[]>(
+        await this.db
+          .from(MEMBERSHIPS)
+          .select('*')
+          .in('project_id', projectIds)
+          .eq('role', 'owner'),
+        'owners of projects',
+      ) ?? []
+    const out: Record<string, string> = {}
+    for (const row of rows) out[row.project_id] = row.email
+    return out
   }
 
   async removeProject(projectId: string): Promise<void> {

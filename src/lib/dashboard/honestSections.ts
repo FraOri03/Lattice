@@ -25,19 +25,37 @@ export interface ProjectFacts {
 }
 
 /**
- * How a shared project reached this browser. 13.3 settles that these are the
- * only two paths, and that each row must say which one it is reading.
+ * How a shared project reached this reader.
+ *
+ * 13.3 settled that there were only two paths and that each row must say
+ * which one it is reading. 18.4 adds the third it was waiting for: the
+ * server index, which knows about projects this device has never held.
  */
-export type SharedScope = 'browser' | 'drive'
+export type SharedScope = 'browser' | 'drive' | 'server'
 
 export interface SharedProject {
   projectId: string
-  name: string
+  /**
+   * Null when only the server knows about it. Postgres holds memberships,
+   * not projects — titles live in Yjs and Drive — so a project this device
+   * has never opened has no name to show, and inventing one would be worse
+   * than saying so.
+   */
+  name: string | null
   icon: string
   /** My role in it — never `owner`, or it would not be shared *with* me. */
   role: Exclude<CollabRole, 'owner'>
+  /** 0 when unknown, which is the case for a server-only row. */
   updatedAt: number
   scope: SharedScope
+}
+
+/** One membership as `/api/shared` reports it (18.4). */
+export interface ServerShared {
+  projectId: string
+  role: Exclude<CollabRole, 'owner'>
+  ownerEmail: string
+  claimed: boolean
 }
 
 export interface SharedGroup {
@@ -65,6 +83,7 @@ export function collectShared(
   members: Record<string, ProjectMember[]>,
   myUserId: string,
   scope: SharedScope,
+  server: ServerShared[] = [],
 ): SharedGroup[] {
   const groups = new Map<string, SharedGroup>()
 
@@ -95,11 +114,41 @@ export function collectShared(
     groups.set(key, group)
   }
 
+  /**
+   * What only the server knows (18.4).
+   *
+   * A project already found above is left alone: this device holds it, so it
+   * has a name, an icon and a real timestamp, and the server would only
+   * repeat the membership. The rows added here are the ones the page could
+   * never show before — shared with you, and not on this device.
+   */
+  const alreadyListed = new Set(
+    [...groups.values()].flatMap((g) => g.items.map((i) => i.projectId)),
+  )
+  for (const entry of server) {
+    if (alreadyListed.has(entry.projectId)) continue
+    const key = entry.ownerEmail || '__unknown__'
+    const group = groups.get(key) ?? {
+      ownerName: null,
+      ownerEmail: entry.ownerEmail || null,
+      items: [],
+    }
+    group.items.push({
+      projectId: entry.projectId,
+      name: null,
+      icon: '',
+      role: entry.role,
+      updatedAt: 0,
+      scope: 'server',
+    })
+    groups.set(key, group)
+  }
+
   for (const group of groups.values()) {
     group.items.sort((a, b) => b.updatedAt - a.updatedAt)
   }
   return [...groups.values()].sort((a, b) =>
-    (a.ownerName ?? '￿').localeCompare(b.ownerName ?? '￿'),
+    (a.ownerName ?? a.ownerEmail ?? '￿').localeCompare(b.ownerName ?? b.ownerEmail ?? '￿'),
   )
 }
 

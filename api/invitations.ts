@@ -195,6 +195,47 @@ async function deliver(
   }
 }
 
+/**
+ * Every address a caller has PROVED, and nothing they merely claim.
+ *
+ * 16.1's rule, applied wherever an action is authorised by who somebody is
+ * rather than by a token they hold: an unverified identity carrying an
+ * address must never reach what was offered to the person who owns it.
+ */
+export async function provenAddresses(
+  db: Repositories,
+  identity: VerifiedIdentity,
+): Promise<{ caller: string; addresses: Set<string> }> {
+  const user = await db.identities.userByVerifiedEmail(identity.email)
+  const held = user ? await db.identities.identitiesOf(user.id) : []
+  return {
+    caller: user?.id ?? '',
+    addresses: new Set(
+      held.filter((i) => i.verifiedAt !== null && i.email).map((i) => i.email),
+    ),
+  }
+}
+
+/**
+ * An invitation named by ID rather than by link, scoped to the caller.
+ *
+ * The lookup goes through "what is pending for the addresses this caller has
+ * proved" rather than through a by-id read, so an id can only ever reach an
+ * invitation that was already theirs. An id is short and appears in
+ * listings; it is not a credential and must not behave like one.
+ */
+async function invitationOfCaller(
+  db: Repositories,
+  identity: VerifiedIdentity,
+  inviteId: string,
+): Promise<ProjectInvite | null> {
+  const { addresses } = await provenAddresses(db, identity)
+  const mine = (
+    await Promise.all([...addresses].map((a) => db.invitations.pendingFor(a)))
+  ).flat()
+  return mine.find((i) => i.id === inviteId) ?? null
+}
+
 /** The one an action names, once it is settled and known to be this project's. */
 async function inviteOfProject(
   db: Repositories,
@@ -236,11 +277,33 @@ export default async function handler(req: ApiRequest, res: ApiRes): Promise<voi
    */
   if (action === 'resolve' || action === 'decline') {
     const token = typeof body.token === 'string' ? body.token : ''
-    if (!token || token.length > 512) {
+    const inviteId = typeof body.inviteId === 'string' ? body.inviteId : ''
+    let found: ProjectInvite | null = null
+
+    if (token) {
+      if (token.length > 512) {
+        sendError(res, 400, 'Invalid token.')
+        return
+      }
+      found = await db.invitations.byTokenHash(hashToken(token))
+    } else if (action === 'decline' && inviteId) {
+      /**
+       * Declining from the dashboard (18.4), where the invitation was
+       * listed rather than opened and there is no link to present.
+       *
+       * This path DOES need an identity, and it looks the id up only among
+       * invitations addressed to the caller — the same rule acceptance
+       * uses, for the same reason: an id appears in listings and is not a
+       * credential, so it must never reach an invitation that is not theirs.
+       */
+      const identity = await requireIdentity(req, res, body.googleToken)
+      if (!identity) return
+      found = await invitationOfCaller(db, identity, inviteId)
+    } else {
       sendError(res, 400, 'Invalid token.')
       return
     }
-    const found = await db.invitations.byTokenHash(hashToken(token))
+
     if (!found) {
       sendError(res, 404, 'This invitation link is not valid.')
       return
@@ -278,27 +341,13 @@ export default async function handler(req: ApiRequest, res: ApiRes): Promise<voi
    * says which offer is being answered; it never says who is answering.
    */
   if (action === 'accept') {
-    const token = typeof body.token === 'string' ? body.token : ''
-    if (!token || token.length > 512) {
-      sendError(res, 400, 'Invalid token.')
-      return
-    }
-    const found = await db.invitations.byTokenHash(hashToken(token))
-    if (!found) {
-      sendError(res, 404, 'This invitation link is not valid.')
-      return
-    }
-    const invite = await settle(db, found, now)
-    if (!isLive(invite, now)) {
-      sendError(res, 409, `This invitation is ${effectiveStatus(invite, now)}.`)
-      return
-    }
-
     const identity = await requireIdentity(req, res, body.googleToken)
     if (!identity) return
 
     /**
-     * Only a VERIFIED identity resolves, which is the whole check: an
+     * Every address this caller has proved.
+     *
+     * Only VERIFIED identities resolve, which is the whole check: an
      * unverified claim on an address must never be able to inherit what was
      * offered to the person who actually owns it.
      *
@@ -308,12 +357,38 @@ export default async function handler(req: ApiRequest, res: ApiRes): Promise<voi
      * would mean telling somebody they cannot accept an invitation sent to
      * their own mailbox.
      */
-    const caller = await db.identities.userByVerifiedEmail(identity.email)
-    const owned = caller ? await db.identities.identitiesOf(caller.id) : []
-    const proves = owned.some(
-      (held) => held.email === invite.email && held.verifiedAt !== null,
-    )
-    if (!caller || !proves) {
+    const { caller, addresses } = await provenAddresses(db, identity)
+
+    const token = typeof body.token === 'string' ? body.token : ''
+    const inviteId = typeof body.inviteId === 'string' ? body.inviteId : ''
+    let found: ProjectInvite | null = null
+
+    if (token) {
+      if (token.length > 512) {
+        sendError(res, 400, 'Invalid token.')
+        return
+      }
+      found = await db.invitations.byTokenHash(hashToken(token))
+    } else if (inviteId) {
+      // accepting from the dashboard (18.4): listed rather than opened, so
+      // there is no link to present
+      found = await invitationOfCaller(db, identity, inviteId)
+    } else {
+      sendError(res, 400, 'An invitation link or id is required.')
+      return
+    }
+
+    if (!found) {
+      sendError(res, 404, 'This invitation is not valid.')
+      return
+    }
+    const invite = await settle(db, found, now)
+    if (!isLive(invite, now)) {
+      sendError(res, 409, `This invitation is ${effectiveStatus(invite, now)}.`)
+      return
+    }
+
+    if (!caller || !addresses.has(invite.email)) {
       sendError(
         res,
         403,
@@ -340,7 +415,7 @@ export default async function handler(req: ApiRequest, res: ApiRes): Promise<voi
      * with.
      */
     await db.memberships.setRole(invite.projectId, invite.email, invite.role)
-    await db.memberships.bind(invite.projectId, invite.email, caller.id)
+    await db.memberships.bind(invite.projectId, invite.email, caller)
 
     const lb = liveblocksClient()
     if (lb) {
@@ -355,7 +430,7 @@ export default async function handler(req: ApiRequest, res: ApiRes): Promise<voi
     const accepted = await db.invitations.patch(invite.id, {
       status: 'accepted',
       acceptedAt: now,
-      acceptedBy: caller.id,
+      acceptedBy: caller,
     })
     res.status(200).json({
       invite: redact(accepted ?? invite, now),

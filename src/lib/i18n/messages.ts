@@ -594,8 +594,12 @@ export const en = {
       scopeBrowserWhy: 'Shared inside this browser profile — visible on this device only.',
       scopeDriveWhy: 'Reaching you through the owner’s Google Drive folder.',
       unknownOwner: 'Owner not recorded',
+      notHereYet: 'Not on this device yet',
+      scopeServer: 'server',
+      scopeServerWhy:
+        'The server knows you are a member. The project itself has not reached this device, so it has no name here yet — open it from a device that holds it, or wait for Drive to sync.',
       whyPartial:
-        'Only projects whose data already reaches this browser can be listed — shared inside this profile, or through a Drive folder you both hold. A full index of everything shared with you needs the server planned for phase 18.',
+        'Only projects whose data already reaches this browser can be listed — shared inside this profile, or through a Drive folder you both hold. The full index needs a database and a signed-in session; this deployment has neither.',
       empty: 'No one has shared a project into this browser or this Drive folder.',
       grants: {
         admin: 'Manages members, roles and project settings. Cannot delete the project.',
@@ -609,7 +613,17 @@ export const en = {
       received: 'Received',
       sent: 'Sent',
       whyNoInbox:
-        'An invitation is a server record from phase 18.1, but nothing yet asks the server what is waiting for your address — that index is phase 18.4. Until then you learn of an invitation by opening its link.',
+        'Invitations waiting for you are read from the server, which needs a database and a signed-in session. This deployment has neither, so you learn of an invitation by opening its link.',
+      receivedIntro: (addresses: string) =>
+        `Invitations waiting for the addresses you have verified: ${addresses}.`,
+      receivedEmpty: 'Nothing is waiting for you.',
+      loading: 'Looking…',
+      invitedBy: (who: string, role: string) => `${who} invited you as ${role}`,
+      expires: (when: string) => `expires ${when}`,
+      accept: 'Accept',
+      decline: 'Decline',
+      accepted: 'Invitation accepted',
+      answerFailed: 'That invitation could not be answered',
       sentIntro:
         'Invitations you issued, gathered from the projects this device holds. Delivery is manual: copy the link and send it yourself.',
       sentEmpty: 'You haven’t invited anyone from this device yet.',
@@ -1664,8 +1678,12 @@ export const it: Catalog = {
         'Condiviso dentro questo profilo browser — visibile solo su questo dispositivo.',
       scopeDriveWhy: 'Ti arriva attraverso la cartella Google Drive del proprietario.',
       unknownOwner: 'Proprietario non registrato',
+      notHereYet: 'Non ancora su questo dispositivo',
+      scopeServer: 'server',
+      scopeServerWhy:
+        'Il server sa che sei un membro. Il progetto non è ancora arrivato su questo dispositivo, quindi qui non ha un nome: aprilo da un dispositivo che lo contiene, o aspetta la sincronizzazione con Drive.',
       whyPartial:
-        'Si possono elencare solo i progetti i cui dati arrivano già a questo browser — condivisi dentro questo profilo, o attraverso una cartella Drive che avete entrambi. Un indice completo di tutto ciò che ti è stato condiviso richiede il server previsto per la fase 18.',
+        'Si possono elencare solo i progetti i cui dati arrivano già a questo browser — condivisi dentro questo profilo, o attraverso una cartella Drive che avete entrambi. L’indice completo richiede un database e una sessione attiva: questo deployment non ha né l’uno né l’altra.',
       empty: 'Nessuno ha condiviso un progetto dentro questo browser o questa cartella Drive.',
       grants: {
         admin:
@@ -1680,7 +1698,17 @@ export const it: Catalog = {
       received: 'Ricevuti',
       sent: 'Inviati',
       whyNoInbox:
-        'Dalla fase 18.1 un invito è un record sul server, ma nessuno chiede ancora al server che cosa sta aspettando il tuo indirizzo: quell’indice è la fase 18.4. Fino ad allora scopri un invito aprendone il link.',
+        'Gli inviti in attesa si leggono dal server, che richiede un database e una sessione attiva. Questo deployment non ha né l’uno né l’altra, quindi scopri un invito aprendone il link.',
+      receivedIntro: (addresses) =>
+        `Inviti in attesa per gli indirizzi che hai verificato: ${addresses}.`,
+      receivedEmpty: 'Non c’è nulla in attesa per te.',
+      loading: 'Cerco…',
+      invitedBy: (who, role) => `${who} ti ha invitato come ${role}`,
+      expires: (when) => `scade ${when}`,
+      accept: 'Accetta',
+      decline: 'Rifiuta',
+      accepted: 'Invito accettato',
+      answerFailed: 'Non è stato possibile rispondere a questo invito',
       sentIntro:
         'Gli inviti che hai emesso, raccolti dai progetti che questo dispositivo contiene. La consegna è manuale: copia il link e mandalo tu.',
       sentEmpty: 'Non hai ancora invitato nessuno da questo dispositivo.',

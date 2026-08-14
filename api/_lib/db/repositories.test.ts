@@ -189,21 +189,50 @@ describe('MembershipRepository — the ACL, in rows', () => {
     )
   })
 
-  it('lists the projects a person is a member of, by binding and by address', async () => {
+  it('lists the slots a person holds, by binding and by address, with their roles', async () => {
     await db.memberships.setRole('p1', 'grace@example.com', 'editor')
     await db.memberships.bind('p1', 'grace@example.com', 'usr_grace')
     await db.memberships.setRole('p2', 'grace@example.com', 'viewer') // unclaimed
     await db.memberships.setRole('p3', 'someone@else.com', 'viewer')
 
-    expect((await db.memberships.projectsOf(['usr_grace'], 'grace@example.com')).sort()).toEqual(
-      ['p1', 'p2'],
+    const slots = await db.memberships.slotsOf(['usr_grace'], ['grace@example.com'])
+    expect(slots.map((s) => `${s.projectId}:${s.role}`).sort()).toEqual([
+      'p1:editor',
+      'p2:viewer',
+    ])
+  })
+
+  it('finds a project shared with any of the addresses an account holds', async () => {
+    // 16.1 lets one account hold several verified identities, and a project
+    // shared with either of them is shared with the same person
+    await db.memberships.setRole('p1', 'work@example.com', 'editor')
+    await db.memberships.setRole('p2', 'home@example.com', 'viewer')
+
+    const slots = await db.memberships.slotsOf(
+      [],
+      ['work@example.com', 'home@example.com'],
     )
+    expect(slots.map((s) => s.projectId).sort()).toEqual(['p1', 'p2'])
   })
 
   it('does not report a bound slot to someone who merely holds the address', async () => {
     await db.memberships.setRole('p1', 'grace@example.com', 'editor')
     await db.memberships.bind('p1', 'grace@example.com', 'usr_grace')
-    expect(await db.memberships.projectsOf([], 'grace@example.com')).toEqual([])
+    expect(await db.memberships.slotsOf([], ['grace@example.com'])).toEqual([])
+  })
+
+  it('names the owner of each project, for grouping', async () => {
+    await db.memberships.replaceAcl('p1', acl)
+    await db.memberships.setRole('p2', 'other@example.com', 'owner')
+
+    expect(await db.memberships.ownersOf(['p1', 'p2', 'p3'])).toEqual({
+      p1: acl.ownerEmail,
+      p2: 'other@example.com',
+    })
+  })
+
+  it('asks nothing when there are no projects to ask about', async () => {
+    expect(await db.memberships.ownersOf([])).toEqual({})
   })
 
   it('drops every membership when a project goes', async () => {

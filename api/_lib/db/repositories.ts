@@ -84,6 +84,16 @@ export interface IdentityRepository {
 
 /* ---------------- membership ---------------- */
 
+/** One ACL slot as the shared-projects index reads it (Phase 18.4, #91). */
+export interface MembershipSlot {
+  projectId: string
+  /** The address the slot was opened with. */
+  email: string
+  role: CollabRole
+  /** The userId that claimed it, or null while nobody has. */
+  userId: string | null
+}
+
 /**
  * The project ACL, in the storage the 16.3 decision picked for it.
  *
@@ -121,13 +131,28 @@ export interface MembershipRepository {
   bind(projectId: string, email: string, userId: string): Promise<void>
 
   /**
-   * Every project this person is a member of — by binding, or by an
-   * address nobody has claimed yet.
+   * Every slot this person holds — by binding, or by an address nobody has
+   * claimed yet.
    *
-   * This is what "Shared with me" needs and what no store can answer
-   * today: a browser can only see its own memberships.
+   * This is what "Shared with me" needs and what no store can answer: a
+   * browser only ever sees its own memberships.
+   *
+   * Several addresses, not one, because 16.1 lets an account hold more than
+   * one verified identity and a project shared with either of them is
+   * shared with the same person. The role travels with the row rather than
+   * being fetched per project afterwards: the dashboard needs it for every
+   * entry, and one query that already knows it beats N that ask again.
    */
-  projectsOf(userIds: string[], email: string): Promise<string[]>
+  slotsOf(userIds: string[], emails: string[]): Promise<MembershipSlot[]>
+
+  /**
+   * Who owns each of these projects, keyed by projectId.
+   *
+   * "Shared with me" groups by the person on the other side, and the owner
+   * is the only slot that identifies them. One query for the whole page,
+   * rather than an ACL load per row.
+   */
+  ownersOf(projectIds: string[]): Promise<Record<string, string>>
 
   /** Drop every membership of a project — the project itself is gone. */
   removeProject(projectId: string): Promise<void>

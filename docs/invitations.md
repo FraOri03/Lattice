@@ -156,10 +156,10 @@ localisation and the ceilings. What 18.1 produces — the record, the deadline
 and the link — is unchanged by it.
 
 **"What is waiting for my address."**
-[18.4 (#91)](https://github.com/FraOri03/Lattice/issues/91) owns that index.
-`InvitationRepository.pendingFor()` has existed since 17.1 and is still not
-exposed, which is why the dashboard's Received tab is still honestly
-unavailable.
+[18.4 (#91)](https://github.com/FraOri03/Lattice/issues/91) owns that index and
+has since shipped — `/api/shared` answers it, and the dashboard's Received tab
+lists real invitations you can accept without the link. See
+[shared-index.md](shared-index.md).
 
 ## The local tier did not go away
 

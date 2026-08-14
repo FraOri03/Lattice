@@ -73,12 +73,15 @@ _Tracked in [#10](https://github.com/FraOri03/Lattice/issues/10)._
 - **The theme reveal needs View Transitions** (Chromium today). Elsewhere — and in a
   hidden/backgrounded tab, where the API is skipped by the browser — day ⇄ night falls
   back to a colour crossfade. Reduced motion gets neither.
-- **The dashboard shows this browser's projects only.** 11.2 shipped the Home screen —
-  the active workspace's projects, grouped starred/recent/active/archived, reached from
-  the product mark in the sidebar. "Shared with me", pending invites and Trash are absent
-  on purpose: each needs an index no single browser holds, so they arrive with the server
-  (13.4). Recent files are cross-project and say which project they come from; entries
-  whose entity is gone, or that predate project ids, are dropped rather than guessed at.
+- **The dashboard reads "Shared with me" and pending invites from the server** (18.4,
+  [shared-index.md](shared-index.md)) — the index no single browser could hold. It needs a
+  database and a signed-in session; without either, both sections say so rather than
+  claiming nothing was shared with you. A project the index names but this device has
+  never held appears without a name, because titles live in Yjs and Drive and never reach
+  the database that knows the membership. Trash is still absent
+  ([#115](https://github.com/FraOri03/Lattice/issues/115)). Recent files are cross-project
+  and say which project they come from; entries whose entity is gone, or that predate
+  project ids, are dropped rather than guessed at.
 - ~~**"Board" is overloaded** … Split behaves like a layout but is presented as a peer
   mode.~~ **Fixed** (`LAT-7`/`NAV-2`/`IA-1`): Split is now a layout toggle in
   `workspaceLayoutStore` and Graph is a content view; neither is a section. See

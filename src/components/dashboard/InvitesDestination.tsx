@@ -4,7 +4,9 @@ import { useCollabStore } from '@/lib/collab/collabStore'
 import { inviteService } from '@/lib/collab/InviteService'
 import { useI18n, useTimeAgo } from '@/lib/i18n'
 import { collectSentInvites } from '@/lib/dashboard/honestSections'
+import { sharedIndex, useSharedIndex } from '@/lib/dashboard/sharedIndex'
 import { ROLE_LABEL } from '@/types/collab'
+import { toast } from '@/components/ui/Toaster'
 import { SectionStateBlock } from './SectionStateBlock'
 import { IcCheck, IcClock, IcCopy, IcX } from '@/components/Icons'
 
@@ -27,6 +29,95 @@ import { IcCheck, IcClock, IcCopy, IcX } from '@/components/Icons'
  * `inviteService.linkFor()` actually does — copy the link and send it yourself
  * — and the page says so instead of implying a mail was sent.
  */
+/**
+ * Received — real from 18.4.
+ *
+ * It listed nothing before, and could not: the recipient's copy of an
+ * invitation existed nowhere, on any device. `/api/shared` answers "what is
+ * waiting for my address" from the server, for every address this account has
+ * verified — so a row here is an invitation, not a guess.
+ *
+ * Accepting needs no link. 18.3's gate is the address, and it is satisfied by
+ * the same verified identities that produced this list; the token proves a
+ * mailbox received something, which this reader has already proved otherwise.
+ */
+function ReceivedTab() {
+  const t = useI18n()
+  const timeAgo = useTimeAgo()
+  const { index, loading, unavailable, loaded } = useSharedIndex()
+  const [busy, setBusy] = useState<string | null>(null)
+
+  /**
+   * Until an answer arrives, this section cannot be shown — and "not yet
+   * asked" reads the same as "cannot be asked". Rendering the empty state
+   * early would claim nothing is waiting for you, which is a different thing
+   * from not knowing.
+   */
+  if (!loaded || unavailable) {
+    return (
+      <SectionStateBlock
+        state="unavailable"
+        what={t.destinations.title.invites}
+        body={loading ? t.honest.invites.loading : t.honest.invites.whyNoInbox}
+      />
+    )
+  }
+
+  const answer = async (inviteId: string, accept: boolean) => {
+    setBusy(inviteId)
+    const result = accept
+      ? await sharedIndex.accept(inviteId)
+      : await sharedIndex.decline(inviteId)
+    setBusy(null)
+    if (!result.ok) toast.error(t.honest.invites.answerFailed, result.error)
+    else if (accept) toast.success(t.honest.invites.accepted)
+  }
+
+  if (!index.invitations.length) {
+    return <p className="mt-4 text-[11.5px] text-muted">{t.honest.invites.receivedEmpty}</p>
+  }
+
+  return (
+    <>
+      <p className="mt-4 rounded-xl border border-bord bg-panel p-3 text-[11.5px] text-muted">
+        {t.honest.invites.receivedIntro(index.addresses.join(', '))}
+      </p>
+      <ul className="mt-3 flex flex-col gap-1.5">
+        {index.invitations.map((invite) => (
+          <li
+            key={invite.id}
+            className="flex flex-wrap items-center gap-2 rounded-xl border border-bord bg-panel px-3 py-2"
+          >
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[12.5px] font-medium">
+                {t.honest.invites.invitedBy(invite.invitedByName, ROLE_LABEL[invite.role])}
+              </span>
+              <span className="block truncate text-[10.5px] text-muted">
+                {invite.email} · {t.honest.invites.expires(timeAgo(invite.expiresAt))}
+              </span>
+            </span>
+            <button
+              className="btn btn-primary flex-none"
+              disabled={busy === invite.id}
+              onClick={() => void answer(invite.id, true)}
+            >
+              <IcCheck size={11} />
+              {t.honest.invites.accept}
+            </button>
+            <button
+              className="btn flex-none"
+              disabled={busy === invite.id}
+              onClick={() => void answer(invite.id, false)}
+            >
+              {t.honest.invites.decline}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </>
+  )
+}
+
 export function InvitesDestination() {
   const t = useI18n()
   const timeAgo = useTimeAgo()
@@ -73,11 +164,7 @@ export function InvitesDestination() {
       </div>
 
       {tab === 'received' ? (
-        <SectionStateBlock
-          state="unavailable"
-          what={t.destinations.title.invites}
-          body={t.honest.invites.whyNoInbox}
-        />
+        <ReceivedTab />
       ) : (
         <>
           <p className="mt-4 rounded-xl border border-bord bg-panel p-3 text-[11.5px] text-muted">

@@ -18,6 +18,7 @@ import type {
   InvitationRepository,
   MailSendRepository,
   MembershipRepository,
+  MembershipSlot,
   OtpRepository,
   Repositories,
   SessionRepository,
@@ -270,15 +271,30 @@ class MemoryMembershipRepository implements MembershipRepository {
     row.updated_at = toIso(Date.now())
   }
 
-  async projectsOf(userIds: string[], email: string): Promise<string[]> {
-    const clean = email.toLowerCase()
-    const hits = this.db.memberships.filter((r) =>
-      r.user_id ? userIds.includes(r.user_id) : !!clean && r.email === clean,
-    )
-    return dedupe(
-      hits.map((r) => r.project_id),
-      (id) => id,
-    )
+  async slotsOf(userIds: string[], emails: string[]): Promise<MembershipSlot[]> {
+    const clean = emails.map((e) => e.toLowerCase()).filter(Boolean)
+    return this.db.memberships
+      .filter((r) =>
+        // a claimed slot answers to its userId and to nothing else — 16.2's
+        // rule, and the reason a reassigned address inherits nothing
+        r.user_id ? userIds.includes(r.user_id) : clean.includes(r.email),
+      )
+      .map((r) => ({
+        projectId: r.project_id,
+        email: r.email,
+        role: r.role as CollabRole,
+        userId: r.user_id,
+      }))
+  }
+
+  async ownersOf(projectIds: string[]): Promise<Record<string, string>> {
+    const out: Record<string, string> = {}
+    for (const row of this.db.memberships) {
+      if (row.role === 'owner' && projectIds.includes(row.project_id)) {
+        out[row.project_id] = row.email
+      }
+    }
+    return out
   }
 
   async removeProject(projectId: string): Promise<void> {
