@@ -65,16 +65,29 @@ function installGis(): void {
   }
 }
 
-/** A signed-in user whose Drive consent was granted, token since expired. */
+/**
+ * A signed-in user whose Drive consent was granted and who holds no live
+ * token — which since 17.2 (#85) is simply the state after any reload: the
+ * token lives in memory, and what persists is the consent flag rather than
+ * the credential.
+ */
 function seedExpiredSession(): void {
   localStorage.setItem(
     'lattice-account',
     JSON.stringify({ id: 'acc_1', name: 'Tester', email: 't@example.com' }),
   )
-  localStorage.setItem(
-    'lattice-google-token',
-    JSON.stringify({ accessToken: 'stale', expiresAt: Date.now() - 1000 }),
-  )
+  localStorage.setItem('lattice-drive-consent', '1')
+}
+
+/**
+ * Drive the mock GIS once, so a real token lands in memory. The gesture
+ * comes first: with user activation already present, the silent refresh
+ * runs straight away instead of arming a retry.
+ */
+async function landToken(service: AuthService): Promise<void> {
+  window.dispatchEvent(new Event('pointerdown'))
+  await service.getAccessToken()
+  await vi.waitFor(() => expect(service.peekToken()).not.toBeNull())
 }
 
 let authService: AuthService
@@ -167,18 +180,48 @@ describe('background token refresh', () => {
     expect(new Set(tokens)).toEqual(new Set(['tok-1']))
   })
 
-  it('serves a live token without touching Google', async () => {
+  it('serves a live token from memory without touching Google again', async () => {
+    seedExpiredSession()
+    await landToken(authService)
+    expect(prompts).toHaveLength(1)
+
+    // the token is cached in the field, so further callers cost nothing
+    expect(await authService.getAccessToken()).toBe('tok-1')
+    expect(await authService.getAccessToken()).toBe('tok-1')
+    expect(prompts).toHaveLength(1)
+  })
+
+  /**
+   * The regression that made the consent flag necessary: with the token in
+   * memory, every reload starts with no token, and treating that as "the
+   * grant is gone" would have demanded a reconnect on every single load.
+   */
+  it('does not mistake a reload for a lost Drive grant', async () => {
+    seedExpiredSession()
+
+    expect(await authService.getAccessToken()).toBeNull()
+    expect(authService.needsReauth()).toBe(false)
+  })
+
+  it('does ask for a reconnect when consent was never granted here', async () => {
     localStorage.setItem(
       'lattice-account',
       JSON.stringify({ id: 'acc_1', name: 'Tester', email: 't@example.com' }),
     )
-    localStorage.setItem(
-      'lattice-google-token',
-      JSON.stringify({ accessToken: 'live', expiresAt: Date.now() + 3_600_000 }),
-    )
+    // no consent flag: this browser has never completed the Drive grant
+    expect(await authService.getAccessToken()).toBeNull()
+    expect(authService.needsReauth()).toBe(true)
+  })
 
-    expect(await authService.getAccessToken()).toBe('live')
-    expect(prompts).toEqual([])
+  it('keeps no OAuth token in browser storage', async () => {
+    seedExpiredSession()
+    await landToken(authService)
+
+    // the whole point of #85: a live token exists, and none of it is on disk
+    expect(authService.peekToken()?.accessToken).toBe('tok-1')
+    const dumped = JSON.stringify(localStorage)
+    expect(dumped).not.toContain('tok-1')
+    expect(localStorage.getItem('lattice-google-token')).toBeNull()
   })
 
   it('preselects the signed-in account so the renewal stays silent', async () => {

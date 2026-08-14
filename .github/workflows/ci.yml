@@ -27,3 +27,8 @@ jobs:
         run: npm test
       - name: Build
         run: npm run build
+      # 17.4 (#87) — every VITE_-prefixed variable is compiled into the
+      # bundle at build time, so this is the gate that keeps a server-side
+      # secret from being published by a build nobody thought to review.
+      - name: Check no secrets reached the client bundle
+        run: npm run check:secrets

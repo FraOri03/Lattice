@@ -30,6 +30,60 @@ All notable changes to Lattice are recorded here. The format follows
 
 ### Added
 
+- **A build can no longer publish a secret by accident.** Lattice compiles every
+  `VITE_`-prefixed setting straight into the JavaScript it serves — that is how the browser
+  gets its configuration, and it means one wrong prefix on a database key would hand that key
+  to every visitor, silently, in a file nobody re-reads. There is now a check that runs on
+  every build in CI and refuses to pass if anything secret reached the bundle: it catches a
+  secret that was merely *named* wrongly before it ever holds a value, catches a real
+  credential from the deploy environment appearing verbatim in the output, and catches keys
+  pasted straight into source. It is equally careful about the opposite mistake — the keys
+  that are meant to be public stay unflagged, because a check that cries wolf is a check
+  people switch off. Alongside it, the environment layout across local, preview and
+  production is written down, along with how to rotate each key without an outage.
+  See [docs/deploy-and-secrets.md](docs/deploy-and-secrets.md).
+
+- **You can sign in with your e-mail address now, no password anywhere.** Type the address,
+  get a six-digit code, type it back — and if that address is one you had already used with
+  Google, you land in *the same account*, not a second empty one beside it. That convergence
+  is the whole reason identity was rebuilt two phases ago. The flow is deliberately
+  tight-lipped: it answers exactly the same whether the address has an account, has never
+  been seen, or has asked too many times in the last hour, so nobody can use the login form
+  to find out who has a Lattice account. Codes last ten minutes, work once, are invalidated
+  the moment you ask for another, and die after five wrong guesses. One honest gap: an
+  e-mail sign-in brings no Google Drive token, so cloud sync stays off until the account
+  connects Drive — the screen says so rather than pretending. Sending needs a mail provider
+  configured; without one the option says it is unavailable instead of silently swallowing
+  the request. See [docs/email-otp.md](docs/email-otp.md).
+
+- **Signing in is Lattice's own now, and signing out actually works.** Until now the app
+  proved who you were by sending your Google token with every single request, which meant a
+  Google credential doubled as Lattice's credential, it sat in browser storage where any
+  script on the page could read it, and "sign out" could only forget things locally — there
+  was nothing to revoke, because Lattice had never issued anything. Sign-in now trades that
+  Google token, once, for a session the server issues and keeps in a cookie the browser
+  cannot read, cannot leak through a script, and the server can end. That makes two things
+  possible that simply were not before: signing out for real, on this device or on **all** of
+  them at once. The Google token stays only in memory, and only Google Drive still needs it —
+  realtime collaboration no longer waits for it, so a Drive session that is expired or
+  refreshing no longer keeps you disconnected from a document. A deployment with no database
+  configured keeps working exactly as before. See [docs/sessions.md](docs/sessions.md).
+
+- **A database, and a seam that keeps it replaceable.** Until now the only server-side state
+  Lattice had was Liveblocks room metadata, and who you are was re-derived from a Google
+  token on every request — which is why an invitation had to reach the exact mailbox you
+  sign in with, why "shared with me" could not exist, and why your identity could not
+  outlive your browser's local storage. There is now a Postgres schema for the four things
+  that need to be true for everyone rather than true in one browser: people, their proven
+  sign-in methods, project memberships and the invitations that open them. Document content
+  is deliberately *not* among them and never will be — docs, boards, sheets, code and
+  presentations stay in Yjs, Liveblocks and Drive. The rest of the code reaches all of it
+  through four interfaces rather than through Supabase, with two real implementations behind
+  them and one test suite that runs against both, so the database is a dependency the app
+  can put down. Nothing reads these tables yet: this phase is the schema and the seam, and
+  the endpoints move onto them next. A deployment with no database configured keeps working
+  exactly as it did before. See [docs/database.md](docs/database.md).
+
 - **Who you are stopped being how you signed in.** Until now your account id was built
   from your Google account: identity was literally derived from the provider, so a second
   way of signing in would have created a second you, and there was no id a permission could

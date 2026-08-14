@@ -1,4 +1,7 @@
+import { useState } from 'react'
 import { useAccount } from '@/lib/auth/AccountProvider'
+import { requestEmailCode } from '@/lib/auth/emailSignIn'
+import { OTP_LENGTH, OTP_TTL_MS } from '@/types/otp'
 import { env } from '@/lib/env'
 import { IcAlert, IcCloud, IcDrive, IcGithub, IcShield } from '@/components/Icons'
 import { LatticeLogotypeTM, LatticeMark } from '@/components/Brand'
@@ -67,6 +70,8 @@ export function LoginScreen() {
           <p className="mt-2 text-[11px] text-[#f24822]">{error}</p>
         )}
 
+        <EmailSignIn />
+
         <button
           className="mt-3 w-full cursor-pointer rounded-md px-2 py-2 text-center text-xs text-muted hover:text-ink"
           onClick={skipLogin}
@@ -91,6 +96,143 @@ export function LoginScreen() {
           </ul>
         </div>
       </div>
+    </div>
+  )
+}
+
+/**
+ * E-mail sign-in (17.3, #86): address, then a six-digit code.
+ *
+ * Two things this deliberately never says: whether the address has an
+ * account, and whether the code was actually delivered. Both would turn
+ * the form into a way to ask "is this person a Lattice user?" one address
+ * at a time, so the confirmation is the same sentence either way — which
+ * is also why the code field appears without waiting to hear that anything
+ * was sent.
+ */
+function EmailSignIn() {
+  const { signInWithCode } = useAccount()
+  const [open, setOpen] = useState(false)
+  const [email, setEmail] = useState('')
+  const [code, setCode] = useState('')
+  const [stage, setStage] = useState<'address' | 'code'>('address')
+  const [busy, setBusy] = useState(false)
+  const [note, setNote] = useState<string | null>(null)
+  const [failure, setFailure] = useState<string | null>(null)
+
+  const sendCode = async () => {
+    setBusy(true)
+    setFailure(null)
+    const result = await requestEmailCode(email)
+    setBusy(false)
+    if (result === 'unavailable') {
+      // about the SERVER, not about the address — safe to say plainly
+      setFailure('E-mail sign-in is not configured on this server.')
+      return
+    }
+    if (result === 'error') {
+      setFailure('Could not reach the server. Try again.')
+      return
+    }
+    setStage('code')
+    setNote(
+      `If ${email} can receive mail, a ${OTP_LENGTH}-digit code is on its way. ` +
+        `It expires in ${Math.round(OTP_TTL_MS / 60000)} minutes.`,
+    )
+  }
+
+  const verify = async () => {
+    setBusy(true)
+    setFailure(null)
+    try {
+      await signInWithCode(email, code)
+    } catch (err) {
+      setFailure(err instanceof Error ? err.message : 'That code is not valid.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (!open) {
+    return (
+      <button
+        className="mt-3 w-full cursor-pointer rounded-md px-2 py-2 text-center text-xs text-muted hover:text-ink"
+        onClick={() => setOpen(true)}
+      >
+        Sign in with an e-mail code instead
+      </button>
+    )
+  }
+
+  return (
+    <div className="mt-3 rounded-lg border border-bord p-3">
+      <label className="block text-[11px] text-muted" htmlFor="otp-email">
+        E-mail address
+      </label>
+      <input
+        id="otp-email"
+        type="email"
+        autoComplete="email"
+        className="field mt-1 w-full text-[13px]"
+        value={email}
+        disabled={stage === 'code' || busy}
+        onChange={(e) => setEmail(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && email) void sendCode()
+        }}
+      />
+
+      {stage === 'code' && (
+        <>
+          <label className="mt-3 block text-[11px] text-muted" htmlFor="otp-code">
+            Six-digit code
+          </label>
+          <input
+            id="otp-code"
+            // one-time-code lets a phone offer the code from the mail app
+            autoComplete="one-time-code"
+            inputMode="numeric"
+            maxLength={OTP_LENGTH}
+            className="field mt-1 w-full tracking-[0.3em] text-[13px]"
+            value={code}
+            disabled={busy}
+            onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && code.length === OTP_LENGTH) void verify()
+            }}
+          />
+        </>
+      )}
+
+      {note && <p className="mt-2 text-[11px] text-muted">{note}</p>}
+      {failure && <p className="mt-2 text-[11px] text-[#f24822]">{failure}</p>}
+
+      <button
+        className="btn mt-3 w-full justify-center py-2 text-[13px]"
+        disabled={busy || (stage === 'address' ? !email : code.length !== OTP_LENGTH)}
+        onClick={() => void (stage === 'address' ? sendCode() : verify())}
+      >
+        {busy
+          ? 'Working…'
+          : stage === 'address'
+            ? 'Send me a code'
+            : 'Sign in'}
+      </button>
+
+      {stage === 'code' && (
+        <button
+          className="mt-2 w-full cursor-pointer text-center text-[11px] text-muted hover:text-ink"
+          disabled={busy}
+          onClick={() => {
+            setStage('address')
+            setCode('')
+            setNote(null)
+            setFailure(null)
+          }}
+        >
+          Use a different address
+        </button>
+      )}
     </div>
   )
 }

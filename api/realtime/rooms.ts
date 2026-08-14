@@ -28,6 +28,7 @@ import {
   canManageRole,
 } from '../../src/lib/collab/permissions.js'
 import type { CollabRole } from '../../src/types/collab.js'
+import type { ApiRequest } from '../_lib/session.js'
 
 /**
  * POST /api/realtime/rooms — project room lifecycle + membership ACL.
@@ -50,10 +51,10 @@ import type { CollabRole } from '../../src/types/collab.js'
  * src/lib/collab/acl.ts.
  */
 
-interface Req {
-  method?: string
-  body?: unknown
-}
+/**
+ * Headers matter now: 17.2 reads the session cookie and the CSRF token off
+ * this request, so the local shape is the shared `ApiRequest`.
+ */
 
 const VALID_ROLES: CollabRole[] = ['owner', 'admin', 'editor', 'commenter', 'viewer']
 
@@ -93,7 +94,7 @@ async function writeAcl(
   await lb.updateRoom(collabRoomId(projectId), { metadata })
 }
 
-export default async function handler(req: Req, res: ApiRes): Promise<void> {
+export default async function handler(req: ApiRequest, res: ApiRes): Promise<void> {
   res.setHeader('Cache-Control', 'no-store')
   if (req.method !== 'POST') {
     sendError(res, 405, 'POST only.')
@@ -117,7 +118,7 @@ export default async function handler(req: Req, res: ApiRes): Promise<void> {
     return
   }
 
-  const identity = await requireIdentity(res, body.googleToken)
+  const identity = await requireIdentity(req, res, body.googleToken)
   if (!identity) return
   const principal = principalOf(identity)
   /** The id a slot this caller claims is bound to, once they claim one. */

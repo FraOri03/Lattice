@@ -13,6 +13,7 @@ import {
   mediaCapabilitiesFor,
   type MediaCapabilities,
 } from '../../src/lib/media/mediaPermissions.js'
+import type { ApiRequest } from '../_lib/session.js'
 
 /**
  * POST /api/realtime/media-token — mint a LiveKit access token for a project
@@ -38,10 +39,10 @@ import {
  * server-side membership to check and honestly reports 501.
  */
 
-interface Req {
-  method?: string
-  body?: unknown
-}
+/**
+ * Headers matter now: 17.2 reads the session cookie and the CSRF token off
+ * this request, so the local shape is the shared `ApiRequest`.
+ */
 
 /** Long enough for a working session; the client re-requests when it expires. */
 const TOKEN_TTL = '2h'
@@ -65,7 +66,7 @@ function publishableSources(capabilities: MediaCapabilities): TrackSource[] {
   return sources
 }
 
-export default async function handler(req: Req, res: ApiRes): Promise<void> {
+export default async function handler(req: ApiRequest, res: ApiRes): Promise<void> {
   res.setHeader('Cache-Control', 'no-store')
   if (req.method !== 'POST') {
     sendError(res, 405, 'POST only.')
@@ -103,7 +104,7 @@ export default async function handler(req: Req, res: ApiRes): Promise<void> {
     return
   }
 
-  const identity = await requireIdentity(res, body.googleToken)
+  const identity = await requireIdentity(req, res, body.googleToken)
   if (!identity) return
 
   const acl = await loadAcl(lb, projectId)

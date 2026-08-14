@@ -1,5 +1,6 @@
 import { env, hasMediaCalls } from '@/lib/env'
 import { authService } from '@/lib/auth/AuthService'
+import { NotAuthenticatedError, sessionClient } from '@/lib/auth/sessionClient'
 import type { CollabRole } from '@/types/collab'
 import type { MediaCapabilities } from './mediaPermissions'
 
@@ -48,15 +49,14 @@ export function mediaUnavailableMessage(reason: MediaUnavailableReason): string 
  * configured) so the UI never invents a reason.
  */
 export async function fetchMediaGrant(projectId: string): Promise<MediaGrant> {
-  const googleToken = await authService.getAccessToken()
-  if (!googleToken) {
-    throw new Error(mediaUnavailableMessage('signed-out'))
-  }
-  const res = await fetch(env.mediaTokenUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ projectId, googleToken }),
-  })
+  const res = await sessionClient
+    .post(env.mediaTokenUrl, { projectId }, () => authService.getAccessToken())
+    .catch((err: unknown) => {
+      if (err instanceof NotAuthenticatedError) {
+        throw new Error(mediaUnavailableMessage('signed-out'))
+      }
+      throw err
+    })
   const body = (await res.json().catch(() => null)) as
     | (Partial<MediaGrant> & { error?: string })
     | null

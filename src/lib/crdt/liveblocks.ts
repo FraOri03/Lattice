@@ -2,6 +2,7 @@ import { createClient, type Client } from '@liveblocks/client'
 import { LiveblocksYjsProvider } from '@liveblocks/yjs'
 import type { CollabMessage, CollabRole, PresencePeer } from '@/types/collab'
 import { authService } from '@/lib/auth/AuthService'
+import { sessionClient } from '@/lib/auth/sessionClient'
 import { env } from '@/lib/env'
 import { SESSION_ID } from '@/lib/collab/CollaborationProvider'
 import { collabRoomId, contentRoomId } from '@/lib/collab/roleAccess'
@@ -17,10 +18,12 @@ import type { ProjectRoom } from './ProjectRoom'
  * carries presence (every role may write presence) and the collab room
  * carries CollabMessage broadcast frames (locks, durable-state fan-out).
  *
- * Authentication is delegated to /api/realtime/auth: the client sends its
- * Google OAuth access token, the endpoint verifies it against Google and
- * the project's room ACL, and Liveblocks enforces the resulting scopes on
- * every websocket operation — a tampered client cannot exceed its role.
+ * Authentication is delegated to /api/realtime/auth. From 17.2 the caller
+ * is identified by the Lattice session cookie, with the Google token kept
+ * as a fallback for a browser that has not exchanged one yet; either way
+ * the endpoint decides the role from the project's room ACL, and Liveblocks
+ * enforces the resulting scopes on every websocket operation — a tampered
+ * client cannot exceed its role.
  */
 
 let client: Client | null = null
@@ -47,12 +50,11 @@ function getClient(): Client {
   if (client) return client
   client = createClient({
     authEndpoint: async (roomId?: string) => {
-      const googleToken = await requireGoogleToken()
-      const res = await fetch(env.realtimeAuthUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ room: roomId, googleToken }),
-      })
+      const res = await sessionClient.post(
+        env.realtimeAuthUrl,
+        { room: roomId },
+        requireGoogleToken,
+      )
       const body = (await res.json().catch(() => null)) as
         | { token?: string; error?: string }
         | null
@@ -70,12 +72,11 @@ async function ensureServerRooms(
   projectId: string,
   projectName: string,
 ): Promise<CollabRole> {
-  const googleToken = await requireGoogleToken()
-  const res = await fetch(env.realtimeRoomsUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'ensure', projectId, projectName, googleToken }),
-  })
+  const res = await sessionClient.post(
+    env.realtimeRoomsUrl,
+    { action: 'ensure', projectId, projectName },
+    requireGoogleToken,
+  )
   const body = (await res.json().catch(() => null)) as
     | { role?: CollabRole; error?: string }
     | null

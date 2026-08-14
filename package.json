@@ -8,6 +8,7 @@
     "build": "npm run typecheck && vite build",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.api.json",
     "test": "vitest run",
+    "check:secrets": "node scripts/check-bundle-secrets.mjs",
     "preview": "vite preview",
     "graph:build": "python -m graphify update ."
   },
@@ -19,6 +20,7 @@
     "@liveblocks/yjs": "^3.22.0",
     "@livekit/components-react": "^2.9.23",
     "@monaco-editor/react": "^4.7.0",
+    "@supabase/supabase-js": "^2.112.3",
     "@tiptap/core": "^2.14.0",
     "@tiptap/extension-collaboration": "^2.27.2",
     "@tiptap/extension-collaboration-cursor": "^2.26.2",
