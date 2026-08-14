@@ -1,0 +1,18 @@
+# Files that must not reach a deployment.
+#
+# Vercel turns EVERY file under `api/` into a Serverless Function unless its
+# name starts with `_`. That silently included the colocated test files, so a
+# repository with 7 endpoints was deploying 14 functions — and the Hobby plan
+# allows 12. Phase 18.4 added the seventh endpoint and its test, crossed the
+# line, and the deployment failed with nothing in the diff that looked like a
+# deployment concern.
+#
+# The count is the reason this file exists, but not the only one: a test file
+# deployed as a function is a public route. `/api/session.test` answering
+# anything at all is not a thing anyone asked for.
+#
+# Consequence worth knowing: these files are not uploaded, so the Vercel build
+# does not typecheck them. `npm run typecheck` and CI still do, on the whole
+# tree — that is where an api test's types are checked.
+api/*.test.ts
+api/**/*.test.ts
