@@ -4,8 +4,8 @@ import {
   sectionToViewMode,
   viewModeToSection,
   type WorkspaceSection,
-} from './workspace'
-import type { ViewMode } from './model'
+} from './workspace.js'
+import type { ViewMode } from './model.js'
 
 /**
  * The section model of the call-and-toolbar IA refactor: Split is a layout and
