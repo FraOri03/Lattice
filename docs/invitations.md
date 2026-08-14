@@ -108,8 +108,10 @@ have replaced. So `resolve` reports and grants nothing, and a link resolved
 from the server shows the invitation and stops.
 
 **Delivery.** [18.2 (#89)](https://github.com/FraOri03/Lattice/issues/89) owns
-the mail. This endpoint produces the record and the link; nothing yet sends
-them.
+the mail, and has since shipped: `create` and `resend` send the invitation and
+report `delivery` next to it. See [mail.md](mail.md) for the templates, the
+localisation and the ceilings. What 18.1 produces — the record, the deadline
+and the link — is unchanged by it.
 
 **"What is waiting for my address."**
 [18.4 (#91)](https://github.com/FraOri03/Lattice/issues/91) owns that index.

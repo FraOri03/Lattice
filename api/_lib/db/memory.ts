@@ -10,11 +10,13 @@ import type { Entitlement } from '../../../src/types/entitlement.js'
 import { freeEntitlement } from '../../../src/types/entitlement.js'
 import type { Session } from '../../../src/types/session.js'
 import type { OtpCode } from '../../../src/types/otpRecord.js'
+import type { MailSend } from '../../../src/types/mail.js'
 import type { RoomAcl } from '../../../src/lib/collab/acl.js'
 import type {
   EntitlementRepository,
   IdentityRepository,
   InvitationRepository,
+  MailSendRepository,
   MembershipRepository,
   OtpRepository,
   Repositories,
@@ -24,10 +26,12 @@ import {
   aclFromRows,
   entitlementFromRow,
   entitlementToRow,
+  fromIso,
   identityFromRow,
   identityToRow,
   inviteFromRow,
   inviteToRow,
+  mailSendToRow,
   rowsFromAcl,
   otpFromRow,
   otpToRow,
@@ -39,6 +43,7 @@ import {
   type EntitlementRow,
   type IdentityRow,
   type InvitationRow,
+  type MailSendRow,
   type MembershipRow,
   type OtpRow,
   type SessionRow,
@@ -73,6 +78,7 @@ export class MemoryDatabase {
   entitlements: EntitlementRow[] = []
   sessions: SessionRow[] = []
   otp: OtpRow[] = []
+  mailSends: MailSendRow[] = []
 
   clear(): void {
     this.users = []
@@ -82,6 +88,7 @@ export class MemoryDatabase {
     this.entitlements = []
     this.sessions = []
     this.otp = []
+    this.mailSends = []
   }
 }
 
@@ -93,9 +100,34 @@ export class MemoryRepositories implements Repositories {
   readonly entitlements: EntitlementRepository = new MemoryEntitlementRepository(this.data)
   readonly sessions: SessionRepository = new MemorySessionRepository(this.data)
   readonly otp: OtpRepository = new MemoryOtpRepository(this.data)
+  readonly mailSends: MailSendRepository = new MemoryMailSendRepository(this.data)
 
   clear(): void {
     this.data.clear()
+  }
+}
+
+/* ---------------- mail sends ---------------- */
+
+class MemoryMailSendRepository implements MailSendRepository {
+  constructor(private db: MemoryDatabase) {}
+
+  async record(send: MailSend): Promise<void> {
+    this.db.mailSends.push(mailSendToRow(send))
+  }
+
+  async countForRecipient(recipient: string, since: number): Promise<number> {
+    const clean = recipient.toLowerCase()
+    return this.db.mailSends.filter(
+      (r) => r.recipient === clean && fromIso(r.created_at) >= since,
+    ).length
+  }
+
+  async countForScope(scope: string, since: number): Promise<number> {
+    if (!scope) return 0
+    return this.db.mailSends.filter(
+      (r) => r.scope === scope && fromIso(r.created_at) >= since,
+    ).length
   }
 }
 

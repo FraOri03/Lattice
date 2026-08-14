@@ -22,9 +22,15 @@ import { loadStoredAccount, storeAccount } from './AuthService'
 
 export type CodeRequest = 'sent' | 'unavailable' | 'error'
 
-/** Ask for a code. See `sessionClient.requestEmailCode` on what 'sent' means. */
-export function requestEmailCode(email: string): Promise<CodeRequest> {
-  return sessionClient.requestEmailCode(email.trim().toLowerCase())
+/**
+ * Ask for a code. See `sessionClient.requestEmailCode` on what 'sent' means.
+ *
+ * `locale` only chooses which language the message is written in (18.2). It
+ * is the sender's UI language because that is the only signal available — an
+ * address says nothing about what its owner reads.
+ */
+export function requestEmailCode(email: string, locale?: string): Promise<CodeRequest> {
+  return sessionClient.requestEmailCode(email.trim().toLowerCase(), locale)
 }
 
 /**

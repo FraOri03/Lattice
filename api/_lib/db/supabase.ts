@@ -11,11 +11,13 @@ import type { Entitlement } from '../../../src/types/entitlement.js'
 import { freeEntitlement } from '../../../src/types/entitlement.js'
 import type { Session } from '../../../src/types/session.js'
 import type { OtpCode } from '../../../src/types/otpRecord.js'
+import type { MailSend } from '../../../src/types/mail.js'
 import type { RoomAcl } from '../../../src/lib/collab/acl.js'
 import type {
   EntitlementRepository,
   IdentityRepository,
   InvitationRepository,
+  MailSendRepository,
   MembershipRepository,
   OtpRepository,
   Repositories,
@@ -29,6 +31,7 @@ import {
   identityToRow,
   inviteFromRow,
   inviteToRow,
+  mailSendToRow,
   rowsFromAcl,
   otpFromRow,
   otpToRow,
@@ -69,6 +72,7 @@ const INVITATIONS = 'project_invitations'
 const ENTITLEMENTS = 'entitlements'
 const SESSIONS = 'sessions'
 const OTP = 'email_otp_codes'
+const MAIL_SENDS = 'mail_sends'
 
 /** Postgres unique-violation; the only conflict this layer expects to lose. */
 const UNIQUE_VIOLATION = '23505'
@@ -92,6 +96,7 @@ export class SupabaseRepositories implements Repositories {
   readonly entitlements: EntitlementRepository
   readonly sessions: SessionRepository
   readonly otp: OtpRepository
+  readonly mailSends: MailSendRepository
 
   constructor(client: SupabaseClient) {
     this.identities = new SupabaseIdentityRepository(client)
@@ -100,6 +105,50 @@ export class SupabaseRepositories implements Repositories {
     this.entitlements = new SupabaseEntitlementRepository(client)
     this.sessions = new SupabaseSessionRepository(client)
     this.otp = new SupabaseOtpRepository(client)
+    this.mailSends = new SupabaseMailSendRepository(client)
+  }
+}
+
+/* ---------------- mail sends ---------------- */
+
+class SupabaseMailSendRepository implements MailSendRepository {
+  constructor(private db: SupabaseClient) {}
+
+  async record(send: MailSend): Promise<void> {
+    unwrap(
+      await this.db.from(MAIL_SENDS).insert(mailSendToRow(send)),
+      'record mail send',
+    )
+  }
+
+  async countForRecipient(recipient: string, since: number): Promise<number> {
+    return this.countWhere('recipient', recipient.toLowerCase(), since)
+  }
+
+  async countForScope(scope: string, since: number): Promise<number> {
+    if (!scope) return 0
+    return this.countWhere('scope', scope, since)
+  }
+
+  /**
+   * `head: true` with an exact count: the rows themselves are never wanted,
+   * only how many there are, and shipping an hour of them across the wire to
+   * call `.length` on it would be the same answer at a worse price.
+   */
+  private async countWhere(
+    column: 'recipient' | 'scope',
+    value: string,
+    since: number,
+  ): Promise<number> {
+    const result = await this.db
+      .from(MAIL_SENDS)
+      .select('id', { count: 'exact', head: true })
+      .eq(column, value)
+      .gte('created_at', toIso(since))
+    if (result.error) {
+      throw new Error(`[db] count mail sends failed: ${result.error.message}`)
+    }
+    return result.count ?? 0
   }
 }
 

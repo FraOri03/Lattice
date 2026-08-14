@@ -1,5 +1,7 @@
 import { nid } from '@/lib/id'
 import type { CollabRole, ProjectInvite } from '@/types/collab'
+import type { MailDelivery } from '@/types/mail'
+import { useStore } from '@/store/useStore'
 import { authService } from '@/lib/auth/AuthService'
 import { NotAuthenticatedError, sessionClient } from '@/lib/auth/sessionClient'
 import { useCollabStore } from './collabStore'
@@ -61,6 +63,12 @@ export interface InviteResult {
   invite?: ProjectInvite
   /** The server's own words when it refused; absent for a local rejection. */
   error?: string
+  /**
+   * What became of the message (18.2). Absent on the local tier, where no
+   * message was ever attempted — which is a different thing from one that
+   * could not be sent, and the UI says so differently.
+   */
+  delivery?: MailDelivery
 }
 
 /**
@@ -225,11 +233,16 @@ class InviteService {
     )
     if (existing) return { ok: true, invite: existing }
 
-    const reply = await this.ask<{ invite: ProjectInvite; token: string | null }>({
+    const reply = await this.ask<{
+      invite: ProjectInvite
+      token: string | null
+      delivery?: MailDelivery
+    }>({
       action: 'create',
       projectId,
       email: clean,
       role,
+      ...this.messageContext(projectId),
     })
     if (reply && !reply.ok) return { ok: false, error: reply.error }
 
@@ -244,7 +257,24 @@ class InviteService {
     void import('./ServerAclService').then(({ serverAcl }) =>
       serverAcl.setRole(projectId, clean, role),
     )
-    return { ok: true, invite }
+    return { ok: true, invite, delivery: reply?.ok ? reply.data.delivery : undefined }
+  }
+
+  /**
+   * What the message needs and the server cannot know (18.2).
+   *
+   * Postgres holds memberships, not projects, so the project's name lives
+   * only here; and an address says nothing about what language its owner
+   * reads, so the sender's UI language is the only signal there is. Both are
+   * used for the body of the mail and for nothing else — no decision is made
+   * from either.
+   */
+  private messageContext(projectId: string): Record<string, unknown> {
+    const state = useStore.getState()
+    return {
+      projectName: state.projects[projectId]?.name ?? '',
+      locale: state.locale,
+    }
   }
 
   /**
@@ -261,6 +291,7 @@ class InviteService {
       action: 'resend',
       projectId,
       inviteId,
+      ...this.messageContext(projectId),
     })
     if (reply?.ok) {
       const updated = { ...reply.data.invite, token: reply.data.token }

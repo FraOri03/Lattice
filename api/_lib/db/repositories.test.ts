@@ -4,6 +4,7 @@ import { aclFromRows, rowsFromAcl } from './rows.js'
 import { resolveClaim } from '../../../src/lib/auth/identity.js'
 import type { IdentityClaim } from '../../../src/types/identity.js'
 import type { ProjectInvite } from '../../../src/types/collab.js'
+import type { MailSend } from '../../../src/types/mail.js'
 import type { RoomAcl } from '../../../src/lib/collab/acl.js'
 import { roleOf } from '../../../src/lib/collab/acl.js'
 
@@ -306,6 +307,49 @@ describe('InvitationRepository', () => {
 
   it('answers null when patching something that is not there', async () => {
     expect(await db.invitations.patch('nope', { status: 'revoked' })).toBeNull()
+  })
+})
+
+describe('MailSendRepository', () => {
+  const NOW = 1_700_000_000_000
+
+  const send = (over: Partial<MailSend> = {}): MailSend => ({
+    id: `mls_${Math.random().toString(36).slice(2)}`,
+    kind: 'invitation',
+    recipient: 'grace@example.com',
+    scope: 'p1',
+    createdAt: NOW,
+    ...over,
+  })
+
+  it('counts what an address has been sent', async () => {
+    await db.mailSends.record(send())
+    await db.mailSends.record(send())
+    expect(await db.mailSends.countForRecipient('grace@example.com', NOW - 1)).toBe(2)
+  })
+
+  it('counts by address regardless of case', async () => {
+    await db.mailSends.record(send({ recipient: 'GRACE@Example.com' }))
+    expect(await db.mailSends.countForRecipient('grace@example.com', NOW - 1)).toBe(1)
+  })
+
+  it('counts what a project has sent, to anyone', async () => {
+    await db.mailSends.record(send({ recipient: 'a@example.com' }))
+    await db.mailSends.record(send({ recipient: 'b@example.com' }))
+    await db.mailSends.record(send({ recipient: 'c@example.com', scope: 'p2' }))
+    expect(await db.mailSends.countForScope('p1', NOW - 1)).toBe(2)
+    expect(await db.mailSends.countForScope('p2', NOW - 1)).toBe(1)
+  })
+
+  it('excludes anything older than the window', async () => {
+    await db.mailSends.record(send({ createdAt: NOW - 10_000 }))
+    expect(await db.mailSends.countForRecipient('grace@example.com', NOW)).toBe(0)
+  })
+
+  it('never attributes a scopeless message to a project', async () => {
+    await db.mailSends.record(send({ kind: 'sign-in-code', scope: '' }))
+    expect(await db.mailSends.countForScope('', NOW - 1)).toBe(0)
+    expect(await db.mailSends.countForRecipient('grace@example.com', NOW - 1)).toBe(1)
   })
 })
 

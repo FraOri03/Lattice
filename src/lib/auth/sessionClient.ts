@@ -139,13 +139,18 @@ class SessionClient {
    * distinguishable outcome is `'unavailable'`, which is about the SERVER
    * having no mail transport and says nothing about the address.
    */
-  async requestEmailCode(email: string): Promise<'sent' | 'unavailable' | 'error'> {
+  async requestEmailCode(
+    email: string,
+    locale?: string,
+  ): Promise<'sent' | 'unavailable' | 'error'> {
     try {
       const res = await fetch(SESSION_URL, {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'otp-request', email }),
+        // the language the message is written in, and nothing else: it is
+        // never used to decide anything, so a wrong one costs a translation
+        body: JSON.stringify({ action: 'otp-request', email, locale }),
       })
       if (res.status === 501) return 'unavailable'
       return res.ok ? 'sent' : 'error'

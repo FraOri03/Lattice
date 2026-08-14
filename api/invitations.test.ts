@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRepositories } from './_lib/db/memory.js'
 import { hashToken } from './_lib/session.js'
 import { INVITE_TTL_MS } from '../src/lib/collab/invitations.js'
+import { recordSend } from './_lib/mailLimits.js'
+import { MAIL_MAX_PER_PROJECT, MAIL_MAX_PER_RECIPIENT } from '../src/types/mail.js'
 import type { RoomAcl } from '../src/lib/collab/acl.js'
 import type { ProjectInvite } from '../src/types/collab.js'
 
@@ -21,6 +23,23 @@ let databasePresent = true
 vi.mock('./_lib/db/index.js', () => ({
   repositories: () => (databasePresent ? db : null),
   NO_DATABASE: 'no database is configured',
+}))
+
+/** Every message the endpoint tried to send, newest last. */
+const outbox: { to: string; subject: string; text: string; html?: string }[] = []
+let mailConfigured = true
+let mailFails = false
+
+vi.mock('./_lib/mail.js', () => ({
+  mailSender: () =>
+    mailConfigured
+      ? {
+          send: async (message: { to: string; subject: string; text: string; html?: string }) => {
+            if (mailFails) throw new Error('provider said no')
+            outbox.push(message)
+          },
+        }
+      : null,
 }))
 
 const handler = (await import('./invitations.js')).default
@@ -62,7 +81,11 @@ function signedInAs(email: string, name = 'Ada'): void {
 
 async function call(body: unknown): Promise<Sent> {
   const { res, sent } = makeRes()
-  await handler({ method: 'POST', body }, res)
+  // the Host header is where the invite link and the logo URL come from
+  await handler(
+    { method: 'POST', body, headers: { host: 'lattice.example.com' } },
+    res,
+  )
   return sent
 }
 
@@ -98,6 +121,9 @@ async function seedInvite(over: Record<string, unknown> = {}) {
 
 beforeEach(async () => {
   databasePresent = true
+  mailConfigured = true
+  mailFails = false
+  outbox.length = 0
   db.clear()
   await db.memberships.replaceAcl('proj_1', acl())
 })
@@ -435,6 +461,114 @@ describe('set-role before acceptance', () => {
       googleToken: 'ya29',
     })
     expect(sent.code).toBe(404)
+  })
+})
+
+describe('delivery (18.2)', () => {
+  it('e-mails the invited address and says the message went', async () => {
+    const { sent, invite, token } = await seedInvite({ projectName: 'Acme redesign' })
+
+    expect((sent.body as { delivery: string }).delivery).toBe('sent')
+    expect(outbox).toHaveLength(1)
+    expect(outbox[0].to).toBe('grace@example.com')
+    expect(outbox[0].subject).toContain('Acme redesign')
+    // the link carries the token that was just minted, at this deployment
+    expect(outbox[0].text).toContain(`https://lattice.example.com/#invite=${token}`)
+    expect(outbox[0].html).toContain('https://lattice.example.com/brand/lattice-mark.png')
+    expect(invite.token).toBeUndefined()
+  })
+
+  it('writes the message in the language the caller asked for', async () => {
+    await seedInvite({ projectName: 'Acme', locale: 'it' })
+    expect(outbox[0].subject).toContain('ti ha invitato')
+  })
+
+  it('reports a failed send without failing the request', async () => {
+    mailFails = true
+    const { sent, token } = await seedInvite()
+
+    // the invitation and its link are valid either way, so this is a state
+    // to report rather than an error to raise
+    expect(sent.code).toBe(201)
+    expect((sent.body as { delivery: string }).delivery).toBe('failed')
+    expect(token).toBeTruthy()
+  })
+
+  it('says delivery is unavailable when the server has no transport', async () => {
+    mailConfigured = false
+    const { sent } = await seedInvite()
+    expect(sent.code).toBe(201)
+    expect((sent.body as { delivery: string }).delivery).toBe('unavailable')
+    expect(outbox).toHaveLength(0)
+  })
+
+  it('sends again on resend, with the rotated token', async () => {
+    const first = await seedInvite()
+    signedInAs('owner@example.com', 'Owner')
+    const sent = await call({
+      action: 'resend',
+      projectId: 'proj_1',
+      inviteId: first.invite.id,
+      googleToken: 'ya29',
+    })
+    const fresh = tokenOf(sent) as string
+
+    expect(outbox).toHaveLength(2)
+    expect(outbox[1].text).toContain(fresh)
+    expect(outbox[1].text).not.toContain(first.token)
+  })
+
+  it('does not send for an address that already had an invitation open', async () => {
+    await seedInvite()
+    await seedInvite()
+    // the second create returned the existing record and no link, so there
+    // was nothing to put in a message
+    expect(outbox).toHaveLength(1)
+  })
+})
+
+describe('rate limiting (18.2)', () => {
+  it('refuses once the address has had its hour’s worth', async () => {
+    for (let i = 0; i < MAIL_MAX_PER_RECIPIENT; i += 1) {
+      await recordSend(db.mailSends, 'invitation', 'grace@example.com', `other_${i}`)
+    }
+    const { sent } = await seedInvite()
+
+    expect(sent.code).toBe(429)
+    expect(outbox).toHaveLength(0)
+  })
+
+  it('refuses a project that has sent too much, whoever the address is', async () => {
+    for (let i = 0; i < MAIL_MAX_PER_PROJECT; i += 1) {
+      await recordSend(db.mailSends, 'invitation', `p${i}@example.com`, 'proj_1')
+    }
+    const { sent } = await seedInvite()
+    expect(sent.code).toBe(429)
+  })
+
+  it('creates no invitation when it refuses', async () => {
+    for (let i = 0; i < MAIL_MAX_PER_RECIPIENT; i += 1) {
+      await recordSend(db.mailSends, 'invitation', 'grace@example.com', `other_${i}`)
+    }
+    await seedInvite()
+    // a record the sender believes they made, with nothing delivered, is
+    // worse than a refusal they can act on
+    expect(await db.invitations.ofProject('proj_1')).toEqual([])
+  })
+
+  it('counts a send that failed, so retrying is not a way around the ceiling', async () => {
+    mailFails = true
+    await seedInvite()
+    expect(await db.mailSends.countForRecipient('grace@example.com', 0)).toBe(1)
+  })
+
+  it('does not limit anything when there is no transport to limit', async () => {
+    mailConfigured = false
+    for (let i = 0; i < MAIL_MAX_PER_RECIPIENT + 3; i += 1) {
+      await recordSend(db.mailSends, 'invitation', 'grace@example.com', `other_${i}`)
+    }
+    const { sent } = await seedInvite()
+    expect(sent.code).toBe(201)
   })
 })
 

@@ -331,11 +331,23 @@ export function ShareDialog() {
       }
       setEmail('')
       const link = inviteService.linkFor(result.invite)
-      if (link) {
-        void navigator.clipboard.writeText(link)
-        toast.success(t.share.inviteCreated(result.invite.email), t.share.inviteCreatedBody)
+      if (link) void navigator.clipboard.writeText(link)
+      const address = result.invite.email
+      /**
+       * Three different things happened and the toast says which (18.2).
+       * "Sent" and "there is no mail backend" used to be the same sentence,
+       * which meant the one case where a message really failed looked
+       * exactly like success.
+       */
+      if (result.delivery === 'sent') {
+        toast.success(t.share.inviteEmailed(address), t.share.inviteEmailedBody)
+      } else if (result.delivery === 'failed') {
+        toast.warning(t.share.inviteMailFailed, t.share.inviteMailFailedBody)
       } else {
-        toast.success(t.share.inviteCreated(result.invite.email), t.share.noLinkBody)
+        toast.success(
+          t.share.inviteCreated(address),
+          link ? t.share.inviteCreatedBody : t.share.noLinkBody,
+        )
       }
     })
   }

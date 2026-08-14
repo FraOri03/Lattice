@@ -10,7 +10,7 @@ shaped it is [16.3](authorisation-phase-16-3.md); the model it stores is
 
 ## What lives here
 
-Seven tables, and they have one thing in common: they are small, rarely
+Eight tables, and they have one thing in common: they are small, rarely
 written, and security-critical.
 
 | Table | Holds |
@@ -22,6 +22,7 @@ written, and security-critical.
 | `entitlements` | account-level plan (storage seam only — Phase 27 owns billing) |
 | `sessions` | a Lattice-issued session; the cookie token is hashed, never stored ([17.2](sessions.md)) |
 | `email_otp_codes` | one-time sign-in codes, scrypt-hashed and rate-limited ([17.3](email-otp.md)) |
+| `mail_sends` | one row per message attempted — the evidence rate limits are counted from ([18.2](mail.md)) |
 
 **Document content is not here and will not be.** Docs, boards, sheets,
 code and presentations live in Yjs, Liveblocks and Google Drive. Postgres

@@ -7,7 +7,11 @@ import {
   type ApiRes,
   type VerifiedIdentity,
 } from './_lib/realtime.js'
-import { hashToken, mintToken, type ApiRequest } from './_lib/session.js'
+import { hashToken, mintToken, originOf, type ApiRequest } from './_lib/session.js'
+import { mailSender, type MailSender } from './_lib/mail.js'
+import { invitationMessage, normaliseLocale } from './_lib/mailTemplates.js'
+import { limitMessage, mailAllowance, recordSend } from './_lib/mailLimits.js'
+import type { MailDelivery } from '../src/types/mail.js'
 import { NO_DATABASE, repositories, type Repositories } from './_lib/db/index.js'
 import { roleOf, roleOfSlot, type RoomAcl } from '../src/lib/collab/acl.js'
 import { assignableRoles, can } from '../src/lib/collab/permissions.js'
@@ -69,6 +73,9 @@ interface Body {
   role?: unknown
   token?: unknown
   googleToken?: unknown
+  /** For the message only (18.2): what the project is called, and in which language. */
+  projectName?: unknown
+  locale?: unknown
 }
 
 /** An invitation may offer any role except ownership, which is transferred. */
@@ -125,6 +132,65 @@ async function settle(
   if (effectiveStatus(invite, now) !== 'expired') return invite
   const patched = await db.invitations.patch(invite.id, { status: 'expired' })
   return patched ?? { ...invite, status: 'expired' }
+}
+
+/**
+ * Send the invitation, and say what happened (Phase 18.2, #89).
+ *
+ * Delivery is reported rather than assumed, and it is deliberately NOT an
+ * error: the invitation and its link are valid in all three outcomes, so a
+ * failed send leaves the sender with something to copy instead of a request
+ * that looks like it did nothing. The UI decides what to say; this decides
+ * what is true.
+ *
+ * The project name comes from the caller, which is the only place it exists
+ * — Postgres holds memberships, not projects. It is therefore attacker-
+ * controlled text in a message a stranger reads, and the templates escape
+ * every interpolation for exactly that reason.
+ */
+async function deliver(
+  db: Repositories,
+  mail: MailSender | null,
+  invite: ProjectInvite,
+  token: string,
+  identity: VerifiedIdentity,
+  req: ApiRequest,
+  body: Body,
+  now: number,
+): Promise<MailDelivery> {
+  if (!mail) return 'unavailable'
+  const origin = originOf(req)
+  if (!origin) return 'unavailable'
+
+  const projectName =
+    typeof body.projectName === 'string' && body.projectName.trim()
+      ? body.projectName.trim().slice(0, 120)
+      : invite.projectId
+
+  // recorded before the attempt: a send that failed still consumed the
+  // sender's allowance, or retrying would be a way around the ceiling
+  await recordSend(db.mailSends, 'invitation', invite.email, invite.projectId, now)
+
+  try {
+    await mail.send(
+      invitationMessage({
+        to: invite.email,
+        projectName,
+        role: invite.role,
+        inviterName: identity.name || identity.email,
+        inviterEmail: identity.email,
+        expiresAt: invite.expiresAt,
+        link: `${origin}/#invite=${encodeURIComponent(token)}`,
+        origin,
+        locale: normaliseLocale(body.locale),
+      }),
+    )
+    return 'sent'
+  } catch (err) {
+    // the detail belongs in the logs; the caller gets a state, not a stack
+    console.warn('[invitations] delivery failed:', err)
+    return 'failed'
+  }
 }
 
 /** The one an action names, once it is settled and known to be this project's. */
@@ -259,6 +325,21 @@ export default async function handler(req: ApiRequest, res: ApiRes): Promise<voi
       )
       if (open) await settle(db, open, now)
 
+      /**
+       * Checked BEFORE the invitation exists. Creating a record and then
+       * refusing to deliver it would leave the sender an offer they think
+       * they made and the recipient nothing at all — a 429 they can act on
+       * is a better answer than a half-sent invitation.
+       */
+      const mail = mailSender()
+      if (mail) {
+        const allowance = await mailAllowance(db.mailSends, email, projectId, now)
+        if (!allowance.allowed) {
+          sendError(res, 429, limitMessage(allowance.reason))
+          return
+        }
+      }
+
       const token = mintToken()
       const draft: ProjectInvite = {
         id: nid('inv'),
@@ -284,9 +365,14 @@ export default async function handler(req: ApiRequest, res: ApiRes): Promise<voi
        * hand back a link that opens nothing.
        */
       const mine = stored.id === draft.id
+      const delivery = mine
+        ? await deliver(db, mail, stored, token, identity, req, body, now)
+        : // nothing was minted, so there is no link to put in a message
+          'unavailable'
       res.status(mine ? 201 : 200).json({
         invite: redact(stored, now),
         token: mine ? token : null,
+        delivery,
       })
       return
     }
@@ -309,6 +395,15 @@ export default async function handler(req: ApiRequest, res: ApiRes): Promise<voi
         sendError(res, 409, `This invitation is ${effectiveStatus(invite, now)}.`)
         return
       }
+      const mail = mailSender()
+      if (mail) {
+        // a resend is a message, and the ceiling counts messages
+        const allowance = await mailAllowance(db.mailSends, invite.email, projectId, now)
+        if (!allowance.allowed) {
+          sendError(res, 429, limitMessage(allowance.reason))
+          return
+        }
+      }
       /**
        * Resending ROTATES the token, and the previous link stops working.
        *
@@ -329,7 +424,8 @@ export default async function handler(req: ApiRequest, res: ApiRes): Promise<voi
         sendError(res, 404, 'No such invitation in this project.')
         return
       }
-      res.status(200).json({ invite: redact(updated, now), token })
+      const delivery = await deliver(db, mail, updated, token, identity, req, body, now)
+      res.status(200).json({ invite: redact(updated, now), token, delivery })
       return
     }
 

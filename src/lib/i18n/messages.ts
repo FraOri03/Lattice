@@ -182,6 +182,10 @@ export const en = {
     inviteCreated: (email: string) => `Invite created for ${email}`,
     inviteCreatedBody:
       'Link copied — send it yourself. It works wherever this project’s data is reachable (same browser, or same Drive).',
+    inviteEmailed: (email: string) => `Invitation e-mailed to ${email}`,
+    inviteEmailedBody: 'The link is on your clipboard too, if you would rather send it yourself.',
+    inviteMailFailed: 'The invitation exists, but the e-mail was not sent',
+    inviteMailFailedBody: 'The link is copied — send it yourself, or try resending later.',
     // member row
     you: '(you)',
     activeAgo: (ago: string) => `active ${ago}`,
@@ -1291,6 +1295,11 @@ export const it: Catalog = {
     invite: 'Invita',
     cannotManage: 'Il tuo ruolo non può gestire i membri.',
     invalidEmail: 'Indirizzo email non valido',
+    inviteEmailed: (email) => `Invito inviato per e-mail a ${email}`,
+    inviteEmailedBody: 'Il link è anche negli appunti, se preferisci mandarlo tu.',
+    inviteMailFailed: 'L’invito esiste, ma l’e-mail non è partita',
+    inviteMailFailedBody:
+      'Il link è copiato: mandalo tu, oppure riprova a reinviare più tardi.',
     inviteCreated: (email) => `Invito creato per ${email}`,
     inviteCreatedBody:
       'Link copiato — invialo tu. Funziona ovunque i dati del progetto siano raggiungibili (stesso browser o stesso Drive).',

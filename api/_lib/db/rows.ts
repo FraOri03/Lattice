@@ -9,6 +9,7 @@ import type { RoomAcl } from '../../../src/lib/collab/acl.js'
 import type { UsageType } from '../../../src/types/model.js'
 import type { Session } from '../../../src/types/session.js'
 import type { OtpCode } from '../../../src/types/otpRecord.js'
+import type { MailKind, MailSend } from '../../../src/types/mail.js'
 
 /**
  * The shape the database actually stores, and the translation to and from
@@ -362,6 +363,36 @@ export function otpToRow(code: OtpCode): OtpRow {
     consumed_at: toIsoOrNull(code.consumedAt),
     attempts: code.attempts,
     request_ip: code.requestIp,
+  }
+}
+
+/* ---------------- mail sends ---------------- */
+
+export interface MailSendRow {
+  id: string
+  kind: string
+  recipient: string
+  scope: string
+  created_at: string
+}
+
+export function mailSendFromRow(row: MailSendRow): MailSend {
+  return {
+    id: row.id,
+    kind: row.kind as MailKind,
+    recipient: row.recipient,
+    scope: row.scope,
+    createdAt: fromIso(row.created_at),
+  }
+}
+
+export function mailSendToRow(send: MailSend): MailSendRow {
+  return {
+    id: send.id,
+    kind: send.kind,
+    recipient: send.recipient.toLowerCase(),
+    scope: send.scope,
+    created_at: toIso(send.createdAt),
   }
 }
 

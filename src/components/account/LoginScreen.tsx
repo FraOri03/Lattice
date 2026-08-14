@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAccount } from '@/lib/auth/AccountProvider'
 import { requestEmailCode } from '@/lib/auth/emailSignIn'
+import { useLocale } from '@/lib/i18n'
 import { OTP_LENGTH, OTP_TTL_MS } from '@/types/otp'
 import { env } from '@/lib/env'
 import { IcAlert, IcCloud, IcDrive, IcGithub, IcShield } from '@/components/Icons'
@@ -119,11 +120,13 @@ function EmailSignIn() {
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState<string | null>(null)
   const [failure, setFailure] = useState<string | null>(null)
+  // which language the code message is written in, and nothing else (18.2)
+  const locale = useLocale()
 
   const sendCode = async () => {
     setBusy(true)
     setFailure(null)
-    const result = await requestEmailCode(email)
+    const result = await requestEmailCode(email, locale)
     setBusy(false)
     if (result === 'unavailable') {
       // about the SERVER, not about the address — safe to say plainly
