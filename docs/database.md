@@ -123,6 +123,9 @@ Branching (a preview database per pull request) needs the Pro plan and is
 off, so a pull request touching the schema is reviewed as SQL and applied
 when it lands.
 
+Which variable belongs in which environment, and how to rotate a key
+without an outage, is [deploy-and-secrets.md](deploy-and-secrets.md).
+
 `supabase/config.toml` is deliberately minimal: it enables the Data API
 (which the *server* uses), the database and Studio, and leaves Auth,
 Storage and Realtime off, because each of those is something Lattice has

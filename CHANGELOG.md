@@ -30,6 +30,19 @@ All notable changes to Lattice are recorded here. The format follows
 
 ### Added
 
+- **A build can no longer publish a secret by accident.** Lattice compiles every
+  `VITE_`-prefixed setting straight into the JavaScript it serves — that is how the browser
+  gets its configuration, and it means one wrong prefix on a database key would hand that key
+  to every visitor, silently, in a file nobody re-reads. There is now a check that runs on
+  every build in CI and refuses to pass if anything secret reached the bundle: it catches a
+  secret that was merely *named* wrongly before it ever holds a value, catches a real
+  credential from the deploy environment appearing verbatim in the output, and catches keys
+  pasted straight into source. It is equally careful about the opposite mistake — the keys
+  that are meant to be public stay unflagged, because a check that cries wolf is a check
+  people switch off. Alongside it, the environment layout across local, preview and
+  production is written down, along with how to rotate each key without an outage.
+  See [docs/deploy-and-secrets.md](docs/deploy-and-secrets.md).
+
 - **You can sign in with your e-mail address now, no password anywhere.** Type the address,
   get a six-digit code, type it back — and if that address is one you had already used with
   Google, you land in *the same account*, not a second empty one beside it. That convergence

@@ -8,6 +8,7 @@
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.api.json",
     "test": "vitest run",
+    "check:secrets": "node scripts/check-bundle-secrets.mjs",
     "preview": "vite preview",
     "graph:build": "python -m graphify update ."
   },
