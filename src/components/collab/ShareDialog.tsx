@@ -330,7 +330,14 @@ export function ShareDialog() {
       if (result.delivery === 'sent') {
         toast.success(t.share.inviteEmailed(address), t.share.inviteEmailedBody)
       } else if (result.delivery === 'failed') {
-        toast.warning(t.share.inviteMailFailed, t.share.inviteMailFailedBody)
+        // the provider's own words when there are any: the sender is the only
+        // person who can act on "the domain is not verified"
+        toast.warning(
+          t.share.inviteMailFailed,
+          result.deliveryError
+            ? `${result.deliveryError} — ${t.share.inviteMailFailedBody}`
+            : t.share.inviteMailFailedBody,
+        )
       } else {
         toast.success(
           t.share.inviteCreated(address),

@@ -29,6 +29,19 @@ vi.mock('./_lib/db/index.js', () => ({
 const outbox: { to: string; subject: string; text: string; html?: string }[] = []
 let mailConfigured = true
 let mailFails = false
+/** Makes the TEMPLATE throw, which is a different failure from the provider's. */
+let templateThrows = false
+
+vi.mock('./_lib/mailTemplates.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./_lib/mailTemplates.js')>()
+  return {
+    ...actual,
+    invitationMessage: (options: Parameters<typeof actual.invitationMessage>[0]) => {
+      if (templateThrows) throw new RangeError('Invalid time value')
+      return actual.invitationMessage(options)
+    },
+  }
+})
 
 vi.mock('./_lib/mail.js', () => ({
   mailSender: () =>
@@ -123,6 +136,7 @@ beforeEach(async () => {
   databasePresent = true
   mailConfigured = true
   mailFails = false
+  templateThrows = false
   outbox.length = 0
   db.clear()
   await db.memberships.replaceAcl('proj_1', acl())
@@ -492,6 +506,40 @@ describe('delivery (18.2)', () => {
     expect(sent.code).toBe(201)
     expect((sent.body as { delivery: string }).delivery).toBe('failed')
     expect(token).toBeTruthy()
+  })
+
+  it('hands the provider’s reason to the sender, who is the one who can act on it', async () => {
+    mailFails = true
+    const { sent } = await seedInvite()
+    // "the domain is not verified" is an afternoon of guessing otherwise
+    expect((sent.body as { deliveryError: string }).deliveryError).toContain(
+      'provider said no',
+    )
+  })
+
+  it('does not blame the provider for a message it never built', async () => {
+    /**
+     * A template that throws used to be caught by the handler meant for
+     * provider rejections: reported as "not sent", the sender advised to
+     * resend, and no request ever made. Two unrelated failures wearing one
+     * face — which is exactly what made a live one impossible to diagnose.
+     */
+    templateThrows = true
+    const { sent } = await seedInvite()
+
+    expect(sent.code).toBe(201)
+    expect((sent.body as { delivery: string }).delivery).toBe('failed')
+    expect((sent.body as { deliveryError: string }).deliveryError).toContain(
+      'could not compose',
+    )
+    // nothing was handed to the transport, which is the tell
+    expect(outbox).toHaveLength(0)
+  })
+
+  it('does not spend the sender’s allowance on a message it never built', async () => {
+    templateThrows = true
+    await seedInvite()
+    expect(await db.mailSends.countForRecipient('grace@example.com', 0)).toBe(0)
   })
 
   it('says delivery is unavailable when the server has no transport', async () => {
