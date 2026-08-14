@@ -19,9 +19,10 @@ import {
  *
  * The rules are in `identity.ts` and are pure; this module only decides
  * storage. That split is the point of shipping 16.1 before the backend:
- * Phase 17 adds a Supabase-backed implementation behind this same
- * interface, and the convergence logic it enforces is the one already
- * under test here.
+ * Phase 17 adds an implementation that asks `/api` behind this same
+ * interface — the browser never talks to the database itself
+ * (`docs/authorisation-phase-16-3.md`) — and the rules the endpoint
+ * enforces are the ones already under test here.
  *
  * HONEST LIMIT — the local store is per-browser. It gives one person one
  * id across devices (see `newUserId`), but it cannot see other people's

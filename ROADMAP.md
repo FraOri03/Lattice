@@ -121,12 +121,17 @@ authoritative. Each item links to its issue.
 
 - [Phase 16](https://github.com/FraOri03/Lattice/milestone/9) — identity model. `User` and
   `UserIdentity` have shipped ([#81](https://github.com/FraOri03/Lattice/issues/81), see
-  [docs/identity.md](docs/identity.md)); moving room memberships onto `userId`
-  ([#82](https://github.com/FraOri03/Lattice/issues/82)) needs a server that can resolve
-  somebody else's address, and the decision on where authorisation lives
-  ([#83](https://github.com/FraOri03/Lattice/issues/83)) is still open.
+  [docs/identity.md](docs/identity.md)), and authorisation is settled: it stays in `/api`,
+  the browser never holds a database credential
+  ([#83](https://github.com/FraOri03/Lattice/issues/83), see
+  [docs/authorisation-phase-16-3.md](docs/authorisation-phase-16-3.md)). What is left is
+  moving room memberships onto `userId`
+  ([#82](https://github.com/FraOri03/Lattice/issues/82)), which needs a server that can
+  resolve somebody else's address — so it lands with Phase 17.
 - [Phase 17](https://github.com/FraOri03/Lattice/milestone/10) — Supabase, server sessions,
-  e-mail OTP. Everything to the right of this depends on it.
+  e-mail OTP. Everything to the right of this depends on it. 16.3 already fixes its shape:
+  service role only, deny-all RLS as a backstop, and Lattice-issued sessions rather than
+  Supabase ones.
 - [Phase 18](https://github.com/FraOri03/Lattice/milestone/11) — e-mail invitations, which
   unlock "Shared with me" and pending invites on the dashboard.
 - [Phase 19](https://github.com/FraOri03/Lattice/milestone/12) — surface upgrades ·

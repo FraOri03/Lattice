@@ -80,12 +80,16 @@ before then keep working unchanged.
 ## Where the records live
 
 [`identityStore.ts`](../src/lib/auth/identityStore.ts) owns storage and
-nothing else; every rule above is in `identity.ts`. Phase 17 adds a
-Supabase-backed implementation behind the same interface, and the logic it
-enforces is the one already under test.
+nothing else; every rule above is in `identity.ts`.
 
 Today the implementation is `LocalIdentityStore`: `localStorage`, key
 `lattice-identity`.
+
+Phase 17 adds one that asks `/api` behind the same interface. The browser
+never talks to the database directly — that was settled in
+[16.3](authorisation-phase-16-3.md) — so the records live in Postgres and
+the rules above run server-side, on the same module, which is why
+`identity.ts` imports nothing an endpoint cannot import.
 
 ## Migration
 

@@ -81,6 +81,11 @@ Role → media capability is a single shared module,
 `src/lib/media/mediaPermissions.ts`, imported verbatim by the UI and by
 `api/realtime/media-token.ts` — the same pattern as `roleAccess.ts`.
 
+That one-copy property is also what settled where authorisation lives once
+Supabase arrives: it stays in `/api`, and the browser never holds a
+database credential. See
+[authorisation-phase-16-3.md](authorisation-phase-16-3.md).
+
 That module speaks only in *abstract* capabilities (join / audio / video /
 screenShare / moderate) and stays dependency-free, because it ships in the
 client bundle. Turning a capability into LiveKit's `TrackSource` enum requires

@@ -1,12 +1,12 @@
-import { nid } from '@/lib/id'
-import type { Account, AuthProviderId } from '@/types/model'
+import { nid } from '../id'
+import type { Account, AuthProviderId } from '../../types/model'
 import type {
   IdentityClaim,
   IdentityRecords,
   ResolvedIdentity,
   User,
   UserIdentity,
-} from '@/types/identity'
+} from '../../types/identity'
 
 /**
  * Identity rules (Phase 16.1) — pure, because the two things that must not
@@ -18,9 +18,13 @@ import type {
  *    account, or "sign in with e-mail as owner@company.com" would be a
  *    complete authorisation bypass.
  *
- * Everything here is a function of (records, claim). The store in
- * `identityStore.ts` only decides where the records live, which is what
- * lets Phase 17 swap localStorage for Supabase without touching a rule.
+ * Everything here is a function of (records, claim); the store in
+ * `identityStore.ts` only decides where the records live. Phase 17 keeps
+ * these rules and runs them where the database is — server-side, see
+ * `docs/authorisation-phase-16-3.md`. Hence the relative imports and the
+ * absence of anything browser-only: like `roleAccess.ts`, this file has
+ * to stay importable by a serverless endpoint. `identityStore.ts` is
+ * where `localStorage` is allowed to appear.
  */
 
 /* ---------------- ids ---------------- */

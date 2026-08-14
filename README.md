@@ -135,6 +135,7 @@ Ordering reflects current intent, not a schedule: nothing here is a delivery dat
 | [docs/integrations.md](docs/integrations.md) | Google, Drive, GitHub, Liveblocks, LiveKit, conversion backend |
 | [docs/collaboration.md](docs/collaboration.md) | Realtime model, permission matrix, calls, honest limits |
 | [docs/identity.md](docs/identity.md) | User and UserIdentity, convergence and containment rules, migration |
+| [docs/authorisation-phase-16-3.md](docs/authorisation-phase-16-3.md) | Where authorisation lives once Supabase arrives, and what it costs |
 | [docs/navigation.md](docs/navigation.md) | URL contract, history, deep links, split as a layout |
 | [docs/accessibility.md](docs/accessibility.md) · [docs/performance.md](docs/performance.md) | Keyboard model and announcements · bundle budget and off-screen work |
 | [docs/file-formats.md](docs/file-formats.md) | Import/export support matrix and fidelity |
