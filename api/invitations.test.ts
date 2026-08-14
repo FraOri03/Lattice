@@ -43,10 +43,14 @@ vi.mock('./_lib/mailTemplates.js', async (importOriginal) => {
   }
 })
 
+/** Configured, and configured wrongly — a `MAIL_FROM` the provider refuses. */
+let mailProblem = ''
+
 vi.mock('./_lib/mail.js', () => ({
   mailSender: () =>
     mailConfigured
       ? {
+          problem: mailProblem || undefined,
           send: async (message: { to: string; subject: string; text: string; html?: string }) => {
             if (mailFails) throw new Error('provider said no')
             outbox.push(message)
@@ -136,6 +140,7 @@ beforeEach(async () => {
   databasePresent = true
   mailConfigured = true
   mailFails = false
+  mailProblem = ''
   templateThrows = false
   outbox.length = 0
   db.clear()
@@ -538,6 +543,31 @@ describe('delivery (18.2)', () => {
 
   it('does not spend the sender’s allowance on a message it never built', async () => {
     templateThrows = true
+    await seedInvite()
+    expect(await db.mailSends.countForRecipient('grace@example.com', 0)).toBe(0)
+  })
+
+  it('calls a broken MAIL_FROM broken, not missing', async () => {
+    /**
+     * The deployment HAS mail. Reporting "no mail backend" for a malformed
+     * address would point the only person who can fix it at a key that is
+     * already set — and the provider's own 422 names a format without
+     * naming which setting holds it.
+     */
+    mailProblem = 'MAIL_FROM is not a valid From address: it has to be…'
+    const { sent } = await seedInvite()
+
+    expect(sent.code).toBe(201)
+    expect((sent.body as { delivery: string }).delivery).toBe('failed')
+    expect((sent.body as { deliveryError: string }).deliveryError).toContain('MAIL_FROM')
+    expect(outbox).toHaveLength(0)
+  })
+
+  it('does not spend the allowance on a send it knew it could not make', async () => {
+    // no request reached the provider and no mailbox was touched, so the
+    // ceiling has nothing to count — charging it would lock this address out
+    // of being invited for an hour over a typo in an environment variable
+    mailProblem = 'MAIL_FROM is not a valid From address: it has to be…'
     await seedInvite()
     expect(await db.mailSends.countForRecipient('grace@example.com', 0)).toBe(0)
   })

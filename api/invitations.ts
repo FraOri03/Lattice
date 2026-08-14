@@ -161,6 +161,18 @@ async function deliver(
   now: number,
 ): Promise<{ delivery: MailDelivery; reason?: string }> {
   if (!mail) return { delivery: 'unavailable' }
+  /**
+   * Configured, and configured wrongly — a malformed `MAIL_FROM`. Reported
+   * as a failure rather than as an absence, because mail IS set up here and
+   * "this deployment has no mail backend" would send the one person who can
+   * fix it looking for a key that is already there.
+   *
+   * Before `recordSend`, like the template failure below: no request reaches
+   * the provider and no mailbox is touched, so charging the hour's allowance
+   * for it would only lock this address out of being invited at all — the
+   * ceiling exists to protect a mailbox from messages, and there are none.
+   */
+  if (mail.problem) return { delivery: 'failed', reason: mail.problem }
   const origin = originOf(req)
   if (!origin) return { delivery: 'unavailable' }
 

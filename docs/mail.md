@@ -17,6 +17,15 @@ RESEND_API_KEY=…                       server-side only
 MAIL_FROM="Lattice <no-reply@yourdomain.com>"
 ```
 
+**In the Vercel dashboard, paste that value without the quotes.** They are
+`.env` file syntax, and a file loader removes them; the settings UI does not,
+so the quoted line becomes a quoted *address* and Resend answers 422 ``Invalid
+`from` field`` — while the settings page shows a value that looks correct.
+`normaliseFrom` in `api/_lib/mail.ts` strips them, along with the newline a
+paste brings, and refuses a value that is still not an address with a sentence
+naming the variable rather than letting the provider say it in a 422. That is a
+safety net, not the instruction.
+
 **The sending domain has to be verified with Resend or nothing arrives.** This
 is the external blocker #89 names, and no amount of correct code substitutes
 for it: an unverified domain is rejected at the API, and every message fails
@@ -28,6 +37,11 @@ With either variable missing the feature is honestly unavailable rather than
 broken: `mailSender()` returns null, `/api/session` answers 501 for a sign-in
 code, and an invitation is still *created* and still has a link to copy — it
 just reports `delivery: 'unavailable'` instead of pretending.
+
+A **malformed** `MAIL_FROM` is deliberately not that state. Mail is configured
+here, and saying "this deployment has no mail backend" would point the one
+person who can fix it away from the fix, so it reports `delivery: 'failed'`
+with the sentence naming the variable.
 
 ## Two messages, one house style
 
