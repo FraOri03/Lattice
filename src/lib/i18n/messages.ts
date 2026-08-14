@@ -947,8 +947,9 @@ export const en = {
       methodGoogle: 'Google',
       methodGithub: 'GitHub',
       methodLocal: 'Local account',
+      methodEmail: 'E-mail',
       idLabel: 'Account ID',
-      idHint: 'Quote this in a bug report.',
+      idHint: 'The same whichever way you sign in. Quote it in a bug report.',
       created: 'Created',
     },
     profile: {
@@ -1083,7 +1084,7 @@ export const en = {
       billing:
         'Plans and billing arrive with phase 22. Nothing in this build is metered or charged.',
       accountMore:
-        'A second e-mail address cannot be linked, and the account cannot be deleted, until identity stops being whatever the provider says it is — phase 16. Signing out already removes it from this browser.',
+        'Your id no longer comes from the provider (16.1), but there is still no second way of signing in to link, and the account cannot be deleted — e-mail sign-in arrives in phase 17. Signing out already removes it from this browser.',
       connectionsMore:
         'The realtime provider, LiveKit and the conversion backend join this list in 14.5.',
     },
@@ -1950,8 +1951,9 @@ export const it: Catalog = {
       methodGoogle: 'Google',
       methodGithub: 'GitHub',
       methodLocal: 'Account locale',
+      methodEmail: 'E-mail',
       idLabel: 'ID account',
-      idHint: 'Citalo in una segnalazione di bug.',
+      idHint: 'Resta lo stesso con qualunque metodo di accesso. Citalo in una segnalazione di bug.',
       created: 'Creato',
     },
     profile: {
@@ -2086,7 +2088,7 @@ export const it: Catalog = {
       billing:
         'Piani e fatturazione arrivano con la fase 22. In questa build nulla è misurato o addebitato.',
       accountMore:
-        'Non si può collegare una seconda e-mail, né eliminare l’account, finché l’identità resta quella che dice il provider — fase 16. Uscire lo toglie già da questo browser.',
+        'Il tuo id non arriva più dal provider (16.1), ma non esiste ancora un secondo modo di accedere da collegare, e l’account non si può eliminare — l’accesso via e-mail arriva nella fase 17. Uscire lo toglie già da questo browser.',
       connectionsMore:
         'Il provider realtime, LiveKit e il backend di conversione entrano in questa lista nella 14.5.',
     },

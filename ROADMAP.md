@@ -119,8 +119,12 @@ authoritative. Each item links to its issue.
 
 ### Later — the backend jump, then the suites
 
-- [Phase 16](https://github.com/FraOri03/Lattice/milestone/9) — identity model, and the
-  open decision on where authorisation lives ([#83](https://github.com/FraOri03/Lattice/issues/83)).
+- [Phase 16](https://github.com/FraOri03/Lattice/milestone/9) — identity model. `User` and
+  `UserIdentity` have shipped ([#81](https://github.com/FraOri03/Lattice/issues/81), see
+  [docs/identity.md](docs/identity.md)); moving room memberships onto `userId`
+  ([#82](https://github.com/FraOri03/Lattice/issues/82)) needs a server that can resolve
+  somebody else's address, and the decision on where authorisation lives
+  ([#83](https://github.com/FraOri03/Lattice/issues/83)) is still open.
 - [Phase 17](https://github.com/FraOri03/Lattice/milestone/10) — Supabase, server sessions,
   e-mail OTP. Everything to the right of this depends on it.
 - [Phase 18](https://github.com/FraOri03/Lattice/milestone/11) — e-mail invitations, which

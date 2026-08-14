@@ -14,6 +14,22 @@ All notable changes to Lattice are recorded here. The format follows
 
 ### Added
 
+- **Who you are stopped being how you signed in.** Until now your account id was built
+  from your Google account: identity was literally derived from the provider, so a second
+  way of signing in would have created a second you, and there was no id a permission could
+  be attached to that survived a provider change. Lattice now keeps a `User` — opaque id,
+  address, name, avatar — and a `UserIdentity` for each proven way of signing in as that
+  person. Two rules decide what happens when someone signs in, and both are asserted
+  directly: the same **verified** address reached through Google or, later, through e-mail
+  converges on the one account; an **unverified** address never does, so signing in as
+  `owner@company.com` without proving it gets you a new empty account and not somebody
+  else's. Accounts already signed in are adopted with their existing id, because that id is
+  already on every comment, member row and activity entry they have written — including in
+  other people's browsers. What this does *not* do yet: room access is still granted by
+  e-mail address, there is no e-mail sign-in to converge with, and the records live in your
+  browser, so nothing here can authorise anything on its own. See
+  [docs/identity.md](docs/identity.md).
+
 - **The call can leave its corner.** A button in the call bar undocks the island into a free
   window: drag its bar to move it, drag any edge or corner to resize it, and the video tiles
   fill whatever space you give it instead of staying 96px wide. It replaces the only way to
