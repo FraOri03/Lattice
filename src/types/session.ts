@@ -1,4 +1,4 @@
-import type { IdentityProvider } from './identity'
+import type { IdentityProvider } from './identity.js'
 
 /* ---------------- sessions (Phase 17.2) ---------------- */
 
