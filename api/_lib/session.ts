@@ -93,6 +93,26 @@ export function isLocalhost(host: string): boolean {
   return name === 'localhost' || name === '127.0.0.1' || name === '[::1]'
 }
 
+/**
+ * The absolute origin this request arrived at (Phase 18.2, #89).
+ *
+ * Mail needs it twice — for the invite link and for the one image the
+ * templates load — and both have to point at the deployment that actually
+ * sent the message: a preview build must invite people to the preview, not
+ * to production. Deriving it from the request is the only way to get that
+ * right without a per-environment variable somebody has to remember to set.
+ *
+ * `x-forwarded-proto` is what Vercel puts the real scheme in; the localhost
+ * exception is the same one the cookie makes, and for the same reason.
+ */
+export function originOf(req: ApiRequest): string {
+  const host = headerOf(req, 'host')
+  if (!host) return ''
+  const forwarded = headerOf(req, 'x-forwarded-proto').split(',')[0]?.trim()
+  const proto = forwarded || (isLocalhost(host) ? 'http' : 'https')
+  return `${proto}://${host}`
+}
+
 interface CookieOptions {
   maxAgeSeconds: number
   secure: boolean

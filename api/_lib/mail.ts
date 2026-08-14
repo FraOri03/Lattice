@@ -1,14 +1,10 @@
-import { OTP_TTL_MS } from '../../src/types/otp.js'
-
 /**
- * Sending mail (Phase 17.3, #86).
+ * Sending mail (Phase 17.3 #86, extended by 18.2 #89).
  *
- * Lattice had no way to send an e-mail, and a one-time code nobody
- * receives is not a sign-in method. This is the smallest transport that
- * makes the flow real, and it is deliberately a SEAM rather than a
- * provider: Phase 18 owns invitation mail and will want templates, a
- * from-name per workspace and delivery tracking — all of which belong
- * behind this interface rather than in place of it.
+ * A SEAM rather than a provider: what a message *is* lives in
+ * `mailTemplates.ts`, and this file only knows how to hand one to Resend.
+ * The split is what lets 18.2 add HTML, a second language and a second
+ * template family without touching the transport at all.
  *
  * ## No dependency
  *
@@ -20,14 +16,30 @@ import { OTP_TTL_MS } from '../../src/types/otp.js'
  *
  * Like every other backend in this codebase, absent configuration means
  * the feature is honestly unavailable rather than broken. `mailSender()`
- * returns null and the endpoint answers 501 saying exactly what is
- * missing — it never pretends to have sent something.
+ * returns null and the caller answers 501 saying exactly what is missing —
+ * it never pretends to have sent something.
+ *
+ * ## The domain is the part code cannot do
+ *
+ * `MAIL_FROM` has to be an address on a domain verified with the provider,
+ * or every message is rejected at the API and no amount of correct code
+ * helps. See docs/invitation-email.md.
  */
 
+/**
+ * One message, in both forms.
+ *
+ * `text` is not a fallback that nobody sees: it is what a client stripping
+ * markup renders, what a screen reader gets the cleanest run at, and what
+ * survives when images and CSS are refused. Every template produces both,
+ * and the plain part is written to stand on its own rather than to say
+ * "view this in a browser".
+ */
 export interface MailMessage {
   to: string
   subject: string
   text: string
+  html?: string
 }
 
 export interface MailSender {
@@ -59,42 +71,16 @@ class ResendSender implements MailSender {
         from: this.from,
         to: [message.to],
         subject: message.subject,
+        // both parts, always — Resend assembles the multipart message, and
+        // sending only one would decide for the recipient's client
         text: message.text,
+        ...(message.html ? { html: message.html } : {}),
       }),
     })
     if (!res.ok) {
-      // the endpoint turns this into a neutral answer; the detail is for logs
+      // the caller turns this into a neutral answer; the detail is for logs
       const detail = await res.text().catch(() => '')
       throw new Error(`[mail] send failed (${res.status}): ${detail.slice(0, 200)}`)
     }
-  }
-}
-
-/**
- * The sign-in code message.
- *
- * Plain text on purpose. An HTML mail asking for a code is the shape of
- * every phishing message ever sent; a short plain one is both harder to
- * spoof convincingly and impossible to get wrong in a client that strips
- * markup.
- *
- * It names no account and confirms nothing. Someone who receives this
- * without asking for it learns only that somebody typed their address —
- * not whether that address has a Lattice account.
- */
-export function signInCodeMessage(to: string, code: string): MailMessage {
-  const minutes = Math.round(OTP_TTL_MS / 60000)
-  return {
-    to,
-    subject: `${code} is your Lattice sign-in code`,
-    text: [
-      `Your Lattice sign-in code is ${code}.`,
-      '',
-      `It expires in ${minutes} minutes and can be used once.`,
-      '',
-      'If you did not ask to sign in, you can ignore this message —',
-      'the code is useless without access to this mailbox, and nobody',
-      'has been told whether this address has an account.',
-    ].join('\n'),
   }
 }

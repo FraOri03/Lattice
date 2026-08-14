@@ -5,7 +5,8 @@ import type { Session, SessionInfo } from '../src/types/session.js'
 import { SESSION_TTL_MS } from '../src/types/session.js'
 import type { OtpRequestResult } from '../src/types/otp.js'
 import { OTP_TTL_MS } from '../src/types/otp.js'
-import { mailSender, signInCodeMessage } from './_lib/mail.js'
+import { mailSender } from './_lib/mail.js'
+import { normaliseLocale, signInCodeMessage } from './_lib/mailTemplates.js'
 import {
   issueCode,
   normaliseEmail,
@@ -22,6 +23,7 @@ import {
   hashToken,
   headerOf,
   mintToken,
+  originOf,
   sessionCookieHeader,
   sessionOf,
   type ApiRequest,
@@ -55,6 +57,8 @@ interface Body {
   googleToken?: unknown
   email?: unknown
   code?: unknown
+  /** The caller's UI language, for the message body only (18.2). */
+  locale?: unknown
 }
 
 /** What an endpoint says when a code was asked for and it cannot send one. */
@@ -225,7 +229,14 @@ export default async function handler(req: ApiRequest, res: ApiRes): Promise<voi
     if (decision.allowed) {
       const { code } = await issueCode(db.otp, email, ip)
       try {
-        await mail.send(signInCodeMessage(email, code))
+        // the sender's UI language is the only signal there is: an address
+        // on its own says nothing about what its owner reads
+        await mail.send(
+          signInCodeMessage(email, code, {
+            locale: normaliseLocale(body.locale),
+            origin: originOf(req),
+          }),
+        )
       } catch {
         // Delivery failed. The caller is still told the same thing: a
         // response that distinguished "sent" from "could not send" would

@@ -10,12 +10,15 @@ import type { Entitlement } from '../../../src/types/entitlement.js'
 import { freeEntitlement } from '../../../src/types/entitlement.js'
 import type { Session } from '../../../src/types/session.js'
 import type { OtpCode } from '../../../src/types/otpRecord.js'
+import type { MailSend } from '../../../src/types/mail.js'
 import type { RoomAcl } from '../../../src/lib/collab/acl.js'
 import type {
   EntitlementRepository,
   IdentityRepository,
   InvitationRepository,
+  MailSendRepository,
   MembershipRepository,
+  MembershipSlot,
   OtpRepository,
   Repositories,
   SessionRepository,
@@ -24,10 +27,12 @@ import {
   aclFromRows,
   entitlementFromRow,
   entitlementToRow,
+  fromIso,
   identityFromRow,
   identityToRow,
   inviteFromRow,
   inviteToRow,
+  mailSendToRow,
   rowsFromAcl,
   otpFromRow,
   otpToRow,
@@ -39,6 +44,7 @@ import {
   type EntitlementRow,
   type IdentityRow,
   type InvitationRow,
+  type MailSendRow,
   type MembershipRow,
   type OtpRow,
   type SessionRow,
@@ -73,6 +79,7 @@ export class MemoryDatabase {
   entitlements: EntitlementRow[] = []
   sessions: SessionRow[] = []
   otp: OtpRow[] = []
+  mailSends: MailSendRow[] = []
 
   clear(): void {
     this.users = []
@@ -82,6 +89,7 @@ export class MemoryDatabase {
     this.entitlements = []
     this.sessions = []
     this.otp = []
+    this.mailSends = []
   }
 }
 
@@ -93,9 +101,34 @@ export class MemoryRepositories implements Repositories {
   readonly entitlements: EntitlementRepository = new MemoryEntitlementRepository(this.data)
   readonly sessions: SessionRepository = new MemorySessionRepository(this.data)
   readonly otp: OtpRepository = new MemoryOtpRepository(this.data)
+  readonly mailSends: MailSendRepository = new MemoryMailSendRepository(this.data)
 
   clear(): void {
     this.data.clear()
+  }
+}
+
+/* ---------------- mail sends ---------------- */
+
+class MemoryMailSendRepository implements MailSendRepository {
+  constructor(private db: MemoryDatabase) {}
+
+  async record(send: MailSend): Promise<void> {
+    this.db.mailSends.push(mailSendToRow(send))
+  }
+
+  async countForRecipient(recipient: string, since: number): Promise<number> {
+    const clean = recipient.toLowerCase()
+    return this.db.mailSends.filter(
+      (r) => r.recipient === clean && fromIso(r.created_at) >= since,
+    ).length
+  }
+
+  async countForScope(scope: string, since: number): Promise<number> {
+    if (!scope) return 0
+    return this.db.mailSends.filter(
+      (r) => r.scope === scope && fromIso(r.created_at) >= since,
+    ).length
   }
 }
 
@@ -238,15 +271,30 @@ class MemoryMembershipRepository implements MembershipRepository {
     row.updated_at = toIso(Date.now())
   }
 
-  async projectsOf(userIds: string[], email: string): Promise<string[]> {
-    const clean = email.toLowerCase()
-    const hits = this.db.memberships.filter((r) =>
-      r.user_id ? userIds.includes(r.user_id) : !!clean && r.email === clean,
-    )
-    return dedupe(
-      hits.map((r) => r.project_id),
-      (id) => id,
-    )
+  async slotsOf(userIds: string[], emails: string[]): Promise<MembershipSlot[]> {
+    const clean = emails.map((e) => e.toLowerCase()).filter(Boolean)
+    return this.db.memberships
+      .filter((r) =>
+        // a claimed slot answers to its userId and to nothing else — 16.2's
+        // rule, and the reason a reassigned address inherits nothing
+        r.user_id ? userIds.includes(r.user_id) : clean.includes(r.email),
+      )
+      .map((r) => ({
+        projectId: r.project_id,
+        email: r.email,
+        role: r.role as CollabRole,
+        userId: r.user_id,
+      }))
+  }
+
+  async ownersOf(projectIds: string[]): Promise<Record<string, string>> {
+    const out: Record<string, string> = {}
+    for (const row of this.db.memberships) {
+      if (row.role === 'owner' && projectIds.includes(row.project_id)) {
+        out[row.project_id] = row.email
+      }
+    }
+    return out
   }
 
   async removeProject(projectId: string): Promise<void> {
@@ -272,8 +320,8 @@ class MemoryInvitationRepository implements InvitationRepository {
     return inviteFromRow(row)
   }
 
-  async byToken(token: string): Promise<ProjectInvite | null> {
-    const row = this.db.invitations.find((r) => r.token === token)
+  async byTokenHash(tokenHash: string): Promise<ProjectInvite | null> {
+    const row = this.db.invitations.find((r) => r.token_hash === tokenHash)
     return row ? inviteFromRow(row) : null
   }
 

@@ -4,6 +4,7 @@ import { aclFromRows, rowsFromAcl } from './rows.js'
 import { resolveClaim } from '../../../src/lib/auth/identity.js'
 import type { IdentityClaim } from '../../../src/types/identity.js'
 import type { ProjectInvite } from '../../../src/types/collab.js'
+import type { MailSend } from '../../../src/types/mail.js'
 import type { RoomAcl } from '../../../src/lib/collab/acl.js'
 import { roleOf } from '../../../src/lib/collab/acl.js'
 
@@ -188,21 +189,50 @@ describe('MembershipRepository — the ACL, in rows', () => {
     )
   })
 
-  it('lists the projects a person is a member of, by binding and by address', async () => {
+  it('lists the slots a person holds, by binding and by address, with their roles', async () => {
     await db.memberships.setRole('p1', 'grace@example.com', 'editor')
     await db.memberships.bind('p1', 'grace@example.com', 'usr_grace')
     await db.memberships.setRole('p2', 'grace@example.com', 'viewer') // unclaimed
     await db.memberships.setRole('p3', 'someone@else.com', 'viewer')
 
-    expect((await db.memberships.projectsOf(['usr_grace'], 'grace@example.com')).sort()).toEqual(
-      ['p1', 'p2'],
+    const slots = await db.memberships.slotsOf(['usr_grace'], ['grace@example.com'])
+    expect(slots.map((s) => `${s.projectId}:${s.role}`).sort()).toEqual([
+      'p1:editor',
+      'p2:viewer',
+    ])
+  })
+
+  it('finds a project shared with any of the addresses an account holds', async () => {
+    // 16.1 lets one account hold several verified identities, and a project
+    // shared with either of them is shared with the same person
+    await db.memberships.setRole('p1', 'work@example.com', 'editor')
+    await db.memberships.setRole('p2', 'home@example.com', 'viewer')
+
+    const slots = await db.memberships.slotsOf(
+      [],
+      ['work@example.com', 'home@example.com'],
     )
+    expect(slots.map((s) => s.projectId).sort()).toEqual(['p1', 'p2'])
   })
 
   it('does not report a bound slot to someone who merely holds the address', async () => {
     await db.memberships.setRole('p1', 'grace@example.com', 'editor')
     await db.memberships.bind('p1', 'grace@example.com', 'usr_grace')
-    expect(await db.memberships.projectsOf([], 'grace@example.com')).toEqual([])
+    expect(await db.memberships.slotsOf([], ['grace@example.com'])).toEqual([])
+  })
+
+  it('names the owner of each project, for grouping', async () => {
+    await db.memberships.replaceAcl('p1', acl)
+    await db.memberships.setRole('p2', 'other@example.com', 'owner')
+
+    expect(await db.memberships.ownersOf(['p1', 'p2', 'p3'])).toEqual({
+      p1: acl.ownerEmail,
+      p2: 'other@example.com',
+    })
+  })
+
+  it('asks nothing when there are no projects to ask about', async () => {
+    expect(await db.memberships.ownersOf([])).toEqual({})
   })
 
   it('drops every membership when a project goes', async () => {
@@ -218,11 +248,12 @@ describe('InvitationRepository', () => {
     projectId: 'p1',
     email: 'grace@example.com',
     role: 'editor',
-    token: 'tok_1',
+    tokenHash: 'hash_1',
     createdAt: 1_700_000_000_000,
     invitedBy: 'usr_ada',
     invitedByName: 'Ada',
     status: 'pending',
+    expiresAt: 1_700_000_000_000 + 14 * 24 * 60 * 60 * 1000,
     updatedAt: 1_700_000_000_000,
     ...over,
   })
@@ -230,12 +261,48 @@ describe('InvitationRepository', () => {
   it('stores and reads back an invitation', async () => {
     const created = await db.invitations.create(invite())
     expect(created).toMatchObject({ email: 'grace@example.com', role: 'editor' })
-    expect(await db.invitations.byToken('tok_1')).toMatchObject({ id: 'inv_1' })
+    expect(await db.invitations.byTokenHash('hash_1')).toMatchObject({ id: 'inv_1' })
+  })
+
+  it('stores the digest and never a token', async () => {
+    // the domain type allows a raw token on a freshly minted copy; the row
+    // has nowhere to put it, which is the property 18.1 is after
+    await db.invitations.create(invite({ token: 'the-secret-token' }))
+    const loaded = await db.invitations.byTokenHash('hash_1')
+    expect(loaded?.token).toBeUndefined()
+    expect(loaded?.tokenHash).toBe('hash_1')
+  })
+
+  it('keeps the deadline through a round trip', async () => {
+    const created = await db.invitations.create(invite())
+    expect(created.expiresAt).toBe(1_700_000_000_000 + 14 * 24 * 60 * 60 * 1000)
+    expect((await db.invitations.byTokenHash('hash_1'))?.expiresAt).toBe(
+      created.expiresAt,
+    )
+  })
+
+  it('records who accepted, not only when', async () => {
+    await db.invitations.create(invite())
+    const accepted = await db.invitations.patch('inv_1', {
+      status: 'accepted',
+      acceptedAt: 1_700_000_100_000,
+      acceptedBy: 'usr_grace',
+    })
+    expect(accepted).toMatchObject({ status: 'accepted', acceptedBy: 'usr_grace' })
+    expect((await db.invitations.byTokenHash('hash_1'))?.acceptedBy).toBe('usr_grace')
+  })
+
+  it('returns a revoked invitation by digest rather than pretending it never existed', async () => {
+    await db.invitations.create(invite())
+    await db.invitations.patch('inv_1', { status: 'revoked' })
+    expect(await db.invitations.byTokenHash('hash_1')).toMatchObject({
+      status: 'revoked',
+    })
   })
 
   it('returns the existing pending invitation rather than minting a second', async () => {
     await db.invitations.create(invite())
-    const again = await db.invitations.create(invite({ id: 'inv_2', token: 'tok_2' }))
+    const again = await db.invitations.create(invite({ id: 'inv_2', tokenHash: 'hash_2' }))
     expect(again.id).toBe('inv_1')
     expect(await db.invitations.ofProject('p1')).toHaveLength(1)
   })
@@ -243,13 +310,15 @@ describe('InvitationRepository', () => {
   it('allows a new invitation once the previous one is no longer pending', async () => {
     await db.invitations.create(invite())
     await db.invitations.patch('inv_1', { status: 'revoked' })
-    const second = await db.invitations.create(invite({ id: 'inv_2', token: 'tok_2' }))
+    const second = await db.invitations.create(invite({ id: 'inv_2', tokenHash: 'hash_2' }))
     expect(second.id).toBe('inv_2')
   })
 
   it('lists what is waiting for an address', async () => {
     await db.invitations.create(invite())
-    await db.invitations.create(invite({ id: 'inv_2', projectId: 'p2', token: 'tok_2' }))
+    await db.invitations.create(
+      invite({ id: 'inv_2', projectId: 'p2', tokenHash: 'hash_2' }),
+    )
     expect(await db.invitations.pendingFor('grace@example.com')).toHaveLength(2)
   })
 
@@ -259,8 +328,57 @@ describe('InvitationRepository', () => {
     expect(await db.invitations.pendingFor('grace@example.com')).toEqual([])
   })
 
+  it('does not list a declined invitation as pending', async () => {
+    await db.invitations.create(invite())
+    await db.invitations.patch('inv_1', { status: 'declined' })
+    expect(await db.invitations.pendingFor('grace@example.com')).toEqual([])
+  })
+
   it('answers null when patching something that is not there', async () => {
     expect(await db.invitations.patch('nope', { status: 'revoked' })).toBeNull()
+  })
+})
+
+describe('MailSendRepository', () => {
+  const NOW = 1_700_000_000_000
+
+  const send = (over: Partial<MailSend> = {}): MailSend => ({
+    id: `mls_${Math.random().toString(36).slice(2)}`,
+    kind: 'invitation',
+    recipient: 'grace@example.com',
+    scope: 'p1',
+    createdAt: NOW,
+    ...over,
+  })
+
+  it('counts what an address has been sent', async () => {
+    await db.mailSends.record(send())
+    await db.mailSends.record(send())
+    expect(await db.mailSends.countForRecipient('grace@example.com', NOW - 1)).toBe(2)
+  })
+
+  it('counts by address regardless of case', async () => {
+    await db.mailSends.record(send({ recipient: 'GRACE@Example.com' }))
+    expect(await db.mailSends.countForRecipient('grace@example.com', NOW - 1)).toBe(1)
+  })
+
+  it('counts what a project has sent, to anyone', async () => {
+    await db.mailSends.record(send({ recipient: 'a@example.com' }))
+    await db.mailSends.record(send({ recipient: 'b@example.com' }))
+    await db.mailSends.record(send({ recipient: 'c@example.com', scope: 'p2' }))
+    expect(await db.mailSends.countForScope('p1', NOW - 1)).toBe(2)
+    expect(await db.mailSends.countForScope('p2', NOW - 1)).toBe(1)
+  })
+
+  it('excludes anything older than the window', async () => {
+    await db.mailSends.record(send({ createdAt: NOW - 10_000 }))
+    expect(await db.mailSends.countForRecipient('grace@example.com', NOW)).toBe(0)
+  })
+
+  it('never attributes a scopeless message to a project', async () => {
+    await db.mailSends.record(send({ kind: 'sign-in-code', scope: '' }))
+    expect(await db.mailSends.countForScope('', NOW - 1)).toBe(0)
+    expect(await db.mailSends.countForRecipient('grace@example.com', NOW - 1)).toBe(1)
   })
 })
 

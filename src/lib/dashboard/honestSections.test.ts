@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { collectSentInvites, collectShared, type ProjectFacts } from './honestSections'
+import {
+  collectSentInvites,
+  collectShared,
+  type ProjectFacts,
+  type ServerShared,
+} from './honestSections'
 import type { ProjectInvite, ProjectMember } from '@/types/collab'
 
 /**
@@ -113,11 +118,12 @@ describe('collectSentInvites', () => {
       projectId: 'p1',
       email: `${id}@example.com`,
       role: 'editor',
-      token: 't',
+      tokenHash: 'h',
       createdAt,
       invitedBy: 'me',
       invitedByName: 'Me',
       status,
+      expiresAt: createdAt + 14 * 24 * 60 * 60 * 1000,
       updatedAt: 0,
     }) as ProjectInvite
 
@@ -130,19 +136,95 @@ describe('collectSentInvites', () => {
     expect(out[0].projectName).toBe('Acme')
   })
 
-  it('shows pending, accepted and revoked — and nothing else', () => {
-    // `expired` is in the type and nothing computes it: no `expiresAt` exists,
-    // so a row wearing that badge would claim a check that never happened
+  it('shows every status the model can actually establish', () => {
+    // `expired` and `declined` used to be excluded because nothing could have
+    // checked them: there was no `expiresAt`, and a refusal had no value to be
+    // recorded as. 18.1 (#88) gives both a real source, so both are shown.
     const out = collectSentInvites({ p1: project('p1', 'Acme') }, () => [
       invite('a', 'pending'),
       invite('b', 'accepted'),
       invite('c', 'revoked'),
       invite('d', 'expired'),
+      invite('e', 'declined'),
     ])
-    expect(out.map((i) => i.invite.status)).toEqual(['pending', 'accepted', 'revoked'])
+    expect(out.map((i) => i.invite.status)).toEqual([
+      'pending',
+      'accepted',
+      'revoked',
+      'expired',
+      'declined',
+    ])
   })
 
   it('is empty when no project holds an invitation', () => {
     expect(collectSentInvites({ p1: project('p1', 'Acme') }, () => [])).toEqual([])
+  })
+})
+
+describe('the server index (18.4)', () => {
+  const me = 'usr_me'
+  const server = (over: Partial<ServerShared> = {}): ServerShared => ({
+    projectId: 'p9',
+    role: 'viewer',
+    ownerEmail: 'owner@example.com',
+    claimed: false,
+    ...over,
+  })
+
+  it('adds a project this device has never held', () => {
+    const groups = collectShared({}, {}, me, 'browser', [server()])
+    expect(groups).toHaveLength(1)
+    expect(groups[0].ownerEmail).toBe('owner@example.com')
+    expect(groups[0].items[0]).toMatchObject({
+      projectId: 'p9',
+      role: 'viewer',
+      scope: 'server',
+      name: null,
+      updatedAt: 0,
+    })
+  })
+
+  it('gives it no name rather than inventing one', () => {
+    // titles live in Yjs and Drive; the database that knows the membership
+    // has never seen one, and a placeholder would be a claim
+    expect(collectShared({}, {}, me, 'browser', [server()])[0].items[0].name).toBeNull()
+  })
+
+  it('does not duplicate a project this device already lists', () => {
+    const projects = { p1: project('p1', 'Acme') }
+    const members = {
+      p1: [
+        member('usr_owner', 'owner', 'Owner'),
+        member(me, 'editor', 'Me'),
+      ],
+    }
+    const groups = collectShared(projects, members, me, 'browser', [
+      server({ projectId: 'p1', role: 'viewer' }),
+    ])
+
+    const all = groups.flatMap((g) => g.items)
+    expect(all).toHaveLength(1)
+    // the local row wins: it has a name, an icon and a real timestamp
+    expect(all[0]).toMatchObject({ projectId: 'p1', name: 'Acme', scope: 'browser' })
+  })
+
+  it('groups server rows by the owner they name', () => {
+    const groups = collectShared({}, {}, me, 'browser', [
+      server({ projectId: 'p1', ownerEmail: 'ada@example.com' }),
+      server({ projectId: 'p2', ownerEmail: 'ada@example.com' }),
+      server({ projectId: 'p3', ownerEmail: 'bob@example.com' }),
+    ])
+    expect(groups).toHaveLength(2)
+    expect(groups.map((g) => g.items.length).sort()).toEqual([1, 2])
+  })
+
+  it('keeps a project with no recorded owner instead of dropping it', () => {
+    const groups = collectShared({}, {}, me, 'browser', [server({ ownerEmail: '' })])
+    expect(groups[0].ownerEmail).toBeNull()
+    expect(groups[0].items).toHaveLength(1)
+  })
+
+  it('changes nothing when the server has nothing to add', () => {
+    expect(collectShared({}, {}, me, 'browser', [])).toEqual([])
   })
 })

@@ -11,12 +11,15 @@ import type { Entitlement } from '../../../src/types/entitlement.js'
 import { freeEntitlement } from '../../../src/types/entitlement.js'
 import type { Session } from '../../../src/types/session.js'
 import type { OtpCode } from '../../../src/types/otpRecord.js'
+import type { MailSend } from '../../../src/types/mail.js'
 import type { RoomAcl } from '../../../src/lib/collab/acl.js'
 import type {
   EntitlementRepository,
   IdentityRepository,
   InvitationRepository,
+  MailSendRepository,
   MembershipRepository,
+  MembershipSlot,
   OtpRepository,
   Repositories,
   SessionRepository,
@@ -29,6 +32,7 @@ import {
   identityToRow,
   inviteFromRow,
   inviteToRow,
+  mailSendToRow,
   rowsFromAcl,
   otpFromRow,
   otpToRow,
@@ -69,6 +73,7 @@ const INVITATIONS = 'project_invitations'
 const ENTITLEMENTS = 'entitlements'
 const SESSIONS = 'sessions'
 const OTP = 'email_otp_codes'
+const MAIL_SENDS = 'mail_sends'
 
 /** Postgres unique-violation; the only conflict this layer expects to lose. */
 const UNIQUE_VIOLATION = '23505'
@@ -92,6 +97,7 @@ export class SupabaseRepositories implements Repositories {
   readonly entitlements: EntitlementRepository
   readonly sessions: SessionRepository
   readonly otp: OtpRepository
+  readonly mailSends: MailSendRepository
 
   constructor(client: SupabaseClient) {
     this.identities = new SupabaseIdentityRepository(client)
@@ -100,6 +106,50 @@ export class SupabaseRepositories implements Repositories {
     this.entitlements = new SupabaseEntitlementRepository(client)
     this.sessions = new SupabaseSessionRepository(client)
     this.otp = new SupabaseOtpRepository(client)
+    this.mailSends = new SupabaseMailSendRepository(client)
+  }
+}
+
+/* ---------------- mail sends ---------------- */
+
+class SupabaseMailSendRepository implements MailSendRepository {
+  constructor(private db: SupabaseClient) {}
+
+  async record(send: MailSend): Promise<void> {
+    unwrap(
+      await this.db.from(MAIL_SENDS).insert(mailSendToRow(send)),
+      'record mail send',
+    )
+  }
+
+  async countForRecipient(recipient: string, since: number): Promise<number> {
+    return this.countWhere('recipient', recipient.toLowerCase(), since)
+  }
+
+  async countForScope(scope: string, since: number): Promise<number> {
+    if (!scope) return 0
+    return this.countWhere('scope', scope, since)
+  }
+
+  /**
+   * `head: true` with an exact count: the rows themselves are never wanted,
+   * only how many there are, and shipping an hour of them across the wire to
+   * call `.length` on it would be the same answer at a worse price.
+   */
+  private async countWhere(
+    column: 'recipient' | 'scope',
+    value: string,
+    since: number,
+  ): Promise<number> {
+    const result = await this.db
+      .from(MAIL_SENDS)
+      .select('id', { count: 'exact', head: true })
+      .eq(column, value)
+      .gte('created_at', toIso(since))
+    if (result.error) {
+      throw new Error(`[db] count mail sends failed: ${result.error.message}`)
+    }
+    return result.count ?? 0
   }
 }
 
@@ -337,40 +387,65 @@ class SupabaseMembershipRepository implements MembershipRepository {
   }
 
   /**
-   * Two queries rather than one `or(...)` filter: the address goes into a
+   * Two queries rather than one `or(...)` filter: an address goes into a
    * PostgREST filter expression as text, and keeping it out of one avoids
-   * having to reason about quoting rules for a value a stranger chose.
+   * having to reason about quoting rules for values a stranger chose.
+   *
+   * `.in()` takes the list as a parameter rather than splicing it into an
+   * expression, which is why the address query is safe with several.
    */
-  async projectsOf(userIds: string[], email: string): Promise<string[]> {
-    const clean = email.toLowerCase()
-    type ProjectIdRow = { project_id: string }
-    const queries: PromiseLike<ProjectIdRow[]>[] = []
+  async slotsOf(userIds: string[], emails: string[]): Promise<MembershipSlot[]> {
+    const clean = emails.map((e) => e.toLowerCase()).filter(Boolean)
+    const queries: PromiseLike<MembershipRow[]>[] = []
 
     if (userIds.length) {
       queries.push(
         this.db
           .from(MEMBERSHIPS)
-          .select('project_id')
+          .select('*')
           .in('user_id', userIds)
-          .then((r) => unwrap<ProjectIdRow[]>(r as Result<ProjectIdRow[]>, 'projects by userId') ?? []),
+          .then((r) => unwrap<MembershipRow[]>(r as Result<MembershipRow[]>, 'slots by userId') ?? []),
       )
     }
-    if (clean) {
+    if (clean.length) {
       queries.push(
         this.db
           .from(MEMBERSHIPS)
-          .select('project_id')
-          .eq('email', clean)
+          .select('*')
+          .in('email', clean)
+          // unclaimed only: a slot somebody else has claimed answers to
+          // their userId now, not to the address it was opened with
           .is('user_id', null)
-          .then((r) => unwrap<ProjectIdRow[]>(r as Result<ProjectIdRow[]>, 'projects by address') ?? []),
+          .then((r) => unwrap<MembershipRow[]>(r as Result<MembershipRow[]>, 'slots by address') ?? []),
       )
     }
 
     const rows = (await Promise.all(queries)).flat()
     return dedupe(
-      rows.map((r) => r.project_id),
-      (id) => id,
+      rows.map((r) => ({
+        projectId: r.project_id,
+        email: r.email,
+        role: r.role as CollabRole,
+        userId: r.user_id,
+      })),
+      (slot) => `${slot.projectId}:${slot.email}`,
     )
+  }
+
+  async ownersOf(projectIds: string[]): Promise<Record<string, string>> {
+    if (!projectIds.length) return {}
+    const rows =
+      unwrap<MembershipRow[]>(
+        await this.db
+          .from(MEMBERSHIPS)
+          .select('*')
+          .in('project_id', projectIds)
+          .eq('role', 'owner'),
+        'owners of projects',
+      ) ?? []
+    const out: Record<string, string> = {}
+    for (const row of rows) out[row.project_id] = row.email
+    return out
   }
 
   async removeProject(projectId: string): Promise<void> {
@@ -426,9 +501,13 @@ class SupabaseInvitationRepository implements InvitationRepository {
     return row ? inviteFromRow(row) : null
   }
 
-  async byToken(token: string): Promise<ProjectInvite | null> {
+  async byTokenHash(tokenHash: string): Promise<ProjectInvite | null> {
     const row = unwrap<InvitationRow>(
-      await this.db.from(INVITATIONS).select('*').eq('token', token).maybeSingle(),
+      await this.db
+        .from(INVITATIONS)
+        .select('*')
+        .eq('token_hash', tokenHash)
+        .maybeSingle(),
       'load invitation by token',
     )
     return row ? inviteFromRow(row) : null

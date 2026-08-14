@@ -73,12 +73,15 @@ _Tracked in [#10](https://github.com/FraOri03/Lattice/issues/10)._
 - **The theme reveal needs View Transitions** (Chromium today). Elsewhere — and in a
   hidden/backgrounded tab, where the API is skipped by the browser — day ⇄ night falls
   back to a colour crossfade. Reduced motion gets neither.
-- **The dashboard shows this browser's projects only.** 11.2 shipped the Home screen —
-  the active workspace's projects, grouped starred/recent/active/archived, reached from
-  the product mark in the sidebar. "Shared with me", pending invites and Trash are absent
-  on purpose: each needs an index no single browser holds, so they arrive with the server
-  (13.4). Recent files are cross-project and say which project they come from; entries
-  whose entity is gone, or that predate project ids, are dropped rather than guessed at.
+- **The dashboard reads "Shared with me" and pending invites from the server** (18.4,
+  [shared-index.md](shared-index.md)) — the index no single browser could hold. It needs a
+  database and a signed-in session; without either, both sections say so rather than
+  claiming nothing was shared with you. A project the index names but this device has
+  never held appears without a name, because titles live in Yjs and Drive and never reach
+  the database that knows the membership. Trash is still absent
+  ([#115](https://github.com/FraOri03/Lattice/issues/115)). Recent files are cross-project
+  and say which project they come from; entries whose entity is gone, or that predate
+  project ids, are dropped rather than guessed at.
 - ~~**"Board" is overloaded** … Split behaves like a layout but is presented as a peer
   mode.~~ **Fixed** (`LAT-7`/`NAV-2`/`IA-1`): Split is now a layout toggle in
   `workspaceLayoutStore` and Graph is a content view; neither is a section. See
@@ -170,7 +173,14 @@ _Honesty gap tracked in [#9](https://github.com/FraOri03/Lattice/issues/9)._
   backups), not CRDT merges — for the Drive sync layer.
 - **Deletions never propagate** to Drive by design; a remote-cleanup UI is future work
   ([#32](https://github.com/FraOri03/Lattice/issues/32)).
-- **Invites are links, not e-mails** — there is no mail server.
+- **Invitations are e-mailed when a transport is configured** (18.2,
+  [mail.md](mail.md)) — `RESEND_API_KEY`, `MAIL_FROM`, and a **verified sending
+  domain**, without which nothing arrives. With none configured the invitation
+  is still created and the link still copies; the app says delivery is
+  unavailable rather than implying a message was sent. **Accepting** proves the
+  address from 18.3: an invitation can only be taken up by an account that
+  holds a verified identity for the address it was sent to, and on the local
+  and Drive tiers the signed-in address has to match.
 - **Identity ≠ storage** — Google sign-in is identity; Drive `drive.file` is a separate
   storage consent. This distinction is under-explained in the UI.
 - OAuth tokens live in browser storage (XSS-scoped; sign out to clear). The mock account

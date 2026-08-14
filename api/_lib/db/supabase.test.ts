@@ -249,11 +249,12 @@ describe('membership statements', () => {
     expect(calls.some((c) => c.op === 'delete')).toBe(true)
   })
 
-  it('keeps the address out of a PostgREST or-filter when listing projects', async () => {
+  it('keeps addresses out of a PostgREST or-filter when listing slots', async () => {
     const { client, calls } = fakeClient(() => ok([]))
     const db = new SupabaseRepositories(client)
-    await db.memberships.projectsOf(['usr_grace'], 'grace@example.com')
-    // two plain queries, never a composed filter expression
+    await db.memberships.slotsOf(['usr_grace'], ['grace@example.com', 'work@example.com'])
+    // two plain queries, never a composed filter expression — the address
+    // list rides in `.in()` as a parameter rather than as text
     expect(calls).toHaveLength(2)
     for (const call of calls) expect(filterNames(call)).not.toContain('or')
   })
@@ -267,11 +268,12 @@ describe('invitation conflicts', () => {
     projectId: 'p1',
     email: 'grace@example.com',
     role: 'editor' as const,
-    token: 'tok_1',
+    tokenHash: 'hash_1',
     createdAt: 1_700_000_000_000,
     invitedBy: 'usr_ada',
     invitedByName: 'Ada',
     status: 'pending' as const,
+    expiresAt: 1_701_000_000_000,
     updatedAt: 1_700_000_000_000,
   }
 
@@ -280,7 +282,7 @@ describe('invitation conflicts', () => {
     project_id: 'p1',
     email: 'grace@example.com',
     role: 'editor',
-    token: 'tok_winner',
+    token_hash: 'hash_winner',
     status: 'pending',
     invited_by: 'usr_ada',
     invited_by_name: 'Ada',
@@ -288,7 +290,8 @@ describe('invitation conflicts', () => {
     updated_at: '2026-01-01T00:00:00.000Z',
     resent_at: null,
     accepted_at: null,
-    expires_at: null,
+    accepted_by: null,
+    expires_at: '2026-01-15T00:00:00.000Z',
   }
 
   /**

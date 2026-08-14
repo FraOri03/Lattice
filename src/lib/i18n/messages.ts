@@ -182,6 +182,10 @@ export const en = {
     inviteCreated: (email: string) => `Invite created for ${email}`,
     inviteCreatedBody:
       'Link copied — send it yourself. It works wherever this project’s data is reachable (same browser, or same Drive).',
+    inviteEmailed: (email: string) => `Invitation e-mailed to ${email}`,
+    inviteEmailedBody: 'The link is on your clipboard too, if you would rather send it yourself.',
+    inviteMailFailed: 'The invitation exists, but the e-mail was not sent',
+    inviteMailFailedBody: 'The link is copied — send it yourself, or try resending later.',
     // member row
     you: '(you)',
     activeAgo: (ago: string) => `active ${ago}`,
@@ -204,15 +208,16 @@ export const en = {
     copyLink: 'Copy invite link',
     copiedTitle: 'Invite link copied',
     copiedBody: 'Send it to the invitee yourself — Lattice has no email backend.',
-    resendTitle: 'Resend (refreshes the invite; copy the link again)',
+    noLinkTitle: 'No link on this device',
+    noLinkBody:
+      'The server keeps only a fingerprint of the link, so it exists on the device that created it and nowhere else. Resend the invitation to mint a fresh one.',
+    resendFailed: 'The invitation could not be resent.',
+    resendTitle: 'Resend (mints a new link; the previous one stops working)',
     resendAria: 'Resend invite',
-    simulateTitle: 'Simulate acceptance (adds a mock member for testing roles)',
-    simulateAria: 'Simulate invite acceptance',
-    simulateJoined: (email: string) => `${email} joined (simulated)`,
     revoke: 'Revoke invite',
     // members footer note
     footerNote:
-      'Invites work wherever this project’s data is reachable (see the collaboration scope above). “Simulate acceptance” (✓) creates a mock member so you can test roles offline.',
+      'An invitation can only be accepted by the address it was sent to. To see the app as another role without a second person, use “Preview as role” in Settings.',
     // settings tab
     previewAsRole: 'Preview as role',
     previewAsRoleBody:
@@ -589,8 +594,12 @@ export const en = {
       scopeBrowserWhy: 'Shared inside this browser profile — visible on this device only.',
       scopeDriveWhy: 'Reaching you through the owner’s Google Drive folder.',
       unknownOwner: 'Owner not recorded',
+      notHereYet: 'Not on this device yet',
+      scopeServer: 'server',
+      scopeServerWhy:
+        'The server knows you are a member. The project itself has not reached this device, so it has no name here yet — open it from a device that holds it, or wait for Drive to sync.',
       whyPartial:
-        'Only projects whose data already reaches this browser can be listed — shared inside this profile, or through a Drive folder you both hold. A full index of everything shared with you needs the server planned for phase 18.',
+        'Only projects whose data already reaches this browser can be listed — shared inside this profile, or through a Drive folder you both hold. The full index needs a database and a signed-in session; this deployment has neither.',
       empty: 'No one has shared a project into this browser or this Drive folder.',
       grants: {
         admin: 'Manages members, roles and project settings. Cannot delete the project.',
@@ -604,7 +613,17 @@ export const en = {
       received: 'Received',
       sent: 'Sent',
       whyNoInbox:
-        'An invitation lives on the sender’s device, keyed to the project it is for, so there is no copy here to list. You learn of one today by opening its link. An inbox needs the server invitation model planned for phase 18.',
+        'Invitations waiting for you are read from the server, which needs a database and a signed-in session. This deployment has neither, so you learn of an invitation by opening its link.',
+      receivedIntro: (addresses: string) =>
+        `Invitations waiting for the addresses you have verified: ${addresses}.`,
+      receivedEmpty: 'Nothing is waiting for you.',
+      loading: 'Looking…',
+      invitedBy: (who: string, role: string) => `${who} invited you as ${role}`,
+      expires: (when: string) => `expires ${when}`,
+      accept: 'Accept',
+      decline: 'Decline',
+      accepted: 'Invitation accepted',
+      answerFailed: 'That invitation could not be answered',
       sentIntro:
         'Invitations you issued, gathered from the projects this device holds. Delivery is manual: copy the link and send it yourself.',
       sentEmpty: 'You haven’t invited anyone from this device yet.',
@@ -613,11 +632,13 @@ export const en = {
       status: {
         pending: 'Pending',
         accepted: 'Accepted',
+        declined: 'Declined',
         revoked: 'Revoked',
+        expired: 'Expired',
       },
-      /** Said once, so no row implies a delivery or expiry the app cannot see. */
+      /** Said once, so no row implies a delivery the app cannot see. */
       noDeliveryClaim:
-        'There is no e-mail backend and no expiry date, so nothing here says delivered, failed or expired.',
+        'There is still no e-mail backend, so nothing here says delivered or failed. Expiry is real from phase 18.1: an invitation stops working two weeks after it was sent.',
       invitedTo: (email: string, project: string) => `${email} · ${project}`,
     },
     trash: {
@@ -1285,6 +1306,11 @@ export const it: Catalog = {
     invite: 'Invita',
     cannotManage: 'Il tuo ruolo non può gestire i membri.',
     invalidEmail: 'Indirizzo email non valido',
+    inviteEmailed: (email) => `Invito inviato per e-mail a ${email}`,
+    inviteEmailedBody: 'Il link è anche negli appunti, se preferisci mandarlo tu.',
+    inviteMailFailed: 'L’invito esiste, ma l’e-mail non è partita',
+    inviteMailFailedBody:
+      'Il link è copiato: mandalo tu, oppure riprova a reinviare più tardi.',
     inviteCreated: (email) => `Invito creato per ${email}`,
     inviteCreatedBody:
       'Link copiato — invialo tu. Funziona ovunque i dati del progetto siano raggiungibili (stesso browser o stesso Drive).',
@@ -1309,14 +1335,15 @@ export const it: Catalog = {
     copyLink: 'Copia link d’invito',
     copiedTitle: 'Link d’invito copiato',
     copiedBody: 'Invialo tu alla persona invitata — Lattice non ha un backend email.',
-    resendTitle: 'Reinvia (rigenera l’invito; ricopia il link)',
+    noLinkTitle: 'Nessun link su questo dispositivo',
+    noLinkBody:
+      'Il server conserva solo un’impronta del link, quindi il link esiste sul dispositivo che l’ha creato e da nessun’altra parte. Reinvia l’invito per generarne uno nuovo.',
+    resendFailed: 'Non è stato possibile reinviare l’invito.',
+    resendTitle: 'Reinvia (genera un link nuovo; il precedente smette di funzionare)',
     resendAria: 'Reinvia invito',
-    simulateTitle: 'Simula accettazione (aggiunge un membro fittizio per testare i ruoli)',
-    simulateAria: 'Simula accettazione invito',
-    simulateJoined: (email) => `${email} è entrato (simulato)`,
     revoke: 'Revoca invito',
     footerNote:
-      'Gli inviti funzionano ovunque i dati del progetto siano raggiungibili (vedi l’ambito di collaborazione sopra). “Simula accettazione” (✓) crea un membro fittizio per testare i ruoli offline.',
+      'Un invito può essere accettato solo dall’indirizzo a cui è stato mandato. Per vedere l’app con un altro ruolo senza una seconda persona, usa “Anteprima come ruolo” nelle Impostazioni.',
     previewAsRole: 'Anteprima come ruolo',
     previewAsRoleBody:
       'Guarda il progetto come lo vede un membro con un ruolo diverso — board in sola lettura, azioni nascoste, accesso solo commenti. Solo per il proprietario; riguarda solo te.',
@@ -1651,8 +1678,12 @@ export const it: Catalog = {
         'Condiviso dentro questo profilo browser — visibile solo su questo dispositivo.',
       scopeDriveWhy: 'Ti arriva attraverso la cartella Google Drive del proprietario.',
       unknownOwner: 'Proprietario non registrato',
+      notHereYet: 'Non ancora su questo dispositivo',
+      scopeServer: 'server',
+      scopeServerWhy:
+        'Il server sa che sei un membro. Il progetto non è ancora arrivato su questo dispositivo, quindi qui non ha un nome: aprilo da un dispositivo che lo contiene, o aspetta la sincronizzazione con Drive.',
       whyPartial:
-        'Si possono elencare solo i progetti i cui dati arrivano già a questo browser — condivisi dentro questo profilo, o attraverso una cartella Drive che avete entrambi. Un indice completo di tutto ciò che ti è stato condiviso richiede il server previsto per la fase 18.',
+        'Si possono elencare solo i progetti i cui dati arrivano già a questo browser — condivisi dentro questo profilo, o attraverso una cartella Drive che avete entrambi. L’indice completo richiede un database e una sessione attiva: questo deployment non ha né l’uno né l’altra.',
       empty: 'Nessuno ha condiviso un progetto dentro questo browser o questa cartella Drive.',
       grants: {
         admin:
@@ -1667,7 +1698,17 @@ export const it: Catalog = {
       received: 'Ricevuti',
       sent: 'Inviati',
       whyNoInbox:
-        'Un invito vive sul dispositivo di chi lo manda, legato al progetto a cui si riferisce, quindi qui non esiste una copia da elencare. Oggi lo scopri aprendo il suo link. Una casella in arrivo richiede il modello di inviti lato server previsto per la fase 18.',
+        'Gli inviti in attesa si leggono dal server, che richiede un database e una sessione attiva. Questo deployment non ha né l’uno né l’altra, quindi scopri un invito aprendone il link.',
+      receivedIntro: (addresses) =>
+        `Inviti in attesa per gli indirizzi che hai verificato: ${addresses}.`,
+      receivedEmpty: 'Non c’è nulla in attesa per te.',
+      loading: 'Cerco…',
+      invitedBy: (who, role) => `${who} ti ha invitato come ${role}`,
+      expires: (when) => `scade ${when}`,
+      accept: 'Accetta',
+      decline: 'Rifiuta',
+      accepted: 'Invito accettato',
+      answerFailed: 'Non è stato possibile rispondere a questo invito',
       sentIntro:
         'Gli inviti che hai emesso, raccolti dai progetti che questo dispositivo contiene. La consegna è manuale: copia il link e mandalo tu.',
       sentEmpty: 'Non hai ancora invitato nessuno da questo dispositivo.',
@@ -1676,10 +1717,12 @@ export const it: Catalog = {
       status: {
         pending: 'In attesa',
         accepted: 'Accettato',
+        declined: 'Rifiutato',
         revoked: 'Revocato',
+        expired: 'Scaduto',
       },
       noDeliveryClaim:
-        'Non esiste un backend e-mail né una data di scadenza, quindi qui niente dice consegnato, fallito o scaduto.',
+        'Continua a non esserci un backend e-mail, quindi qui niente dice consegnato o fallito. La scadenza invece è reale dalla fase 18.1: un invito smette di funzionare due settimane dopo l’invio.',
       invitedTo: (email, project) => `${email} · ${project}`,
     },
     trash: {

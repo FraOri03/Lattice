@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useStore } from '@/store/useStore'
 import { useUiStore } from '@/store/useUiStore'
 import { useCollabStore } from '@/lib/collab/collabStore'
@@ -8,13 +8,13 @@ import { collabHub } from '@/lib/collab/hub'
 import { useMyRole } from '@/lib/collab/useCollab'
 import { useCollabMode } from '@/lib/collab/collabPresentation'
 import { assignableRoles, can, canManageRole } from '@/lib/collab/permissions'
+import { isLive } from '@/lib/collab/invitations'
 import { currentIdentity, colorForUser } from '@/lib/collab/CollaborationProvider'
 import { useI18n, useTimeAgo } from '@/lib/i18n'
 import { type CollabRole, type ProjectInvite, type ProjectMember } from '@/types/collab'
 import { toast } from '@/components/ui/Toaster'
 import { confirmDialog } from '@/components/ui/ConfirmDialog'
 import {
-  IcCheck,
   IcCopy,
   IcEye,
   IcInfo,
@@ -135,8 +135,19 @@ function MemberRow({ member, projectId }: { member: ProjectMember; projectId: st
 function InviteRow({ invite, projectId }: { invite: ProjectInvite; projectId: string }) {
   const t = useI18n()
   const timeAgo = useTimeAgo()
-  const copyLink = () => {
-    void navigator.clipboard.writeText(inviteService.linkFor(invite))
+  /**
+   * The link exists only where its token does — the device that created the
+   * invitation, or the one that last resent it. Anywhere else the record
+   * carries a digest, and 18.1's answer to "copy the link" is to say so and
+   * offer the resend that mints a fresh one.
+   */
+  const copyLink = (target: ProjectInvite = invite) => {
+    const link = inviteService.linkFor(target)
+    if (!link) {
+      toast.warning(t.share.noLinkTitle, t.share.noLinkBody)
+      return
+    }
+    void navigator.clipboard.writeText(link)
     toast.success(t.share.copiedTitle, t.share.copiedBody)
   }
   return (
@@ -157,7 +168,12 @@ function InviteRow({ invite, projectId }: { invite: ProjectInvite; projectId: st
       <span className="rounded-full bg-[#ffa629]/15 px-2 py-0.5 text-[10px] font-medium text-[#ffa629]">
         {t.share.pending}
       </span>
-      <button className="icon-btn h-6 w-6" title={t.share.copyLink} aria-label={t.share.copyLink} onClick={copyLink}>
+      <button
+        className="icon-btn h-6 w-6"
+        title={t.share.copyLink}
+        aria-label={t.share.copyLink}
+        onClick={() => copyLink()}
+      >
         <IcCopy size={12} />
       </button>
       <button
@@ -165,28 +181,20 @@ function InviteRow({ invite, projectId }: { invite: ProjectInvite; projectId: st
         title={t.share.resendTitle}
         aria-label={t.share.resendAria}
         onClick={() => {
-          inviteService.resend(projectId, invite.id)
-          copyLink()
+          // the fresh token only exists in the reply, so the copy waits for it
+          void inviteService.resend(projectId, invite.id).then((updated) => {
+            if (updated) copyLink(updated)
+            else toast.error(t.share.resendFailed)
+          })
         }}
       >
         <IcRefresh size={12} />
       </button>
       <button
         className="icon-btn h-6 w-6"
-        title={t.share.simulateTitle}
-        aria-label={t.share.simulateAria}
-        onClick={() => {
-          inviteService.acceptAsMock(invite)
-          toast.success(t.share.simulateJoined(invite.email))
-        }}
-      >
-        <IcCheck size={12} />
-      </button>
-      <button
-        className="icon-btn h-6 w-6"
         title={t.share.revoke}
         aria-label={t.share.revoke}
-        onClick={() => inviteService.revoke(projectId, invite.id)}
+        onClick={() => void inviteService.revoke(projectId, invite.id)}
       >
         <IcX size={12} />
       </button>
@@ -285,21 +293,51 @@ export function ShareDialog() {
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<CollabRole>('editor')
 
+  /**
+   * The server owns the invitation records from 18.1, so this device asks
+   * what the project actually has outstanding rather than showing only what
+   * it happened to create itself. A no-op when there is no database.
+   */
+  useEffect(() => {
+    if (open && projectId) void inviteService.refresh(projectId)
+  }, [open, projectId])
+
   if (!open || !project) return null
 
   const activeMembers = members.filter((m) => m.status === 'active')
-  const pendingInvites = invites.filter((i) => i.status === 'pending')
+  // the clock, not the column: an offer past its deadline is not pending
+  const pendingInvites = invites.filter((i) => isLive(i, Date.now()))
   const mayInvite = can(myRole, 'members.manage')
 
   const sendInvite = () => {
-    const invite = inviteService.create(projectId, email, role)
-    if (!invite) {
-      toast.error(t.share.invalidEmail)
-      return
-    }
-    setEmail('')
-    void navigator.clipboard.writeText(inviteService.linkFor(invite))
-    toast.success(t.share.inviteCreated(invite.email), t.share.inviteCreatedBody)
+    void inviteService.create(projectId, email, role).then((result) => {
+      if (!result.ok || !result.invite) {
+        // the server's own words when it refused (already a member, rank it
+        // may not assign); the local rejection only ever means the address
+        toast.error(result.error ?? t.share.invalidEmail)
+        return
+      }
+      setEmail('')
+      const link = inviteService.linkFor(result.invite)
+      if (link) void navigator.clipboard.writeText(link)
+      const address = result.invite.email
+      /**
+       * Three different things happened and the toast says which (18.2).
+       * "Sent" and "there is no mail backend" used to be the same sentence,
+       * which meant the one case where a message really failed looked
+       * exactly like success.
+       */
+      if (result.delivery === 'sent') {
+        toast.success(t.share.inviteEmailed(address), t.share.inviteEmailedBody)
+      } else if (result.delivery === 'failed') {
+        toast.warning(t.share.inviteMailFailed, t.share.inviteMailFailedBody)
+      } else {
+        toast.success(
+          t.share.inviteCreated(address),
+          link ? t.share.inviteCreatedBody : t.share.noLinkBody,
+        )
+      }
+    })
   }
 
   return (

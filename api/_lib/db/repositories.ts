@@ -9,6 +9,7 @@ import type { CollabRole, ProjectInvite } from '../../../src/types/collab.js'
 import type { Entitlement } from '../../../src/types/entitlement.js'
 import type { Session } from '../../../src/types/session.js'
 import type { OtpCode } from '../../../src/types/otpRecord.js'
+import type { MailSend } from '../../../src/types/mail.js'
 import type { RoomAcl } from '../../../src/lib/collab/acl.js'
 
 /**
@@ -83,6 +84,16 @@ export interface IdentityRepository {
 
 /* ---------------- membership ---------------- */
 
+/** One ACL slot as the shared-projects index reads it (Phase 18.4, #91). */
+export interface MembershipSlot {
+  projectId: string
+  /** The address the slot was opened with. */
+  email: string
+  role: CollabRole
+  /** The userId that claimed it, or null while nobody has. */
+  userId: string | null
+}
+
 /**
  * The project ACL, in the storage the 16.3 decision picked for it.
  *
@@ -120,13 +131,28 @@ export interface MembershipRepository {
   bind(projectId: string, email: string, userId: string): Promise<void>
 
   /**
-   * Every project this person is a member of — by binding, or by an
-   * address nobody has claimed yet.
+   * Every slot this person holds — by binding, or by an address nobody has
+   * claimed yet.
    *
-   * This is what "Shared with me" needs and what no store can answer
-   * today: a browser can only see its own memberships.
+   * This is what "Shared with me" needs and what no store can answer: a
+   * browser only ever sees its own memberships.
+   *
+   * Several addresses, not one, because 16.1 lets an account hold more than
+   * one verified identity and a project shared with either of them is
+   * shared with the same person. The role travels with the row rather than
+   * being fetched per project afterwards: the dashboard needs it for every
+   * entry, and one query that already knows it beats N that ask again.
    */
-  projectsOf(userIds: string[], email: string): Promise<string[]>
+  slotsOf(userIds: string[], emails: string[]): Promise<MembershipSlot[]>
+
+  /**
+   * Who owns each of these projects, keyed by projectId.
+   *
+   * "Shared with me" groups by the person on the other side, and the owner
+   * is the only slot that identifies them. One query for the whole page,
+   * rather than an ACL load per row.
+   */
+  ownersOf(projectIds: string[]): Promise<Record<string, string>>
 
   /** Drop every membership of a project — the project itself is gone. */
   removeProject(projectId: string): Promise<void>
@@ -143,7 +169,21 @@ export interface InvitationRepository {
    */
   create(invite: ProjectInvite): Promise<ProjectInvite>
 
-  byToken(token: string): Promise<ProjectInvite | null>
+  /**
+   * The invitation a link presents, found by the DIGEST of its token
+   * (Phase 18.1).
+   *
+   * The raw token never reaches this layer, which is what makes "the
+   * database holds no usable invitation credential" a property of the
+   * types rather than a habit — the same arrangement sessions and one-time
+   * codes already have.
+   *
+   * Every status is returned, not only `pending`: a caller that asks about
+   * a revoked invitation needs to be told it was revoked, and answering
+   * `null` would make an expired link and a forged one indistinguishable to
+   * the person holding a real one.
+   */
+  byTokenHash(tokenHash: string): Promise<ProjectInvite | null>
 
   ofProject(projectId: string): Promise<ProjectInvite[]>
 
@@ -260,6 +300,27 @@ export interface OtpRepository {
   countForIp(ip: string, since: number): Promise<number>
 }
 
+/* ---------------- mail sends ---------------- */
+
+/**
+ * The evidence rate limiting is decided on (Phase 18.2, #89).
+ *
+ * One row per message attempted, because that is the thing being limited.
+ * `project_invitations` cannot answer this: one row covers an invitation for
+ * its whole life, so a sender who resends fifty times produces one row and
+ * fifty e-mails.
+ */
+export interface MailSendRepository {
+  /** Record an attempt. Called whether or not the provider then accepts it. */
+  record(send: MailSend): Promise<void>
+
+  /** Messages to this address since `since` — the per-recipient ceiling. */
+  countForRecipient(recipient: string, since: number): Promise<number>
+
+  /** Messages from this project since `since` — the per-project ceiling. */
+  countForScope(scope: string, since: number): Promise<number>
+}
+
 /* ---------------- the set of them ---------------- */
 
 export interface Repositories {
@@ -269,4 +330,5 @@ export interface Repositories {
   entitlements: EntitlementRepository
   sessions: SessionRepository
   otp: OtpRepository
+  mailSends: MailSendRepository
 }

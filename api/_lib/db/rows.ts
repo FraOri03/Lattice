@@ -9,6 +9,7 @@ import type { RoomAcl } from '../../../src/lib/collab/acl.js'
 import type { UsageType } from '../../../src/types/model.js'
 import type { Session } from '../../../src/types/session.js'
 import type { OtpCode } from '../../../src/types/otpRecord.js'
+import type { MailKind, MailSend } from '../../../src/types/mail.js'
 
 /**
  * The shape the database actually stores, and the translation to and from
@@ -199,12 +200,18 @@ export function rowsFromAcl(
 
 /* ---------------- invitations ---------------- */
 
+/**
+ * `token_hash` gets the same treatment as `session.token_hash`: the digest
+ * is stored, the value never is. {@link ProjectInvite.token} exists in the
+ * domain only on the copy that was just minted, and there is deliberately
+ * no column it could be written to.
+ */
 export interface InvitationRow {
   id: string
   project_id: string
   email: string
   role: string
-  token: string
+  token_hash: string
   status: string
   invited_by: string | null
   invited_by_name: string
@@ -212,7 +219,8 @@ export interface InvitationRow {
   updated_at: string
   resent_at: string | null
   accepted_at: string | null
-  expires_at: string | null
+  accepted_by: string | null
+  expires_at: string
 }
 
 export function inviteFromRow(row: InvitationRow): ProjectInvite {
@@ -221,17 +229,19 @@ export function inviteFromRow(row: InvitationRow): ProjectInvite {
     projectId: row.project_id,
     email: row.email,
     role: row.role as CollabRole,
-    token: row.token,
+    tokenHash: row.token_hash,
     createdAt: fromIso(row.created_at),
     invitedBy: row.invited_by ?? '',
     invitedByName: row.invited_by_name,
     status: row.status as InviteStatus,
+    expiresAt: fromIso(row.expires_at),
     updatedAt: fromIso(row.updated_at),
   }
   const resentAt = fromIsoOrNull(row.resent_at)
   if (resentAt !== null) invite.resentAt = resentAt
   const acceptedAt = fromIsoOrNull(row.accepted_at)
   if (acceptedAt !== null) invite.acceptedAt = acceptedAt
+  if (row.accepted_by) invite.acceptedBy = row.accepted_by
   return invite
 }
 
@@ -241,7 +251,7 @@ export function inviteToRow(invite: ProjectInvite): InvitationRow {
     project_id: invite.projectId,
     email: invite.email.toLowerCase(),
     role: invite.role,
-    token: invite.token,
+    token_hash: invite.tokenHash,
     status: invite.status,
     invited_by: invite.invitedBy || null,
     invited_by_name: invite.invitedByName,
@@ -249,7 +259,8 @@ export function inviteToRow(invite: ProjectInvite): InvitationRow {
     updated_at: toIso(invite.updatedAt),
     resent_at: toIsoOrNull(invite.resentAt),
     accepted_at: toIsoOrNull(invite.acceptedAt),
-    expires_at: null,
+    accepted_by: invite.acceptedBy ?? null,
+    expires_at: toIso(invite.expiresAt),
   }
 }
 
@@ -352,6 +363,36 @@ export function otpToRow(code: OtpCode): OtpRow {
     consumed_at: toIsoOrNull(code.consumedAt),
     attempts: code.attempts,
     request_ip: code.requestIp,
+  }
+}
+
+/* ---------------- mail sends ---------------- */
+
+export interface MailSendRow {
+  id: string
+  kind: string
+  recipient: string
+  scope: string
+  created_at: string
+}
+
+export function mailSendFromRow(row: MailSendRow): MailSend {
+  return {
+    id: row.id,
+    kind: row.kind as MailKind,
+    recipient: row.recipient,
+    scope: row.scope,
+    createdAt: fromIso(row.created_at),
+  }
+}
+
+export function mailSendToRow(send: MailSend): MailSendRow {
+  return {
+    id: send.id,
+    kind: send.kind,
+    recipient: send.recipient.toLowerCase(),
+    scope: send.scope,
+    created_at: toIso(send.createdAt),
   }
 }
 

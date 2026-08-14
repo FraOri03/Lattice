@@ -38,21 +38,53 @@ export interface ProjectMember {
 
 /* ---------------- invitations ---------------- */
 
-export type InviteStatus = 'pending' | 'accepted' | 'revoked' | 'expired'
+/**
+ * `declined` is the recipient's answer; `revoked` is the sender's. They were
+ * one value until 18.1, which meant an audit trail could not tell "they said
+ * no" from "we changed our mind" (#88).
+ */
+export type InviteStatus =
+  | 'pending'
+  | 'accepted'
+  | 'declined'
+  | 'revoked'
+  | 'expired'
 
 export interface ProjectInvite {
   id: string
   projectId: string
   email: string
   role: CollabRole
-  /** opaque token carried by the invite link */
-  token: string
+  /**
+   * SHA-256 of the token the link carries. This is what the server stores
+   * and compares against, and it is safe to hand to anyone who may see the
+   * invitation: it grants nothing.
+   */
+  tokenHash: string
+  /**
+   * The token itself, present ONLY on the copy held by whoever minted it.
+   *
+   * The server returns it exactly once, in the reply to `create` and
+   * `resend`, because that reply is the one moment a link can be built. It
+   * is never on an invitation loaded from the server afterwards — that copy
+   * carries the digest and nothing else, which is what makes listing
+   * invitations safe.
+   */
+  token?: string
   createdAt: number
   invitedBy: string
   invitedByName: string
   status: InviteStatus
+  /**
+   * When this invitation stops being acceptable. Always set from 18.1: an
+   * invitation without a deadline is a permanent grant to whoever ends up
+   * holding the mailbox.
+   */
+  expiresAt: number
   resentAt?: number
   acceptedAt?: number
+  /** The userId that accepted. Set by 18.3, which is what verifies it. */
+  acceptedBy?: string
   updatedAt: number
 }
 
