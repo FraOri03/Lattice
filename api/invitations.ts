@@ -159,39 +159,65 @@ async function deliver(
   req: ApiRequest,
   body: Body,
   now: number,
-): Promise<MailDelivery> {
-  if (!mail) return 'unavailable'
+): Promise<{ delivery: MailDelivery; reason?: string }> {
+  if (!mail) return { delivery: 'unavailable' }
   const origin = originOf(req)
-  if (!origin) return 'unavailable'
+  if (!origin) return { delivery: 'unavailable' }
 
   const projectName =
     typeof body.projectName === 'string' && body.projectName.trim()
       ? body.projectName.trim().slice(0, 120)
       : invite.projectId
 
+  /**
+   * The message is built OUTSIDE the try, and that is the point.
+   *
+   * It used to be built as the argument to `mail.send()`, inside it — so a
+   * template that threw (an unformattable deadline is enough) was caught by
+   * the handler meant for provider rejections and reported as "the e-mail
+   * was not sent". No request was ever made, yet the sender was advised to
+   * try resending, which could never have worked. Two unrelated failures
+   * wearing one face, in the logs as well as on screen.
+   *
+   * A template that throws is a bug in Lattice. It says so.
+   */
+  let message
+  try {
+    message = invitationMessage({
+      to: invite.email,
+      projectName,
+      role: invite.role,
+      inviterName: identity.name || identity.email,
+      inviterEmail: identity.email,
+      expiresAt: invite.expiresAt,
+      link: `${origin}/#invite=${encodeURIComponent(token)}`,
+      origin,
+      locale: normaliseLocale(body.locale),
+    })
+  } catch (err) {
+    console.error('[invitations] could not build the message:', err)
+    return { delivery: 'failed', reason: 'Lattice could not compose the message.' }
+  }
+
   // recorded before the attempt: a send that failed still consumed the
   // sender's allowance, or retrying would be a way around the ceiling
   await recordSend(db.mailSends, 'invitation', invite.email, invite.projectId, now)
 
   try {
-    await mail.send(
-      invitationMessage({
-        to: invite.email,
-        projectName,
-        role: invite.role,
-        inviterName: identity.name || identity.email,
-        inviterEmail: identity.email,
-        expiresAt: invite.expiresAt,
-        link: `${origin}/#invite=${encodeURIComponent(token)}`,
-        origin,
-        locale: normaliseLocale(body.locale),
-      }),
-    )
-    return 'sent'
+    await mail.send(message)
+    return { delivery: 'sent' }
   } catch (err) {
-    // the detail belongs in the logs; the caller gets a state, not a stack
-    console.warn('[invitations] delivery failed:', err)
-    return 'failed'
+    /**
+     * The provider's own words, handed to the sender.
+     *
+     * They are the difference between "verify your sending domain" and an
+     * afternoon of guessing, and the caller is an authenticated member who
+     * may manage this project — not the public. Truncated, because a
+     * provider error is a sentence, not a payload.
+     */
+    const detail = err instanceof Error ? err.message : String(err)
+    console.warn('[invitations] delivery failed:', detail)
+    return { delivery: 'failed', reason: detail.slice(0, 300) }
   }
 }
 
@@ -564,14 +590,15 @@ export default async function handler(req: ApiRequest, res: ApiRes): Promise<voi
        * hand back a link that opens nothing.
        */
       const mine = stored.id === draft.id
-      const delivery = mine
+      const sending = mine
         ? await deliver(db, mail, stored, token, identity, req, body, now)
         : // nothing was minted, so there is no link to put in a message
-          'unavailable'
+          { delivery: 'unavailable' as const }
       res.status(mine ? 201 : 200).json({
         invite: redact(stored, now),
         token: mine ? token : null,
-        delivery,
+        delivery: sending.delivery,
+        deliveryError: sending.reason,
       })
       return
     }
@@ -623,8 +650,13 @@ export default async function handler(req: ApiRequest, res: ApiRes): Promise<voi
         sendError(res, 404, 'No such invitation in this project.')
         return
       }
-      const delivery = await deliver(db, mail, updated, token, identity, req, body, now)
-      res.status(200).json({ invite: redact(updated, now), token, delivery })
+      const sending = await deliver(db, mail, updated, token, identity, req, body, now)
+      res.status(200).json({
+        invite: redact(updated, now),
+        token,
+        delivery: sending.delivery,
+        deliveryError: sending.reason,
+      })
       return
     }
 

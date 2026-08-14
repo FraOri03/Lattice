@@ -69,6 +69,13 @@ export interface InviteResult {
    * could not be sent, and the UI says so differently.
    */
   delivery?: MailDelivery
+  /**
+   * Why delivery failed, in the provider's own words (or Lattice's, when it
+   * could not compose the message). Shown to the sender because they are the
+   * only person who can act on it — "verify your sending domain" is an
+   * afternoon of guessing otherwise.
+   */
+  deliveryError?: string
 }
 
 /**
@@ -286,6 +293,7 @@ class InviteService {
       invite: ProjectInvite
       token: string | null
       delivery?: MailDelivery
+      deliveryError?: string
     }>({
       action: 'create',
       projectId,
@@ -306,7 +314,12 @@ class InviteService {
     void import('./ServerAclService').then(({ serverAcl }) =>
       serverAcl.setRole(projectId, clean, role),
     )
-    return { ok: true, invite, delivery: reply?.ok ? reply.data.delivery : undefined }
+    return {
+      ok: true,
+      invite,
+      delivery: reply?.ok ? reply.data.delivery : undefined,
+      deliveryError: reply?.ok ? reply.data.deliveryError : undefined,
+    }
   }
 
   /**
