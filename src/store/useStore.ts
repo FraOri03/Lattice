@@ -413,6 +413,13 @@ interface AppState {
   deleteWorkspace: (id: string) => void
   setActiveWorkspace: (id: string) => void
   moveProjectToWorkspace: (projectId: string, workspaceId: string) => void
+  /**
+   * Give every project a workspace: orphans join the personal one.
+   * Membership is what the project lists filter on, so a project in no
+   * workspace is invisible everywhere. See the definition for why that
+   * happens and why this runs on hydration and after every pull.
+   */
+  adoptOrphanProjects: () => void
 
   createProject: (partial?: Partial<Project>) => string
   updateProject: (id: string, patch: Partial<Omit<Project, 'id'>>) => void
@@ -983,6 +990,48 @@ export const useStore = create<AppState>()(
           // the visible context follows the moved active project
           activeWorkspaceId:
             s.activeProjectId === projectId ? workspaceId : s.activeWorkspaceId,
+        })
+      },
+
+      /**
+       * Adopt every project that belongs to no workspace into the personal
+       * one.
+       *
+       * Workspace membership lives in `workspace.projectIds` and is written
+       * by `createProject` — which is the only way a project enters a vault
+       * locally. A project can also arrive WITHOUT being created here: the
+       * Drive pull merges project records straight into `projects`, and the
+       * snapshot on Drive carries no workspace (workspaces are local
+       * organization, projects are the synced unit). Such a project is in
+       * `projects` but in no `projectIds`, and since Home, the dashboard nav
+       * and the project switcher all list `projectIds`, it is invisible in
+       * every one of them while sync reports it perfectly in order.
+       *
+       * That is why this runs both on hydration — healing vaults already in
+       * that state — and after each pull. Adoption is the conservative
+       * choice: a project the user can see in the wrong workspace can be
+       * moved; one they cannot see at all looks like data loss.
+       */
+      adoptOrphanProjects: () => {
+        const s = get()
+        const personal = s.workspaces[PERSONAL_WORKSPACE_ID]
+        // no personal workspace: the lists fall back to showing everything,
+        // so there is nothing to heal and nowhere safe to put these
+        if (!personal) return
+        const owned = new Set(
+          Object.values(s.workspaces).flatMap((ws) => ws.projectIds),
+        )
+        const orphans = Object.keys(s.projects).filter((id) => !owned.has(id))
+        if (!orphans.length) return
+        set({
+          workspaces: {
+            ...s.workspaces,
+            [PERSONAL_WORKSPACE_ID]: {
+              ...personal,
+              projectIds: [...personal.projectIds, ...orphans],
+              updatedAt: Date.now(),
+            },
+          },
         })
       },
 
@@ -2524,8 +2573,13 @@ export const useStore = create<AppState>()(
         return s as AppState
       },
       // hydration is the moment a session meets the vault it was stored
-      // against: anything it points at that is no longer there goes now
-      onRehydrateStorage: () => (state) => state?.pruneTabSessions(),
+      // against: anything it points at that is no longer there goes now —
+      // and any project the vault holds but no workspace claims (a project
+      // pulled from Drive, which is invisible until adopted) gets a home
+      onRehydrateStorage: () => (state) => {
+        state?.pruneTabSessions()
+        state?.adoptOrphanProjects()
+      },
       partialize: (s) => ({
         workspaces: s.workspaces,
         activeWorkspaceId: s.activeWorkspaceId,
