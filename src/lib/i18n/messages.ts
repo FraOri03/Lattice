@@ -204,7 +204,11 @@ export const en = {
     copyLink: 'Copy invite link',
     copiedTitle: 'Invite link copied',
     copiedBody: 'Send it to the invitee yourself — Lattice has no email backend.',
-    resendTitle: 'Resend (refreshes the invite; copy the link again)',
+    noLinkTitle: 'No link on this device',
+    noLinkBody:
+      'The server keeps only a fingerprint of the link, so it exists on the device that created it and nowhere else. Resend the invitation to mint a fresh one.',
+    resendFailed: 'The invitation could not be resent.',
+    resendTitle: 'Resend (mints a new link; the previous one stops working)',
     resendAria: 'Resend invite',
     simulateTitle: 'Simulate acceptance (adds a mock member for testing roles)',
     simulateAria: 'Simulate invite acceptance',
@@ -604,7 +608,7 @@ export const en = {
       received: 'Received',
       sent: 'Sent',
       whyNoInbox:
-        'An invitation lives on the sender’s device, keyed to the project it is for, so there is no copy here to list. You learn of one today by opening its link. An inbox needs the server invitation model planned for phase 18.',
+        'An invitation is a server record from phase 18.1, but nothing yet asks the server what is waiting for your address — that index is phase 18.4. Until then you learn of an invitation by opening its link.',
       sentIntro:
         'Invitations you issued, gathered from the projects this device holds. Delivery is manual: copy the link and send it yourself.',
       sentEmpty: 'You haven’t invited anyone from this device yet.',
@@ -613,11 +617,13 @@ export const en = {
       status: {
         pending: 'Pending',
         accepted: 'Accepted',
+        declined: 'Declined',
         revoked: 'Revoked',
+        expired: 'Expired',
       },
-      /** Said once, so no row implies a delivery or expiry the app cannot see. */
+      /** Said once, so no row implies a delivery the app cannot see. */
       noDeliveryClaim:
-        'There is no e-mail backend and no expiry date, so nothing here says delivered, failed or expired.',
+        'There is still no e-mail backend, so nothing here says delivered or failed. Expiry is real from phase 18.1: an invitation stops working two weeks after it was sent.',
       invitedTo: (email: string, project: string) => `${email} · ${project}`,
     },
     trash: {
@@ -1309,7 +1315,11 @@ export const it: Catalog = {
     copyLink: 'Copia link d’invito',
     copiedTitle: 'Link d’invito copiato',
     copiedBody: 'Invialo tu alla persona invitata — Lattice non ha un backend email.',
-    resendTitle: 'Reinvia (rigenera l’invito; ricopia il link)',
+    noLinkTitle: 'Nessun link su questo dispositivo',
+    noLinkBody:
+      'Il server conserva solo un’impronta del link, quindi il link esiste sul dispositivo che l’ha creato e da nessun’altra parte. Reinvia l’invito per generarne uno nuovo.',
+    resendFailed: 'Non è stato possibile reinviare l’invito.',
+    resendTitle: 'Reinvia (genera un link nuovo; il precedente smette di funzionare)',
     resendAria: 'Reinvia invito',
     simulateTitle: 'Simula accettazione (aggiunge un membro fittizio per testare i ruoli)',
     simulateAria: 'Simula accettazione invito',
@@ -1667,7 +1677,7 @@ export const it: Catalog = {
       received: 'Ricevuti',
       sent: 'Inviati',
       whyNoInbox:
-        'Un invito vive sul dispositivo di chi lo manda, legato al progetto a cui si riferisce, quindi qui non esiste una copia da elencare. Oggi lo scopri aprendo il suo link. Una casella in arrivo richiede il modello di inviti lato server previsto per la fase 18.',
+        'Dalla fase 18.1 un invito è un record sul server, ma nessuno chiede ancora al server che cosa sta aspettando il tuo indirizzo: quell’indice è la fase 18.4. Fino ad allora scopri un invito aprendone il link.',
       sentIntro:
         'Gli inviti che hai emesso, raccolti dai progetti che questo dispositivo contiene. La consegna è manuale: copia il link e mandalo tu.',
       sentEmpty: 'Non hai ancora invitato nessuno da questo dispositivo.',
@@ -1676,10 +1686,12 @@ export const it: Catalog = {
       status: {
         pending: 'In attesa',
         accepted: 'Accettato',
+        declined: 'Rifiutato',
         revoked: 'Revocato',
+        expired: 'Scaduto',
       },
       noDeliveryClaim:
-        'Non esiste un backend e-mail né una data di scadenza, quindi qui niente dice consegnato, fallito o scaduto.',
+        'Continua a non esserci un backend e-mail, quindi qui niente dice consegnato o fallito. La scadenza invece è reale dalla fase 18.1: un invito smette di funzionare due settimane dopo l’invio.',
       invitedTo: (email, project) => `${email} · ${project}`,
     },
     trash: {

@@ -131,10 +131,13 @@ describe('Invites', () => {
 
     fireEvent.click(screen.getByRole('tab', { name: 'Received' }))
 
-    expect(main().getByText(/lives on the sender’s device/)).toBeInTheDocument()
+    // 18.1 moved the constraint rather than removing it: the record is on the
+    // server now, and what is missing is the index that answers "what is
+    // waiting for my address" (18.4, #91)
+    expect(main().getByText(/that index is phase 18.4/)).toBeInTheDocument()
   })
 
-  it('lists sent invitations, and claims no delivery or expiry', () => {
+  it('lists sent invitations, and still claims no delivery', () => {
     const s = useStore.getState()
     const pid = s.createProject({ name: 'Acme' })
     const invite = {
@@ -142,11 +145,12 @@ describe('Invites', () => {
       projectId: pid,
       email: 'giulia@example.com',
       role: 'editor',
-      token: 't',
+      tokenHash: 'h',
       createdAt: Date.now(),
       invitedBy: 'me',
       invitedByName: 'Me',
       status: 'pending',
+      expiresAt: Date.now() + 14 * 24 * 60 * 60 * 1000,
       updatedAt: 0,
     } as ProjectInvite
     useCollabStore.setState({ invites: { [pid]: [invite] } })
@@ -156,10 +160,11 @@ describe('Invites', () => {
 
     expect(main().getByText('giulia@example.com · Acme')).toBeInTheDocument()
     expect(main().getByText('Pending')).toBeInTheDocument()
-    expect(main().getByText(/nothing here says delivered, failed or expired/)).toBeInTheDocument()
+    // no mail backend is still true (18.2, #89); expiry no longer is
+    expect(main().getByText(/nothing here says delivered or failed/)).toBeInTheDocument()
   })
 
-  it('never shows a status nothing computes', () => {
+  it('shows an expired invitation, now that something computes the deadline', () => {
     const s = useStore.getState()
     const pid = s.createProject({ name: 'Acme' })
     const expired = {
@@ -167,11 +172,12 @@ describe('Invites', () => {
       projectId: pid,
       email: 'old@example.com',
       role: 'viewer',
-      token: 't',
+      tokenHash: 'h',
       createdAt: 1,
       invitedBy: 'me',
       invitedByName: 'Me',
       status: 'expired',
+      expiresAt: 2,
       updatedAt: 0,
     } as ProjectInvite
     useCollabStore.setState({ invites: { [pid]: [expired] } })
@@ -179,9 +185,10 @@ describe('Invites', () => {
 
     renderDashboard()
 
-    // there is no `expiresAt` anywhere, so a row wearing that badge would be
-    // claiming a check that never happened
-    expect(main().queryByText('old@example.com · Acme')).toBeNull()
+    // the badge is a claim the app can now back: `expiresAt` is real and the
+    // shared rules decide against the clock (#88)
+    expect(main().getByText('old@example.com · Acme')).toBeInTheDocument()
+    expect(main().getByText('Expired')).toBeInTheDocument()
   })
 
   it('shows no count on the navigation, because it cannot compute one', () => {

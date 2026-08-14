@@ -267,11 +267,12 @@ describe('invitation conflicts', () => {
     projectId: 'p1',
     email: 'grace@example.com',
     role: 'editor' as const,
-    token: 'tok_1',
+    tokenHash: 'hash_1',
     createdAt: 1_700_000_000_000,
     invitedBy: 'usr_ada',
     invitedByName: 'Ada',
     status: 'pending' as const,
+    expiresAt: 1_701_000_000_000,
     updatedAt: 1_700_000_000_000,
   }
 
@@ -280,7 +281,7 @@ describe('invitation conflicts', () => {
     project_id: 'p1',
     email: 'grace@example.com',
     role: 'editor',
-    token: 'tok_winner',
+    token_hash: 'hash_winner',
     status: 'pending',
     invited_by: 'usr_ada',
     invited_by_name: 'Ada',
@@ -288,7 +289,8 @@ describe('invitation conflicts', () => {
     updated_at: '2026-01-01T00:00:00.000Z',
     resent_at: null,
     accepted_at: null,
-    expires_at: null,
+    accepted_by: null,
+    expires_at: '2026-01-15T00:00:00.000Z',
   }
 
   /**

@@ -426,9 +426,13 @@ class SupabaseInvitationRepository implements InvitationRepository {
     return row ? inviteFromRow(row) : null
   }
 
-  async byToken(token: string): Promise<ProjectInvite | null> {
+  async byTokenHash(tokenHash: string): Promise<ProjectInvite | null> {
     const row = unwrap<InvitationRow>(
-      await this.db.from(INVITATIONS).select('*').eq('token', token).maybeSingle(),
+      await this.db
+        .from(INVITATIONS)
+        .select('*')
+        .eq('token_hash', tokenHash)
+        .maybeSingle(),
       'load invitation by token',
     )
     return row ? inviteFromRow(row) : null

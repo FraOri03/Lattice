@@ -218,11 +218,12 @@ describe('InvitationRepository', () => {
     projectId: 'p1',
     email: 'grace@example.com',
     role: 'editor',
-    token: 'tok_1',
+    tokenHash: 'hash_1',
     createdAt: 1_700_000_000_000,
     invitedBy: 'usr_ada',
     invitedByName: 'Ada',
     status: 'pending',
+    expiresAt: 1_700_000_000_000 + 14 * 24 * 60 * 60 * 1000,
     updatedAt: 1_700_000_000_000,
     ...over,
   })
@@ -230,12 +231,48 @@ describe('InvitationRepository', () => {
   it('stores and reads back an invitation', async () => {
     const created = await db.invitations.create(invite())
     expect(created).toMatchObject({ email: 'grace@example.com', role: 'editor' })
-    expect(await db.invitations.byToken('tok_1')).toMatchObject({ id: 'inv_1' })
+    expect(await db.invitations.byTokenHash('hash_1')).toMatchObject({ id: 'inv_1' })
+  })
+
+  it('stores the digest and never a token', async () => {
+    // the domain type allows a raw token on a freshly minted copy; the row
+    // has nowhere to put it, which is the property 18.1 is after
+    await db.invitations.create(invite({ token: 'the-secret-token' }))
+    const loaded = await db.invitations.byTokenHash('hash_1')
+    expect(loaded?.token).toBeUndefined()
+    expect(loaded?.tokenHash).toBe('hash_1')
+  })
+
+  it('keeps the deadline through a round trip', async () => {
+    const created = await db.invitations.create(invite())
+    expect(created.expiresAt).toBe(1_700_000_000_000 + 14 * 24 * 60 * 60 * 1000)
+    expect((await db.invitations.byTokenHash('hash_1'))?.expiresAt).toBe(
+      created.expiresAt,
+    )
+  })
+
+  it('records who accepted, not only when', async () => {
+    await db.invitations.create(invite())
+    const accepted = await db.invitations.patch('inv_1', {
+      status: 'accepted',
+      acceptedAt: 1_700_000_100_000,
+      acceptedBy: 'usr_grace',
+    })
+    expect(accepted).toMatchObject({ status: 'accepted', acceptedBy: 'usr_grace' })
+    expect((await db.invitations.byTokenHash('hash_1'))?.acceptedBy).toBe('usr_grace')
+  })
+
+  it('returns a revoked invitation by digest rather than pretending it never existed', async () => {
+    await db.invitations.create(invite())
+    await db.invitations.patch('inv_1', { status: 'revoked' })
+    expect(await db.invitations.byTokenHash('hash_1')).toMatchObject({
+      status: 'revoked',
+    })
   })
 
   it('returns the existing pending invitation rather than minting a second', async () => {
     await db.invitations.create(invite())
-    const again = await db.invitations.create(invite({ id: 'inv_2', token: 'tok_2' }))
+    const again = await db.invitations.create(invite({ id: 'inv_2', tokenHash: 'hash_2' }))
     expect(again.id).toBe('inv_1')
     expect(await db.invitations.ofProject('p1')).toHaveLength(1)
   })
@@ -243,19 +280,27 @@ describe('InvitationRepository', () => {
   it('allows a new invitation once the previous one is no longer pending', async () => {
     await db.invitations.create(invite())
     await db.invitations.patch('inv_1', { status: 'revoked' })
-    const second = await db.invitations.create(invite({ id: 'inv_2', token: 'tok_2' }))
+    const second = await db.invitations.create(invite({ id: 'inv_2', tokenHash: 'hash_2' }))
     expect(second.id).toBe('inv_2')
   })
 
   it('lists what is waiting for an address', async () => {
     await db.invitations.create(invite())
-    await db.invitations.create(invite({ id: 'inv_2', projectId: 'p2', token: 'tok_2' }))
+    await db.invitations.create(
+      invite({ id: 'inv_2', projectId: 'p2', tokenHash: 'hash_2' }),
+    )
     expect(await db.invitations.pendingFor('grace@example.com')).toHaveLength(2)
   })
 
   it('does not list an accepted invitation as pending', async () => {
     await db.invitations.create(invite())
     await db.invitations.patch('inv_1', { status: 'accepted', acceptedAt: Date.now() })
+    expect(await db.invitations.pendingFor('grace@example.com')).toEqual([])
+  })
+
+  it('does not list a declined invitation as pending', async () => {
+    await db.invitations.create(invite())
+    await db.invitations.patch('inv_1', { status: 'declined' })
     expect(await db.invitations.pendingFor('grace@example.com')).toEqual([])
   })
 

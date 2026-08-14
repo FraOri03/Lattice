@@ -112,16 +112,21 @@ export interface SentInvite {
 /**
  * The statuses a sent invitation may be shown in.
  *
- * `expired` is absent on purpose. `InviteStatus` carries it, but there is no
- * `expiresAt` field anywhere and nothing computes it — so a row wearing that
- * badge would be making a claim the app has no way to have checked. 13.3 rules
- * the delivery lifecycle out for the same reason: no e-mail backend, so no
- * *delivered* and no *failed*, and no *declined* at all.
+ * `expired` and `declined` were absent until 18.1, and for the same reason
+ * rather than by preference: no `expiresAt` existed and nothing computed it,
+ * and a recipient's refusal had no value to be recorded as — so a row wearing
+ * either badge would have been making a claim the app had no way to have
+ * checked. Both are real facts now (#88), so both are shown.
+ *
+ * What 13.3 ruled out still stands: no e-mail backend, so no *delivered* and
+ * no *failed*. That is 18.2's to add.
  */
 export const SHOWN_INVITE_STATUSES = [
   'pending',
   'accepted',
+  'declined',
   'revoked',
+  'expired',
 ] as const satisfies readonly InviteStatus[]
 
 /**

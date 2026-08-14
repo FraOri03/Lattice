@@ -11,21 +11,21 @@ import { IcCheck, IcClock, IcCopy, IcX } from '@/components/Icons'
 /**
  * Invites (13.3, 13.5 §3) — one tab that works and one that cannot.
  *
- * **Received is unavailable, and the reason is structural.** `collabStore.invites`
- * is keyed by project and lives on the *inviter's* device; the recipient's copy
- * exists nowhere, on any device. You learn of an invitation today by opening
- * its `#invite=` link. So an inbox is not unbuilt UI, it is a missing model —
- * #88 and #90.
+ * **Received is still unavailable, but the reason has moved.** It used to be
+ * that the recipient's copy existed nowhere at all; from 18.1 the invitation is
+ * a server record, and what is missing is the question — "what is waiting for
+ * my address" — which is 18.4's index (#91). You still learn of an invitation
+ * by opening its `#invite=` link.
  *
  * **Sent is real**, as an aggregation: per-project invitations already ship, and
  * a workspace-wide list is a UI fold over the projects this device holds rather
  * than a server feature.
  *
- * Two claims this page refuses to make, both because nothing behind it could
- * have checked them: there is no e-mail backend, so no *delivered* and no
- * *failed*; and there is no `expiresAt`, so no countdown and no *expired*.
- * Delivery is what `inviteService.linkFor()` actually does — copy the link and
- * send it yourself — and the page says so instead of implying a mail was sent.
+ * One claim this page still refuses to make: there is no e-mail backend, so no
+ * *delivered* and no *failed* (18.2, #89). *Expired* it now can make, because
+ * `expiresAt` is real and the shared rules compute it. Delivery is what
+ * `inviteService.linkFor()` actually does — copy the link and send it yourself
+ * — and the page says so instead of implying a mail was sent.
  */
 export function InvitesDestination() {
   const t = useI18n()
@@ -41,7 +41,13 @@ export function InvitesDestination() {
     [projects, invites],
   )
 
-  const STATUS_ICON = { pending: IcClock, accepted: IcCheck, revoked: IcX } as const
+  const STATUS_ICON = {
+    pending: IcClock,
+    accepted: IcCheck,
+    declined: IcX,
+    revoked: IcX,
+    expired: IcClock,
+  } as const
 
   return (
     <div className="mx-auto w-full max-w-5xl px-6 py-8">
@@ -102,11 +108,15 @@ export function InvitesDestination() {
                       {Icon && <Icon size={10} aria-hidden />}
                       {t.honest.invites.status[invite.status as keyof typeof t.honest.invites.status]}
                     </span>
-                    {invite.status === 'pending' && (
+                    {/* the link exists only where its token does (18.1): a
+                        record this device did not create carries a digest */}
+                    {invite.status === 'pending' && inviteService.linkFor(invite) && (
                       <button
                         className="btn flex-none"
                         onClick={() => {
-                          void navigator.clipboard?.writeText(inviteService.linkFor(invite))
+                          const link = inviteService.linkFor(invite)
+                          if (!link) return
+                          void navigator.clipboard?.writeText(link)
                           setCopied(invite.id)
                         }}
                       >

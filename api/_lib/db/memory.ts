@@ -272,8 +272,8 @@ class MemoryInvitationRepository implements InvitationRepository {
     return inviteFromRow(row)
   }
 
-  async byToken(token: string): Promise<ProjectInvite | null> {
-    const row = this.db.invitations.find((r) => r.token === token)
+  async byTokenHash(tokenHash: string): Promise<ProjectInvite | null> {
+    const row = this.db.invitations.find((r) => r.token_hash === tokenHash)
     return row ? inviteFromRow(row) : null
   }
 

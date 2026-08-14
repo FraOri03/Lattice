@@ -143,7 +143,21 @@ export interface InvitationRepository {
    */
   create(invite: ProjectInvite): Promise<ProjectInvite>
 
-  byToken(token: string): Promise<ProjectInvite | null>
+  /**
+   * The invitation a link presents, found by the DIGEST of its token
+   * (Phase 18.1).
+   *
+   * The raw token never reaches this layer, which is what makes "the
+   * database holds no usable invitation credential" a property of the
+   * types rather than a habit — the same arrangement sessions and one-time
+   * codes already have.
+   *
+   * Every status is returned, not only `pending`: a caller that asks about
+   * a revoked invitation needs to be told it was revoked, and answering
+   * `null` would make an expired link and a forged one indistinguishable to
+   * the person holding a real one.
+   */
+  byTokenHash(tokenHash: string): Promise<ProjectInvite | null>
 
   ofProject(projectId: string): Promise<ProjectInvite[]>
 

@@ -245,6 +245,7 @@ this folder, so it cannot itself trigger a sync. Details in
 | `api/github/oauth.ts` | GitHub OAuth token exchange (server-side; keeps the client secret off the client). |
 | `api/realtime/auth.ts` | Verifies the Google identity and mints scoped Liveblocks room tokens. |
 | `api/realtime/rooms.ts` | Server-side membership ACL; evaluates the shared `permissions.ts` matrix. |
+| `api/invitations.ts` | The invitation lifecycle: hashed tokens, deadlines, resend/revoke ([18.1](invitations.md)). |
 | `api/_lib/realtime.ts` | Shared helpers for the realtime functions. |
 
 ## Source layout
@@ -253,6 +254,7 @@ this folder, so it cannot itself trigger a sync. Details in
 api/
   github/oauth.ts                # Vercel function: GitHub OAuth token exchange
   realtime/{auth,rooms}.ts       # realtime identity + room ACLs
+  invitations.ts                 # server invitation model (18.1)
   _lib/realtime.ts
 src/
   App.tsx                        # providers + login gate + mode router

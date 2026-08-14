@@ -18,7 +18,7 @@ written, and security-critical.
 | `users` | the person — opaque id, address, display name |
 | `user_identities` | one proven way of signing in as that person |
 | `project_memberships` | one ACL slot: address, role, and the userId that claimed it |
-| `project_invitations` | an offer of membership that nobody has accepted yet |
+| `project_invitations` | an offer of membership: hashed token, deadline, and who accepted ([18.1](invitations.md)) |
 | `entitlements` | account-level plan (storage seam only — Phase 27 owns billing) |
 | `sessions` | a Lattice-issued session; the cookie token is hashed, never stored ([17.2](sessions.md)) |
 | `email_otp_codes` | one-time sign-in codes, scrypt-hashed and rate-limited ([17.3](email-otp.md)) |
@@ -101,9 +101,11 @@ state rather than merely being unlikely to.
 
 - **One owner per project.** `RoomAcl.ownerEmail` is a single value; a
   partial unique index makes that true of the rows as well.
-- **One pending invitation per address per project.** `InviteService`
-  already returns the existing invite rather than minting a second; the
-  index makes that an invariant instead of a race.
+- **One pending invitation per address per project.** `create()` returns the
+  existing invite rather than minting a second; the index makes that an
+  invariant instead of a race. A lapsed invitation is settled to `expired`
+  before a new one is minted, so the invariant means "no two *live* offers"
+  rather than "one offer, ever" ([18.1](invitations.md)).
 - **One verified address per provider.** Two different users can never both
   hold verified `google:ada@example.com`. Convergence still works, because
   it links an identity of a *different* provider to the same user.

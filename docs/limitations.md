@@ -170,7 +170,13 @@ _Honesty gap tracked in [#9](https://github.com/FraOri03/Lattice/issues/9)._
   backups), not CRDT merges — for the Drive sync layer.
 - **Deletions never propagate** to Drive by design; a remote-cleanup UI is future work
   ([#32](https://github.com/FraOri03/Lattice/issues/32)).
-- **Invites are links, not e-mails** — there is no mail server.
+- **Invites are links, not e-mails** — nothing sends them yet
+  ([#89](https://github.com/FraOri03/Lattice/issues/89)). The record itself is
+  server-side from 18.1, so a link now resolves in a browser that has never
+  seen the project ([invitations.md](invitations.md)) — but **accepting** one
+  from another device still needs the address check of
+  [#90](https://github.com/FraOri03/Lattice/issues/90), so until then such a
+  link shows the invitation and stops.
 - **Identity ≠ storage** — Google sign-in is identity; Drive `drive.file` is a separate
   storage consent. This distinction is under-explained in the UI.
 - OAuth tokens live in browser storage (XSS-scoped; sign out to clear). The mock account

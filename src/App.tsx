@@ -115,24 +115,41 @@ function useCollaboration() {
     const token = new URLSearchParams(location.hash.slice(1)).get('invite')
     if (!token) return
     history.replaceState(null, '', location.pathname + location.search)
-    const invite = inviteService.findByToken(token)
-    if (!invite) {
-      toast.warning(
-        'Invite not found',
-        'This invite was revoked, already used, or its project data has not reached this browser yet.',
-      )
-      return
-    }
-    void confirmDialog({
-      title: 'Join this project?',
-      body: `You were invited as ${invite.role} by ${invite.invitedByName}.`,
-      confirmLabel: 'Accept invite',
-    }).then((ok) => {
-      if (!ok) return
-      if (inviteService.accept(invite)) {
-        useStore.getState().setActiveProject(invite.projectId)
-        toast.success('Invite accepted', `You joined as ${invite.role}.`)
+    void inviteService.findByToken(token).then((found) => {
+      if (!found) {
+        toast.warning(
+          'Invite not found',
+          'This invite was revoked, has expired, was already used, or its project data has not reached this browser yet.',
+        )
+        return
       }
+      const { invite, source } = found
+      /**
+       * A link resolved by the SERVER was opened somewhere this browser has
+       * never seen the project — which is the case Phase 18 exists for, and
+       * the one acceptance is not yet safe in: `accept()` adds whoever is
+       * signed in right now, without checking they own the invited address.
+       * 18.3 (#90) is where that check lands, and until it does the honest
+       * answer is to show the invitation and stop.
+       */
+      if (source === 'server') {
+        toast.warning(
+          `You were invited as ${invite.role}`,
+          `${invite.invitedByName} invited ${invite.email} to this project. Accepting an invitation from another device needs the address check Lattice does not perform yet.`,
+        )
+        return
+      }
+      void confirmDialog({
+        title: 'Join this project?',
+        body: `You were invited as ${invite.role} by ${invite.invitedByName}.`,
+        confirmLabel: 'Accept invite',
+      }).then((ok) => {
+        if (!ok) return
+        if (inviteService.accept(invite)) {
+          useStore.getState().setActiveProject(invite.projectId)
+          toast.success('Invite accepted', `You joined as ${invite.role}.`)
+        }
+      })
     })
   }, [])
 }

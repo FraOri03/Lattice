@@ -113,11 +113,12 @@ describe('collectSentInvites', () => {
       projectId: 'p1',
       email: `${id}@example.com`,
       role: 'editor',
-      token: 't',
+      tokenHash: 'h',
       createdAt,
       invitedBy: 'me',
       invitedByName: 'Me',
       status,
+      expiresAt: createdAt + 14 * 24 * 60 * 60 * 1000,
       updatedAt: 0,
     }) as ProjectInvite
 
@@ -130,16 +131,24 @@ describe('collectSentInvites', () => {
     expect(out[0].projectName).toBe('Acme')
   })
 
-  it('shows pending, accepted and revoked — and nothing else', () => {
-    // `expired` is in the type and nothing computes it: no `expiresAt` exists,
-    // so a row wearing that badge would claim a check that never happened
+  it('shows every status the model can actually establish', () => {
+    // `expired` and `declined` used to be excluded because nothing could have
+    // checked them: there was no `expiresAt`, and a refusal had no value to be
+    // recorded as. 18.1 (#88) gives both a real source, so both are shown.
     const out = collectSentInvites({ p1: project('p1', 'Acme') }, () => [
       invite('a', 'pending'),
       invite('b', 'accepted'),
       invite('c', 'revoked'),
       invite('d', 'expired'),
+      invite('e', 'declined'),
     ])
-    expect(out.map((i) => i.invite.status)).toEqual(['pending', 'accepted', 'revoked'])
+    expect(out.map((i) => i.invite.status)).toEqual([
+      'pending',
+      'accepted',
+      'revoked',
+      'expired',
+      'declined',
+    ])
   })
 
   it('is empty when no project holds an invitation', () => {
