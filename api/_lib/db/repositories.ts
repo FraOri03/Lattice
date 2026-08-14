@@ -7,6 +7,7 @@ import type {
 } from '../../../src/types/identity.js'
 import type { CollabRole, ProjectInvite } from '../../../src/types/collab.js'
 import type { Entitlement } from '../../../src/types/entitlement.js'
+import type { Session } from '../../../src/types/session.js'
 import type { RoomAcl } from '../../../src/lib/collab/acl.js'
 
 /**
@@ -151,6 +152,60 @@ export interface InvitationRepository {
   patch(id: string, patch: Partial<ProjectInvite>): Promise<ProjectInvite | null>
 }
 
+/* ---------------- sessions ---------------- */
+
+/**
+ * Session storage (Phase 17.2, #85).
+ *
+ * The repository only ever sees HASHES. Minting the token, hashing it and
+ * comparing it are `api/_lib/session.ts`'s job; keeping the raw token out
+ * of this interface is what makes "the database never holds a usable
+ * credential" a property of the types rather than a habit.
+ */
+export interface SessionRepository {
+  /**
+   * Store a new session. `tokenHash` and `csrfHash` are SHA-256 digests;
+   * the values they came from are never passed here.
+   */
+  create(
+    session: Session,
+    hashes: { tokenHash: string; csrfHash: string },
+  ): Promise<Session>
+
+  /**
+   * Resolve a token hash to a LIVE session — never a revoked or expired
+   * one. Returning an expired session and leaving the check to the caller
+   * would put the most important condition in the least reliable place.
+   */
+  byTokenHash(tokenHash: string, now?: number): Promise<Session | null>
+
+  /** Whether this CSRF token belongs to this session. Constant-time upstream. */
+  csrfHashOf(sessionId: string): Promise<string | null>
+
+  /**
+   * Replace the CSRF token bound to a session.
+   *
+   * Called on every "who am I", so a token that did leak is valid for one
+   * page load rather than for the month the session lives.
+   */
+  rotateCsrf(sessionId: string, csrfHash: string): Promise<void>
+
+  /** Slide the expiry of a session that is still being used. */
+  touch(sessionId: string, lastSeenAt: number, expiresAt: number): Promise<void>
+
+  /** Sign out this device. Idempotent. */
+  revoke(sessionId: string, now?: number): Promise<void>
+
+  /**
+   * Sign out everywhere. Returns how many sessions were live, so the UI can
+   * say what actually happened rather than guess.
+   */
+  revokeAllOf(userId: string, now?: number): Promise<number>
+
+  /** Live sessions of a user, newest first — the "where am I signed in" list. */
+  liveOf(userId: string, now?: number): Promise<Session[]>
+}
+
 /* ---------------- entitlements ---------------- */
 
 /**
@@ -174,4 +229,5 @@ export interface Repositories {
   memberships: MembershipRepository
   invitations: InvitationRepository
   entitlements: EntitlementRepository
+  sessions: SessionRepository
 }

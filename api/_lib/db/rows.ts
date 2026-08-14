@@ -7,6 +7,7 @@ import type {
 } from '../../../src/types/entitlement.js'
 import type { RoomAcl } from '../../../src/lib/collab/acl.js'
 import type { UsageType } from '../../../src/types/model.js'
+import type { Session } from '../../../src/types/session.js'
 
 /**
  * The shape the database actually stores, and the translation to and from
@@ -248,6 +249,69 @@ export function inviteToRow(invite: ProjectInvite): InvitationRow {
     resent_at: toIsoOrNull(invite.resentAt),
     accepted_at: toIsoOrNull(invite.acceptedAt),
     expires_at: null,
+  }
+}
+
+/* ---------------- sessions ---------------- */
+
+/**
+ * `token_hash` and `csrf_hash` have no domain counterpart on purpose: they
+ * never leave this layer, and a {@link Session} that carried them could be
+ * returned to a browser by accident.
+ */
+export interface SessionRow {
+  id: string
+  user_id: string
+  token_hash: string
+  csrf_hash: string
+  provider: string
+  provider_subject: string
+  email: string
+  display_name: string
+  avatar_url: string
+  created_at: string
+  last_seen_at: string
+  expires_at: string
+  revoked_at: string | null
+  user_agent: string
+}
+
+export function sessionFromRow(row: SessionRow): Session {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    provider: row.provider as IdentityProvider,
+    providerSubject: row.provider_subject,
+    email: row.email,
+    displayName: row.display_name,
+    avatarUrl: row.avatar_url,
+    createdAt: fromIso(row.created_at),
+    lastSeenAt: fromIso(row.last_seen_at),
+    expiresAt: fromIso(row.expires_at),
+    revokedAt: fromIsoOrNull(row.revoked_at),
+    userAgent: row.user_agent,
+  }
+}
+
+export function sessionToRow(
+  session: Session,
+  hashes: { tokenHash: string; csrfHash: string },
+): SessionRow {
+  return {
+    id: session.id,
+    user_id: session.userId,
+    token_hash: hashes.tokenHash,
+    csrf_hash: hashes.csrfHash,
+    provider: session.provider,
+    provider_subject: session.providerSubject,
+    email: session.email.toLowerCase(),
+    display_name: session.displayName,
+    avatar_url: session.avatarUrl,
+    created_at: toIso(session.createdAt),
+    last_seen_at: toIso(session.lastSeenAt),
+    expires_at: toIso(session.expiresAt),
+    revoked_at: toIsoOrNull(session.revokedAt),
+    user_agent: session.userAgent,
   }
 }
 

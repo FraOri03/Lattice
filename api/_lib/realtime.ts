@@ -7,6 +7,9 @@ import {
   type RoomAcl,
 } from '../../src/lib/collab/acl.js'
 import { googleUserIds } from '../../src/lib/auth/identity.js'
+import type { Session } from '../../src/types/session.js'
+import { repositories } from './db/index.js'
+import { csrfOk, sessionOf, touchSession, type ApiRequest } from './session.js'
 
 /**
  * Shared helpers for the realtime endpoints (api/realtime/*).
@@ -175,13 +178,65 @@ export function sendError(res: ApiRes, code: number, error: string): void {
   res.status(code).json({ error })
 }
 
-/** Basic shared validation: verified identity or an error response. */
+/**
+ * The identity a session asserts.
+ *
+ * Exactly the shape `verifyGoogleToken` produces, which is the point: the
+ * ACL, `principalOf`, `roleOf` and the whole permission matrix cannot tell
+ * the two apart, so 17.2 changes how a caller is identified without
+ * touching what they are allowed to do.
+ */
+export function identityFromSession(session: Session): VerifiedIdentity {
+  return {
+    sub: session.providerSubject,
+    email: session.email,
+    name: session.displayName,
+    picture: session.avatarUrl,
+  }
+}
+
+/**
+ * Who is calling: the session cookie first, the Google token in the body
+ * as a fallback.
+ *
+ * ## Why both, for now
+ *
+ * The fallback is the transitional path 17.2 owes the deployments it
+ * changes under. A browser that has not established a session yet — one
+ * mid-upgrade, or one on a deployment with no database at all — keeps
+ * working exactly as it did, because realtime breaking for everyone during
+ * a rollout is not an acceptable way to improve security. It is the branch
+ * 16.3 predicted, and 17.3 is where the Google token stops being accepted.
+ *
+ * ## Why a session request must also carry a CSRF token
+ *
+ * A cookie is sent by the browser whether or not the page meant to send
+ * it. Every endpoint reached through here mints a credential or changes a
+ * membership, so presenting the cookie is not enough: the caller has to
+ * prove it can also read the session, which only same-origin script can.
+ * The body-token path needs no such check — a token nobody's browser
+ * attaches automatically cannot be ridden.
+ */
 export async function requireIdentity(
+  req: ApiRequest,
   res: ApiRes,
   googleToken: unknown,
 ): Promise<VerifiedIdentity | null> {
+  const db = repositories()
+  if (db) {
+    const session = await sessionOf(req, db.sessions)
+    if (session) {
+      if (!(await csrfOk(req, session, db.sessions))) {
+        sendError(res, 403, 'Missing or invalid CSRF token.')
+        return null
+      }
+      await touchSession(session, db.sessions)
+      return identityFromSession(session)
+    }
+  }
+
   if (typeof googleToken !== 'string' || !googleToken) {
-    sendError(res, 401, 'Missing Google access token.')
+    sendError(res, 401, 'Not signed in: no session cookie and no Google access token.')
     return null
   }
   const identity = await verifyGoogleToken(googleToken)

@@ -1,5 +1,6 @@
 import type { CollabMessage, CollabRole, PresencePeer, RealtimeStatus } from '@/types/collab'
 import { authService } from '@/lib/auth/AuthService'
+import { sessionClient } from '@/lib/auth/sessionClient'
 import { hasRealtimeBackend } from '@/lib/env'
 import { useStore } from '@/store/useStore'
 import { useCrdtStore } from './crdtStore'
@@ -84,7 +85,9 @@ class YjsManager {
     // on the next gesture, "Reconnect Drive") pick the connection back up
     this.unsubscribeAuth = authService.subscribe(() => {
       if (!this.started || this.attachment || !this.activeProjectId) return
-      if (!authService.peekToken()) return
+      // a Lattice session is enough on its own; the Google token only
+      // matters on the transitional path (17.2)
+      if (!authService.peekToken() && !sessionClient.current()) return
       void this.activate(this.activeProjectId)
     })
   }
@@ -159,11 +162,21 @@ class YjsManager {
     const seq = ++this.attachSeq
     useCrdtStore.getState().setStatus('connecting')
 
-    // Attaching needs a Google token. Asking for it here keeps the failure
-    // out of the transport: a token that can only be renewed on the next
-    // user gesture is not an error, and the auth subscription re-runs this
-    // as soon as one lands.
-    const token = await authService.getAccessToken()
+    /**
+     * 17.2 — realtime is authenticated by the Lattice session cookie, so a
+     * Drive token that is expired or mid-refresh no longer holds the
+     * connection back. That decoupling is the point of the session: the
+     * only thing that still needs a Google token is Google Drive.
+     *
+     * Without a session we are on the transitional path, and the Google
+     * token is asked for exactly as before. Asking here keeps the failure
+     * out of the transport: a token that can only be renewed on the next
+     * user gesture is not an error, and the auth subscription re-runs this
+     * as soon as one lands.
+     */
+    const hasSession = await sessionClient.ready()
+    if (seq !== this.attachSeq) return
+    const token = hasSession ? 'session' : await authService.getAccessToken()
     if (seq !== this.attachSeq) return
     if (!token) {
       if (authService.needsReauth()) {

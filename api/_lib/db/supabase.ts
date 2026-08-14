@@ -9,6 +9,7 @@ import type {
 import type { CollabRole, ProjectInvite } from '../../../src/types/collab.js'
 import type { Entitlement } from '../../../src/types/entitlement.js'
 import { freeEntitlement } from '../../../src/types/entitlement.js'
+import type { Session } from '../../../src/types/session.js'
 import type { RoomAcl } from '../../../src/lib/collab/acl.js'
 import type {
   EntitlementRepository,
@@ -16,6 +17,7 @@ import type {
   InvitationRepository,
   MembershipRepository,
   Repositories,
+  SessionRepository,
 } from './repositories.js'
 import {
   aclFromRows,
@@ -26,6 +28,8 @@ import {
   inviteFromRow,
   inviteToRow,
   rowsFromAcl,
+  sessionFromRow,
+  sessionToRow,
   toIso,
   userFromRow,
   userToRow,
@@ -33,6 +37,7 @@ import {
   type IdentityRow,
   type InvitationRow,
   type MembershipRow,
+  type SessionRow,
   type UserRow,
 } from './rows.js'
 
@@ -57,6 +62,7 @@ const IDENTITIES = 'user_identities'
 const MEMBERSHIPS = 'project_memberships'
 const INVITATIONS = 'project_invitations'
 const ENTITLEMENTS = 'entitlements'
+const SESSIONS = 'sessions'
 
 /** Postgres unique-violation; the only conflict this layer expects to lose. */
 const UNIQUE_VIOLATION = '23505'
@@ -78,12 +84,14 @@ export class SupabaseRepositories implements Repositories {
   readonly memberships: MembershipRepository
   readonly invitations: InvitationRepository
   readonly entitlements: EntitlementRepository
+  readonly sessions: SessionRepository
 
   constructor(client: SupabaseClient) {
     this.identities = new SupabaseIdentityRepository(client)
     this.memberships = new SupabaseMembershipRepository(client)
     this.invitations = new SupabaseInvitationRepository(client)
     this.entitlements = new SupabaseEntitlementRepository(client)
+    this.sessions = new SupabaseSessionRepository(client)
   }
 }
 
@@ -461,6 +469,114 @@ class SupabaseInvitationRepository implements InvitationRepository {
       'patch invitation',
     )
     return next
+  }
+}
+
+/* ---------------- sessions ---------------- */
+
+class SupabaseSessionRepository implements SessionRepository {
+  constructor(private db: SupabaseClient) {}
+
+  async create(
+    session: Session,
+    hashes: { tokenHash: string; csrfHash: string },
+  ): Promise<Session> {
+    unwrap(
+      await this.db.from(SESSIONS).insert(sessionToRow(session, hashes)),
+      'create session',
+    )
+    return session
+  }
+
+  /**
+   * "Live" is part of the WHERE clause, not a check the caller is trusted
+   * to remember. A revoked or expired session resolves to nothing here, so
+   * there is no path where an endpoint gets one and forgets to look.
+   */
+  async byTokenHash(tokenHash: string, now = Date.now()): Promise<Session | null> {
+    const row = unwrap<SessionRow>(
+      await this.db
+        .from(SESSIONS)
+        .select('*')
+        .eq('token_hash', tokenHash)
+        .is('revoked_at', null)
+        .gt('expires_at', toIso(now))
+        .maybeSingle(),
+      'resolve session',
+    )
+    return row ? sessionFromRow(row) : null
+  }
+
+  async csrfHashOf(sessionId: string): Promise<string | null> {
+    const row = unwrap<{ csrf_hash: string }>(
+      await this.db
+        .from(SESSIONS)
+        .select('csrf_hash')
+        .eq('id', sessionId)
+        .maybeSingle(),
+      'load csrf hash',
+    )
+    return row?.csrf_hash ?? null
+  }
+
+  async rotateCsrf(sessionId: string, csrfHash: string): Promise<void> {
+    unwrap(
+      await this.db.from(SESSIONS).update({ csrf_hash: csrfHash }).eq('id', sessionId),
+      'rotate csrf',
+    )
+  }
+
+  async touch(sessionId: string, lastSeenAt: number, expiresAt: number): Promise<void> {
+    unwrap(
+      await this.db
+        .from(SESSIONS)
+        .update({ last_seen_at: toIso(lastSeenAt), expires_at: toIso(expiresAt) })
+        .eq('id', sessionId),
+      'touch session',
+    )
+  }
+
+  /** `is('revoked_at', null)` keeps the first revocation's timestamp. */
+  async revoke(sessionId: string, now = Date.now()): Promise<void> {
+    unwrap(
+      await this.db
+        .from(SESSIONS)
+        .update({ revoked_at: toIso(now) })
+        .eq('id', sessionId)
+        .is('revoked_at', null),
+      'revoke session',
+    )
+  }
+
+  async revokeAllOf(userId: string, now = Date.now()): Promise<number> {
+    const stamp = toIso(now)
+    const rows =
+      unwrap<{ id: string }[]>(
+        await this.db
+          .from(SESSIONS)
+          .update({ revoked_at: stamp })
+          .eq('user_id', userId)
+          .is('revoked_at', null)
+          .gt('expires_at', stamp)
+          .select('id'),
+        'revoke all sessions',
+      ) ?? []
+    return rows.length
+  }
+
+  async liveOf(userId: string, now = Date.now()): Promise<Session[]> {
+    const rows =
+      unwrap<SessionRow[]>(
+        await this.db
+          .from(SESSIONS)
+          .select('*')
+          .eq('user_id', userId)
+          .is('revoked_at', null)
+          .gt('expires_at', toIso(now))
+          .order('created_at', { ascending: false }),
+        'list sessions',
+      ) ?? []
+    return rows.map(sessionFromRow)
   }
 }
 

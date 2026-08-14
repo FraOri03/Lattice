@@ -30,6 +30,19 @@ All notable changes to Lattice are recorded here. The format follows
 
 ### Added
 
+- **Signing in is Lattice's own now, and signing out actually works.** Until now the app
+  proved who you were by sending your Google token with every single request, which meant a
+  Google credential doubled as Lattice's credential, it sat in browser storage where any
+  script on the page could read it, and "sign out" could only forget things locally — there
+  was nothing to revoke, because Lattice had never issued anything. Sign-in now trades that
+  Google token, once, for a session the server issues and keeps in a cookie the browser
+  cannot read, cannot leak through a script, and the server can end. That makes two things
+  possible that simply were not before: signing out for real, on this device or on **all** of
+  them at once. The Google token stays only in memory, and only Google Drive still needs it —
+  realtime collaboration no longer waits for it, so a Drive session that is expired or
+  refreshing no longer keeps you disconnected from a document. A deployment with no database
+  configured keeps working exactly as before. See [docs/sessions.md](docs/sessions.md).
+
 - **A database, and a seam that keeps it replaceable.** Until now the only server-side state
   Lattice had was Liveblocks room metadata, and who you are was re-derived from a Google
   token on every request — which is why an invitation had to reach the exact mailbox you

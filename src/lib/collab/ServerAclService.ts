@@ -1,5 +1,6 @@
 import type { CollabRole } from '@/types/collab'
 import { authService } from '@/lib/auth/AuthService'
+import { NotAuthenticatedError, sessionClient } from '@/lib/auth/sessionClient'
 import { env, hasRealtimeBackend } from '@/lib/env'
 
 /**
@@ -27,20 +28,17 @@ export interface AclResult {
 class ServerAclService {
   private async post(body: Record<string, unknown>): Promise<AclResult> {
     if (!hasRealtimeBackend) return { ok: true } // nothing to mirror
-    const googleToken = await authService.getAccessToken()
-    if (!googleToken) {
-      return { ok: false, error: 'Sign in with Google to update server permissions.' }
-    }
     try {
-      const res = await fetch(env.realtimeRoomsUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...body, googleToken }),
-      })
+      const res = await sessionClient.post(env.realtimeRoomsUrl, body, () =>
+        authService.getAccessToken(),
+      )
       if (res.ok) return { ok: true }
       const payload = (await res.json().catch(() => null)) as { error?: string } | null
       return { ok: false, error: payload?.error ?? `Server ACL update failed (${res.status})` }
     } catch (err) {
+      if (err instanceof NotAuthenticatedError) {
+        return { ok: false, error: 'Sign in to update server permissions.' }
+      }
       return { ok: false, error: err instanceof Error ? err.message : String(err) }
     }
   }

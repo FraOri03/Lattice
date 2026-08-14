@@ -10,7 +10,7 @@ shaped it is [16.3](authorisation-phase-16-3.md); the model it stores is
 
 ## What lives here
 
-Five tables, and they have one thing in common: they are small, rarely
+Six tables, and they have one thing in common: they are small, rarely
 written, and security-critical.
 
 | Table | Holds |
@@ -20,6 +20,7 @@ written, and security-critical.
 | `project_memberships` | one ACL slot: address, role, and the userId that claimed it |
 | `project_invitations` | an offer of membership that nobody has accepted yet |
 | `entitlements` | account-level plan (storage seam only — Phase 27 owns billing) |
+| `sessions` | a Lattice-issued session; the cookie token is hashed, never stored ([17.2](sessions.md)) |
 
 **Document content is not here and will not be.** Docs, boards, sheets,
 code and presentations live in Yjs, Liveblocks and Google Drive. Postgres

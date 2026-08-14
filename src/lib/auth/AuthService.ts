@@ -3,6 +3,7 @@ import type { Account } from '@/types/model'
 import { applyProfilePatch, mergeProviderProfile, type ProfilePatch } from './profile'
 import { MOCK_SUBJECT, providerIdsOf } from './identity'
 import { identityStore } from './identityStore'
+import { sessionClient } from './sessionClient'
 
 /**
  * AuthService — personal account sign-in.
@@ -72,6 +73,35 @@ export interface AuthService {
 
 const ACCOUNT_KEY = 'lattice-account'
 const TOKEN_KEY = 'lattice-google-token'
+/**
+ * "Drive consent was granted in this browser at some point" — a fact, not
+ * a credential (17.2, #85).
+ *
+ * The token used to be its own evidence: something in TOKEN_KEY meant
+ * consent had happened, so a silent refresh was worth attempting. Moving
+ * the token into memory took that evidence away, and without a replacement
+ * every reload would have declared the Drive session expired and demanded
+ * a reconnect — a token-shaped hole where a boolean belongs. This flag is
+ * what survives instead, and it grants nothing to whoever reads it.
+ */
+const DRIVE_CONSENT_KEY = 'lattice-drive-consent'
+
+function hasDriveConsent(): boolean {
+  try {
+    return localStorage.getItem(DRIVE_CONSENT_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function setDriveConsent(granted: boolean): void {
+  try {
+    if (granted) localStorage.setItem(DRIVE_CONSENT_KEY, '1')
+    else localStorage.removeItem(DRIVE_CONSENT_KEY)
+  } catch {
+    // storage blocked: the session still works for as long as the tab lives
+  }
+}
 const GIS_SRC = 'https://accounts.google.com/gsi/client'
 const SCOPES = `openid email profile ${DRIVE_SCOPE}`
 /**
@@ -346,6 +376,14 @@ class GoogleAuthService implements AuthService {
   private listeners = new Set<() => void>()
 
   constructor() {
+    // 17.2 — delete any token an earlier version persisted. Leaving it
+    // behind would keep exactly the credential this phase removed sitting
+    // in storage, for as long as the browser kept it.
+    try {
+      localStorage.removeItem(TOKEN_KEY)
+    } catch {
+      // storage blocked: nothing was ever written there either
+    }
     // A restored session must schedule its own renewal, or the token simply
     // expires while the app is open and every caller discovers it the hard way.
     this.scheduleWakeupForToken()
@@ -358,20 +396,27 @@ class GoogleAuthService implements AuthService {
     }
   }
 
+  /**
+   * The Google token lives in MEMORY and nowhere else (17.2, #85).
+   *
+   * It used to be persisted under TOKEN_KEY, which meant a Drive-scoped
+   * OAuth credential sat in `localStorage` for any script on the page to
+   * read — the limitation #85 exists to close. Keeping it in a field means
+   * a reload drops it, and a reload is now allowed to drop it: identity
+   * survives in the session cookie, realtime authenticates with that, and
+   * the only thing still needing this token is Google Drive, which asks
+   * for it through `getAccessToken()` and silently renews exactly as it
+   * already did whenever the hourly expiry passed.
+   */
+  private token: StoredToken | null = null
+
   private loadToken(): StoredToken | null {
-    try {
-      const raw = localStorage.getItem(TOKEN_KEY)
-      if (!raw) return null
-      const t = JSON.parse(raw) as StoredToken
-      return t.accessToken && t.expiresAt ? t : null
-    } catch {
-      return null
-    }
+    const t = this.token
+    return t && t.accessToken && t.expiresAt ? t : null
   }
 
   private saveToken(token: StoredToken | null) {
-    if (token) localStorage.setItem(TOKEN_KEY, JSON.stringify(token))
-    else localStorage.removeItem(TOKEN_KEY)
+    this.token = token
   }
 
   private async client(): Promise<TokenClient> {
@@ -489,6 +534,9 @@ class GoogleAuthService implements AuthService {
    */
   private acceptToken(token: StoredToken): void {
     this.saveToken(token)
+    // consent is proven by a token having arrived, and the proof outlives
+    // the token itself
+    setDriveConsent(true)
     this.silentFailures = 0
     this.nextSilentAt = 0
     this.reauthNeeded = false
@@ -542,9 +590,11 @@ class GoogleAuthService implements AuthService {
    * gesture instead. Callers get null and stay honest in the meantime.
    */
   private async refreshSilently(): Promise<StoredToken | null> {
-    // no token ever stored → consent was never granted: only "Connect Drive"
-    // can help, and it must come from a real click.
-    if (!this.loadToken()) {
+    // consent was never granted in this browser → only "Connect Drive" can
+    // help, and it must come from a real click. Note this asks about
+    // CONSENT, not about a stored token: since 17.2 the token is in memory,
+    // so its absence after a reload says nothing about the grant.
+    if (!hasDriveConsent()) {
       this.setReauthNeeded(true)
       return null
     }
@@ -665,12 +715,26 @@ class GoogleAuthService implements AuthService {
     )
     saveAccount(account)
     mirrorProfileToUser(account)
+    /**
+     * 17.2 — trade the Google token for a Lattice session, once. From here
+     * the browser proves who it is with an HttpOnly cookie it cannot read,
+     * and the Google token is a Drive credential and nothing more.
+     *
+     * A failure here is not a failed sign-in: a deployment with no database
+     * answers 501, and the app falls back to the token path exactly as
+     * before. Sign-in must not depend on a backend that is allowed to be
+     * absent.
+     */
+    await sessionClient.establish(token.accessToken)
     this.setReauthNeeded(false)
     this.notify()
     return account
   }
 
   async signOut(): Promise<void> {
+    // revoke the server session first: a sign-out that only cleared local
+    // state would leave a live session behind on every other device
+    await sessionClient.logout()
     await this.disconnectDrive()
     saveAccount(null)
   }
@@ -724,6 +788,7 @@ class GoogleAuthService implements AuthService {
       }
     }
     this.saveToken(null)
+    setDriveConsent(false)
     this.setReauthNeeded(false)
     this.notify()
   }

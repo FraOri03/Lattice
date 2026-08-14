@@ -8,6 +8,7 @@ import type {
 import type { CollabRole, ProjectInvite } from '../../../src/types/collab.js'
 import type { Entitlement } from '../../../src/types/entitlement.js'
 import { freeEntitlement } from '../../../src/types/entitlement.js'
+import type { Session } from '../../../src/types/session.js'
 import type { RoomAcl } from '../../../src/lib/collab/acl.js'
 import type {
   EntitlementRepository,
@@ -15,6 +16,7 @@ import type {
   InvitationRepository,
   MembershipRepository,
   Repositories,
+  SessionRepository,
 } from './repositories.js'
 import {
   aclFromRows,
@@ -25,6 +27,8 @@ import {
   inviteFromRow,
   inviteToRow,
   rowsFromAcl,
+  sessionFromRow,
+  sessionToRow,
   toIso,
   userFromRow,
   userToRow,
@@ -32,6 +36,7 @@ import {
   type IdentityRow,
   type InvitationRow,
   type MembershipRow,
+  type SessionRow,
   type UserRow,
 } from './rows.js'
 
@@ -61,6 +66,7 @@ export class MemoryDatabase {
   memberships: MembershipRow[] = []
   invitations: InvitationRow[] = []
   entitlements: EntitlementRow[] = []
+  sessions: SessionRow[] = []
 
   clear(): void {
     this.users = []
@@ -68,6 +74,7 @@ export class MemoryDatabase {
     this.memberships = []
     this.invitations = []
     this.entitlements = []
+    this.sessions = []
   }
 }
 
@@ -77,6 +84,7 @@ export class MemoryRepositories implements Repositories {
   readonly memberships: MembershipRepository = new MemoryMembershipRepository(this.data)
   readonly invitations: InvitationRepository = new MemoryInvitationRepository(this.data)
   readonly entitlements: EntitlementRepository = new MemoryEntitlementRepository(this.data)
+  readonly sessions: SessionRepository = new MemorySessionRepository(this.data)
 
   clear(): void {
     this.data.clear()
@@ -280,6 +288,73 @@ class MemoryInvitationRepository implements InvitationRepository {
     const next: ProjectInvite = { ...inviteFromRow(row), ...patch, updatedAt: Date.now() }
     Object.assign(row, inviteToRow(next))
     return next
+  }
+}
+
+/* ---------------- sessions ---------------- */
+
+class MemorySessionRepository implements SessionRepository {
+  constructor(private db: MemoryDatabase) {}
+
+  async create(
+    session: Session,
+    hashes: { tokenHash: string; csrfHash: string },
+  ): Promise<Session> {
+    this.db.sessions.push(sessionToRow(session, hashes))
+    return session
+  }
+
+  /** Live only: revoked and expired are resolved as "no session". */
+  async byTokenHash(tokenHash: string, now = Date.now()): Promise<Session | null> {
+    const row = this.db.sessions.find((r) => r.token_hash === tokenHash)
+    if (!row) return null
+    const session = sessionFromRow(row)
+    if (session.revokedAt !== null) return null
+    if (session.expiresAt <= now) return null
+    return session
+  }
+
+  async csrfHashOf(sessionId: string): Promise<string | null> {
+    return this.db.sessions.find((r) => r.id === sessionId)?.csrf_hash ?? null
+  }
+
+  async rotateCsrf(sessionId: string, csrfHash: string): Promise<void> {
+    const row = this.db.sessions.find((r) => r.id === sessionId)
+    if (row) row.csrf_hash = csrfHash
+  }
+
+  async touch(sessionId: string, lastSeenAt: number, expiresAt: number): Promise<void> {
+    const row = this.db.sessions.find((r) => r.id === sessionId)
+    if (!row) return
+    row.last_seen_at = toIso(lastSeenAt)
+    row.expires_at = toIso(expiresAt)
+  }
+
+  async revoke(sessionId: string, now = Date.now()): Promise<void> {
+    const row = this.db.sessions.find((r) => r.id === sessionId)
+    if (!row || row.revoked_at) return
+    row.revoked_at = toIso(now)
+  }
+
+  async revokeAllOf(userId: string, now = Date.now()): Promise<number> {
+    let count = 0
+    for (const row of this.db.sessions) {
+      if (row.user_id !== userId || row.revoked_at) continue
+      if (Date.parse(row.expires_at) <= now) continue
+      row.revoked_at = toIso(now)
+      count += 1
+    }
+    return count
+  }
+
+  async liveOf(userId: string, now = Date.now()): Promise<Session[]> {
+    return this.db.sessions
+      .filter(
+        (r) =>
+          r.user_id === userId && !r.revoked_at && Date.parse(r.expires_at) > now,
+      )
+      .map(sessionFromRow)
+      .sort((a, b) => b.createdAt - a.createdAt)
   }
 }
 
