@@ -74,7 +74,7 @@ const BASE: Meta = {
 }
 
 async function call(body: unknown) {
-  const { default: handler } = await import('./rooms')
+  const { default: handler } = await import('./rooms.js')
   const { res, sent } = makeRes()
   await handler({ method: 'POST', body }, res)
   return sent

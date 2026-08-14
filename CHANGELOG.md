@@ -154,6 +154,20 @@ All notable changes to Lattice are recorded here. The format follows
 
 ### Fixed
 
+- **Every realtime feature returned 500, on a deployment that was configured correctly.**
+  Opening a project logged `realtime attach failed (HTTP 500)` and no project call could be
+  joined, while the endpoints' own answers — 501 for a missing key, 401 for a rejected token
+  — never appeared, because no handler ever ran. Vercel emits `api/` as ESM and Node's
+  loader does no extensionless resolution, so one relative import written without `.js`
+  fails to resolve and takes the entire module graph down at load time: every request 500s
+  before the first line of the endpoint. The import was `nid` in `src/lib/auth/identity.ts`,
+  which was browser-only code until an endpoint imported it — which 16.2 did, to derive the
+  caller's userId from the Google account it had already verified. The extension is there
+  now, and the mistake can no longer reach a deploy: the `api` typecheck pass resolves
+  modules the way Node will (`NodeNext`, and no `@/*` alias, since no bundler is there to
+  rewrite one), so an import a deployed function could not resolve fails the build — and
+  `npm run build`, the command Vercel runs, now includes that pass.
+
 - **Every video uploaded to a board failed to convert.** The worker asked jsDelivr for the
   `dist/umd` build of ffmpeg-core, and that build was never reachable: `@ffmpeg/ffmpeg`
   always spawns its inner worker as a module, where `importScripts()` — the only thing the

@@ -1,4 +1,4 @@
-import type { CollabRole } from '../../types/collab'
+import type { CollabRole } from '../../types/collab.js'
 
 /**
  * The project ACL and the rule that decides who a membership belongs to

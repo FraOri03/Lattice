@@ -1,4 +1,4 @@
-import type { CollabRole } from '@/types/collab'
+import type { CollabRole } from '../../types/collab.js'
 
 /**
  * PermissionsService — the single source of truth for what each role may

@@ -95,7 +95,7 @@ const ACL_ROOM = {
 }
 
 async function callMediaToken(body: unknown, method = 'POST') {
-  const { default: handler } = await import('./media-token')
+  const { default: handler } = await import('./media-token.js')
   const { res, sent } = makeRes()
   await handler({ method, body }, res)
   return sent

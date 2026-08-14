@@ -1,4 +1,4 @@
-import type { ViewMode } from './model'
+import type { ViewMode } from './model.js'
 
 /* ---------------- roles & members (Phase 7) ---------------- */
 

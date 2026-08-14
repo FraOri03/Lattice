@@ -83,7 +83,7 @@ function claimsOf(token: string): { video?: { canPublishSources?: string[] } } {
 
 async function mintFor(email: string) {
   mockGoogle(email)
-  const { default: handler } = await import('./media-token')
+  const { default: handler } = await import('./media-token.js')
   const { res, sent } = makeRes()
   await handler({ method: 'POST', body: { projectId: 'proj_1', googleToken: 'ya29.valid' } }, res)
   return sent

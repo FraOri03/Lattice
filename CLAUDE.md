@@ -12,8 +12,8 @@ Mappa architetturale dettagliata: [docs/architecture/GRAPHIFY_PROJECT_MAP.md](do
 
 ```bash
 npm run dev         # Vite dev server
-npm run build       # tsc --noEmit && vite build
-npm run typecheck   # tsc --noEmit
+npm run build       # npm run typecheck && vite build
+npm run typecheck   # tsc --noEmit (src) + tsc -p tsconfig.api.json (api)
 npm test            # vitest run
 npm run graph:build # rigenera il knowledge graph Graphify (dev-only)
 ```
@@ -21,7 +21,18 @@ npm run graph:build # rigenera il knowledge graph Graphify (dev-only)
 Non esiste ESLint in questo progetto: `typecheck` è il gate di qualità statica.
 Copre `src` (tsconfig.json) **e** `api` (tsconfig.api.json): le funzioni
 serverless non sono nell'`include` principale, e senza il secondo passaggio
-verrebbero controllate solo da Vercel al deploy.
+verrebbero controllate solo da Vercel al deploy. `build` lo esegue tutto, così
+un deploy fallisce invece di pubblicare una funzione rotta.
+
+Il secondo passaggio usa `moduleResolution: NodeNext` e nessun alias `@/*`,
+perché Vercel emette `api/` come ESM e il loader di Node non fa risoluzione
+senza estensione: un `import` relativo senza `.js` — anche in un modulo di
+`src` importato da una funzione — non si risolve a runtime e fa fallire
+l'intero module graph, con 500 su ogni richiesta. **Gli import di valore
+condivisi tra `api/` e `src/` vanno scritti con l'estensione `.js`** (Vite e
+`tsc` la rimappano sul `.ts`); gli `import type` sono cancellati dal
+transpile, ma li teniamo estesi per non far distinguere i due casi a chi
+legge.
 
 ## Graphify code intelligence
 

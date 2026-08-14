@@ -1,4 +1,4 @@
-import type { CollabRole } from '../../types/collab'
+import type { CollabRole } from '../../types/collab.js'
 
 /**
  * Role → media capability matrix, shared VERBATIM by the client UI and the
