@@ -130,6 +130,67 @@ Liveblocks ACL. With any of them missing:
 - Liveblocks/Yjs collaboration is entirely unaffected;
 - tests need no real credentials.
 
+## Who a membership belongs to
+
+Phase 16.2 ([#82](https://github.com/FraOri03/Lattice/issues/82)). The rule
+and the ACL shape live in one dependency-free module,
+[`src/lib/collab/acl.ts`](../src/lib/collab/acl.ts), imported verbatim by
+the browser and by `api/realtime/*` — the same pattern as `roleAccess.ts`,
+and the same property that settled where authorisation lives when Supabase
+arrives ([16.3](authorisation-phase-16-3.md): in `/api`, never in the
+browser).
+
+A membership slot is **opened with an e-mail address**, because an address
+is all you have for someone you have not met. What changed is what happens
+once they arrive:
+
+> An address that has been **bound** to a userId is claimable only by that
+> userId. An address with no binding is claimable by whoever proves it.
+
+The binding happens in `rooms.ensure`, the first time the invited person
+opens the project: Google has just vouched for the address the slot was
+opened with, so the slot is bound to their userId and the address stops
+granting it. One write per member per project.
+
+Three consequences, in order of how much they matter:
+
+- **A reassigned address no longer inherits a project.** When a company
+  gives `ada@example.com` to a new employee, they get nothing. Before
+  16.2 they got everything Ada had.
+- **A membership survives an address change.** Same Google account, new
+  address: the userId still matches, so nothing is lost.
+- **An invitation not yet accepted is exactly an unbound slot** — which is
+  what "keep the e-mail only for invitations not yet accepted" means in
+  practice.
+
+### Where the caller's userId comes from
+
+From the Google subject the endpoint already verified, via
+`googleUserIds()` in [`identity.ts`](../src/lib/auth/identity.ts). The
+browser does not send a userId and would not be believed if it did, so the
+new key is exactly as unforgeable as the address it replaces.
+
+It is a *set* of two ids, not one: the id minted by 16.1 (`usr_<hash>`)
+and the pre-16.1 one preserved by its migration (`acc_<sub>`). Both are
+facts about the same Google subject, and a slot may have been bound to
+either.
+
+### Gradual, and reversible
+
+Deliberately. The role lists keep the shape and wire format they have
+always had; the bindings are one extra, optional metadata key (`bound`,
+holding `"<userId> <address>"` rows). A deployment that knows nothing
+about them reads the ACL exactly as before and matches by address, so a
+rollback costs nothing and locks nobody out.
+
+Dropping the addresses from the role lists is a **later, separate step**.
+It needs a server that can resolve somebody else's address to a userId
+before an invitation is accepted — Phase 17. Until then the address is
+still how a slot is opened and named, and only *claiming* it has moved.
+
+Not migrated in this phase, by design: the **Liveblocks identity** is still
+the e-mail address. It names a realtime session, not a permission.
+
 ## Tests
 
 `src/lib/collab/collabPresentation.test.ts` locks the three tiers, including the "backend configured but not signed in ⇒ not realtime" case, so no surface can over-promise.

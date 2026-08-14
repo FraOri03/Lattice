@@ -12,7 +12,39 @@ All notable changes to Lattice are recorded here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **A project membership now belongs to a person, not to an e-mail address.** Access was
+  granted to an address, so whoever held that address held the project — and when a company
+  reassigns a departed colleague's mailbox, the new employee silently inherited everything
+  the old one could open. A membership is still *offered* to an address, because that is all
+  you have for someone you have not met, but the first time the invited person opens the
+  project it is bound to them: from then on the address no longer grants it, and their
+  access survives the address changing. An invitation that has not been accepted yet is
+  exactly the case where the address still counts, which is the only place it should. The
+  binding is derived on the server from the Google account it has already verified — the
+  browser never says who it is and would not be believed if it did. Nothing has to be
+  migrated by hand and nothing breaks on a rollback: projects created before this keep
+  working, and are bound the next time each member opens them. See
+  [docs/collaboration.md](docs/collaboration.md#who-a-membership-belongs-to).
+
 ### Added
+
+- **Who you are stopped being how you signed in.** Until now your account id was built
+  from your Google account: identity was literally derived from the provider, so a second
+  way of signing in would have created a second you, and there was no id a permission could
+  be attached to that survived a provider change. Lattice now keeps a `User` — opaque id,
+  address, name, avatar — and a `UserIdentity` for each proven way of signing in as that
+  person. Two rules decide what happens when someone signs in, and both are asserted
+  directly: the same **verified** address reached through Google or, later, through e-mail
+  converges on the one account; an **unverified** address never does, so signing in as
+  `owner@company.com` without proving it gets you a new empty account and not somebody
+  else's. Accounts already signed in are adopted with their existing id, because that id is
+  already on every comment, member row and activity entry they have written — including in
+  other people's browsers. What this does *not* do yet: room access is still granted by
+  e-mail address, there is no e-mail sign-in to converge with, and the records live in your
+  browser, so nothing here can authorise anything on its own. See
+  [docs/identity.md](docs/identity.md).
 
 - **The call can leave its corner.** A button in the call bar undocks the island into a free
   window: drag its bar to move it, drag any edge or corner to resize it, and the video tiles

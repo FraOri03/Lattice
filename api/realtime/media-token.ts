@@ -2,11 +2,12 @@ import { AccessToken, TrackSource } from 'livekit-server-sdk'
 import {
   liveblocksClient,
   loadAcl,
+  principalOf,
   requireIdentity,
-  roleOf,
   sendError,
   type ApiRes,
 } from '../_lib/realtime.js'
+import { roleOf } from '../../src/lib/collab/acl.js'
 import { isValidProjectId, mediaRoomId } from '../../src/lib/media/mediaRoomId.js'
 import {
   mediaCapabilitiesFor,
@@ -110,7 +111,7 @@ export default async function handler(req: Req, res: ApiRes): Promise<void> {
     sendError(res, 403, 'This project has no realtime room yet — open it as its owner first.')
     return
   }
-  const role = roleOf(acl, identity.email)
+  const role = roleOf(acl, principalOf(identity))
   if (!role) {
     sendError(res, 403, `${identity.email} is not a member of this project (server check).`)
     return

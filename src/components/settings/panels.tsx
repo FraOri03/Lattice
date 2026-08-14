@@ -187,6 +187,7 @@ function AccountPanel() {
     google: t.settings.account.methodGoogle,
     github: t.settings.account.methodGithub,
     mock: t.settings.account.methodLocal,
+    email: t.settings.account.methodEmail,
   }
 
   return (

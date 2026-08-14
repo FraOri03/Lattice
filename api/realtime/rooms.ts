@@ -1,15 +1,23 @@
 import {
-  addEmail,
   aclToMetadata,
   liveblocksClient,
   loadAcl,
+  principalOf,
   requireIdentity,
-  roleOf,
   sendError,
-  stripEmail,
   type ApiRes,
-  type RoomAcl,
 } from '../_lib/realtime.js'
+import {
+  addEmail,
+  bindUserId,
+  encodeBindings,
+  matchOf,
+  roleOf,
+  roleOfSlot,
+  stripEmail,
+  type RoomAcl,
+} from '../../src/lib/collab/acl.js'
+import { CANONICAL_USER_ID } from '../../src/lib/auth/identity.js'
 import {
   collabRoomId,
   contentRoomId,
@@ -35,6 +43,11 @@ import type { CollabRole } from '../../src/types/collab.js'
  * (src/lib/collab/permissions.ts) is evaluated HERE, server-side — the
  * same module the UI uses, so the rules cannot drift, but the browser's
  * answer is never trusted.
+ *
+ * `ensure` is also where 16.2's migration happens: a membership slot
+ * opened with an e-mail address is bound to the userId of whoever first
+ * proves that address, after which the address no longer grants it. See
+ * src/lib/collab/acl.ts.
  */
 
 interface Req {
@@ -56,6 +69,7 @@ interface Body {
 /** Metadata patch that also clears role lists that became empty. */
 function metadataPatch(projectId: string, acl: RoomAcl) {
   const meta = aclToMetadata(projectId, acl)
+  const bound = encodeBindings(acl.bindings)
   return {
     kind: meta.kind,
     projectId: meta.projectId,
@@ -64,7 +78,19 @@ function metadataPatch(projectId: string, acl: RoomAcl) {
     editors: acl.editors.length ? acl.editors : null,
     commenters: acl.commenters.length ? acl.commenters : null,
     viewers: acl.viewers.length ? acl.viewers : null,
+    bound: bound.length ? bound : null,
   }
+}
+
+/** Write an ACL to both of a project's rooms. */
+async function writeAcl(
+  lb: NonNullable<ReturnType<typeof liveblocksClient>>,
+  projectId: string,
+  acl: RoomAcl,
+): Promise<void> {
+  const metadata = metadataPatch(projectId, acl)
+  await lb.updateRoom(contentRoomId(projectId), { metadata })
+  await lb.updateRoom(collabRoomId(projectId), { metadata })
 }
 
 export default async function handler(req: Req, res: ApiRes): Promise<void> {
@@ -93,20 +119,29 @@ export default async function handler(req: Req, res: ApiRes): Promise<void> {
 
   const identity = await requireIdentity(res, body.googleToken)
   if (!identity) return
+  const principal = principalOf(identity)
+  /** The id a slot this caller claims is bound to, once they claim one. */
+  const callerUserId = principal.userIds[CANONICAL_USER_ID] ?? ''
 
   const acl = await loadAcl(lb, projectId)
 
   switch (action) {
     case 'ensure': {
       if (!acl) {
-        // bootstrap: the first person to open the project owns its rooms
-        const fresh: RoomAcl = {
-          ownerEmail: identity.email,
-          admins: [],
-          editors: [],
-          commenters: [],
-          viewers: [],
-        }
+        // bootstrap: the first person to open the project owns its rooms,
+        // and owns them as a userId from the very first write
+        const fresh: RoomAcl = bindUserId(
+          {
+            ownerEmail: identity.email,
+            admins: [],
+            editors: [],
+            commenters: [],
+            viewers: [],
+            bindings: {},
+          },
+          identity.email,
+          callerUserId,
+        )
         const metadata = aclToMetadata(projectId, fresh)
         for (const roomId of roomIdsForProject(projectId)) {
           try {
@@ -116,7 +151,7 @@ export default async function handler(req: Req, res: ApiRes): Promise<void> {
           }
         }
         const settled = await loadAcl(lb, projectId)
-        const role = settled ? roleOf(settled, identity.email) : 'owner'
+        const role = settled ? roleOf(settled, principal) : 'owner'
         if (!role) {
           sendError(res, 403, 'Another user claimed this project first.')
           return
@@ -124,8 +159,8 @@ export default async function handler(req: Req, res: ApiRes): Promise<void> {
         res.status(200).json({ role })
         return
       }
-      const role = roleOf(acl, identity.email)
-      if (!role) {
+      const match = matchOf(acl, principal)
+      if (!match) {
         sendError(
           res,
           403,
@@ -133,12 +168,22 @@ export default async function handler(req: Req, res: ApiRes): Promise<void> {
         )
         return
       }
-      res.status(200).json({ role })
+      /**
+       * 16.2 — the moment an invitation is accepted, in the only place
+       * that can observe it: the invitee opened the project and Google
+       * vouched for the address the slot was opened with. From here the
+       * slot answers to their userId and the address is no longer what
+       * grants it. One write per member per project, never repeated.
+       */
+      if (callerUserId && !acl.bindings[match.slotEmail]) {
+        await writeAcl(lb, projectId, bindUserId(acl, match.slotEmail, callerUserId))
+      }
+      res.status(200).json({ role: match.role })
       return
     }
 
     case 'members': {
-      if (!acl || !roleOf(acl, identity.email)) {
+      if (!acl || !roleOf(acl, principal)) {
         sendError(res, 403, 'Not a member of this project.')
         return
       }
@@ -151,7 +196,7 @@ export default async function handler(req: Req, res: ApiRes): Promise<void> {
         sendError(res, 404, 'This project has no realtime rooms yet.')
         return
       }
-      const callerRole = roleOf(acl, identity.email)
+      const callerRole = roleOf(acl, principal)
       if (!callerRole) {
         sendError(res, 403, 'Not a member of this project.')
         return
@@ -171,7 +216,15 @@ export default async function handler(req: Req, res: ApiRes): Promise<void> {
         sendError(res, 403, 'The owner role cannot be changed here.')
         return
       }
-      const targetRole = roleOf(acl, email)
+      /**
+       * A slot is still addressed by e-mail here, because that is all an
+       * admin has: you grant access to an address, and only the person who
+       * proves it turns the slot into a userId. Changing a *bound* slot's
+       * role therefore changes the bound person's role — that is the row
+       * the UI is showing. Handing the address to somebody else means
+       * removing it first, which drops the binding with it.
+       */
+      const targetRole = roleOfSlot(acl, email)
       // removing/demoting an existing member: rank rules apply
       if (targetRole && !canManageRole(callerRole, targetRole)) {
         sendError(res, 403, `A ${callerRole} cannot manage a ${targetRole}.`)
@@ -183,15 +236,13 @@ export default async function handler(req: Req, res: ApiRes): Promise<void> {
         return
       }
       const next = newRole ? addEmail(acl, email, newRole) : stripEmail(acl, email)
-      const metadata = metadataPatch(projectId, next)
-      await lb.updateRoom(contentRoomId(projectId), { metadata })
-      await lb.updateRoom(collabRoomId(projectId), { metadata })
+      await writeAcl(lb, projectId, next)
       res.status(200).json({ acl: next })
       return
     }
 
     case 'delete': {
-      if (!acl || roleOf(acl, identity.email) !== 'owner') {
+      if (!acl || roleOf(acl, principal) !== 'owner') {
         sendError(res, 403, 'Only the project owner can delete its realtime rooms.')
         return
       }

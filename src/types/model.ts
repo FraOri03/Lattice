@@ -164,7 +164,12 @@ export interface Folder {
 
 /* ---------------- account (Phase 6) ---------------- */
 
-export type AuthProviderId = 'google' | 'github' | 'mock'
+/**
+ * Sign-in methods as the account UI names them. It is the {@link
+ * import('./identity').IdentityProvider} set plus `github`, which is a
+ * repository connection rather than a way of signing in.
+ */
+export type AuthProviderId = 'google' | 'github' | 'mock' | 'email'
 
 /** How someone says they use Lattice. Collected in 14.2; nothing reads it yet. */
 export type UsageType = 'personal' | 'work' | 'education'

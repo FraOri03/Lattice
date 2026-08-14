@@ -1,7 +1,8 @@
 import { env, hasGoogleAuth } from '@/lib/env'
-import { nid } from '@/lib/id'
 import type { Account } from '@/types/model'
 import { applyProfilePatch, mergeProviderProfile, type ProfilePatch } from './profile'
+import { MOCK_SUBJECT, providerIdsOf } from './identity'
+import { identityStore } from './identityStore'
 
 /**
  * AuthService — personal account sign-in.
@@ -156,7 +157,41 @@ export function updateStoredAccount(patch: ProfilePatch): Account | null {
   if (!existing) return null
   const next = applyProfilePatch(existing, patch)
   saveAccount(next)
+  mirrorProfileToUser(next)
   return next
+}
+
+/**
+ * Restore a session, and make sure the identity store knows about it.
+ *
+ * A session restored from storage never goes through `signIn()`, so
+ * without this the store would stay empty until the next sign-in or
+ * profile edit and the account would be a person the model has never
+ * heard of. Reading it is enough: the store adopts whoever is already
+ * signed in on its first read, keeping their id.
+ */
+function restoreAccount(): Account | null {
+  const account = loadAccount()
+  if (account) identityStore.user(account.id)
+  return account
+}
+
+/**
+ * Keep the user record in step with the account (16.1).
+ *
+ * One direction only, and deliberately: the account owns the *effective*
+ * name and avatar, including the override bookkeeping that decides whether
+ * a re-sign-in may touch them, while the user record owns identity — the
+ * id, the address, and what other people will read once the profile lives
+ * on a server. `primaryEmail` is not mirrored: it is where invitations go,
+ * so linking a second provider must not quietly redirect them.
+ */
+function mirrorProfileToUser(account: Account): void {
+  identityStore.update(account.id, {
+    displayName: account.name,
+    avatarUrl: account.avatarUrl,
+    usageType: account.usageType,
+  })
 }
 
 /* ---------------- Google Identity Services ---------------- */
@@ -592,22 +627,44 @@ class GoogleAuthService implements AuthService {
     const existing = loadAccount()
     const now = Date.now()
     const provider = { name: info.name ?? 'Google user', avatarUrl: info.picture ?? '' }
+    const email = (info.email ?? '').toLowerCase()
+    /**
+     * 16.1 — the id no longer comes from the Google subject. The identity
+     * store answers "who is this", linking this Google identity to an
+     * existing user when it can (same subject, or an address someone has
+     * already verified) and minting one only when it cannot.
+     *
+     * Google's userinfo only ever returns an address it vouches for, which
+     * is what makes this claim a verified one — and therefore what lets a
+     * later e-mail OTP sign-in converge onto this same account.
+     */
+    const { user } = identityStore.resolve({
+      provider: 'google',
+      providerSubject: info.sub,
+      email,
+      emailVerified: !!email,
+      displayName: provider.name,
+      avatarUrl: provider.avatarUrl,
+    })
     // the provider is authoritative about the Google account, not about the
-    // name the user chose for themselves — mergeProviderProfile keeps both
+    // name the user chose for themselves — mergeProviderProfile keeps both.
+    // Only the SAME user's overrides carry over: signing in as someone else
+    // on a shared browser must not inherit the previous person's name.
     const account = mergeProviderProfile(
-      existing,
+      existing?.id === user.id ? existing : null,
       {
-        id: existing?.id ?? `acc_${info.sub}`,
+        id: user.id,
         name: provider.name,
-        email: info.email ?? '',
+        email,
         avatarUrl: provider.avatarUrl,
-        providers: [...new Set([...(existing?.providers ?? []), 'google' as const])],
-        createdAt: existing?.createdAt ?? now,
+        providers: providerIdsOf(identityStore.identitiesOf(user.id)),
+        createdAt: user.createdAt,
         updatedAt: now,
       },
       provider,
     )
     saveAccount(account)
+    mirrorProfileToUser(account)
     this.setReauthNeeded(false)
     this.notify()
     return account
@@ -619,7 +676,7 @@ class GoogleAuthService implements AuthService {
   }
 
   restore(): Account | null {
-    return loadAccount()
+    return restoreAccount()
   }
 
   async getAccessToken(): Promise<string | null> {
@@ -687,15 +744,29 @@ class MockAuthService implements AuthService {
   readonly kind = 'mock' as const
 
   async signIn(): Promise<Account> {
+    /**
+     * Resolved through the same store as a real sign-in, so the local
+     * account is a user like any other — but its claim is UNVERIFIED, and
+     * that is load-bearing: a local account claiming an address must never
+     * converge onto the real account that owns it.
+     */
+    const { user } = identityStore.resolve({
+      provider: 'mock',
+      providerSubject: MOCK_SUBJECT,
+      email: 'local@lattice.dev',
+      emailVerified: false,
+      displayName: 'Local User',
+      avatarUrl: '',
+    })
     const existing = loadAccount()
     if (existing) return existing
     const now = Date.now()
     const account: Account = {
-      id: nid('acc'),
+      id: user.id,
       name: 'Local User',
       email: 'local@lattice.dev',
       avatarUrl: '',
-      providers: ['mock'],
+      providers: providerIdsOf(identityStore.identitiesOf(user.id)),
       // there is no provider profile behind a local account, so an edited
       // name has nothing to be reset to — the panel says so rather than
       // offering a reset that would do nothing
@@ -711,7 +782,7 @@ class MockAuthService implements AuthService {
   }
 
   restore(): Account | null {
-    return loadAccount()
+    return restoreAccount()
   }
 
   async getAccessToken(): Promise<string | null> {

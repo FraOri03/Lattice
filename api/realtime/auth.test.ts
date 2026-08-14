@@ -268,6 +268,78 @@ describe('rejections', () => {
   })
 })
 
+describe('membership follows the userId, not the address (16.2)', () => {
+  /** The id the endpoint derives for the mocked subject, `g-sub-1`. */
+  let canonical: string
+
+  beforeEach(async () => {
+    const { googleUserIds } = await import('../../src/lib/auth/identity.js')
+    canonical = googleUserIds('g-sub-1')[0]
+  })
+
+  const boundTo = (userId: string) => ({
+    metadata: { ...ACL_ROOM.metadata, bound: [`${userId} ada@example.com`] },
+  })
+
+  it('keeps a bound member when their address changes', async () => {
+    getRoom.mockResolvedValue(boundTo(canonical))
+    // same Google account, new address: it matches nothing in the ACL
+    mockGoogle({ email: 'ada.lovelace@example.com' })
+    const session = makeSession()
+    const sent = await callAuth({
+      room: 'lattice:proj:proj_1',
+      googleToken: 'ya29.valid',
+    })
+    expect(sent.code).toBe(200)
+    expect(session.allow).toHaveBeenCalledWith('lattice:proj:proj_1', ['room:write'])
+  })
+
+  it('refuses the address to whoever holds it next', async () => {
+    // ada's old work address, now issued to somebody else
+    getRoom.mockResolvedValue(boundTo('usr_ada_elsewhere'))
+    mockGoogle({ email: 'ada@example.com' })
+    const sent = await callAuth({
+      room: 'lattice:proj:proj_1',
+      googleToken: 'ya29.valid',
+    })
+    expect(sent.code).toBe(403)
+    expect(prepareSession).not.toHaveBeenCalled()
+  })
+
+  it('accepts the legacy id, which is the same Google subject', async () => {
+    getRoom.mockResolvedValue(boundTo('acc_g-sub-1'))
+    mockGoogle({ email: 'ada@example.com' })
+    makeSession()
+    const sent = await callAuth({
+      room: 'lattice:proj:proj_1',
+      googleToken: 'ya29.valid',
+    })
+    expect(sent.code).toBe(200)
+  })
+
+  it('still admits an unbound member by address, so invitations work', async () => {
+    getRoom.mockResolvedValue(ACL_ROOM) // no bindings at all: a pre-16.2 room
+    mockGoogle({ email: 'ada@example.com' })
+    makeSession()
+    const sent = await callAuth({
+      room: 'lattice:proj:proj_1',
+      googleToken: 'ya29.valid',
+    })
+    expect(sent.code).toBe(200)
+  })
+
+  it('never lets the browser name its own userId', async () => {
+    getRoom.mockResolvedValue(boundTo('usr_ada_elsewhere'))
+    mockGoogle({ email: 'ada@example.com' })
+    const sent = await callAuth({
+      room: 'lattice:proj:proj_1',
+      googleToken: 'ya29.valid',
+      userId: 'usr_ada_elsewhere',
+    })
+    expect(sent.code).toBe(403)
+  })
+})
+
 describe('secret hygiene', () => {
   it('never echoes the secret into a response, on success or failure', async () => {
     mockGoogle()

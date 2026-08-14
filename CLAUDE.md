@@ -19,6 +19,9 @@ npm run graph:build # rigenera il knowledge graph Graphify (dev-only)
 ```
 
 Non esiste ESLint in questo progetto: `typecheck` è il gate di qualità statica.
+Copre `src` (tsconfig.json) **e** `api` (tsconfig.api.json): le funzioni
+serverless non sono nell'`include` principale, e senza il secondo passaggio
+verrebbero controllate solo da Vercel al deploy.
 
 ## Graphify code intelligence
 

@@ -11,8 +11,12 @@ import { env, hasRealtimeBackend } from '@/lib/env'
  * realtime backend is not configured every call is a cheap no-op, so the
  * Phase 7 local/Drive collaboration flows keep working unchanged.
  *
- * ACL keys are Google account e-mails: invite people with the address
- * they sign in to Google with.
+ * Memberships are still *opened* with an e-mail address — an address is
+ * all you have for someone you have not met — but from 16.2 the slot is
+ * bound to the invitee's userId the first time they open the project, and
+ * stops answering to the address (src/lib/collab/acl.ts). Invite people
+ * with the address they sign in to Google with; after that, the address is
+ * only a label.
  */
 
 export interface AclResult {
