@@ -1,4 +1,4 @@
-import type { CollabRole } from '../../types/collab'
+import type { CollabRole } from '../../types/collab.js'
 
 /**
  * Role → realtime-room access mapping, shared VERBATIM by the client UI

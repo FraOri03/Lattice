@@ -1,4 +1,4 @@
-import type { UsageType } from './model'
+import type { UsageType } from './model.js'
 
 /* ---------------- identity model (Phase 16.1) ---------------- */
 

@@ -95,7 +95,7 @@ const ACL_ROOM = {
 }
 
 async function callAuth(body: unknown, method = 'POST') {
-  const { default: handler } = await import('./auth')
+  const { default: handler } = await import('./auth.js')
   const { res, sent } = makeRes()
   await handler({ method, body }, res)
   return sent

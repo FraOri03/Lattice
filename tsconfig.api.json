@@ -1,7 +1,19 @@
 {
+  // Serverless functions only. Vercel emits api/ as ESM (package.json
+  // "type": "module") and Node's ESM loader does no extensionless
+  // resolution, so this pass uses NodeNext: it fails on any import a
+  // deployed function could not resolve at runtime — a missing `.js`
+  // extension, or a `@/*` alias no bundler is there to rewrite. Both
+  // crash the whole module graph at load time and turn every request
+  // into a 500. `src` is deliberately absent: the transitively imported
+  // modules are pulled in anyway (and checked under Node's rules, which
+  // is the point), while the rest of src is covered by tsconfig.json.
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "paths": {},
     "noEmit": true
   },
-  "include": ["api", "src"]
+  "include": ["api"]
 }

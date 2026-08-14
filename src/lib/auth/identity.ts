@@ -1,12 +1,12 @@
-import { nid } from '../id'
-import type { Account, AuthProviderId } from '../../types/model'
+import { nid } from '../id.js'
+import type { Account, AuthProviderId } from '../../types/model.js'
 import type {
   IdentityClaim,
   IdentityRecords,
   ResolvedIdentity,
   User,
   UserIdentity,
-} from '../../types/identity'
+} from '../../types/identity.js'
 
 /**
  * Identity rules (Phase 16.1) — pure, because the two things that must not
