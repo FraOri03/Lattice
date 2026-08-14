@@ -524,6 +524,7 @@ class SyncEngine {
     const drive = this.drive!
     const projectFolders = await drive.listFolder(['projects'])
     const conflicts: SyncConflict[] = []
+    const failed: string[] = []
 
     for (const folder of projectFolders) {
       if (folder.mimeType !== FOLDER_MIME) continue
@@ -534,13 +535,36 @@ class SyncEngine {
       if (taggedId) drive.bindProjectFolder(taggedId, folder)
       const projectId = taggedId ?? folder.name
 
-      const snapMeta = await drive.findFile(['projects', projectId], 'project.json')
-      if (!snapMeta) continue
-      const snapshot = await drive.downloadJson<ProjectSnapshot>(snapMeta.id)
-      if (snapshot?.app !== 'lattice-project' || !snapshot.project) continue
-      await this.mergeSnapshot(snapshot, conflicts)
+      // One project must not be able to hide the others. This loop used to
+      // let any single failure — a rate-limited body fetch, one unreadable
+      // file — abort the whole pull, so every project after it in Drive's
+      // listing simply never arrived. On a vault that has no local copy to
+      // fall back on (a new browser, or a new ORIGIN: localStorage and
+      // IndexedDB are per-origin, so moving the app to its own domain
+      // starts an empty one) that reads exactly like the project is gone.
+      try {
+        const snapMeta = await drive.findFile(['projects', projectId], 'project.json')
+        if (!snapMeta) continue
+        const snapshot = await drive.downloadJson<ProjectSnapshot>(snapMeta.id)
+        if (snapshot?.app !== 'lattice-project' || !snapshot.project) continue
+        await this.mergeSnapshot(snapshot, conflicts)
+      } catch (err) {
+        // an expired token fails every remaining project too: stop rather
+        // than spend the rest of the listing proving it
+        if (err instanceof DriveApiError && err.status === 401) throw err
+        console.error(`[sync] could not pull project ${folder.name}`, err)
+        failed.push(folder.name)
+      }
     }
     if (conflicts.length) useSyncStore.getState().addConflicts(conflicts)
+    // report AFTER merging everything that did work, and report it as a
+    // failure: pull is the only reader of Drive, and a push marking the
+    // sync "synced" afterwards would paint over the missing projects.
+    if (failed.length) {
+      throw new Error(
+        `Could not pull ${failed.length} project${failed.length === 1 ? '' : 's'} from Drive (${failed.join(', ')}) — the others synced; retry with "Sync now".`,
+      )
+    }
   }
 
   /** Merge one remote project snapshot into the local vault, newest-wins. */
@@ -613,6 +637,10 @@ class SyncEngine {
       boardOrder,
       assets,
     })
+    // a pulled project is in `projects` but in no workspace — and the
+    // project lists all filter on workspace membership, so without this it
+    // stays invisible on this device however healthy the sync looks
+    useStore.getState().adoptOrphanProjects()
 
     // fetch bodies for entities where remote won; back up local first when
     // the local copy had unpushed edits (conflict case)
