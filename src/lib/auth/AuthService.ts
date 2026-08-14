@@ -161,6 +161,20 @@ function hasUserActivation(): boolean {
   return Date.now() - lastGestureAt < GESTURE_WINDOW_MS
 }
 
+/**
+ * The stored account record. Exported because e-mail sign-in (17.3) writes
+ * the same record through a path that is deliberately not this class —
+ * `emailSignIn.ts` explains why.
+ */
+export function loadStoredAccount(): Account | null {
+  return loadAccount()
+}
+
+/** @see loadStoredAccount */
+export function storeAccount(account: Account | null): void {
+  saveAccount(account)
+}
+
 function loadAccount(): Account | null {
   try {
     const raw = localStorage.getItem(ACCOUNT_KEY)

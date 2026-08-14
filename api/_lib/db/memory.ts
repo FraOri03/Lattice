@@ -9,12 +9,14 @@ import type { CollabRole, ProjectInvite } from '../../../src/types/collab.js'
 import type { Entitlement } from '../../../src/types/entitlement.js'
 import { freeEntitlement } from '../../../src/types/entitlement.js'
 import type { Session } from '../../../src/types/session.js'
+import type { OtpCode } from '../../../src/types/otpRecord.js'
 import type { RoomAcl } from '../../../src/lib/collab/acl.js'
 import type {
   EntitlementRepository,
   IdentityRepository,
   InvitationRepository,
   MembershipRepository,
+  OtpRepository,
   Repositories,
   SessionRepository,
 } from './repositories.js'
@@ -27,6 +29,8 @@ import {
   inviteFromRow,
   inviteToRow,
   rowsFromAcl,
+  otpFromRow,
+  otpToRow,
   sessionFromRow,
   sessionToRow,
   toIso,
@@ -36,6 +40,7 @@ import {
   type IdentityRow,
   type InvitationRow,
   type MembershipRow,
+  type OtpRow,
   type SessionRow,
   type UserRow,
 } from './rows.js'
@@ -67,6 +72,7 @@ export class MemoryDatabase {
   invitations: InvitationRow[] = []
   entitlements: EntitlementRow[] = []
   sessions: SessionRow[] = []
+  otp: OtpRow[] = []
 
   clear(): void {
     this.users = []
@@ -75,6 +81,7 @@ export class MemoryDatabase {
     this.invitations = []
     this.entitlements = []
     this.sessions = []
+    this.otp = []
   }
 }
 
@@ -85,6 +92,7 @@ export class MemoryRepositories implements Repositories {
   readonly invitations: InvitationRepository = new MemoryInvitationRepository(this.data)
   readonly entitlements: EntitlementRepository = new MemoryEntitlementRepository(this.data)
   readonly sessions: SessionRepository = new MemorySessionRepository(this.data)
+  readonly otp: OtpRepository = new MemoryOtpRepository(this.data)
 
   clear(): void {
     this.data.clear()
@@ -376,6 +384,58 @@ class MemoryEntitlementRepository implements EntitlementRepository {
     const next: Entitlement = { ...current, ...patch, userId, updatedAt: Date.now() }
     upsert(this.db.entitlements, entitlementToRow(next), (r) => r.user_id)
     return next
+  }
+}
+
+/* ---------------- e-mail one-time codes ---------------- */
+
+class MemoryOtpRepository implements OtpRepository {
+  constructor(private db: MemoryDatabase) {}
+
+  /** Issuing invalidates every earlier live code, in one operation. */
+  async issue(code: OtpCode): Promise<OtpCode> {
+    const email = code.email.toLowerCase()
+    const stamp = toIso(code.createdAt)
+    for (const row of this.db.otp) {
+      if (row.email === email && !row.consumed_at) row.consumed_at = stamp
+    }
+    this.db.otp.push(otpToRow(code))
+    return code
+  }
+
+  async liveFor(email: string, now = Date.now()): Promise<OtpCode | null> {
+    const clean = email.toLowerCase()
+    const row = this.db.otp.find(
+      (r) => r.email === clean && !r.consumed_at && Date.parse(r.expires_at) > now,
+    )
+    return row ? otpFromRow(row) : null
+  }
+
+  async noteAttempt(id: string): Promise<number> {
+    const row = this.db.otp.find((r) => r.id === id)
+    if (!row) return 0
+    row.attempts += 1
+    return row.attempts
+  }
+
+  async consume(id: string, now = Date.now()): Promise<void> {
+    const row = this.db.otp.find((r) => r.id === id)
+    if (!row || row.consumed_at) return
+    row.consumed_at = toIso(now)
+  }
+
+  async countForEmail(email: string, since: number): Promise<number> {
+    const clean = email.toLowerCase()
+    return this.db.otp.filter(
+      (r) => r.email === clean && Date.parse(r.created_at) >= since,
+    ).length
+  }
+
+  async countForIp(ip: string, since: number): Promise<number> {
+    if (!ip) return 0
+    return this.db.otp.filter(
+      (r) => r.request_ip === ip && Date.parse(r.created_at) >= since,
+    ).length
   }
 }
 

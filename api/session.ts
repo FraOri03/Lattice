@@ -1,7 +1,19 @@
 import { nid } from '../src/lib/id.js'
 import { resolveClaim } from '../src/lib/auth/identity.js'
+import type { IdentityProvider } from '../src/types/identity.js'
 import type { Session, SessionInfo } from '../src/types/session.js'
 import { SESSION_TTL_MS } from '../src/types/session.js'
+import type { OtpRequestResult } from '../src/types/otp.js'
+import { OTP_TTL_MS } from '../src/types/otp.js'
+import { mailSender, signInCodeMessage } from './_lib/mail.js'
+import {
+  issueCode,
+  normaliseEmail,
+  rateCheck,
+  sourceIp,
+  verifyCode,
+} from './_lib/otp.js'
+import type { Repositories } from './_lib/db/repositories.js'
 import { NO_DATABASE, repositories } from './_lib/db/index.js'
 import { verifyGoogleToken, sendError, type ApiRes } from './_lib/realtime.js'
 import {
@@ -41,7 +53,13 @@ import {
 interface Body {
   action?: unknown
   googleToken?: unknown
+  email?: unknown
+  code?: unknown
 }
+
+/** What an endpoint says when a code was asked for and it cannot send one. */
+const NO_MAIL =
+  'E-mail sign-in is not configured on this server (RESEND_API_KEY and MAIL_FROM are missing).'
 
 function infoOf(session: Session, csrfToken: string): SessionInfo {
   return {
@@ -53,6 +71,54 @@ function infoOf(session: Session, csrfToken: string): SessionInfo {
     expiresAt: session.expiresAt,
     csrfToken,
   }
+}
+
+/** The identity a freshly proven claim carries into its session. */
+interface SessionSeed {
+  userId: string
+  provider: IdentityProvider
+  providerSubject: string
+  email: string
+  displayName: string
+  avatarUrl: string
+}
+
+/**
+ * Mint a session for a claim that has just been proven.
+ *
+ * Shared by both ways in — a Google token and an e-mail code — because
+ * "OTP as a second provider **on the same session**" is the whole point of
+ * 17.3. Two copies of this would be two session formats, and eventually
+ * two sets of security properties.
+ */
+async function startSession(
+  db: Repositories,
+  req: ApiRequest,
+  seed: SessionSeed,
+): Promise<{ info: SessionInfo; cookie: string }> {
+  const token = mintToken()
+  const csrfToken = mintToken()
+  const now = Date.now()
+  const session: Session = {
+    id: nid('ses'),
+    userId: seed.userId,
+    provider: seed.provider,
+    providerSubject: seed.providerSubject,
+    email: seed.email,
+    displayName: seed.displayName,
+    avatarUrl: seed.avatarUrl,
+    createdAt: now,
+    lastSeenAt: now,
+    expiresAt: now + SESSION_TTL_MS,
+    revokedAt: null,
+    // coarse and untrusted; it exists so a person can recognise a device
+    userAgent: headerOf(req, 'user-agent').slice(0, 256),
+  }
+  await db.sessions.create(session, {
+    tokenHash: hashToken(token),
+    csrfHash: hashToken(csrfToken),
+  })
+  return { info: infoOf(session, csrfToken), cookie: sessionCookieHeader(token, req) }
 }
 
 export default async function handler(req: ApiRequest, res: ApiRes): Promise<void> {
@@ -126,31 +192,103 @@ export default async function handler(req: ApiRequest, res: ApiRes): Promise<voi
     const { resolved } = resolveClaim(records, claim)
     await db.identities.saveResolved(resolved)
 
-    const token = mintToken()
-    const csrfToken = mintToken()
-    const now = Date.now()
-    const session: Session = {
-      id: nid('ses'),
+    const { info, cookie } = await startSession(db, req, {
       userId: resolved.user.id,
       provider: 'google',
       providerSubject: identity.sub,
       email: identity.email,
       displayName: claim.displayName,
       avatarUrl: identity.picture,
-      createdAt: now,
-      lastSeenAt: now,
-      expiresAt: now + SESSION_TTL_MS,
-      revokedAt: null,
-      // coarse and untrusted; it exists so a person can recognise a device
-      userAgent: headerOf(req, 'user-agent').slice(0, 256),
-    }
-    await db.sessions.create(session, {
-      tokenHash: hashToken(token),
-      csrfHash: hashToken(csrfToken),
     })
+    res.setHeader('Set-Cookie', cookie)
+    res.status(200).json(info)
+    return
+  }
 
-    res.setHeader('Set-Cookie', sessionCookieHeader(token, req))
-    res.status(200).json(infoOf(session, csrfToken))
+  /* ---------------- e-mail one-time codes (17.3, #86) ---------------- */
+
+  if (action === 'otp-request') {
+    const email = normaliseEmail(body.email)
+    if (!email) {
+      // a malformed address is a client bug, not a signal about anyone
+      sendError(res, 400, 'A valid e-mail address is required.')
+      return
+    }
+    const mail = mailSender()
+    if (!mail) {
+      sendError(res, 501, NO_MAIL)
+      return
+    }
+
+    const ip = sourceIp(req)
+    const decision = await rateCheck(db.otp, email, ip)
+    if (decision.allowed) {
+      const { code } = await issueCode(db.otp, email, ip)
+      try {
+        await mail.send(signInCodeMessage(email, code))
+      } catch {
+        // Delivery failed. The caller is still told the same thing: a
+        // response that distinguished "sent" from "could not send" would
+        // distinguish addresses too.
+      }
+    }
+
+    /**
+     * ALWAYS this, whatever happened above — sent, rate limited, or a
+     * delivery failure. The response cannot depend on whether the address
+     * has an account, or this endpoint becomes a way to ask "is this
+     * person a Lattice user?" one address at a time.
+     */
+    const result: OtpRequestResult = { sent: true, expiresInMs: OTP_TTL_MS }
+    res.status(200).json(result)
+    return
+  }
+
+  if (action === 'otp-verify') {
+    const email = normaliseEmail(body.email)
+    const code = typeof body.code === 'string' ? body.code : ''
+    if (!email || !code) {
+      sendError(res, 400, 'An e-mail address and a code are required.')
+      return
+    }
+
+    if (!(await verifyCode(db.otp, email, code))) {
+      // One message for every failure: no code, expired, wrong digits, out
+      // of attempts. Four situations that must look identical from outside.
+      sendError(res, 401, 'That code is not valid. Request a new one.')
+      return
+    }
+
+    /**
+     * The claim OTP produces, and the reason 16.1 built convergence: the
+     * address is VERIFIED — the code proved control of the mailbox — so
+     * `resolveClaim` lands on the user who already signed in with Google at
+     * that address rather than minting a second account beside them.
+     */
+    const claim = {
+      provider: 'email' as const,
+      providerSubject: email,
+      email,
+      emailVerified: true,
+      displayName: email,
+      avatarUrl: '',
+    }
+    const records = await db.identities.recordsForClaim(claim)
+    const { resolved } = resolveClaim(records, claim)
+    await db.identities.saveResolved(resolved)
+
+    const { info, cookie } = await startSession(db, req, {
+      userId: resolved.user.id,
+      provider: 'email',
+      providerSubject: email,
+      email,
+      // an existing account keeps the name it already had; a brand-new one
+      // has nothing but the address to go on
+      displayName: resolved.user.displayName || email,
+      avatarUrl: resolved.user.avatarUrl,
+    })
+    res.setHeader('Set-Cookie', cookie)
+    res.status(200).json(info)
     return
   }
 

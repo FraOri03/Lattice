@@ -8,6 +8,7 @@ import type {
 import type { RoomAcl } from '../../../src/lib/collab/acl.js'
 import type { UsageType } from '../../../src/types/model.js'
 import type { Session } from '../../../src/types/session.js'
+import type { OtpCode } from '../../../src/types/otpRecord.js'
 
 /**
  * The shape the database actually stores, and the translation to and from
@@ -312,6 +313,45 @@ export function sessionToRow(
     expires_at: toIso(session.expiresAt),
     revoked_at: toIsoOrNull(session.revokedAt),
     user_agent: session.userAgent,
+  }
+}
+
+/* ---------------- e-mail one-time codes ---------------- */
+
+export interface OtpRow {
+  id: string
+  email: string
+  code_hash: string
+  created_at: string
+  expires_at: string
+  consumed_at: string | null
+  attempts: number
+  request_ip: string
+}
+
+export function otpFromRow(row: OtpRow): OtpCode {
+  return {
+    id: row.id,
+    email: row.email,
+    codeHash: row.code_hash,
+    createdAt: fromIso(row.created_at),
+    expiresAt: fromIso(row.expires_at),
+    consumedAt: fromIsoOrNull(row.consumed_at),
+    attempts: row.attempts,
+    requestIp: row.request_ip,
+  }
+}
+
+export function otpToRow(code: OtpCode): OtpRow {
+  return {
+    id: code.id,
+    email: code.email.toLowerCase(),
+    code_hash: code.codeHash,
+    created_at: toIso(code.createdAt),
+    expires_at: toIso(code.expiresAt),
+    consumed_at: toIsoOrNull(code.consumedAt),
+    attempts: code.attempts,
+    request_ip: code.requestIp,
   }
 }
 

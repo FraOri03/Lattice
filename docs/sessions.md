@@ -79,8 +79,10 @@ deployments it changes underneath:
 
 `/api/session` answers `501` in that second case, and the client reads that
 as "fall back", never as "signed out".
-[17.3](https://github.com/FraOri03/Lattice/issues/86) is where the Google
-token stops being accepted.
+
+[17.3](email-otp.md) has since added e-mail codes as a second provider on
+this same session. The Google-token fallback is still here: removing it is
+its own change, and it needs every deployment to have a database first.
 
 ## What this changed in the browser
 

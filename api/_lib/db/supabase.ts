@@ -10,12 +10,14 @@ import type { CollabRole, ProjectInvite } from '../../../src/types/collab.js'
 import type { Entitlement } from '../../../src/types/entitlement.js'
 import { freeEntitlement } from '../../../src/types/entitlement.js'
 import type { Session } from '../../../src/types/session.js'
+import type { OtpCode } from '../../../src/types/otpRecord.js'
 import type { RoomAcl } from '../../../src/lib/collab/acl.js'
 import type {
   EntitlementRepository,
   IdentityRepository,
   InvitationRepository,
   MembershipRepository,
+  OtpRepository,
   Repositories,
   SessionRepository,
 } from './repositories.js'
@@ -28,6 +30,8 @@ import {
   inviteFromRow,
   inviteToRow,
   rowsFromAcl,
+  otpFromRow,
+  otpToRow,
   sessionFromRow,
   sessionToRow,
   toIso,
@@ -37,6 +41,7 @@ import {
   type IdentityRow,
   type InvitationRow,
   type MembershipRow,
+  type OtpRow,
   type SessionRow,
   type UserRow,
 } from './rows.js'
@@ -63,6 +68,7 @@ const MEMBERSHIPS = 'project_memberships'
 const INVITATIONS = 'project_invitations'
 const ENTITLEMENTS = 'entitlements'
 const SESSIONS = 'sessions'
+const OTP = 'email_otp_codes'
 
 /** Postgres unique-violation; the only conflict this layer expects to lose. */
 const UNIQUE_VIOLATION = '23505'
@@ -85,6 +91,7 @@ export class SupabaseRepositories implements Repositories {
   readonly invitations: InvitationRepository
   readonly entitlements: EntitlementRepository
   readonly sessions: SessionRepository
+  readonly otp: OtpRepository
 
   constructor(client: SupabaseClient) {
     this.identities = new SupabaseIdentityRepository(client)
@@ -92,6 +99,7 @@ export class SupabaseRepositories implements Repositories {
     this.invitations = new SupabaseInvitationRepository(client)
     this.entitlements = new SupabaseEntitlementRepository(client)
     this.sessions = new SupabaseSessionRepository(client)
+    this.otp = new SupabaseOtpRepository(client)
   }
 }
 
@@ -608,6 +616,96 @@ class SupabaseEntitlementRepository implements EntitlementRepository {
       'save entitlement',
     )
     return next
+  }
+}
+
+/* ---------------- e-mail one-time codes ---------------- */
+
+class SupabaseOtpRepository implements OtpRepository {
+  constructor(private db: SupabaseClient) {}
+
+  /**
+   * Invalidate, then insert. "Previous codes invalidated" is a requirement,
+   * so it is not left to the caller to remember — and the order matters: a
+   * failure between the two leaves nobody able to sign in, which is far
+   * better than leaving two codes live.
+   */
+  async issue(code: OtpCode): Promise<OtpCode> {
+    const email = code.email.toLowerCase()
+    unwrap(
+      await this.db
+        .from(OTP)
+        .update({ consumed_at: toIso(code.createdAt) })
+        .eq('email', email)
+        .is('consumed_at', null),
+      'invalidate previous codes',
+    )
+    unwrap(await this.db.from(OTP).insert(otpToRow(code)), 'issue code')
+    return code
+  }
+
+  async liveFor(email: string, now = Date.now()): Promise<OtpCode | null> {
+    const row = unwrap<OtpRow>(
+      await this.db
+        .from(OTP)
+        .select('*')
+        .eq('email', email.toLowerCase())
+        .is('consumed_at', null)
+        .gt('expires_at', toIso(now))
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      'load live code',
+    )
+    return row ? otpFromRow(row) : null
+  }
+
+  async noteAttempt(id: string): Promise<number> {
+    const current = unwrap<{ attempts: number }>(
+      await this.db.from(OTP).select('attempts').eq('id', id).maybeSingle(),
+      'load attempts',
+    )
+    if (!current) return 0
+    const attempts = current.attempts + 1
+    unwrap(await this.db.from(OTP).update({ attempts }).eq('id', id), 'record attempt')
+    return attempts
+  }
+
+  async consume(id: string, now = Date.now()): Promise<void> {
+    unwrap(
+      await this.db
+        .from(OTP)
+        .update({ consumed_at: toIso(now) })
+        .eq('id', id)
+        .is('consumed_at', null),
+      'consume code',
+    )
+  }
+
+  async countForEmail(email: string, since: number): Promise<number> {
+    return this.countWhere('email', email.toLowerCase(), since)
+  }
+
+  async countForIp(ip: string, since: number): Promise<number> {
+    if (!ip) return 0
+    return this.countWhere('request_ip', ip, since)
+  }
+
+  /** HEAD + exact count: the rows themselves are never needed here. */
+  private async countWhere(
+    column: string,
+    value: string,
+    since: number,
+  ): Promise<number> {
+    const result = await this.db
+      .from(OTP)
+      .select('id', { count: 'exact', head: true })
+      .eq(column, value)
+      .gte('created_at', toIso(since))
+    if (result.error) {
+      throw new Error(`[db] count codes failed: ${result.error.message}`)
+    }
+    return result.count ?? 0
   }
 }
 

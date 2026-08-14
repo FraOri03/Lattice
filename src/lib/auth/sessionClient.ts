@@ -128,6 +128,57 @@ class SessionClient {
     }
   }
 
+  /* ---------------- e-mail one-time codes (17.3, #86) ---------------- */
+
+  /**
+   * Ask for a sign-in code.
+   *
+   * `'sent'` does NOT mean an account exists, or even that delivery
+   * succeeded — the server answers identically either way, on purpose, so
+   * that this call cannot be used to discover who has an account. The only
+   * distinguishable outcome is `'unavailable'`, which is about the SERVER
+   * having no mail transport and says nothing about the address.
+   */
+  async requestEmailCode(email: string): Promise<'sent' | 'unavailable' | 'error'> {
+    try {
+      const res = await fetch(SESSION_URL, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'otp-request', email }),
+      })
+      if (res.status === 501) return 'unavailable'
+      return res.ok ? 'sent' : 'error'
+    } catch {
+      return 'error'
+    }
+  }
+
+  /**
+   * Exchange an address and its code for a session.
+   *
+   * Null on every failure, because the server distinguishes none of them:
+   * no code, expired, wrong digits and out of attempts all answer the same.
+   */
+  async signInWithEmailCode(email: string, code: string): Promise<SessionInfo | null> {
+    try {
+      const res = await fetch(SESSION_URL, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'otp-verify', email, code }),
+      })
+      if (!res.ok) return null
+      const info = (await res.json()) as SessionInfo
+      this.info = info
+      this.supported = true
+      this.notify()
+      return info
+    } catch {
+      return null
+    }
+  }
+
   /** Sign out this device. */
   async logout(): Promise<void> {
     await this.revoke('logout')

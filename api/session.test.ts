@@ -3,6 +3,7 @@ import { MemoryRepositories } from './_lib/db/memory.js'
 import { hashToken, mintToken } from './_lib/session.js'
 import type { Session, SessionInfo } from '../src/types/session.js'
 import { SESSION_TTL_MS } from '../src/types/session.js'
+import { OTP_MAX_PER_EMAIL } from '../src/types/otp.js'
 
 /**
  * /api/session — the endpoint that lets Lattice stop treating a Google
@@ -289,6 +290,271 @@ describe('method and action handling', () => {
         method: 'POST',
         headers: { cookie: `lattice_session=${token}`, 'x-lattice-csrf': csrf },
         body: { action: 'nonsense' },
+      },
+      res,
+    )
+    expect(sent.code).toBe(400)
+  })
+})
+
+/* ---------------- e-mail one-time codes (17.3, #86) ---------------- */
+
+/** Capture what the mail transport was asked to send. */
+const sentMail: { to: string; text: string }[] = []
+
+let mailConfigured = true
+let mailFails = false
+
+vi.mock('./_lib/mail.js', async () => {
+  const actual = await vi.importActual<typeof import('./_lib/mail.js')>('./_lib/mail.js')
+  return {
+    ...actual,
+    mailSender: () =>
+      mailConfigured
+        ? {
+            send: async (m: { to: string; subject: string; text: string }) => {
+              if (mailFails) throw new Error('provider down')
+              sentMail.push({ to: m.to, text: m.text })
+            },
+          }
+        : null,
+  }
+})
+
+/** The digits out of the message the user would have received. */
+const lastCode = (): string => /\b(\d{6})\b/.exec(sentMail.at(-1)?.text ?? '')?.[1] ?? ''
+
+describe('requesting a sign-in code', () => {
+  beforeEach(() => {
+    mailConfigured = true
+    mailFails = false
+    sentMail.length = 0
+  })
+
+  it('sends a six-digit code', async () => {
+    const { res, sent } = makeRes()
+    await handler(
+      {
+        method: 'POST',
+        headers: {},
+        body: { action: 'otp-request', email: 'ada@example.com' },
+      },
+      res,
+    )
+    expect(sent.code).toBe(200)
+    expect(sentMail).toHaveLength(1)
+    expect(lastCode()).toMatch(/^\d{6}$/)
+  })
+
+  /**
+   * The property this whole flow lives or dies by: the answer must not
+   * depend on whether the address has an account, or the endpoint becomes
+   * a way to ask "is this person a Lattice user?" one address at a time.
+   */
+  it('answers identically for an address with an account and one without', async () => {
+    mockGoogle('known@example.com', 'g-known')
+    const { res: mk } = makeRes()
+    await handler(
+      { method: 'POST', headers: {}, body: { action: 'create', googleToken: 'g' } },
+      mk,
+    )
+    vi.unstubAllGlobals()
+
+    const answers: unknown[] = []
+    for (const email of ['known@example.com', 'stranger@example.com']) {
+      const { res, sent } = makeRes()
+      await handler(
+        { method: 'POST', headers: {}, body: { action: 'otp-request', email } },
+        res,
+      )
+      answers.push({ code: sent.code, body: sent.body })
+    }
+    expect(answers[0]).toEqual(answers[1])
+  })
+
+  /** Being throttled is itself information: saying so would leak it. */
+  it('answers the same once the address is rate limited', async () => {
+    const seen = new Set<string>()
+    for (let i = 0; i < OTP_MAX_PER_EMAIL + 3; i++) {
+      const { res, sent } = makeRes()
+      await handler(
+        {
+          method: 'POST',
+          headers: {},
+          body: { action: 'otp-request', email: 'ada@example.com' },
+        },
+        res,
+      )
+      seen.add(JSON.stringify({ code: sent.code, body: sent.body }))
+    }
+    expect(seen.size).toBe(1)
+    // ...and it really did stop sending
+    expect(sentMail.length).toBe(OTP_MAX_PER_EMAIL)
+  })
+
+  it('answers the same when the provider fails to deliver', async () => {
+    const ok = makeRes()
+    await handler(
+      {
+        method: 'POST',
+        headers: {},
+        body: { action: 'otp-request', email: 'a@example.com' },
+      },
+      ok.res,
+    )
+    mailFails = true
+    const bad = makeRes()
+    await handler(
+      {
+        method: 'POST',
+        headers: {},
+        body: { action: 'otp-request', email: 'b@example.com' },
+      },
+      bad.res,
+    )
+    expect(bad.sent.code).toBe(ok.sent.code)
+    expect(bad.sent.body).toEqual(ok.sent.body)
+  })
+
+  it('rejects a malformed address as a client bug, not a signal', async () => {
+    const { res, sent } = makeRes()
+    await handler(
+      { method: 'POST', headers: {}, body: { action: 'otp-request', email: 'nope' } },
+      res,
+    )
+    expect(sent.code).toBe(400)
+  })
+
+  it('says so plainly when the SERVER has no mail transport', async () => {
+    mailConfigured = false
+    const { res, sent } = makeRes()
+    await handler(
+      {
+        method: 'POST',
+        headers: {},
+        body: { action: 'otp-request', email: 'a@example.com' },
+      },
+      res,
+    )
+    // about the server, not about the address: safe to distinguish
+    expect(sent.code).toBe(501)
+  })
+})
+
+describe('signing in with a code', () => {
+  beforeEach(() => {
+    mailConfigured = true
+    mailFails = false
+    sentMail.length = 0
+  })
+
+  async function requestCode(email: string): Promise<string> {
+    const { res } = makeRes()
+    await handler(
+      { method: 'POST', headers: {}, body: { action: 'otp-request', email } },
+      res,
+    )
+    return lastCode()
+  }
+
+  it('mints a session on the right code', async () => {
+    const code = await requestCode('ada@example.com')
+    const { res, sent } = makeRes()
+    await handler(
+      {
+        method: 'POST',
+        headers: { host: 'lattice.app' },
+        body: { action: 'otp-verify', email: 'ada@example.com', code },
+      },
+      res,
+    )
+    expect(sent.code).toBe(200)
+    expect(sent.headers['Set-Cookie']).toContain('HttpOnly')
+    expect(sent.body).toMatchObject({ email: 'ada@example.com', provider: 'email' })
+  })
+
+  /**
+   * The convergence 16.1 was built for: an address Google already verified
+   * lands on the SAME user, not a second account beside it.
+   */
+  it('converges onto the account that already signed in with Google', async () => {
+    mockGoogle('ada@example.com', 'g-1')
+    const g = makeRes()
+    await handler(
+      { method: 'POST', headers: {}, body: { action: 'create', googleToken: 'g' } },
+      g.res,
+    )
+    const googleUserId = (g.sent.body as SessionInfo).userId
+    vi.unstubAllGlobals()
+
+    const code = await requestCode('ada@example.com')
+    const { res, sent } = makeRes()
+    await handler(
+      {
+        method: 'POST',
+        headers: {},
+        body: { action: 'otp-verify', email: 'ada@example.com', code },
+      },
+      res,
+    )
+    expect((sent.body as SessionInfo).userId).toBe(googleUserId)
+    expect(db.data.users).toHaveLength(1)
+    expect(db.data.identities).toHaveLength(2) // google + email, one person
+  })
+
+  it('gives every failure the same answer', async () => {
+    const code = await requestCode('ada@example.com')
+    const wrong = code === '000000' ? '111111' : '000000'
+
+    const answers: unknown[] = []
+    const attempts = [
+      { email: 'ada@example.com', code: wrong }, // wrong digits
+      { email: 'nobody@example.com', code: '123456' }, // never requested
+    ]
+    for (const attempt of attempts) {
+      const { res, sent } = makeRes()
+      await handler(
+        { method: 'POST', headers: {}, body: { action: 'otp-verify', ...attempt } },
+        res,
+      )
+      answers.push({ code: sent.code, body: sent.body })
+    }
+    expect(answers[0]).toEqual(answers[1])
+    expect((answers[0] as { code: number }).code).toBe(401)
+  })
+
+  it('will not accept the same code twice', async () => {
+    const code = await requestCode('ada@example.com')
+    const first = makeRes()
+    await handler(
+      {
+        method: 'POST',
+        headers: {},
+        body: { action: 'otp-verify', email: 'ada@example.com', code },
+      },
+      first.res,
+    )
+    expect(first.sent.code).toBe(200)
+
+    const second = makeRes()
+    await handler(
+      {
+        method: 'POST',
+        headers: {},
+        body: { action: 'otp-verify', email: 'ada@example.com', code },
+      },
+      second.res,
+    )
+    expect(second.sent.code).toBe(401)
+  })
+
+  it('requires both an address and a code', async () => {
+    const { res, sent } = makeRes()
+    await handler(
+      {
+        method: 'POST',
+        headers: {},
+        body: { action: 'otp-verify', email: 'a@example.com' },
       },
       res,
     )

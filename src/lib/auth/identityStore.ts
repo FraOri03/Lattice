@@ -1,11 +1,13 @@
 import type { Account } from '@/types/model'
 import type {
   IdentityClaim,
+  IdentityProvider,
   IdentityRecords,
   ResolvedIdentity,
   User,
   UserIdentity,
 } from '@/types/identity'
+import { nid } from '@/lib/id'
 import {
   applyUserPatch,
   identitiesOf,
@@ -42,8 +44,29 @@ export interface IdentityStore {
     userId: string,
     patch: Partial<Pick<User, 'displayName' | 'avatarUrl' | 'primaryEmail' | 'usageType'>>,
   ): User | null
+  /**
+   * Record an identity the SERVER has already resolved (17.3, #86).
+   *
+   * Distinct from {@link resolve} in the only way that matters: it does not
+   * decide who this is. E-mail sign-in gets its answer from the endpoint,
+   * which ran the same rules over every account rather than over this
+   * browser's — so re-deciding here would mint a local id for someone the
+   * server has already given one, and one person would hold two.
+   */
+  adopt(claim: AdoptedIdentity): ResolvedIdentity
+
   /** Everything stored — for tests, diagnostics and the account panel. */
   records(): IdentityRecords
+}
+
+/** A user and identity the server has already decided on. */
+export interface AdoptedIdentity {
+  userId: string
+  provider: IdentityProvider
+  providerSubject: string
+  email: string
+  displayName: string
+  avatarUrl: string
 }
 
 const KEY = 'lattice-identity'
@@ -128,6 +151,61 @@ export class LocalIdentityStore implements IdentityStore {
     const next = applyUserPatch(this.load(), userId, patch)
     this.persist(next)
     return userById(next, userId)
+  }
+
+  adopt(claim: AdoptedIdentity): ResolvedIdentity {
+    const records = this.load()
+    const now = Date.now()
+
+    const existingUser = userById(records, claim.userId)
+    const user: User = existingUser
+      ? {
+          ...existingUser,
+          // the server is authoritative about the address it just verified;
+          // a name already chosen here is not overwritten by one derived
+          // from an address
+          primaryEmail: existingUser.primaryEmail || claim.email,
+          updatedAt: now,
+        }
+      : {
+          id: claim.userId,
+          primaryEmail: claim.email,
+          displayName: claim.displayName || claim.email,
+          avatarUrl: claim.avatarUrl,
+          createdAt: now,
+          updatedAt: now,
+        }
+
+    const existingIdentity = records.identities.find(
+      (i) => i.provider === claim.provider && i.providerSubject === claim.providerSubject,
+    )
+    const identity: UserIdentity = existingIdentity
+      ? { ...existingIdentity, userId: claim.userId, email: claim.email, verifiedAt: now }
+      : {
+          id: nid('uid'),
+          userId: claim.userId,
+          provider: claim.provider,
+          providerSubject: claim.providerSubject,
+          email: claim.email,
+          // the code proved control of the mailbox: this address is verified
+          verifiedAt: now,
+        }
+
+    this.persist({
+      users: records.users.some((u) => u.id === user.id)
+        ? records.users.map((u) => (u.id === user.id ? user : u))
+        : [...records.users, user],
+      identities: records.identities.some((i) => i.id === identity.id)
+        ? records.identities.map((i) => (i.id === identity.id ? identity : i))
+        : [...records.identities, identity],
+    })
+
+    return {
+      user,
+      identity,
+      createdUser: !existingUser,
+      linkedIdentity: !existingIdentity,
+    }
   }
 
   records(): IdentityRecords {

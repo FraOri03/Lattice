@@ -9,6 +9,7 @@ import {
 } from 'react'
 import type { Account } from '@/types/model'
 import { authService, updateStoredAccount } from './AuthService'
+import { signInWithEmailCode } from './emailSignIn'
 import type { ProfilePatch } from './profile'
 import { hasGoogleAuth } from '@/lib/env'
 import { syncEngine } from '@/lib/sync/SyncEngine'
@@ -29,6 +30,12 @@ export interface AccountContextValue {
   loginSkipped: boolean
   error: string | null
   signIn: () => Promise<void>
+  /**
+   * Sign in with an e-mail code (17.3). Separate from {@link signIn}
+   * because it is a different provider, not a different button for the
+   * same one — see `lib/auth/emailSignIn.ts`.
+   */
+  signInWithCode: (email: string, code: string) => Promise<void>
   signOut: () => Promise<void>
   skipLogin: () => void
   /**
@@ -79,6 +86,27 @@ export function AccountProvider({ children }: { children: ReactNode }) {
     }
   }, [account])
 
+  const signInWithCode = useCallback(
+    async (email: string, code: string) => {
+      setStatus('signing-in')
+      setError(null)
+      try {
+        const acc = await signInWithEmailCode(email, code)
+        setAccount(acc)
+        setStatus('signed-in')
+        localStorage.removeItem(SKIP_KEY)
+        setLoginSkipped(false)
+        // no Drive token comes with an e-mail sign-in, so no sync to start:
+        // "Connect Drive" is how this account gets one, if it wants one
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Sign-in failed')
+        setStatus(account ? 'signed-in' : 'signed-out')
+        throw err
+      }
+    },
+    [account],
+  )
+
   const signOut = useCallback(async () => {
     syncEngine.stop()
     await authService.signOut()
@@ -104,11 +132,22 @@ export function AccountProvider({ children }: { children: ReactNode }) {
       loginSkipped,
       error,
       signIn,
+      signInWithCode,
       signOut,
       skipLogin,
       updateProfile,
     }),
-    [account, status, loginSkipped, error, signIn, signOut, skipLogin, updateProfile],
+    [
+      account,
+      status,
+      loginSkipped,
+      error,
+      signIn,
+      signInWithCode,
+      signOut,
+      skipLogin,
+      updateProfile,
+    ],
   )
 
   return <AccountContext.Provider value={value}>{children}</AccountContext.Provider>

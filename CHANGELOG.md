@@ -30,6 +30,19 @@ All notable changes to Lattice are recorded here. The format follows
 
 ### Added
 
+- **You can sign in with your e-mail address now, no password anywhere.** Type the address,
+  get a six-digit code, type it back — and if that address is one you had already used with
+  Google, you land in *the same account*, not a second empty one beside it. That convergence
+  is the whole reason identity was rebuilt two phases ago. The flow is deliberately
+  tight-lipped: it answers exactly the same whether the address has an account, has never
+  been seen, or has asked too many times in the last hour, so nobody can use the login form
+  to find out who has a Lattice account. Codes last ten minutes, work once, are invalidated
+  the moment you ask for another, and die after five wrong guesses. One honest gap: an
+  e-mail sign-in brings no Google Drive token, so cloud sync stays off until the account
+  connects Drive — the screen says so rather than pretending. Sending needs a mail provider
+  configured; without one the option says it is unavailable instead of silently swallowing
+  the request. See [docs/email-otp.md](docs/email-otp.md).
+
 - **Signing in is Lattice's own now, and signing out actually works.** Until now the app
   proved who you were by sending your Google token with every single request, which meant a
   Google credential doubled as Lattice's credential, it sat in browser storage where any

@@ -8,6 +8,7 @@ import type {
 import type { CollabRole, ProjectInvite } from '../../../src/types/collab.js'
 import type { Entitlement } from '../../../src/types/entitlement.js'
 import type { Session } from '../../../src/types/session.js'
+import type { OtpCode } from '../../../src/types/otpRecord.js'
 import type { RoomAcl } from '../../../src/lib/collab/acl.js'
 
 /**
@@ -222,6 +223,43 @@ export interface EntitlementRepository {
   ): Promise<Entitlement>
 }
 
+/* ---------------- e-mail one-time codes ---------------- */
+
+/**
+ * One-time code storage (Phase 17.3, #86).
+ *
+ * As with sessions, the repository only ever sees a HASH. Minting the code
+ * and hashing it belong to `api/_lib/otp.ts`; keeping the digits out of
+ * this interface is what makes "the database never holds a usable code" a
+ * property of the types.
+ */
+export interface OtpRepository {
+  /**
+   * Store a new code, after invalidating every earlier live one for the
+   * same address.
+   *
+   * The two are one operation on purpose: "previous codes invalidated" is
+   * a requirement, and a caller that could forget the first half would
+   * leave several codes valid at once.
+   */
+  issue(code: OtpCode): Promise<OtpCode>
+
+  /** The one live, unconsumed code for an address; null when there is none. */
+  liveFor(email: string, now?: number): Promise<OtpCode | null>
+
+  /** Record a wrong guess. Returns the new count. */
+  noteAttempt(id: string): Promise<number>
+
+  /** Burn a code — accepted, superseded, or out of attempts. */
+  consume(id: string, now?: number): Promise<void>
+
+  /** How many codes this address asked for since `since`. */
+  countForEmail(email: string, since: number): Promise<number>
+
+  /** How many codes this source asked for since `since`. */
+  countForIp(ip: string, since: number): Promise<number>
+}
+
 /* ---------------- the set of them ---------------- */
 
 export interface Repositories {
@@ -230,4 +268,5 @@ export interface Repositories {
   invitations: InvitationRepository
   entitlements: EntitlementRepository
   sessions: SessionRepository
+  otp: OtpRepository
 }
