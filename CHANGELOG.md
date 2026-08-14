@@ -30,6 +30,21 @@ All notable changes to Lattice are recorded here. The format follows
 
 ### Added
 
+- **A database, and a seam that keeps it replaceable.** Until now the only server-side state
+  Lattice had was Liveblocks room metadata, and who you are was re-derived from a Google
+  token on every request — which is why an invitation had to reach the exact mailbox you
+  sign in with, why "shared with me" could not exist, and why your identity could not
+  outlive your browser's local storage. There is now a Postgres schema for the four things
+  that need to be true for everyone rather than true in one browser: people, their proven
+  sign-in methods, project memberships and the invitations that open them. Document content
+  is deliberately *not* among them and never will be — docs, boards, sheets, code and
+  presentations stay in Yjs, Liveblocks and Drive. The rest of the code reaches all of it
+  through four interfaces rather than through Supabase, with two real implementations behind
+  them and one test suite that runs against both, so the database is a dependency the app
+  can put down. Nothing reads these tables yet: this phase is the schema and the seam, and
+  the endpoints move onto them next. A deployment with no database configured keeps working
+  exactly as it did before. See [docs/database.md](docs/database.md).
+
 - **Who you are stopped being how you signed in.** Until now your account id was built
   from your Google account: identity was literally derived from the provider, so a second
   way of signing in would have created a second you, and there was no id a permission could

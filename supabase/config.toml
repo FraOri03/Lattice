@@ -1,0 +1,69 @@
+# Supabase — local development configuration (Phase 17.1, #84).
+#
+# Deliberately minimal. The generated default enables every Supabase
+# product; most of them are things Lattice has already decided NOT to use,
+# and shipping them switched on would describe an architecture this repo
+# does not have. What is enabled here is what the app actually depends on:
+#
+#   api   — PostgREST. The SERVER talks to it with the service role; the
+#           browser never holds a Supabase credential at all
+#           (docs/authorisation-phase-16-3.md).
+#   db    — Postgres itself, and the migrations in ./migrations.
+#   studio — local inspection only; not part of any deployed surface.
+#
+# What is off, and why:
+#
+#   auth      Supabase Auth is not Lattice's session. 16.3 settled that the
+#             browser must not hold a Supabase session, so sign-in is
+#             Lattice-issued (Google today, e-mail OTP in #86) and GoTrue
+#             would be a second, unused identity system.
+#   storage   Documents live in Yjs/Liveblocks and Google Drive. Postgres
+#             holds identity and membership, never content.
+#   realtime  Liveblocks owns realtime. Postgres subscriptions in the
+#             browser are the named, accepted cost of the 16.3 decision.
+#
+# Remote project: crauqgafplibltzztumo (eu-central-1). Migrations reach it
+# through the GitHub integration on merge to main, not from a laptop.
+
+project_id = "lattice"
+
+[api]
+enabled = true
+port = 54321
+# `public` only: nothing here is meant to be reachable without the service
+# role, and RLS denies anon/authenticated on every table regardless.
+schemas = ["public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+# Match the remote project so a migration cannot pass locally and fail on
+# deploy because of a version difference.
+major_version = 17
+
+[db.migrations]
+enabled = true
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+enabled = false
+
+[storage]
+enabled = false
+
+[realtime]
+enabled = false
+
+[edge_runtime]
+enabled = false
+
+[analytics]
+enabled = false
+
+[inbucket]
+enabled = false
