@@ -15,7 +15,6 @@ import { type CollabRole, type ProjectInvite, type ProjectMember } from '@/types
 import { toast } from '@/components/ui/Toaster'
 import { confirmDialog } from '@/components/ui/ConfirmDialog'
 import {
-  IcCheck,
   IcCopy,
   IcEye,
   IcInfo,
@@ -190,17 +189,6 @@ function InviteRow({ invite, projectId }: { invite: ProjectInvite; projectId: st
         }}
       >
         <IcRefresh size={12} />
-      </button>
-      <button
-        className="icon-btn h-6 w-6"
-        title={t.share.simulateTitle}
-        aria-label={t.share.simulateAria}
-        onClick={() => {
-          inviteService.acceptAsMock(invite)
-          toast.success(t.share.simulateJoined(invite.email))
-        }}
-      >
-        <IcCheck size={12} />
       </button>
       <button
         className="icon-btn h-6 w-6"

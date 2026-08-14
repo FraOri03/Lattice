@@ -214,13 +214,10 @@ export const en = {
     resendFailed: 'The invitation could not be resent.',
     resendTitle: 'Resend (mints a new link; the previous one stops working)',
     resendAria: 'Resend invite',
-    simulateTitle: 'Simulate acceptance (adds a mock member for testing roles)',
-    simulateAria: 'Simulate invite acceptance',
-    simulateJoined: (email: string) => `${email} joined (simulated)`,
     revoke: 'Revoke invite',
     // members footer note
     footerNote:
-      'Invites work wherever this project’s data is reachable (see the collaboration scope above). “Simulate acceptance” (✓) creates a mock member so you can test roles offline.',
+      'An invitation can only be accepted by the address it was sent to. To see the app as another role without a second person, use “Preview as role” in Settings.',
     // settings tab
     previewAsRole: 'Preview as role',
     previewAsRoleBody:
@@ -1330,12 +1327,9 @@ export const it: Catalog = {
     resendFailed: 'Non è stato possibile reinviare l’invito.',
     resendTitle: 'Reinvia (genera un link nuovo; il precedente smette di funzionare)',
     resendAria: 'Reinvia invito',
-    simulateTitle: 'Simula accettazione (aggiunge un membro fittizio per testare i ruoli)',
-    simulateAria: 'Simula accettazione invito',
-    simulateJoined: (email) => `${email} è entrato (simulato)`,
     revoke: 'Revoca invito',
     footerNote:
-      'Gli inviti funzionano ovunque i dati del progetto siano raggiungibili (vedi l’ambito di collaborazione sopra). “Simula accettazione” (✓) crea un membro fittizio per testare i ruoli offline.',
+      'Un invito può essere accettato solo dall’indirizzo a cui è stato mandato. Per vedere l’app con un altro ruolo senza una seconda persona, usa “Anteprima come ruolo” nelle Impostazioni.',
     previewAsRole: 'Anteprima come ruolo',
     previewAsRoleBody:
       'Guarda il progetto come lo vede un membro con un ruolo diverso — board in sola lettura, azioni nascoste, accesso solo commenti. Solo per il proprietario; riguarda solo te.',

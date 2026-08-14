@@ -572,6 +572,163 @@ describe('rate limiting (18.2)', () => {
   })
 })
 
+describe('acceptance (18.3)', () => {
+  /** A user, and the identities their account has proved. */
+  async function account(
+    userId: string,
+    identities: { email: string; verified: boolean; provider?: 'google' | 'email' }[],
+  ) {
+    const now = Date.now()
+    for (const [index, held] of identities.entries()) {
+      await db.identities.saveResolved({
+        user: {
+          id: userId,
+          primaryEmail: identities[0].email,
+          displayName: userId,
+          avatarUrl: '',
+          createdAt: now,
+          updatedAt: now,
+        },
+        identity: {
+          id: `idn_${userId}_${index}`,
+          userId,
+          provider: held.provider ?? 'google',
+          providerSubject: `sub_${held.email}`,
+          email: held.email,
+          verifiedAt: held.verified ? now : null,
+        },
+        createdUser: index === 0,
+        linkedIdentity: index > 0,
+      })
+    }
+  }
+
+  it('lets the invited address in, and records who accepted', async () => {
+    const { token, invite } = await seedInvite()
+    await account('usr_grace', [{ email: 'grace@example.com', verified: true }])
+
+    signedInAs('grace@example.com', 'Grace')
+    const sent = await call({ action: 'accept', token, googleToken: 'ya29' })
+
+    expect(sent.code).toBe(200)
+    expect(asInvite(sent)).toMatchObject({
+      status: 'accepted',
+      acceptedBy: 'usr_grace',
+    })
+    expect(asInvite(sent).acceptedAt).toBeGreaterThan(0)
+    // the membership is real, at the role that was offered
+    const acl = await db.memberships.aclOf('proj_1')
+    expect(acl?.editors).toContain('grace@example.com')
+    expect(invite.role).toBe('editor')
+  })
+
+  it('REFUSES somebody signed in as a different address', async () => {
+    // the hole #90 exists to close: an invitation to one address granting
+    // membership to whoever happened to be signed in
+    const { token } = await seedInvite()
+    await account('usr_mallory', [{ email: 'mallory@example.com', verified: true }])
+
+    signedInAs('mallory@example.com', 'Mallory')
+    const sent = await call({ action: 'accept', token, googleToken: 'ya29' })
+
+    expect(sent.code).toBe(403)
+    expect((sent.body as { error: string }).error).toContain('grace@example.com')
+    const acl = await db.memberships.aclOf('proj_1')
+    expect(acl?.editors ?? []).not.toContain('mallory@example.com')
+    expect((await db.invitations.byTokenHash(hashToken(token)))?.status).toBe('pending')
+  })
+
+  it('refuses an account that holds the address WITHOUT having verified it', async () => {
+    const { token } = await seedInvite()
+    await account('usr_mallory', [
+      { email: 'mallory@example.com', verified: true },
+      { email: 'grace@example.com', verified: false, provider: 'email' },
+    ])
+
+    signedInAs('mallory@example.com', 'Mallory')
+    expect((await call({ action: 'accept', token, googleToken: 'ya29' })).code).toBe(403)
+  })
+
+  it('accepts when the invited address is a SECOND verified identity', async () => {
+    // 16.1's convergence: refusing this would tell somebody they cannot
+    // accept an invitation sent to their own mailbox
+    const { token } = await seedInvite()
+    await account('usr_grace', [
+      { email: 'work@example.com', verified: true },
+      { email: 'grace@example.com', verified: true, provider: 'email' },
+    ])
+
+    signedInAs('work@example.com', 'Grace')
+    const sent = await call({ action: 'accept', token, googleToken: 'ya29' })
+    expect(sent.code).toBe(200)
+    expect(asInvite(sent).acceptedBy).toBe('usr_grace')
+  })
+
+  it('refuses a caller the database has never verified at all', async () => {
+    const { token } = await seedInvite()
+    signedInAs('grace@example.com', 'Grace') // no account row behind it
+    expect((await call({ action: 'accept', token, googleToken: 'ya29' })).code).toBe(403)
+  })
+
+  it('refuses without a signed-in caller', async () => {
+    const { token } = await seedInvite()
+    vi.unstubAllGlobals()
+    expect((await call({ action: 'accept', token })).code).toBe(401)
+  })
+
+  it('refuses a token that matches nothing', async () => {
+    await seedInvite()
+    await account('usr_grace', [{ email: 'grace@example.com', verified: true }])
+    signedInAs('grace@example.com', 'Grace')
+    expect(
+      (await call({ action: 'accept', token: 'nope', googleToken: 'ya29' })).code,
+    ).toBe(404)
+  })
+
+  it('refuses an invitation that already lapsed', async () => {
+    const { token, invite } = await seedInvite()
+    await account('usr_grace', [{ email: 'grace@example.com', verified: true }])
+    vi.setSystemTime(invite.expiresAt + 1)
+
+    signedInAs('grace@example.com', 'Grace')
+    expect((await call({ action: 'accept', token, googleToken: 'ya29' })).code).toBe(409)
+
+    vi.useRealTimers()
+  })
+
+  it('refuses a revoked invitation, and cannot be accepted twice', async () => {
+    const { token, invite } = await seedInvite()
+    await account('usr_grace', [{ email: 'grace@example.com', verified: true }])
+
+    signedInAs('owner@example.com', 'Owner')
+    await call({
+      action: 'revoke',
+      projectId: 'proj_1',
+      inviteId: invite.id,
+      googleToken: 'ya29',
+    })
+    signedInAs('grace@example.com', 'Grace')
+    expect((await call({ action: 'accept', token, googleToken: 'ya29' })).code).toBe(409)
+
+    const fresh = await seedInvite()
+    await account('usr_grace', [{ email: 'grace@example.com', verified: true }])
+    signedInAs('grace@example.com', 'Grace')
+    expect((await call({ action: 'accept', token: fresh.token, googleToken: 'ya29' })).code).toBe(200)
+    expect((await call({ action: 'accept', token: fresh.token, googleToken: 'ya29' })).code).toBe(409)
+  })
+
+  it('binds the Postgres membership to the real user id', async () => {
+    const { token } = await seedInvite()
+    await account('usr_grace', [{ email: 'grace@example.com', verified: true }])
+    signedInAs('grace@example.com', 'Grace')
+    await call({ action: 'accept', token, googleToken: 'ya29' })
+
+    // project_memberships.user_id is a foreign key to users, so the id that
+    // belongs there is the caller's real one
+    expect(await db.memberships.projectsOf(['usr_grace'], '')).toContain('proj_1')
+  })
+})
+
 describe('list', () => {
   it('shows the project its own invitations, never their tokens', async () => {
     await seedInvite()

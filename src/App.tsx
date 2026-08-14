@@ -123,32 +123,33 @@ function useCollaboration() {
         )
         return
       }
-      const { invite, source } = found
-      /**
-       * A link resolved by the SERVER was opened somewhere this browser has
-       * never seen the project — which is the case Phase 18 exists for, and
-       * the one acceptance is not yet safe in: `accept()` adds whoever is
-       * signed in right now, without checking they own the invited address.
-       * 18.3 (#90) is where that check lands, and until it does the honest
-       * answer is to show the invitation and stop.
-       */
-      if (source === 'server') {
-        toast.warning(
-          `You were invited as ${invite.role}`,
-          `${invite.invitedByName} invited ${invite.email} to this project. Accepting an invitation from another device needs the address check Lattice does not perform yet.`,
-        )
-        return
-      }
+      const { invite } = found
       void confirmDialog({
         title: 'Join this project?',
-        body: `You were invited as ${invite.role} by ${invite.invitedByName}.`,
+        body: `${invite.invitedByName} invited ${invite.email} as ${invite.role}.`,
         confirmLabel: 'Accept invite',
-      }).then((ok) => {
-        if (!ok) return
-        if (inviteService.accept(invite)) {
+      }).then(async (confirmed) => {
+        if (!confirmed) return
+        /**
+         * 18.3 — the address is proved before anything is granted, and by
+         * the server whenever there is one. A refusal names the mailbox that
+         * was invited, because that is the only fact that lets somebody act
+         * on it: sign in as that address, or ask the sender to invite the
+         * one you actually use.
+         */
+        const outcome = await inviteService.accept(invite, token)
+        if (outcome.ok) {
           useStore.getState().setActiveProject(invite.projectId)
           toast.success('Invite accepted', `You joined as ${invite.role}.`)
+          return
         }
+        toast.warning(
+          'This invitation is not yours to accept',
+          outcome.error ??
+            (outcome.address
+              ? `It was sent to ${outcome.address}. Sign in as that address to accept it.`
+              : 'It is no longer open.'),
+        )
       })
     })
   }, [])

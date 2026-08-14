@@ -5,12 +5,12 @@ import {
   principalOf,
   requireIdentity,
   sendError,
+  writeAcl,
   type ApiRes,
 } from '../_lib/realtime.js'
 import {
   addEmail,
   bindUserId,
-  encodeBindings,
   matchOf,
   roleOf,
   roleOfSlot,
@@ -18,11 +18,7 @@ import {
   type RoomAcl,
 } from '../../src/lib/collab/acl.js'
 import { CANONICAL_USER_ID } from '../../src/lib/auth/identity.js'
-import {
-  collabRoomId,
-  contentRoomId,
-  roomIdsForProject,
-} from '../../src/lib/collab/roleAccess.js'
+import { roomIdsForProject } from '../../src/lib/collab/roleAccess.js'
 import {
   assignableRoles,
   canManageRole,
@@ -65,33 +61,6 @@ interface Body {
   email?: unknown
   role?: unknown
   googleToken?: unknown
-}
-
-/** Metadata patch that also clears role lists that became empty. */
-function metadataPatch(projectId: string, acl: RoomAcl) {
-  const meta = aclToMetadata(projectId, acl)
-  const bound = encodeBindings(acl.bindings)
-  return {
-    kind: meta.kind,
-    projectId: meta.projectId,
-    ownerEmail: meta.ownerEmail,
-    admins: acl.admins.length ? acl.admins : null,
-    editors: acl.editors.length ? acl.editors : null,
-    commenters: acl.commenters.length ? acl.commenters : null,
-    viewers: acl.viewers.length ? acl.viewers : null,
-    bound: bound.length ? bound : null,
-  }
-}
-
-/** Write an ACL to both of a project's rooms. */
-async function writeAcl(
-  lb: NonNullable<ReturnType<typeof liveblocksClient>>,
-  projectId: string,
-  acl: RoomAcl,
-): Promise<void> {
-  const metadata = metadataPatch(projectId, acl)
-  await lb.updateRoom(contentRoomId(projectId), { metadata })
-  await lb.updateRoom(collabRoomId(projectId), { metadata })
 }
 
 export default async function handler(req: ApiRequest, res: ApiRes): Promise<void> {

@@ -30,6 +30,7 @@ POST /api/invitations
 
   { action: 'resolve',  token }                   → { invite }
   { action: 'decline',  token }                   → { invite }
+  { action: 'accept',   token }                   → { invite, projectId, role }
 ```
 
 The first five are member actions: the caller's role is read from the project
@@ -97,15 +98,56 @@ on an address must not be able to sign an audit entry as the person who owns
 it. When it resolves to nobody the record keeps the display name and loses
 only the pointer — a weaker trail, but an honest one.
 
-## What 18.1 deliberately does not do
+## Acceptance proves the address (18.3, #90)
 
-**Acceptance.** [18.3 (#90)](https://github.com/FraOri03/Lattice/issues/90)
-owns it, because accepting is where the address has to be *proved*, and
-today's client-side `accept()` does not prove it: it adds whoever is signed in
-right now. An accept action on this endpoint would be that same hole reachable
-from any browser holding a token — strictly worse than the local one it would
-have replaced. So `resolve` reports and grants nothing, and a link resolved
-from the server shows the invitation and stops.
+The hole was not subtle. `accept()` added whoever was signed in, and its
+"simulate acceptance" sibling added a member from the invited address with
+nothing proved at all — so an invitation sent to one address granted
+membership to another, on every tier.
+
+**The token gets the caller as far as the invitation and no further.** It says
+which offer is being answered; it never says who is answering. That is decided
+against the database:
+
+```
+caller = userByVerifiedEmail(session address)   ← verified identities only
+proves = caller holds a VERIFIED identity for the invited address
+```
+
+The invited address does not have to be the one they signed in with: an
+account that holds it as a second, verified identity qualifies, which is
+precisely what [16.1](identity.md)'s convergence is for. Refusing that would
+mean telling somebody they cannot accept an invitation sent to their own
+mailbox.
+
+On success the membership is written to `project_memberships` and bound to the
+caller's real `users.id`, the address and its role are added to the Liveblocks
+room ACL, and the invitation is marked `accepted` with `accepted_by`.
+
+### Why the Liveblocks slot is deliberately left unbound
+
+The ids in room metadata are derived from the credential a request presents
+(`principalOf`), not from `users`. For an e-mail session that derivation is
+seeded from the address, so binding at acceptance would write an id that the
+same person arriving with Google would not match — and 16.2's rule is that a
+bound slot stops answering to the address. The invitee would be locked out of
+the project they had just joined. Binding stays where 16.2 put it:
+`rooms.ensure`, the first time they open the project, using the credential they
+actually came with.
+
+### The local and Drive tiers
+
+They have no server, and that is where the hole lived. Two rules replaced it:
+the signed-in address has to match the invited one (compared
+case-insensitively), and a **server-backed invitation is never granted
+locally** — if the record has a `tokenHash`, only the server may accept it,
+whatever this browser believes about who is signed in.
+
+`acceptAsMock` is gone. A button that created a member from an unproven
+address was the hole with a label on it; offline role testing is what "Preview
+as role" in the share dialog's settings is for.
+
+## What 18.1 deliberately did not do
 
 **Delivery.** [18.2 (#89)](https://github.com/FraOri03/Lattice/issues/89) owns
 the mail, and has since shipped: `create` and `resend` send the invitation and

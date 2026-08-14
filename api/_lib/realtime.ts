@@ -1,5 +1,5 @@
 import { Liveblocks } from '@liveblocks/node'
-import { contentRoomId } from '../../src/lib/collab/roleAccess.js'
+import { collabRoomId, contentRoomId } from '../../src/lib/collab/roleAccess.js'
 import {
   decodeBindings,
   encodeBindings,
@@ -164,6 +164,45 @@ export async function loadAcl(
   } catch {
     return null // room does not exist yet
   }
+}
+
+/**
+ * Metadata patch that also CLEARS role lists which became empty.
+ *
+ * `aclToMetadata` simply omits an empty list, and an omitted key in a patch
+ * leaves the stored value alone — so the last member of a role would keep
+ * their access after being removed. Explicit nulls are what actually delete.
+ */
+export function metadataPatch(projectId: string, acl: RoomAcl) {
+  const meta = aclToMetadata(projectId, acl)
+  const bound = encodeBindings(acl.bindings)
+  return {
+    kind: meta.kind,
+    projectId: meta.projectId,
+    ownerEmail: meta.ownerEmail,
+    admins: acl.admins.length ? acl.admins : null,
+    editors: acl.editors.length ? acl.editors : null,
+    commenters: acl.commenters.length ? acl.commenters : null,
+    viewers: acl.viewers.length ? acl.viewers : null,
+    bound: bound.length ? bound : null,
+  }
+}
+
+/**
+ * Write an ACL to BOTH of a project's rooms.
+ *
+ * Shared rather than duplicated: 18.3 grants membership from
+ * `api/invitations`, and two copies of "how an ACL is stored" would be two
+ * places for a project's two rooms to fall out of step.
+ */
+export async function writeAcl(
+  lb: Liveblocks,
+  projectId: string,
+  acl: RoomAcl,
+): Promise<void> {
+  const metadata = metadataPatch(projectId, acl)
+  await lb.updateRoom(contentRoomId(projectId), { metadata })
+  await lb.updateRoom(collabRoomId(projectId), { metadata })
 }
 
 /* ---------------- tiny response helpers ---------------- */

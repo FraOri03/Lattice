@@ -174,10 +174,10 @@ _Honesty gap tracked in [#9](https://github.com/FraOri03/Lattice/issues/9)._
   [mail.md](mail.md)) — `RESEND_API_KEY`, `MAIL_FROM`, and a **verified sending
   domain**, without which nothing arrives. With none configured the invitation
   is still created and the link still copies; the app says delivery is
-  unavailable rather than implying a message was sent. **Accepting** an
-  invitation from another device still needs the address check of
-  [#90](https://github.com/FraOri03/Lattice/issues/90), so until then such a
-  link shows the invitation and stops.
+  unavailable rather than implying a message was sent. **Accepting** proves the
+  address from 18.3: an invitation can only be taken up by an account that
+  holds a verified identity for the address it was sent to, and on the local
+  and Drive tiers the signed-in address has to match.
 - **Identity ≠ storage** — Google sign-in is identity; Drive `drive.file` is a separate
   storage consent. This distinction is under-explained in the UI.
 - OAuth tokens live in browser storage (XSS-scoped; sign out to clear). The mock account

@@ -4,6 +4,7 @@ import {
   principalOf,
   requireIdentity,
   sendError,
+  writeAcl,
   type ApiRes,
   type VerifiedIdentity,
 } from './_lib/realtime.js'
@@ -13,7 +14,7 @@ import { invitationMessage, normaliseLocale } from './_lib/mailTemplates.js'
 import { limitMessage, mailAllowance, recordSend } from './_lib/mailLimits.js'
 import type { MailDelivery } from '../src/types/mail.js'
 import { NO_DATABASE, repositories, type Repositories } from './_lib/db/index.js'
-import { roleOf, roleOfSlot, type RoomAcl } from '../src/lib/collab/acl.js'
+import { addEmail, roleOf, roleOfSlot, type RoomAcl } from '../src/lib/collab/acl.js'
 import { assignableRoles, can } from '../src/lib/collab/permissions.js'
 import {
   INVITE_TTL_MS,
@@ -21,6 +22,7 @@ import {
   canRevoke,
   canChangeRole,
   effectiveStatus,
+  isLive,
   redact,
 } from '../src/lib/collab/invitations.js'
 import { nid } from '../src/lib/id.js'
@@ -257,6 +259,109 @@ export default async function handler(req: ApiRequest, res: ApiRes): Promise<voi
     }
     const declined = await db.invitations.patch(invite.id, { status: 'declined' })
     res.status(200).json({ invite: redact(declined ?? invite, now) })
+    return
+  }
+
+  /* ---------------- acceptance (Phase 18.3, #90) ---------------- */
+
+  /**
+   * Accepting proves the address, and refuses everything that does not.
+   *
+   * The hole this closes was not subtle: `accept()` added whoever was signed
+   * in, and its "simulate acceptance" sibling added a member from the
+   * invited address with nothing proved at all. An invitation must not be
+   * acceptable by an address other than the one it was sent to, and that is
+   * checked HERE — on the server, against identities the database says are
+   * verified — rather than anywhere a browser could be persuaded otherwise.
+   *
+   * The token gets the caller as far as the invitation and no further. It
+   * says which offer is being answered; it never says who is answering.
+   */
+  if (action === 'accept') {
+    const token = typeof body.token === 'string' ? body.token : ''
+    if (!token || token.length > 512) {
+      sendError(res, 400, 'Invalid token.')
+      return
+    }
+    const found = await db.invitations.byTokenHash(hashToken(token))
+    if (!found) {
+      sendError(res, 404, 'This invitation link is not valid.')
+      return
+    }
+    const invite = await settle(db, found, now)
+    if (!isLive(invite, now)) {
+      sendError(res, 409, `This invitation is ${effectiveStatus(invite, now)}.`)
+      return
+    }
+
+    const identity = await requireIdentity(req, res, body.googleToken)
+    if (!identity) return
+
+    /**
+     * Only a VERIFIED identity resolves, which is the whole check: an
+     * unverified claim on an address must never be able to inherit what was
+     * offered to the person who actually owns it.
+     *
+     * The invited address does not have to be the one they signed in with.
+     * An account that holds it as a second, verified identity qualifies —
+     * that is precisely what 16.1's convergence is for, and refusing it
+     * would mean telling somebody they cannot accept an invitation sent to
+     * their own mailbox.
+     */
+    const caller = await db.identities.userByVerifiedEmail(identity.email)
+    const owned = caller ? await db.identities.identitiesOf(caller.id) : []
+    const proves = owned.some(
+      (held) => held.email === invite.email && held.verifiedAt !== null,
+    )
+    if (!caller || !proves) {
+      sendError(
+        res,
+        403,
+        `This invitation was sent to ${invite.email}. Sign in as that address to accept it.`,
+      )
+      return
+    }
+
+    /**
+     * The membership, in both places that hold one.
+     *
+     * Postgres gets the binding: `project_memberships.user_id` is a foreign
+     * key to `users`, so the id that belongs there is the caller's real one.
+     *
+     * The Liveblocks ACL gets the address and its role, and DELIBERATELY no
+     * binding. The ids in room metadata are derived from the credential a
+     * request presents (`principalOf`), not from `users` — for an e-mail
+     * session that derivation is seeded from the address, so binding here
+     * would write an id that the same person arriving with Google would not
+     * match, and 16.2's rule is that a bound slot stops answering to the
+     * address. That would lock the invitee out of the project they just
+     * joined. Binding stays where 16.2 put it: `rooms.ensure`, the first
+     * time they actually open the project, using the credential they came
+     * with.
+     */
+    await db.memberships.setRole(invite.projectId, invite.email, invite.role)
+    await db.memberships.bind(invite.projectId, invite.email, caller.id)
+
+    const lb = liveblocksClient()
+    if (lb) {
+      const roomAcl = await loadAcl(lb, invite.projectId)
+      // no rooms yet is not a failure: `rooms.ensure` bootstraps them from
+      // the Postgres membership that was just written
+      if (roomAcl) {
+        await writeAcl(lb, invite.projectId, addEmail(roomAcl, invite.email, invite.role))
+      }
+    }
+
+    const accepted = await db.invitations.patch(invite.id, {
+      status: 'accepted',
+      acceptedAt: now,
+      acceptedBy: caller.id,
+    })
+    res.status(200).json({
+      invite: redact(accepted ?? invite, now),
+      projectId: invite.projectId,
+      role: invite.role,
+    })
     return
   }
 

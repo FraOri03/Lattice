@@ -83,6 +83,27 @@ export interface InviteLookup {
   source: 'local' | 'server'
 }
 
+/**
+ * What came of accepting (18.3).
+ *
+ * `address` is present whenever the refusal is about WHO is accepting, so
+ * the UI can name the mailbox that was invited — the only fact that lets
+ * somebody act on the refusal. It is safe to show: whoever holds the link
+ * was mailed at that address.
+ */
+export interface AcceptOutcome {
+  ok: boolean
+  invite?: ProjectInvite
+  address?: string
+  /** The server's own words, when it refused. */
+  error?: string
+}
+
+/** Addresses compare case-insensitively, or the check has a trivial bypass. */
+function sameAddress(a: string, b: string): boolean {
+  return !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase()
+}
+
 class InviteService {
   /** False once the server has said it has no database. Sticky, like sessionClient. */
   private serverAvailable = true
@@ -354,54 +375,67 @@ class InviteService {
     return !!reply?.ok
   }
 
-  /* ---------------- acceptance (unchanged — 18.3 owns it) ---------------- */
+  /* ---------------- acceptance (18.3, #90) ---------------- */
 
   /**
-   * Accept an invite as the CURRENT identity.
+   * Accept an invitation, having proved the address it was sent to.
    *
-   * It does not check that the current identity owns the invited address.
-   * That is the hole #90 closes, and it is left exactly as it was rather
-   * than half-moved: the only change 18.1 makes is refusing to expose it to
-   * invitations resolved from the server, where a token alone would
-   * otherwise be enough from any browser.
+   * Two paths, and which one applies is not a preference — it is what the
+   * invitation is:
+   *
+   *  - **A server record** (`tokenHash` set) is accepted only by the server,
+   *    which checks the caller's account against the invited address using
+   *    identities the database says are verified. This browser never grants
+   *    it locally, whatever it believes about who is signed in, because a
+   *    browser is exactly the thing that cannot be trusted to answer that.
+   *  - **A local invitation** (`tokenHash` empty) has no server behind it, so
+   *    the address is all there is — and it now has to match. Before 18.3
+   *    this branch added whoever was signed in, which is how an invitation
+   *    sent to one address ended up granting membership to another.
    */
-  accept(invite: ProjectInvite): boolean {
-    if (!isLive(invite, Date.now())) return false
+  async accept(invite: ProjectInvite, token?: string): Promise<AcceptOutcome> {
+    if (!isLive(invite, Date.now())) {
+      return { ok: false, error: 'This invitation is no longer open.' }
+    }
+
+    if (invite.tokenHash) {
+      if (!token) {
+        return { ok: false, address: invite.email, error: 'This invitation needs its link.' }
+      }
+      const reply = await this.ask<{
+        invite: ProjectInvite
+        projectId: string
+        role: CollabRole
+      }>({ action: 'accept', token })
+      if (!reply) {
+        return {
+          ok: false,
+          address: invite.email,
+          error: 'Sign in to accept this invitation.',
+        }
+      }
+      if (!reply.ok) return { ok: false, address: invite.email, error: reply.error }
+      this.replace(invite.projectId, reply.data.invite)
+      return { ok: true, invite: reply.data.invite }
+    }
+
     const identity = currentIdentity()
+    if (!sameAddress(identity.email, invite.email)) {
+      return { ok: false, address: invite.email }
+    }
     membersService.addMember(invite.projectId, {
       userId: identity.userId,
       name: identity.name,
-      email: identity.email || invite.email,
+      email: identity.email,
       avatarUrl: identity.avatarUrl,
       role: invite.role,
       invitedBy: invite.invitedBy,
     })
-    this.patch(invite.projectId, invite.id, {
+    const patched = this.patch(invite.projectId, invite.id, {
       status: 'accepted',
       acceptedAt: Date.now(),
     })
-    return true
-  }
-
-  /**
-   * Simulate the invitee accepting (offline testing): creates a mock member
-   * from the invited email so roles/permissions can be exercised without a
-   * second person. Local tier only — it writes no server record.
-   */
-  acceptAsMock(invite: ProjectInvite): boolean {
-    if (!isLive(invite, Date.now())) return false
-    membersService.addMember(invite.projectId, {
-      userId: `mock_${invite.email}`,
-      name: invite.email.split('@')[0],
-      email: invite.email,
-      role: invite.role,
-      invitedBy: invite.invitedBy,
-    })
-    this.patch(invite.projectId, invite.id, {
-      status: 'accepted',
-      acceptedAt: Date.now(),
-    })
-    return true
+    return { ok: true, invite: patched ?? invite }
   }
 
   /* ---------------- the local store ---------------- */
