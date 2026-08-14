@@ -57,8 +57,30 @@ export interface Project {
   deletedAt?: number
   /** Who put it there — a display name, for the row that says so. */
   deletedBy?: string
+  /**
+   * The account that created it, which is the account that owns it.
+   *
+   * Recorded once, here, because ownership decided later is ownership decided
+   * by whoever happens to open the project first — and that produced projects
+   * with four owners, one per device that ever saw them. This field travels
+   * with the project, so every device agrees on the same answer instead of
+   * appointing itself.
+   *
+   * Absent on projects created before this was recorded; `ensureOwner` still
+   * falls back for those, and only for those.
+   */
+  createdBy?: ProjectCreator
   storageRoot: string
   settings: ProjectSettings
+}
+
+/** Who made a project. Enough to open its ACL slot without a second lookup. */
+export interface ProjectCreator {
+  userId: string
+  /** Lowercased; '' when the creator was a guest with no account. */
+  email: string
+  name: string
+  avatarUrl: string
 }
 
 /**

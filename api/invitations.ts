@@ -453,6 +453,25 @@ export default async function handler(req: ApiRequest, res: ApiRes): Promise<voi
 
   const acl = await aclForProject(db, projectId)
   if (!acl) {
+    /**
+     * A project with no server-side membership is a LOCAL project, not an
+     * error. Most are: nothing writes a membership until somebody shares one,
+     * so `proj_default` and every project made offline arrive here.
+     *
+     * Asking one what it has offered is therefore a fair question with a
+     * boring answer — none — and 404 was the wrong way to say it. The share
+     * dialog asks on every open, so that mistake cost a failed request and
+     * about a second and a half of function time each time anybody looked at
+     * the members of a project they had never shared.
+     *
+     * The refusal still stands for everything that WRITES: you cannot invite
+     * to, revoke from or re-role a project the server has no ACL to check you
+     * against.
+     */
+    if (action === 'list') {
+      res.status(200).json({ invites: [] })
+      return
+    }
     sendError(res, 404, 'This project has no membership record on the server yet.')
     return
   }

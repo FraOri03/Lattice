@@ -37,6 +37,12 @@ class SessionClient {
    * realtime message.
    */
   private supported = true
+  /**
+   * True once a probe came back 401. A browser with no session stays
+   * without one until something establishes it, and every path that could
+   * (`establish`, `signInWithEmailCode`, `reset`) clears this.
+   */
+  private probed = false
   private listeners = new Set<() => void>()
 
   current(): SessionInfo | null {
@@ -66,7 +72,7 @@ class SessionClient {
   /** What we know, asking the server once if we do not know yet. */
   private async ensure(): Promise<SessionInfo | null> {
     if (this.info) return this.info
-    if (!this.supported) return null
+    if (!this.supported || this.probed) return null
     if (this.probe) return this.probe
     this.probe = this.whoAmI().finally(() => {
       this.probe = null
@@ -84,6 +90,21 @@ class SessionClient {
       if (res.status === 501) {
         // no database on this deployment: stop asking
         this.supported = false
+        return null
+      }
+      /**
+       * 401 is "this browser has no session", which does not change on its
+       * own — so remembering it is the difference between one probe and one
+       * per call. Anything that WOULD change it (`establish`, an OTP
+       * sign-in, `reset`) clears the flag, so a real sign-in still works
+       * immediately.
+       *
+       * Without this, a browser signed in with the local demo account
+       * re-asked on every request that went through `post`, which 18.x made
+       * frequent enough to fill a console.
+       */
+      if (res.status === 401) {
+        this.probed = true
         return null
       }
       if (!res.ok) return null
@@ -121,6 +142,7 @@ class SessionClient {
       const info = (await res.json()) as SessionInfo
       this.info = info
       this.supported = true
+      this.probed = false
       this.notify()
       return info
     } catch {
@@ -177,6 +199,7 @@ class SessionClient {
       const info = (await res.json()) as SessionInfo
       this.info = info
       this.supported = true
+      this.probed = false
       this.notify()
       return info
     } catch {
@@ -278,6 +301,7 @@ class SessionClient {
     this.info = null
     this.probe = null
     this.supported = true
+    this.probed = false
     this.notify()
   }
 }
