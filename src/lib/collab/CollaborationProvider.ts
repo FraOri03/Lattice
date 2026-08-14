@@ -42,45 +42,11 @@ export interface CollaborationProvider {
 
 /* ---------------- session identity ---------------- */
 
-export interface CollabIdentity {
-  userId: string
-  name: string
-  email: string
-  avatarUrl: string
-}
+// Lives in `localIdentity.ts` so the project store can read it without
+// importing this module and, with it, the whole realtime stack.
+// Re-exported here because every existing caller imports it from here.
+export { currentIdentity, type CollabIdentity } from './localIdentity'
 
-const GUEST_KEY = 'lattice-guest-id'
-
-/** Stable identity for presence/comments: the signed-in account, else a per-browser guest. */
-export function currentIdentity(): CollabIdentity {
-  try {
-    const raw = localStorage.getItem('lattice-account')
-    if (raw) {
-      const acc = JSON.parse(raw) as {
-        id: string
-        name: string
-        email: string
-        avatarUrl: string
-      }
-      if (acc?.id) {
-        return {
-          userId: acc.id,
-          name: acc.name || 'User',
-          email: acc.email || '',
-          avatarUrl: acc.avatarUrl || '',
-        }
-      }
-    }
-  } catch {
-    /* fall through to guest */
-  }
-  let guestId = localStorage.getItem(GUEST_KEY)
-  if (!guestId) {
-    guestId = nid('guest')
-    localStorage.setItem(GUEST_KEY, guestId)
-  }
-  return { userId: guestId, name: 'Guest', email: '', avatarUrl: '' }
-}
 
 /** This tab's session id — one user may be present from several tabs. */
 export const SESSION_ID = nid('sess')

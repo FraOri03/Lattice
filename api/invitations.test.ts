@@ -730,6 +730,38 @@ describe('acceptance (18.3)', () => {
   })
 })
 
+describe('a project the server has never seen', () => {
+  /**
+   * Most projects are local: nothing writes a membership until somebody
+   * shares one, so `proj_default` and everything made offline land here. The
+   * share dialog asks for their invitations on every open.
+   */
+  it('answers an empty list instead of 404', async () => {
+    signedInAs('owner@example.com', 'Owner')
+    const sent = await call({
+      action: 'list',
+      projectId: 'never_shared',
+      googleToken: 'ya29',
+    })
+
+    expect(sent.code).toBe(200)
+    expect((sent.body as { invites: unknown[] }).invites).toEqual([])
+  })
+
+  it('still refuses to write to it', async () => {
+    signedInAs('owner@example.com', 'Owner')
+    for (const body of [
+      { action: 'create', email: 'grace@example.com', role: 'editor' },
+      { action: 'revoke', inviteId: 'inv_1' },
+      { action: 'set-role', inviteId: 'inv_1', role: 'viewer' },
+      { action: 'resend', inviteId: 'inv_1' },
+    ]) {
+      const sent = await call({ projectId: 'never_shared', googleToken: 'ya29', ...body })
+      expect(sent.code).toBe(404)
+    }
+  })
+})
+
 describe('list', () => {
   it('shows the project its own invitations, never their tokens', async () => {
     await seedInvite()

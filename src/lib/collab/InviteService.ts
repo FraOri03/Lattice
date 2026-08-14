@@ -121,6 +121,17 @@ class InviteService {
         this.serverAvailable = false
         return null
       }
+      /**
+       * 404 means the SERVER does not know this project — it has no ACL to
+       * check anyone against, which is true of every project that was never
+       * shared. That is the local tier's case, so this falls back to it
+       * rather than reporting an error: before 18.1 the invitation would
+       * simply have been made locally, and it still should be.
+       *
+       * Not sticky: the endpoint is there, and the next project may well be
+       * one it knows.
+       */
+      if (res.status === 404) return null
       if (!res.ok) {
         const payload = (await res.json().catch(() => null)) as { error?: string } | null
         return { ok: false, error: payload?.error ?? `Request failed (${res.status})` }
@@ -248,6 +259,23 @@ class InviteService {
   ): Promise<InviteResult> {
     const clean = email.trim().toLowerCase()
     if (!EMAIL.test(clean)) return { ok: false }
+
+    /**
+     * Already a member? Then there is nothing to offer.
+     *
+     * The server has refused this since 18.1, but the check lived ONLY there,
+     * so the local tier could still mint an invitation for somebody who was
+     * already in the project — which is how an address ends up listed as an
+     * active owner and as a pending admin at the same time.
+     */
+    const member = useCollabStore
+      .getState()
+      .members[projectId]?.find(
+        (m) => m.status === 'active' && m.email.toLowerCase() === clean,
+      )
+    if (member) {
+      return { ok: false, error: `${clean} is already a member of this project.` }
+    }
 
     const existing = this.invitesOf(projectId).find(
       (i) => i.email === clean && i.status === 'pending',

@@ -1,6 +1,7 @@
 import type { CollabRole, ProjectMember } from '@/types/collab'
+import { useStore } from '@/store/useStore'
 import { useCollabStore } from './collabStore'
-import { currentIdentity } from './CollaborationProvider'
+import { currentIdentity } from './localIdentity'
 import { canManageRole } from './permissions'
 import { activityLog } from './ActivityLogService'
 import { collabHub } from './hub'
@@ -14,6 +15,20 @@ import { serverAcl } from './ServerAclService'
 
 class MembersService {
   /** Idempotent: make sure the current user owns projects they created. */
+  /**
+   * Make sure the project has its owner recorded.
+   *
+   * The owner is the account that CREATED the project, read from
+   * `project.createdBy`. That field travels with the project, so every device
+   * that opens it writes the same owner instead of appointing itself — which
+   * is what produced projects carrying four owners, one per device that had
+   * ever seen them, and two of them nameless guests with no address at all.
+   *
+   * The current identity is used only for projects created before the creator
+   * was recorded. That fallback is the old behaviour, kept because a legacy
+   * project with no owner at all would otherwise be unmanageable, and narrowed
+   * to the only case that needs it.
+   */
   ensureOwner(projectId: string): void {
     const s = useCollabStore.getState()
     const members = s.members[projectId] ?? []
@@ -21,7 +36,8 @@ class MembersService {
       this.touchSelf(projectId)
       return
     }
-    const identity = currentIdentity()
+    const creator = useStore.getState().projects[projectId]?.createdBy
+    const identity = creator ?? currentIdentity()
     const now = Date.now()
     const owner: ProjectMember = {
       userId: identity.userId,

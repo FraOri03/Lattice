@@ -32,6 +32,7 @@ import type {
   WebEmbed,
   Workspace,
 } from '@/types/model'
+import { currentIdentity } from '@/lib/collab/localIdentity'
 import { detectLocale } from '@/lib/i18n/messages'
 import { nid } from '@/lib/id'
 import { blobToDataUrl } from '@/lib/media'
@@ -990,6 +991,14 @@ export const useStore = create<AppState>()(
       createProject: (partial = {}) => {
         const id = nid('proj')
         const now = Date.now()
+        /**
+         * The creator is the owner, and it is decided here — once, at the only
+         * moment the answer is unambiguous. Deciding it later means deciding
+         * it from whoever opens the project first on each device, which is how
+         * a project ends up with several owners and no way to tell which is
+         * real.
+         */
+        const creator = currentIdentity()
         const project: Project = {
           id,
           name: 'New project',
@@ -1000,6 +1009,12 @@ export const useStore = create<AppState>()(
           updatedAt: now,
           archived: false,
           starred: false,
+          createdBy: {
+            userId: creator.userId,
+            email: creator.email.trim().toLowerCase(),
+            name: creator.name,
+            avatarUrl: creator.avatarUrl,
+          },
           storageRoot: `projects/${id}`,
           settings: {},
           ...partial,
