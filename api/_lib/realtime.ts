@@ -1,6 +1,12 @@
 import { Liveblocks } from '@liveblocks/node'
-import type { CollabRole } from '../../src/types/collab.js'
 import { contentRoomId } from '../../src/lib/collab/roleAccess.js'
+import {
+  decodeBindings,
+  encodeBindings,
+  type Principal,
+  type RoomAcl,
+} from '../../src/lib/collab/acl.js'
+import { googleUserIds } from '../../src/lib/auth/identity.js'
 
 /**
  * Shared helpers for the realtime endpoints (api/realtime/*).
@@ -10,10 +16,12 @@ import { contentRoomId } from '../../src/lib/collab/roleAccess.js'
  *    it against Google (tokeninfo checks signature/expiry/audience) and
  *    derive the e-mail from Google's answer, never from the request body.
  *  - Authorization: each project's ACL lives in the Liveblocks room
- *    metadata (emails per role), writable only through these endpoints
- *    with the LIVEBLOCKS_SECRET_KEY. Access tokens are minted with
- *    exactly the scopes the role allows; Liveblocks enforces them on
- *    every websocket operation.
+ *    metadata (a slot per member, opened with an address and bound to a
+ *    userId once its owner shows up — see src/lib/collab/acl.ts),
+ *    writable only through these endpoints with the
+ *    LIVEBLOCKS_SECRET_KEY. Access tokens are minted with exactly the
+ *    scopes the role allows; Liveblocks enforces them on every websocket
+ *    operation.
  */
 
 /* ---------------- environment ---------------- */
@@ -89,14 +97,11 @@ export async function verifyGoogleToken(
 
 /* ---------------- room ACL (metadata) ---------------- */
 
-export interface RoomAcl {
-  ownerEmail: string
-  admins: string[]
-  editors: string[]
-  commenters: string[]
-  viewers: string[]
-}
-
+/**
+ * The ACL shape and the rule that resolves it live in
+ * `src/lib/collab/acl.ts`, shared verbatim with the browser. What stays
+ * here is only how it is stored: Liveblocks room metadata.
+ */
 type Metadata = Record<string, string | string[]>
 
 const asList = (v: string | string[] | undefined): string[] =>
@@ -112,6 +117,9 @@ export function aclFromMetadata(meta: Metadata | undefined): RoomAcl | null {
     editors: asList(meta.editors),
     commenters: asList(meta.commenters),
     viewers: asList(meta.viewers),
+    // absent on every room written before 16.2, which is exactly the
+    // "nobody has claimed these addresses yet" state
+    bindings: decodeBindings(asList(meta.bound)),
   }
 }
 
@@ -125,50 +133,21 @@ export function aclToMetadata(projectId: string, acl: RoomAcl): Metadata {
   if (acl.editors.length) meta.editors = acl.editors
   if (acl.commenters.length) meta.commenters = acl.commenters
   if (acl.viewers.length) meta.viewers = acl.viewers
+  const bound = encodeBindings(acl.bindings)
+  if (bound.length) meta.bound = bound
   return meta
 }
 
-export function roleOf(acl: RoomAcl, email: string): CollabRole | null {
-  if (acl.ownerEmail === email) return 'owner'
-  if (acl.admins.includes(email)) return 'admin'
-  if (acl.editors.includes(email)) return 'editor'
-  if (acl.commenters.includes(email)) return 'commenter'
-  if (acl.viewers.includes(email)) return 'viewer'
-  return null
-}
-
-/** Remove an e-mail from every role list (before re-adding elsewhere). */
-export function stripEmail(acl: RoomAcl, email: string): RoomAcl {
-  const drop = (l: string[]) => l.filter((e) => e !== email)
-  return {
-    ownerEmail: acl.ownerEmail,
-    admins: drop(acl.admins),
-    editors: drop(acl.editors),
-    commenters: drop(acl.commenters),
-    viewers: drop(acl.viewers),
-  }
-}
-
-export function addEmail(acl: RoomAcl, email: string, role: CollabRole): RoomAcl {
-  const next = stripEmail(acl, email)
-  switch (role) {
-    case 'owner':
-      next.ownerEmail = email
-      break
-    case 'admin':
-      next.admins = [...next.admins, email]
-      break
-    case 'editor':
-      next.editors = [...next.editors, email]
-      break
-    case 'commenter':
-      next.commenters = [...next.commenters, email]
-      break
-    case 'viewer':
-      next.viewers = [...next.viewers, email]
-      break
-  }
-  return next
+/**
+ * Who is calling, as the ACL asks about them.
+ *
+ * Both halves come from Google's answer and nothing else: the address it
+ * verified, and every userId derivable from the subject it verified. The
+ * browser never sends a userId, so there is no claim to be trusted or
+ * checked — 16.2's key is as unforgeable as the e-mail it replaces.
+ */
+export function principalOf(identity: VerifiedIdentity): Principal {
+  return { email: identity.email, userIds: googleUserIds(identity.sub) }
 }
 
 /** Load a project's ACL from its content room; null when no room yet. */

@@ -59,6 +59,36 @@ export function newUserId(claim: Pick<IdentityClaim, 'provider' | 'providerSubje
   return seed ? `usr_${hash36(`${claim.provider}:${seed}`)}` : nid('usr')
 }
 
+/**
+ * Every userId a Google account could hold, newest form first.
+ *
+ * This is what lets an endpoint answer "who is calling" from a verified
+ * Google subject alone, with no database and nothing claimed by the
+ * browser — which is what 16.2 keys the ACL on. Two forms, because the
+ * seed is deterministic (see {@link newUserId}) but the legacy id is not
+ * derived the same way:
+ *
+ *  - `usr_<hash>` — minted by 16.1 and after;
+ *  - `acc_<sub>`  — the pre-16.1 id, preserved by the migration for
+ *    everyone who was already signed in.
+ *
+ * The same person can present either: a user who was migrated holds the
+ * legacy id, while the same Google account on a browser that has never
+ * seen this app mints the canonical one. Both are facts about one Google
+ * subject, so both are accepted; {@link CANONICAL_USER_ID} is the one
+ * written when a membership is bound.
+ */
+export function googleUserIds(sub: string): string[] {
+  if (!sub) return []
+  return [
+    newUserId({ provider: 'google', providerSubject: sub, email: '' }),
+    `acc_${sub}`,
+  ]
+}
+
+/** Index into {@link googleUserIds} of the id new bindings should use. */
+export const CANONICAL_USER_ID = 0
+
 /* ---------------- lookups ---------------- */
 
 const sameEmail = (a: string, b: string): boolean =>

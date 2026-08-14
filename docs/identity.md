@@ -108,12 +108,10 @@ stored with an empty subject and the next sign-in repairs it in place
 
 - The store is **per-browser**. It gives one person one id across devices,
   but it cannot see other people's users, so nothing here authorises
-  anything on its own.
-- Room access is still decided server-side from the ACL, **by e-mail**.
-  Moving memberships onto `userId` is
-  [16.2](https://github.com/FraOri03/Lattice/issues/82), and it depends on
-  a server that can answer "which user is this address" for someone other
-  than you — that is Phase 17.
+  anything on its own — and the server never believes it. Endpoints derive
+  the caller's userIds from the Google subject they verified
+  (`googleUserIds`), which is what 16.2 binds memberships to: see
+  [collaboration.md](collaboration.md#who-a-membership-belongs-to).
 - The Liveblocks identity is still the e-mail address, by design: it is
   not migrated in this phase.
 - There is no second provider yet. `email` is representable and its rules

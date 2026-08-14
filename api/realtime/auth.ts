@@ -1,8 +1,8 @@
 import {
   liveblocksClient,
   loadAcl,
+  principalOf,
   requireIdentity,
-  roleOf,
   sendError,
   type ApiRes,
 } from '../_lib/realtime.js'
@@ -12,6 +12,7 @@ import {
   parseRoomId,
   permissionsForRole,
 } from '../../src/lib/collab/roleAccess.js'
+import { roleOf } from '../../src/lib/collab/acl.js'
 
 /**
  * POST /api/realtime/auth — mint a Liveblocks access token.
@@ -19,11 +20,16 @@ import {
  * Body: { room: string, googleToken: string }
  *
  * The token's scopes are derived ONLY from server-side state:
- *  - identity: googleToken verified against Google (audience-checked)
+ *  - identity: googleToken verified against Google (audience-checked),
+ *    from which both the address and the caller's userIds are derived
  *  - role: the project ACL stored in the room metadata
- * The browser's claimed role is never read. Liveblocks then enforces the
- * scopes on every websocket operation, so a viewer's tampered client
- * still cannot write a single CRDT byte.
+ * The browser's claimed role is never read, and neither is a claimed
+ * userId — it does not send one. Liveblocks then enforces the scopes on
+ * every websocket operation, so a viewer's tampered client still cannot
+ * write a single CRDT byte.
+ *
+ * The Liveblocks identity itself stays the e-mail address: 16.2 moves the
+ * ACL, not the realtime session key.
  */
 
 interface Req {
@@ -63,7 +69,7 @@ export default async function handler(req: Req, res: ApiRes): Promise<void> {
     sendError(res, 403, 'This project has no realtime room yet — open it as its owner first.')
     return
   }
-  const role = roleOf(acl, identity.email)
+  const role = roleOf(acl, principalOf(identity))
   if (!role) {
     sendError(res, 403, `${identity.email} is not a member of this project (server check).`)
     return

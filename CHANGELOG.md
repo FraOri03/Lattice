@@ -12,6 +12,22 @@ All notable changes to Lattice are recorded here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **A project membership now belongs to a person, not to an e-mail address.** Access was
+  granted to an address, so whoever held that address held the project — and when a company
+  reassigns a departed colleague's mailbox, the new employee silently inherited everything
+  the old one could open. A membership is still *offered* to an address, because that is all
+  you have for someone you have not met, but the first time the invited person opens the
+  project it is bound to them: from then on the address no longer grants it, and their
+  access survives the address changing. An invitation that has not been accepted yet is
+  exactly the case where the address still counts, which is the only place it should. The
+  binding is derived on the server from the Google account it has already verified — the
+  browser never says who it is and would not be believed if it did. Nothing has to be
+  migrated by hand and nothing breaks on a rollback: projects created before this keep
+  working, and are bound the next time each member opens them. See
+  [docs/collaboration.md](docs/collaboration.md#who-a-membership-belongs-to).
+
 ### Added
 
 - **Who you are stopped being how you signed in.** Until now your account id was built

@@ -27,7 +27,9 @@ import {
  * HONEST LIMIT — the local store is per-browser. It gives one person one
  * id across devices (see `newUserId`), but it cannot see other people's
  * users, so nothing here can authorise anything on its own. Room access
- * is still decided server-side from the ACL, by e-mail, until 16.2.
+ * is decided server-side, and the server derives the caller's userIds
+ * from the Google subject it verified rather than believing this store
+ * (`googleUserIds`, and `src/lib/collab/acl.ts` for what it is used for).
  */
 
 export interface IdentityStore {
