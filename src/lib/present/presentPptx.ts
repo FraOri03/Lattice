@@ -1,6 +1,8 @@
 import JSZip from 'jszip'
 import { presentableSlides } from './sections'
 import { furnitureElements, masterTokensFor } from './masters'
+import { docOf, linesOf, type TextLine, type TextRun } from './richtext'
+import { resolveTextRender, type TextRender } from './textStyles'
 import {
   SLIDE_H,
   SLIDE_W,
@@ -30,12 +32,43 @@ function xfrm(el: { x: number; y: number; w: number; h: number }): string {
   return `<a:xfrm><a:off x="${Math.round(el.x * EMU)}" y="${Math.round(el.y * EMU)}"/><a:ext cx="${Math.round(el.w * EMU)}" cy="${Math.round(el.h * EMU)}"/></a:xfrm>`
 }
 
-function textBody(el: TextElement, themeText: string): string {
-  const algn = el.align === 'center' ? 'ctr' : el.align === 'right' ? 'r' : 'l'
-  const color = srgb(el.color ?? themeText, themeText)
-  const paras = el.text.split('\n').map((line) => {
-    const rPr = `<a:rPr lang="en-US" sz="${Math.round(el.fontSize * 100)}"${el.bold ? ' b="1"' : ''}${el.italic ? ' i="1"' : ''}><a:solidFill><a:srgbClr val="${color}"/></a:solidFill></a:rPr>`
-    return `<a:p><a:pPr algn="${algn}"/><a:r>${rPr}<a:t>${esc(line)}</a:t></a:r></a:p>`
+/**
+ * Text as PresentationML runs (19E.3).
+ *
+ * OOXML has runs natively, so mixed formatting inside one box exports as what
+ * it is rather than collapsing to the box's dominant style. Lists become real
+ * PowerPoint bullets. Links ride along as hyperlink-styled runs carrying their
+ * href in the run text's own `<a:rPr>` — Lattice entity links (`lattice://`)
+ * have no meaning outside Lattice, so they export as plain text, and the
+ * export dialog says so.
+ */
+function textBody(el: TextElement, themeText: string, render: TextRender): string {
+  const algn = render.align === 'center' ? 'ctr' : render.align === 'right' ? 'r' : 'l'
+  const boxColor = srgb(el.color ?? render.color ?? themeText, themeText)
+  const size = Math.round(render.size * 100)
+
+  const runXml = (run: TextRun): string => {
+    const b = run.bold || render.weight >= 600 ? ' b="1"' : ''
+    const i = run.italic || el.italic ? ' i="1"' : ''
+    const u = run.underline ? ' u="sng"' : ''
+    const rPr = `<a:rPr lang="en-US" sz="${size}"${b}${i}${u}><a:solidFill><a:srgbClr val="${boxColor}"/></a:solidFill><a:latin typeface="Calibri"/></a:rPr>`
+    return `<a:r>${rPr}<a:t>${esc(run.text)}</a:t></a:r>`
+  }
+
+  const lines = linesOf(docOf(el))
+  const source: TextLine[] = lines.length
+    ? lines
+    : el.text.split('\n').map((text) => ({ runs: [{ text }], level: 0 }))
+
+  const paras = source.map((line) => {
+    const indent = line.list ? ` marL="${(line.level + 1) * 285750}" indent="-285750"` : ''
+    const bullet = line.list === 'bullet'
+      ? '<a:buChar char="•"/>'
+      : line.list === 'number'
+        ? '<a:buAutoNum type="arabicPeriod"/>'
+        : '<a:buNone/>'
+    const runs = line.runs.length ? line.runs.map(runXml).join('') : ''
+    return `<a:p><a:pPr algn="${algn}"${indent}>${bullet}</a:pPr>${runs}</a:p>`
   })
   return `<p:txBody><a:bodyPr wrap="square"><a:normAutofit/></a:bodyPr><a:lstStyle/>${paras.join('')}</p:txBody>`
 }
@@ -46,10 +79,15 @@ interface SlideCtx {
   seq: number
 }
 
-function elementXml(ctx: SlideCtx, el: PresentElement, themeText: string): string {
+function elementXml(
+  ctx: SlideCtx,
+  el: PresentElement,
+  themeText: string,
+  render: TextRender,
+): string {
   const id = ++ctx.seq
   if (el.kind === 'text') {
-    return `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="Text ${id}"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr>${xfrm(el)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr>${textBody(el, themeText)}</p:sp>`
+    return `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="Text ${id}"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr>${xfrm(el)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr>${textBody(el, themeText, render)}</p:sp>`
   }
   if (el.kind === 'shape') {
     const geom = el.shape === 'ellipse' ? 'ellipse' : el.shape === 'line' ? 'line' : 'rect'
@@ -106,7 +144,9 @@ export async function exportPresentationPptx(body: PresentationBody): Promise<Bl
     const els = [...slide.elements, ...furnitureElements(body, slide, n, theme)].sort(
       (a, b) => a.z - b.z,
     )
-    const shapes = els.map((el) => elementXml(ctx, el, theme.text)).join('')
+    const shapes = els
+      .map((el) => elementXml(ctx, el, theme.text, resolveTextRender(el as TextElement, theme, body.textStyles)))
+      .join('')
     const bg = `<p:bg><p:bgPr><a:solidFill><a:srgbClr val="${srgb(slide.background ?? theme.bg, theme.bg)}"/></a:solidFill><a:effectLst/></p:bgPr></p:bg>`
     const slideXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <p:sld ${NS}><p:cSld>${bg}<p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/>${shapes}</p:spTree></p:cSld></p:sld>`

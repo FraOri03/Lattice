@@ -37,8 +37,16 @@ import {
   type OverrideKey,
 } from '@/lib/present/layouts'
 import { LayoutPicker } from './LayoutPicker'
+import { TypographyPanel } from './TypographyPanel'
 import { MasterPanel } from './MasterPanel'
 import { THEME_PRESETS, type ThemeTokens } from '@/lib/present/theme'
+import {
+  resolveTextRender,
+  withStyleOverride,
+  type TextStyleName,
+  type TextStyleSpec,
+} from '@/lib/present/textStyles'
+import { measureOverflow, type AutoSizeMode, type OverflowReport } from '@/lib/present/overflow'
 import {
   moveSection,
   presentableSlides,
@@ -123,6 +131,7 @@ export default function PresentationWorkspace({ meta }: { meta: PresentationDocM
   // notes collapse to a strip: the canvas is what this screen is for (19E.1)
   const [notesOpen, setNotesOpen] = useState(false)
   const [layoutsOpen, setLayoutsOpen] = useState(false)
+  const [overflow, setOverflow] = useState<OverflowReport | null>(null)
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const imageInput = useRef<HTMLInputElement>(null)
@@ -189,6 +198,45 @@ export default function PresentationWorkspace({ meta }: { meta: PresentationDocM
     [elements, selectedIds],
   )
   const selected = selectedEls.length === 1 ? selectedEls[0] : null
+
+  /**
+   * Overflow is measured, not estimated (19E.3): the rendered box knows how
+   * tall its text really is, and the panel reports that rather than guessing
+   * from character counts.
+   */
+  const selectedTextId = selected?.kind === 'text' ? selected.id : null
+  useEffect(() => {
+    if (!selectedTextId || !slide) {
+      setOverflow(null)
+      return
+    }
+    const inner = document.querySelector<HTMLElement>(
+      `[data-el-id="${selectedTextId}"] [data-text-measure]`,
+    )
+    const el = slide.elements.find((e) => e.id === selectedTextId)
+    if (!inner || !el || el.kind !== 'text') {
+      setOverflow(null)
+      return
+    }
+    const r = resolveTextRender(el, slideTokens, body?.textStyles)
+    const next = measureOverflow({
+      contentHeight: inner.scrollHeight,
+      boxHeight: el.h,
+      fontSize: r.size,
+      lineHeight: r.lineHeight,
+    })
+    // measuring produces a fresh object every time; storing an equal one would
+    // re-render, re-measure and never settle
+    setOverflow((prev) =>
+      prev &&
+      prev.overflowing === next.overflowing &&
+      prev.overBy === next.overBy &&
+      prev.shrunkFontSize === next.shrunkFontSize &&
+      prev.grownHeight === next.grownHeight
+        ? prev
+        : next,
+    )
+  }, [selectedTextId, slide, slideTokens, body?.textStyles, scale])
 
   /* ---------- mutation helpers (all through history) ---------- */
 
@@ -418,6 +466,59 @@ export default function PresentationWorkspace({ meta }: { meta: PresentationDocM
         ? `${plan.freeElementIds.length} object(s) kept their own position as free objects. Undo restores the previous arrangement.`
         : 'Undo restores the previous arrangement.',
     )
+  }
+
+  const textActions: TextActions = {
+    setStyleRef: (name) =>
+      patchOne((el) => (el.kind === 'text' ? { ...el, styleRef: name } : el)),
+    setOverride: (key, value) =>
+      patchOne(
+        (el) => {
+          if (el.kind !== 'text') return el
+          // one visible Size control: it edits the box when the box is on its
+          // own, and the style override when the box follows a style
+          if (key === 'size' && !el.styleRef) {
+            return { ...el, fontSize: Math.max(1, Number(value) || el.fontSize) }
+          }
+          return { ...el, styleOverride: withStyleOverride(el.styleOverride, key, value) }
+        },
+        { coalesceKey: `type-${key}-${selected?.id}` },
+      ),
+    setBoxProp: (patch) => patchOne((el) => (el.kind === 'text' ? { ...el, ...patch } : el)),
+    /**
+     * Promote this box's overrides into its style. Every other box on that
+     * style has no value of its own to keep, so they all follow — in one
+     * history entry, because it is one patch to the deck.
+     */
+    updateStyle: () => {
+      const el = selected
+      if (!el || el.kind !== 'text' || !el.styleRef || !el.styleOverride) return
+      const name = el.styleRef
+      const promoted = el.styleOverride
+      apply((b) => ({
+        ...b,
+        textStyles: { ...(b.textStyles ?? {}), [name]: { ...(b.textStyles?.[name] ?? {}), ...promoted } },
+        slides: b.slides.map((s, i) =>
+          i !== si
+            ? s
+            : { ...s, elements: s.elements.map((x) => (x.id === el.id ? { ...x, styleOverride: undefined } : x)) },
+        ),
+      }))
+      toast.info(`${name} style updated`, 'Every box on this style follows. Undo restores it.')
+    },
+    applyRemedy: (mode, report) =>
+      patchOne((el) => {
+        if (el.kind !== 'text') return el
+        if (mode === 'shrink' && report.shrunkFontSize !== null) {
+          return el.styleRef
+            ? { ...el, autoSize: mode, styleOverride: withStyleOverride(el.styleOverride, 'size', report.shrunkFontSize) }
+            : { ...el, autoSize: mode, fontSize: report.shrunkFontSize }
+        }
+        if (mode === 'grow' && report.grownHeight !== null) {
+          return { ...el, autoSize: mode, h: report.grownHeight }
+        }
+        return { ...el, autoSize: mode }
+      }),
   }
 
   const masterActions: MasterActions = {
@@ -670,6 +771,7 @@ export default function PresentationWorkspace({ meta }: { meta: PresentationDocM
             <SlideCanvas
               slide={slide}
               tokens={slideTokens}
+              textStyles={body.textStyles}
               decor={furnitureElements(body, slide, si + 1, slideTokens)}
               readOnly={readOnly}
               scale={scale}
@@ -743,6 +845,8 @@ export default function PresentationWorkspace({ meta }: { meta: PresentationDocM
             onSetTheme={(t) => apply((b) => ({ ...b, theme: t }))}
             slideTokens={slideTokens}
             masterActions={masterActions}
+            overflow={overflow}
+            textActions={textActions}
             onRevertOverride={(key) => {
               const ph = placeholderFor(slide.layoutId, selected!)
               if (ph) patchOne((el) => revertOverride(el, ph, slideTokens, key))
@@ -771,6 +875,15 @@ export default function PresentationWorkspace({ meta }: { meta: PresentationDocM
       />
     </section>
   )
+}
+
+/** What the typography panel can do, gathered so the props stay legible. */
+interface TextActions {
+  setStyleRef: (name: TextStyleName | undefined) => void
+  setOverride: <K extends keyof TextStyleSpec>(key: K, value: TextStyleSpec[K] | undefined) => void
+  setBoxProp: (patch: { valign?: 'top' | 'middle' | 'bottom'; padding?: number; autoSize?: AutoSizeMode }) => void
+  applyRemedy: (mode: AutoSizeMode, report: OverflowReport) => void
+  updateStyle: () => void
 }
 
 /** What the master panel can do, gathered so the Inspector props stay legible. */
@@ -911,6 +1024,8 @@ function Inspector({
   slideTokens,
   masterActions,
   onRevertOverride,
+  overflow,
+  textActions,
 }: {
   body: PresentationBody
   slide: PresentSlide
@@ -933,6 +1048,8 @@ function Inspector({
   slideTokens: ThemeTokens
   masterActions: MasterActions
   onRevertOverride: (key: OverrideKey) => void
+  overflow: OverflowReport | null
+  textActions: TextActions
 }) {
   const count = selectedEls.length
   const anyLocked = selectedEls.some((e) => e.locked)
@@ -1185,7 +1302,22 @@ function Inspector({
             </label>
           </div>
 
-          {selected.kind === 'text' && <TextControls selected={selected} onPatchOne={onPatchOne} onSeal={onSeal} />}
+          {selected.kind === 'text' && (
+            <>
+              <TextControls selected={selected} onPatchOne={onPatchOne} onSeal={onSeal} />
+              <TypographyPanel
+                el={selected}
+                render={resolveTextRender(selected, slideTokens, body.textStyles)}
+                overflow={overflow}
+                readOnly={readOnly}
+                onSetStyleRef={textActions.setStyleRef}
+                onSetOverride={textActions.setOverride}
+                onSetBoxProp={textActions.setBoxProp}
+                onApplyRemedy={textActions.applyRemedy}
+                onUpdateStyle={textActions.updateStyle}
+              />
+            </>
+          )}
           {selected.kind === 'image' && (
             <ImageControls selected={selected} onPatchOne={onPatchOne} onReplace={() => onReplaceImage(selected.id)} />
           )}

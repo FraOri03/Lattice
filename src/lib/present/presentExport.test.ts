@@ -103,3 +103,69 @@ describe('PPTX export — master furniture (19E.2)', () => {
     expect(xml).not.toContain('Lattice · Phase 19')
   })
 })
+
+/**
+ * OOXML has runs natively, so mixed formatting should export as what it is
+ * rather than collapsing to the box's dominant style (19E.3).
+ */
+describe('PPTX export — structured text (19E.3)', () => {
+  const richDeck = (doc: unknown): PresentationBody => ({
+    app: 'lattice-present',
+    version: 5,
+    theme: 'plain',
+    slides: [
+      createSlide({
+        id: 'a',
+        elements: [createTextElement({ id: 't', text: 'plain bold', doc: doc as never })],
+      }),
+    ],
+  })
+
+  const slideXml = async (blob: Blob): Promise<string> => {
+    const zip = await open(blob)
+    return zip.files['ppt/slides/slide1.xml'].async('text')
+  }
+
+  it('writes one run per formatting change, not one per box', async () => {
+    const doc = {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: 'plain ' },
+            { type: 'text', text: 'bold', marks: [{ type: 'bold' }] },
+          ],
+        },
+      ],
+    }
+    const xml = await slideXml(await exportPresentationPptx(richDeck(doc)))
+    const runs = xml.match(/<a:r>/g) ?? []
+    expect(runs.length).toBeGreaterThanOrEqual(2)
+    expect(xml).toMatch(/b="1"[^>]*>?[\s\S]*?<a:t>bold<\/a:t>/)
+    expect(xml).toContain('<a:t>plain </a:t>')
+  })
+
+  it('exports a bullet list as a real PowerPoint bullet', async () => {
+    const doc = {
+      type: 'doc',
+      content: [
+        {
+          type: 'bulletList',
+          content: [
+            { type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'one' }] }] },
+          ],
+        },
+      ],
+    }
+    const xml = await slideXml(await exportPresentationPptx(richDeck(doc)))
+    expect(xml).toContain('<a:buChar char="•"/>')
+    expect(xml).toContain('<a:t>one</a:t>')
+  })
+
+  it('still exports a box that only ever had a string', async () => {
+    const body = richDeck(undefined)
+    const xml = await slideXml(await exportPresentationPptx(body))
+    expect(xml).toContain('<a:t>plain bold</a:t>')
+  })
+})

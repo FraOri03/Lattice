@@ -5,6 +5,8 @@ import {
   type PresentSlide,
 } from '@/lib/present/presentModel'
 import type { ThemeTokens } from '@/lib/present/theme'
+import { resolveTextRender, type DeckTextStyles, type TextRender } from '@/lib/present/textStyles'
+import { docOf, linesOf, type TextLine } from '@/lib/present/richtext'
 
 /**
  * Shared, dependency-light slide rendering used by BOTH the presentation
@@ -44,28 +46,56 @@ export function elementTransform(el: PresentElement): React.CSSProperties {
 export function ElementContent({
   el,
   themeText,
+  render,
+  measureRef,
 }: {
   el: PresentElement
   themeText: string
+  /** resolved typography (19E.3); absent falls back to the flat fields */
+  render?: TextRender
+  /** the inner box, so the editor can measure what the text really needs */
+  measureRef?: React.Ref<HTMLDivElement>
 }) {
   if (el.kind === 'text') {
+    const r = render
+    const lines = linesOf(docOf(el))
+    const clip = el.autoSize === 'clip' || el.autoSize === undefined
     return (
       <div
         style={{
           width: '100%',
           height: '100%',
-          fontSize: el.fontSize,
-          fontWeight: el.bold ? 700 : 400,
-          fontStyle: el.italic ? 'italic' : 'normal',
-          textAlign: el.align,
-          color: el.color ?? themeText,
-          lineHeight: 1.25,
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent:
+            r?.valign === 'middle' ? 'center' : r?.valign === 'bottom' ? 'flex-end' : 'flex-start',
+          padding: r?.padding ?? 0,
+          fontSize: r?.size ?? el.fontSize,
+          fontFamily: r?.fontFamily ?? 'inherit',
+          fontWeight: r?.weight ?? (el.bold ? 700 : 400),
+          // same reason as weight: with a document, italic lives on the runs
+          fontStyle: !el.doc && el.italic ? 'italic' : 'normal',
+          textAlign: r?.align ?? el.align,
+          color: r?.color ?? el.color ?? themeText,
+          lineHeight: r?.lineHeight ?? 1.25,
+          letterSpacing: r ? `${r.letterSpacing}em` : undefined,
           whiteSpace: 'pre-wrap',
-          overflow: 'hidden',
+          // "show overflow" has to actually show it, or the state would be a
+          // label for something invisible
+          overflow: clip ? 'hidden' : 'visible',
           wordBreak: 'break-word',
+          boxSizing: 'border-box',
         }}
       >
-        {el.text}
+        <div ref={measureRef} data-text-measure>
+          {lines.length === 0 ? (
+            el.text
+          ) : (
+            lines.map((line, i) => (
+              <RichLine key={i} line={line} />
+            ))
+          )}
+        </div>
       </div>
     )
   }
@@ -100,18 +130,53 @@ export function ElementContent({
   )
 }
 
+/** One line of structured text: its runs, and its list marker if it has one. */
+function RichLine({ line }: { line: TextLine }) {
+  const body = line.runs.map((run, i) => {
+    const style: React.CSSProperties = {
+      fontWeight: run.bold ? 700 : undefined,
+      fontStyle: run.italic ? 'italic' : undefined,
+      textDecoration: run.underline ? 'underline' : undefined,
+    }
+    // a link is drawn as a link but never navigable from a slide surface:
+    // clicking here selects the box, it does not leave the deck
+    if (run.href) {
+      return (
+        <span key={i} style={{ ...style, textDecoration: 'underline', opacity: 0.95 }} title={run.href}>
+          {run.text}
+        </span>
+      )
+    }
+    return (
+      <span key={i} style={style}>
+        {run.text}
+      </span>
+    )
+  })
+
+  if (!line.list) return <div>{body.length ? body : ' '}</div>
+  return (
+    <div style={{ display: 'flex', gap: '0.5em', paddingLeft: `${line.level * 1.2}em` }}>
+      <span aria-hidden style={{ opacity: 0.7 }}>{line.list === 'bullet' ? '•' : '—'}</span>
+      <span style={{ flex: 1 }}>{body}</span>
+    </div>
+  )
+}
+
 /** A positioned, transformed element (used by thumbnails / read-only render). */
 export function StaticElement({
   el,
   themeText,
+  render,
 }: {
   el: PresentElement
   themeText: string
+  render?: TextRender
 }) {
   if (el.hidden) return null
   return (
     <div style={{ ...elementStyle(el), ...elementTransform(el) }}>
-      <ElementContent el={el} themeText={themeText} />
+      <ElementContent el={el} themeText={themeText} render={render} />
     </div>
   )
 }
@@ -120,11 +185,14 @@ export function StaticElement({
 export function SlideView({
   slide,
   tokens,
+  textStyles,
   decor = [],
   width,
 }: {
   slide: PresentSlide
   tokens: ThemeTokens
+  /** the deck's named text styles (19E.3) */
+  textStyles?: DeckTextStyles
   /** master furniture, drawn with the slide but never part of it (19E.2) */
   decor?: PresentElement[]
   width: number
@@ -151,7 +219,12 @@ export function SlideView({
           .filter((el) => !el.hidden)
           .sort((a, b) => a.z - b.z)
           .map((el) => (
-            <StaticElement key={el.id} el={el} themeText={t.text} />
+            <StaticElement
+              key={el.id}
+              el={el}
+              themeText={t.text}
+              render={el.kind === 'text' ? resolveTextRender(el, tokens, textStyles) : undefined}
+            />
           ))}
       </div>
     </div>

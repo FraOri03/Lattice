@@ -77,6 +77,7 @@ export function SlideRail({
                   <SlideView
                     slide={slide}
                     tokens={masterTokensFor(body, slide)}
+                    textStyles={body.textStyles}
                     decor={furnitureElements(body, slide, index + 1, masterTokensFor(body, slide))}
                     width={156}
                   />

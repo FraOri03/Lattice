@@ -1,4 +1,7 @@
 import type { ThemeTokens } from '@/lib/present/theme'
+import { resolveTextRender, type DeckTextStyles } from '@/lib/present/textStyles'
+import { docOf } from '@/lib/present/richtext'
+import { RichTextBox } from './RichTextBox'
 import {
   useMemo,
   useRef,
@@ -77,6 +80,7 @@ type Gesture =
 export interface SlideCanvasProps {
   slide: PresentSlide
   tokens: ThemeTokens
+  textStyles?: DeckTextStyles
   /**
    * Master furniture (19E.2). Drawn under the interaction layer and never
    * hit-tested: it belongs to the master, so it cannot be selected, dragged
@@ -100,6 +104,7 @@ let gestureSeq = 0
 export function SlideCanvas({
   slide,
   tokens,
+  textStyles,
   decor = [],
   readOnly,
   scale,
@@ -320,7 +325,11 @@ export function SlideCanvas({
             style={{ ...elementStyle(el), pointerEvents: 'none' }}
             aria-hidden
           >
-            <ElementContent el={el} themeText={t.text} />
+            <ElementContent
+              el={el}
+              themeText={t.text}
+              render={el.kind === 'text' ? resolveTextRender(el, tokens, textStyles) : undefined}
+            />
           </div>
         ))}
 
@@ -330,6 +339,7 @@ export function SlideCanvas({
           return (
             <div
               key={el.id}
+              data-el-id={el.id}
               style={{
                 ...elementStyle(el),
                 ...elementTransform(el),
@@ -344,43 +354,29 @@ export function SlideCanvas({
               }}
             >
               {isEditing && el.kind === 'text' ? (
-                <textarea
-                  autoFocus
-                  value={el.text}
-                  aria-label="Edit text"
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    fontSize: el.fontSize,
-                    fontWeight: el.bold ? 700 : 400,
-                    fontStyle: el.italic ? 'italic' : 'normal',
-                    textAlign: el.align,
-                    color: el.color ?? t.text,
-                    lineHeight: 1.25,
-                    background: 'transparent',
-                    border: `${inv}px dashed ${ACCENT}`,
-                    outline: 'none',
-                    resize: 'none',
-                    fontFamily: 'inherit',
-                    padding: 0,
-                  }}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  onChange={(e) => {
-                    const value = e.target.value
+                <RichTextBox
+                  doc={docOf(el)}
+                  render={resolveTextRender(el, tokens, textStyles)}
+                  autofocus
+                  onChange={(doc, plain) =>
                     setSlideElements(
                       slide.elements.map((x) =>
-                        x.id === el.id && x.kind === 'text' ? { ...x, text: value } : x,
+                        x.id === el.id && x.kind === 'text' ? { ...x, doc, text: plain } : x,
                       ),
                       { coalesceKey: `text-${el.id}` },
                     )
-                  }}
-                  onBlur={() => {
+                  }
+                  onDone={() => {
                     onEditText(null)
                     onSeal()
                   }}
                 />
               ) : (
-                <ElementContent el={el} themeText={t.text} />
+                <ElementContent
+                  el={el}
+                  themeText={t.text}
+                  render={el.kind === 'text' ? resolveTextRender(el, tokens, textStyles) : undefined}
+                />
               )}
 
               {/* single-selection transform handles */}

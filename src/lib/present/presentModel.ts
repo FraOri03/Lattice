@@ -2,6 +2,15 @@ import { nid } from '@/lib/id'
 import type { ThemeTokenOverride } from './theme'
 import { sanitizeTokens } from './theme'
 import type { PlaceholderRole } from './layouts'
+import type { JSONContent } from '@tiptap/core'
+import type { AutoSizeMode } from './overflow'
+import {
+  sanitizeTextStyles,
+  TEXT_STYLE_NAMES,
+  type DeckTextStyles,
+  type TextStyleName,
+  type TextStyleSpec,
+} from './textStyles'
 import { migrateMasters, type PresentMaster } from './masters'
 
 /**
@@ -22,10 +31,11 @@ export const SLIDE_H = 540
  * (Phase 1): additive optional element fields (rotation/opacity/locked/hidden)
  * and image `alt`. v2 → v3 (19E.1): sections, hidden slides, review status.
  * v3 → v4 (19E.2): theme tokens, masters, slide `masterId`/`layoutId` and
- * element `role`. Every addition is optional, so a body of any version loads
- * unchanged and renders exactly as it did.
+ * element `role`. v4 → v5 (19E.3): structured text (`doc`), named text styles
+ * and box typography. Every addition is optional, so a body of any version
+ * loads unchanged and renders exactly as it did.
  */
-export const PRESENT_BODY_VERSION = 4
+export const PRESENT_BODY_VERSION = 5
 
 export type PresentTheme = 'plain' | 'ink' | 'accent'
 
@@ -74,12 +84,30 @@ export interface PresentElementBase {
 
 export interface TextElement extends PresentElementBase {
   kind: 'text'
+  /**
+   * The plain projection of `doc`, kept in step with it on every edit. The
+   * digest, search and any exporter that cannot carry formatting read this,
+   * so they never have to walk a document — and it is what a pre-19E.3 body
+   * has instead of one.
+   */
   text: string
   fontSize: number
   bold: boolean
   italic: boolean
   align: 'left' | 'center' | 'right'
   color: string | null // null → theme text color
+  /** structured rich text (19E.3); absent on anything written before it */
+  doc?: JSONContent
+  /** the named style this box follows (19E.3) */
+  styleRef?: TextStyleName
+  /** what it changes about that style — a key here IS the override */
+  styleOverride?: TextStyleSpec
+  /** vertical placement inside the box (19E.3) */
+  valign?: 'top' | 'middle' | 'bottom'
+  /** inner padding in slide px (19E.3) */
+  padding?: number
+  /** what happens when the text does not fit (19E.3) */
+  autoSize?: AutoSizeMode
 }
 
 export interface ImageElement extends PresentElementBase {
@@ -132,6 +160,8 @@ export interface PresentationBody {
   tokens?: ThemeTokenOverride
   /** the deck's masters; absent means every slide follows the deck (19E.2) */
   masters?: PresentMaster[]
+  /** the deck's named text styles (19E.3) */
+  textStyles?: DeckTextStyles
 }
 
 export const THEME_COLORS: Record<
@@ -230,11 +260,30 @@ const num = (v: unknown, fallback: number): number => (isFiniteNumber(v) ? v : f
  * **preserving every other field** — including unknown ones from a future
  * schema — via the spread. Returns null only for non-objects.
  */
+const AUTOSIZE_MODES = ['overflow', 'shrink', 'grow', 'clip']
+const VALIGNS = ['top', 'middle', 'bottom']
+
 function migrateElement(raw: unknown): PresentElement | null {
   if (!raw || typeof raw !== 'object') return null
   const e = raw as Record<string, unknown>
+  // 19E.3 fields: a value the renderer could not use is dropped, and the
+  // element falls back to its style — never to a broken layout
+  const styleRef = TEXT_STYLE_NAMES.includes(e.styleRef as TextStyleName)
+    ? (e.styleRef as TextStyleName)
+    : undefined
+  const rich = {
+    doc: e.doc && typeof e.doc === 'object' ? (e.doc as JSONContent) : undefined,
+    styleRef,
+    styleOverride:
+      e.styleOverride && typeof e.styleOverride === 'object'
+        ? (e.styleOverride as TextStyleSpec)
+        : undefined,
+    valign: VALIGNS.includes(e.valign as string) ? (e.valign as 'top') : undefined,
+    autoSize: AUTOSIZE_MODES.includes(e.autoSize as string) ? (e.autoSize as AutoSizeMode) : undefined,
+  }
   return {
     ...(e as unknown as PresentElement),
+    ...(e.kind === 'text' ? rich : {}),
     id: typeof e.id === 'string' && e.id ? (e.id as string) : nid('el'),
     x: num(e.x, 0),
     y: num(e.y, 0),
@@ -327,6 +376,7 @@ export function migratePresentBody(raw: unknown): PresentationBody {
     return next
   })
   const tokens = sanitizeTokens(b.tokens)
+  const textStyles = sanitizeTextStyles(b.textStyles)
   return {
     ...(b as object),
     app: 'lattice-present',
@@ -336,6 +386,7 @@ export function migratePresentBody(raw: unknown): PresentationBody {
     ...(sections ? { sections } : {}),
     ...(tokens ? { tokens } : {}),
     ...(masters ? { masters } : {}),
+    ...(textStyles ? { textStyles } : {}),
   } as PresentationBody
 }
 

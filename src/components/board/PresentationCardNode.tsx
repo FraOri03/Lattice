@@ -125,6 +125,7 @@ function ExpandedDeck({ presentId, onOpen }: { presentId: string; onOpen: () => 
           <SlideView
             slide={slide}
             tokens={masterTokensFor(body, slide)}
+            textStyles={body.textStyles}
             decor={furnitureElements(body, slide, 1, masterTokensFor(body, slide))}
             width={248}
           />
