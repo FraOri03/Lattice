@@ -218,6 +218,35 @@ describe('the server index (18.4)', () => {
     expect(groups.map((g) => g.items.length).sort()).toEqual([1, 2])
   })
 
+  it('puts one owner in one section, whichever side named them', () => {
+    // a roster names a userId and the server names an address, so the same
+    // person arrived under two keys: their own section, plus a second one
+    // headed "unknown owner" carrying their address. The page keys sections
+    // by that address, so the two also collided in React.
+    const groups = collectShared(
+      { p1: project('p1', 'Here') },
+      { p1: [member('ada', 'owner', 'Ada'), member(me, 'editor', 'Me')] },
+      me,
+      'browser',
+      [server({ projectId: 'p2', ownerEmail: 'ada@example.com' })],
+    )
+
+    expect(groups).toHaveLength(1)
+    expect(groups[0].ownerName).toBe('Ada')
+    expect(groups[0].items.map((i) => i.projectId).sort()).toEqual(['p1', 'p2'])
+  })
+
+  it('matches that owner whatever case the two sides spelled them in', () => {
+    const groups = collectShared(
+      { p1: project('p1', 'Here') },
+      { p1: [member('ada', 'owner', 'Ada'), member(me, 'editor', 'Me')] },
+      me,
+      'browser',
+      [server({ projectId: 'p2', ownerEmail: 'Ada@Example.com' })],
+    )
+    expect(groups).toHaveLength(1)
+  })
+
   it('keeps a project with no recorded owner instead of dropping it', () => {
     const groups = collectShared({}, {}, me, 'browser', [server({ ownerEmail: '' })])
     expect(groups[0].ownerEmail).toBeNull()

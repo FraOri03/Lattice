@@ -125,9 +125,25 @@ export function collectShared(
   const alreadyListed = new Set(
     [...groups.values()].flatMap((g) => g.items.map((i) => i.projectId)),
   )
+  /**
+   * The two sides name an owner differently — a roster carries a userId, the
+   * server carries an address — so a group already open for this owner has to
+   * be found by the one thing both of them hold.
+   *
+   * Without it, someone who owns a project on this device AND a project only
+   * the server knows about is two sections: theirs, and a second one headed
+   * "unknown owner" carrying the same address. They also collide on the React
+   * key, which the page derives from that address.
+   */
+  const groupOfOwner = new Map<string, string>()
+  for (const [key, group] of groups) {
+    if (group.ownerEmail) groupOfOwner.set(group.ownerEmail.toLowerCase(), key)
+  }
   for (const entry of server) {
     if (alreadyListed.has(entry.projectId)) continue
-    const key = entry.ownerEmail || '__unknown__'
+    const address = entry.ownerEmail.toLowerCase()
+    const key = (address && groupOfOwner.get(address)) || entry.ownerEmail || '__unknown__'
+    if (address) groupOfOwner.set(address, key)
     const group = groups.get(key) ?? {
       ownerName: null,
       ownerEmail: entry.ownerEmail || null,

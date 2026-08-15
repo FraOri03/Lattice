@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useSyncExternalStore } from 'react'
 import { authService } from '@/lib/auth/AuthService'
 import { NotAuthenticatedError, sessionClient } from '@/lib/auth/sessionClient'
 import { EMPTY_SHARED_INDEX, type SharedIndex } from '@/types/shared'
@@ -42,14 +42,23 @@ export interface InviteAction {
   error?: string
 }
 
+/** The state a service that has never asked anybody anything is in. */
+const BLANK: IndexState = {
+  index: EMPTY_SHARED_INDEX,
+  loading: false,
+  unavailable: false,
+  loaded: false,
+}
+
 class SharedIndexService {
-  private state: IndexState = {
-    index: EMPTY_SHARED_INDEX,
-    loading: false,
-    unavailable: false,
-    loaded: false,
-  }
+  private state: IndexState = BLANK
   private inflight: Promise<void> | null = null
+  /**
+   * Bumped by {@link reset}. A fetch started for the previous account can
+   * still be in the air when someone signs out, and its reply must not be
+   * written over the blank state that sign-out just installed.
+   */
+  private generation = 0
   private listeners = new Set<() => void>()
 
   current(): IndexState {
@@ -63,13 +72,7 @@ class SharedIndexService {
 
   private set(patch: Partial<IndexState>): void {
     this.state = { ...this.state, ...patch }
-    for (const listener of this.listeners) {
-      try {
-        listener()
-      } catch {
-        // a broken subscriber must not break the others
-      }
-    }
+    this.notify()
   }
 
   /** Ask once per session unless something changed it. */
@@ -84,6 +87,12 @@ class SharedIndexService {
   }
 
   private async fetch(): Promise<void> {
+    const started = this.generation
+    /** Drop an answer that belongs to whoever was signed in when it was asked. */
+    const settle = (patch: Partial<IndexState>) => {
+      if (this.generation !== started) return
+      this.set(patch)
+    }
     try {
       const res = await sessionClient.post(SHARED_URL, { action: 'index' }, () =>
         authService.getAccessToken(),
@@ -91,7 +100,7 @@ class SharedIndexService {
       if (!res.ok) {
         // 501 (no database) and 401 (no session) are the same fact to a
         // reader: this deployment cannot answer for you
-        this.set({
+        settle({
           loading: false,
           loaded: true,
           unavailable: true,
@@ -99,17 +108,13 @@ class SharedIndexService {
         })
         return
       }
-      this.set({
-        loading: false,
-        loaded: true,
-        unavailable: false,
-        index: (await res.json()) as SharedIndex,
-      })
+      const index = (await res.json()) as SharedIndex
+      settle({ loading: false, loaded: true, unavailable: false, index })
     } catch (err) {
       if (!(err instanceof NotAuthenticatedError)) {
         console.warn('[dashboard/shared] index failed:', err)
       }
-      this.set({
+      settle({
         loading: false,
         loaded: true,
         unavailable: true,
@@ -155,26 +160,57 @@ class SharedIndexService {
     }
   }
 
-  /** Forget everything — sign-out, and tests. */
+  /**
+   * Forget everything — a sign-in, a sign-out, and tests.
+   *
+   * This index is about ONE person: the projects shared with them and the
+   * invitations waiting for their addresses. Nothing about it survives a
+   * change of account, and the service is a module singleton that outlives
+   * one — the app never reloads on sign-out, so without this the next person
+   * to sign in on this browser reads the last one's list.
+   *
+   * Three things have to go, and forgetting any one of them leaves the leak
+   * open: the state, the mounted readers' copy of it (hence `notify`, which
+   * this used not to do), and any reply still in the air (hence the
+   * generation, which `fetch` checks before writing).
+   */
   reset(): void {
-    this.state = {
-      index: EMPTY_SHARED_INDEX,
-      loading: false,
-      unavailable: false,
-      loaded: false,
+    this.generation += 1
+    this.inflight = null
+    this.state = BLANK
+    this.notify()
+  }
+
+  private notify(): void {
+    for (const listener of this.listeners) {
+      try {
+        listener()
+      } catch {
+        // a broken subscriber must not break the others
+      }
     }
   }
 }
 
 export const sharedIndex = new SharedIndexService()
 
-/** Subscribe a component to the index, loading it on first use. */
+/**
+ * Subscribe a component to the index, loading it on first use.
+ *
+ * `useSyncExternalStore` rather than `useState` + `subscribe`: the service is
+ * a singleton that several pages read, so a change landing between a
+ * component's render and its effect would otherwise be missed entirely — and
+ * the state it would be stuck on is `loaded: false`, which renders the "this
+ * cannot be answered" block over an answer that has already arrived.
+ */
 export function useSharedIndex(): IndexState {
-  const [state, setState] = useState(sharedIndex.current())
+  const state = useSyncExternalStore(
+    (listener) => sharedIndex.subscribe(listener),
+    () => sharedIndex.current(),
+    () => sharedIndex.current(),
+  )
   useEffect(() => {
-    const unsubscribe = sharedIndex.subscribe(() => setState(sharedIndex.current()))
     void sharedIndex.load()
-    return unsubscribe
   }, [])
   return state
 }
