@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { vaultKey } from '@/lib/storage/vaultScope'
 import type {
   ActivityEvent,
   AppNotification,
@@ -204,7 +205,10 @@ export const useCollabStore = create<CollabState>()(
       setCommentMode: (commentMode) => set({ commentMode }),
     }),
     {
-      name: 'lattice-collab-v1',
+      // members, invitations, comments and the activity trail are all about
+      // one account's projects: scoped, or the next person to sign in on this
+      // machine reads them (see `lib/storage/vaultScope`)
+      name: vaultKey('lattice-collab-v1'),
       version: 1,
       partialize: (s) => ({
         members: s.members,

@@ -12,6 +12,26 @@ All notable changes to Lattice are recorded here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **Signing in with a second account no longer shows the first account's work.** Everything
+  Lattice keeps on the machine — the vault, the document bodies and asset binaries in
+  IndexedDB, the Drive push bookkeeping, the collaboration records, the connected GitHub
+  credential — was stored under fixed per-origin names. That is one vault per *browser*, not
+  one per account: signing out cleared the account record, the Drive token and the shared
+  index, and left the rest loaded, so the next person to sign in opened the dashboard onto
+  someone else's projects. Worse than the display: the sync engine then treated them as the
+  arriving account's own and pushed them into *their* Google Drive. Every storage name is now
+  namespaced per account, and switching accounts reloads the page, because those names are
+  read once when the modules are imported and the singletons above them still hold the
+  previous session. The local CRDT stores are scoped too — they were keyed on the project id
+  alone, and every fresh vault seeds the same default project id, so two accounts on one
+  browser collided on the same database and the same cross-tab channel. Nothing has to be
+  migrated: the existing unsuffixed keys become the first account's namespace, so an install
+  already in use keeps every byte where it is, and work done under "continue without an
+  account" is handed to the account that signs in next rather than dropped. This stops new
+  contamination; a vault already mixed by a switch made before this is not untangled by it.
+
 ### Changed
 
 - **A project membership now belongs to a person, not to an e-mail address.** Access was

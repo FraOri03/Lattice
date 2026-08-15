@@ -3,6 +3,7 @@ import type { CollabCapabilities, CollabMessage, PresencePeer } from '@/types/co
 import { authService } from '@/lib/auth/AuthService'
 import { hasRealtimeBackend } from '@/lib/env'
 import { yjsManager } from '@/lib/crdt/YjsManager'
+import { vaultKey } from '@/lib/storage/vaultScope'
 
 /**
  * CollaborationProvider — pluggable transport for collaboration traffic
@@ -71,7 +72,13 @@ export function colorForUser(userId: string): string {
 
 /* ---------------- local (BroadcastChannel) ---------------- */
 
-const CHANNEL = 'lattice-collab-v1'
+/**
+ * Scoped per account (`lib/storage/vaultScope`): "this browser (tabs)" is a
+ * transport with no server to check permissions, so two tabs signed into two
+ * different accounts sharing one channel name would have been a direct
+ * cross-account feed of presence, cursors and board operations.
+ */
+const CHANNEL = vaultKey('lattice-collab-v1')
 
 export class LocalCollaborationProvider implements CollaborationProvider {
   readonly id = 'local' as const

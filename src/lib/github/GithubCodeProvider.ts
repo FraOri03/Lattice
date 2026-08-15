@@ -1,4 +1,5 @@
 import { env, hasGithubOAuth } from '@/lib/env'
+import { vaultKey } from '@/lib/storage/vaultScope'
 
 /**
  * GithubCodeProvider — GitHub integration for CODE DOCUMENTS ONLY.
@@ -18,8 +19,11 @@ import { env, hasGithubOAuth } from '@/lib/env'
  */
 
 const API = 'https://api.github.com'
-const TOKEN_KEY = 'lattice-github-token'
-const USER_KEY = 'lattice-github-user'
+// A GitHub credential belongs to a person, not to a browser: scoped per
+// account (see `lib/storage/vaultScope`) so signing in as someone else does
+// not hand them the previous account's repository access.
+const TOKEN_KEY = vaultKey('lattice-github-token')
+const USER_KEY = vaultKey('lattice-github-user')
 
 export interface GithubUser {
   login: string

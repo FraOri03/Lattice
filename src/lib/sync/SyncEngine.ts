@@ -1,6 +1,7 @@
 import type { JSONContent } from '@tiptap/core'
 import { useStore } from '@/store/useStore'
 import { storage } from '@/lib/storage/StorageProvider'
+import { vaultKey } from '@/lib/storage/vaultScope'
 import {
   GoogleDriveStorageProvider,
   DriveApiError,
@@ -105,7 +106,13 @@ interface PulledEntity {
   localUpdatedAt: number
 }
 
-const META_KEY = 'lattice-sync-meta'
+/**
+ * Scoped per account (see `lib/storage/vaultScope`). This is the record of
+ * what has already been pushed to *a* Drive, so an unscoped one told the
+ * next account to sign in that their empty Drive was up to date — and the
+ * projects it thought were pushed were the previous account's.
+ */
+const META_KEY = vaultKey('lattice-sync-meta')
 const PUSH_DEBOUNCE_MS = 10_000
 
 /**

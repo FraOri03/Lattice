@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { nid } from '@/lib/id'
+import { vaultKey } from '@/lib/storage/vaultScope'
 import { moveShot as moveShotInSequence, renumberShots } from '@/lib/photo/shots'
 import type {
   PhotoCameraElement,
@@ -591,7 +592,7 @@ export const usePhotoStore = create<PhotoState>()(
       },
     }),
     {
-      name: 'lattice-photo-v1',
+      name: vaultKey('lattice-photo-v1'),
       version: 1,
       partialize: (s) => ({
         scenes: scenesWithCurrent(s),
