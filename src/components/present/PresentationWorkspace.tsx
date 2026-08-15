@@ -10,9 +10,19 @@ import {
   createTextElement,
   type PresentElement,
   type PresentSlide,
+  type PresentationBody,
   type PresentTheme,
   type ShapeElement,
+  type SlideReviewStatus,
 } from '@/lib/present/presentModel'
+import {
+  moveSection,
+  presentableSlides,
+  removeSection,
+  renameSection,
+  setSectionCollapsed,
+  startSectionAt,
+} from '@/lib/present/sections'
 import { clampPosition, normalizedZ, rectOf } from '@/lib/present/geometry'
 import { alignElements, distributeElements, type AlignEdge, type DistributeAxis } from '@/lib/present/align'
 import { toast } from '@/components/ui/Toaster'
@@ -21,11 +31,12 @@ import { ToolbarDivider } from '@/components/ui/ToolbarDivider'
 import { SlideToolbar } from './SlideToolbar'
 import { ActionIcon } from '@/components/ActionIcons'
 import {
-  IcCopy,
+  IcChevronDown,
+  IcChevronRight,
   IcEye,
+  IcEyeOff,
   IcImage,
   IcLock,
-  IcPlus,
   IcRedo,
   IcTrash,
   IcUndo,
@@ -34,8 +45,9 @@ import {
   IcZoomIn,
   IcZoomOut,
 } from '@/components/Icons'
-import { SlideView } from './SlideView'
 import { SlideCanvas } from './SlideCanvas'
+import { LayersPanel } from './LayersPanel'
+import { SlideRail, type SlideRailHandlers } from './SlideRail'
 import { useDeckHistory } from './useDeckHistory'
 
 /**
@@ -51,6 +63,9 @@ const MAX_ZOOM = 4
 const clampZoom = (z: number) => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z))
 
 type LayerMode = 'front' | 'back' | 'forward' | 'backward'
+
+/** Which part of the deck the right panel is describing (19E.1). */
+type InspectorScope = 'slide' | 'element' | 'deck'
 
 /** Recompute z after a layer op so order stays contiguous (audit DM-8). */
 function reorderZ(elements: PresentElement[], ids: Set<string>, mode: LayerMode): PresentElement[] {
@@ -71,7 +86,8 @@ function reorderZ(elements: PresentElement[], ids: Set<string>, mode: LayerMode)
 export default function PresentationWorkspace({ meta }: { meta: PresentationDocMeta }) {
   const updatePresentMeta = useStore((s) => s.updatePresentMeta)
   const closePresent = useStore((s) => s.closePresent)
-  const { body, apply, undo, redo, seal, flush, canUndo, canRedo, readOnly } = useDeckHistory(meta)
+  const { body, apply, undo, redo, seal, flush, canUndo, canRedo, readOnly, unsaved } =
+    useDeckHistory(meta)
 
   const [slideIndex, setSlideIndex] = useState(0)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -79,6 +95,9 @@ export default function PresentationWorkspace({ meta }: { meta: PresentationDocM
   const [zoom, setZoom] = useState<number | 'fit'>('fit')
   const [fitScale, setFitScale] = useState(0.6)
   const [snapEnabled, setSnapEnabled] = useState(true)
+  const [layersCollapsed, setLayersCollapsed] = useState(false)
+  // notes collapse to a strip: the canvas is what this screen is for (19E.1)
+  const [notesOpen, setNotesOpen] = useState(false)
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const imageInput = useRef<HTMLInputElement>(null)
@@ -333,6 +352,36 @@ export default function PresentationWorkspace({ meta }: { meta: PresentationDocM
     goToSlide(Math.max(0, i > 0 ? i - 1 : 0))
   }
 
+  /* ---------- deck structure (19E.1) ---------- */
+
+  const toggleHidden = (i: number) =>
+    apply((b) => ({
+      ...b,
+      slides: b.slides.map((s, j) => (j === i ? { ...s, hidden: s.hidden ? undefined : true } : s)),
+    }))
+
+  const setReviewStatus = (i: number, status: SlideReviewStatus | undefined) =>
+    apply((b) => ({
+      ...b,
+      slides: b.slides.map((s, j) => (j === i ? { ...s, reviewStatus: status } : s)),
+    }))
+
+  const railHandlers: SlideRailHandlers = {
+    onGoTo: goToSlide,
+    onMove: moveSlide,
+    onDuplicate: duplicateSlide,
+    onDelete: (i) => void deleteSlide(i),
+    onAdd: addSlide,
+    onStartSection: (i) => apply((b) => startSectionAt(b, i)),
+    onRenameSection: (id, title) => apply((b) => renameSection(b, id, title)),
+    // collapsing is a view preference, but a persisted one, so it goes through
+    // history like everything else rather than living in component state
+    onToggleCollapsed: (section) =>
+      apply((b) => setSectionCollapsed(b, section.id, section.collapsed !== true)),
+    onMoveSection: (id, direction) => apply((b) => moveSection(b, id, direction)),
+    onRemoveSection: (id) => apply((b) => removeSection(b, id)),
+  }
+
   /* ---------- export ---------- */
 
   const exportPdf = async () => {
@@ -484,20 +533,8 @@ export default function PresentationWorkspace({ meta }: { meta: PresentationDocM
           100%
         </button>
 
-        <ToolbarDivider />
-        <label className="flex items-center gap-1 text-[11px] text-muted">
-          Theme
-          <select
-            className="field h-6 w-24 cursor-pointer px-1 py-0 text-[11.5px]"
-            value={body.theme}
-            disabled={readOnly}
-            onChange={(e) => apply((b) => ({ ...b, theme: e.target.value as PresentTheme }))}
-          >
-            <option value="plain">Plain</option>
-            <option value="ink">Ink</option>
-            <option value="accent">Deep blue</option>
-          </select>
-        </label>
+        {/* the theme is a deck property and now lives in the inspector's Deck
+            scope, so this bar stops carrying a control that belongs to a panel */}
         <ToolbarDivider />
         <button className="btn" title="Export as PDF" onClick={() => void exportPdf()}>
           <ActionIcon.Export size={12} /> PDF
@@ -511,83 +548,31 @@ export default function PresentationWorkspace({ meta }: { meta: PresentationDocM
       </div>
 
       <div className="flex min-h-0 flex-1">
-        {/* ---------- slide navigator ---------- */}
-        <aside className="flex w-44 flex-none flex-col border-r border-bord">
-          <div className="min-h-0 flex-1 overflow-y-auto p-2">
-            {body.slides.map((s, i) => (
-              <div
-                key={s.id}
-                className={`group relative mb-2 cursor-pointer overflow-hidden rounded-lg border ${
-                  i === si ? 'border-accent' : 'border-bord hover:border-muted'
-                }`}
-                onClick={() => goToSlide(i)}
-                role="button"
-                aria-label={`Slide ${i + 1}`}
-                aria-current={i === si}
-              >
-                <SlideView slide={s} theme={body.theme} width={156} />
-                <span className="absolute top-1 left-1 rounded bg-panel/85 px-1 text-[9px] font-bold">
-                  {i + 1}
-                </span>
-                {!readOnly && (
-                  <span className="absolute right-1 bottom-1 hidden gap-0.5 group-hover:flex">
-                    <button
-                      className="icon-btn h-5 w-5 bg-panel/90"
-                      title="Move slide up"
-                      aria-label={`Move slide ${i + 1} up`}
-                      disabled={i === 0}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        moveSlide(i, -1)
-                      }}
-                    >
-                      ↑
-                    </button>
-                    <button
-                      className="icon-btn h-5 w-5 bg-panel/90"
-                      title="Move slide down"
-                      aria-label={`Move slide ${i + 1} down`}
-                      disabled={i === body.slides.length - 1}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        moveSlide(i, 1)
-                      }}
-                    >
-                      ↓
-                    </button>
-                    <button
-                      className="icon-btn h-5 w-5 bg-panel/90"
-                      title="Duplicate slide"
-                      aria-label={`Duplicate slide ${i + 1}`}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        duplicateSlide(i)
-                      }}
-                    >
-                      <IcCopy size={10} />
-                    </button>
-                    <button
-                      className="icon-btn h-5 w-5 bg-panel/90 text-[#f24822]"
-                      title="Delete slide"
-                      aria-label={`Delete slide ${i + 1}`}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        void deleteSlide(i)
-                      }}
-                    >
-                      <IcTrash size={10} />
-                    </button>
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
-          {!readOnly && (
-            <button className="btn m-2 flex-none" onClick={addSlide}>
-              <IcPlus size={12} /> Add slide
-            </button>
-          )}
-        </aside>
+        <SlideRail
+          body={body}
+          currentIndex={si}
+          readOnly={readOnly}
+          handlers={railHandlers}
+        />
+
+        <LayersPanel
+          elements={elements}
+          selectedIds={selectedIds}
+          collapsed={layersCollapsed}
+          readOnly={readOnly}
+          onToggleCollapsed={() => setLayersCollapsed((v) => !v)}
+          onSelect={(id, additive) =>
+            setSelectedIds((prev) => {
+              if (!additive) return new Set([id])
+              const next = new Set(prev)
+              next.has(id) ? next.delete(id) : next.add(id)
+              return next
+            })
+          }
+          onToggleFlag={(id, flag) =>
+            patchElement(id, (e) => ({ ...e, [flag]: e[flag] ? undefined : true }))
+          }
+        />
 
         {/* ---------- canvas column ---------- */}
         <div className="flex min-w-0 flex-1 flex-col">
@@ -631,35 +616,64 @@ export default function PresentationWorkspace({ meta }: { meta: PresentationDocM
             />
           </div>
 
-          <div className="flex-none border-t border-bord px-3 py-2">
-            <label className="mb-1 block text-[9.5px] font-semibold tracking-widest text-muted uppercase">
+          {/* notes: a strip until you want them, so the canvas keeps the room */}
+          <div className="flex-none border-t border-bord px-3 py-1.5">
+            <button
+              className="flex w-full items-center gap-1.5 text-left text-[9.5px] font-semibold tracking-widest text-muted uppercase hover:text-ink"
+              aria-expanded={notesOpen}
+              onClick={() => setNotesOpen((v) => !v)}
+            >
+              {notesOpen ? <IcChevronDown size={10} /> : <IcChevronRight size={10} />}
               Speaker notes — slide {si + 1}
-            </label>
-            <textarea
-              className="field h-14 w-full resize-none text-[12px]"
-              placeholder="Notes only you see while presenting…"
-              value={slide.notes}
-              readOnly={readOnly}
-              onChange={(e) => {
-                const v = e.target.value
-                patchSlide((s) => ({ ...s, notes: v }), { coalesceKey: `notes-${slide.id}` })
-              }}
-              onBlur={seal}
-            />
+              {!notesOpen && slide.notes.trim() && (
+                <span className="ml-1 min-w-0 flex-1 truncate normal-case opacity-70">
+                  {slide.notes.trim()}
+                </span>
+              )}
+            </button>
+            {notesOpen && (
+              <textarea
+                className="field mt-1 h-14 w-full resize-none text-[12px]"
+                placeholder="Notes only you see while presenting…"
+                value={slide.notes}
+                readOnly={readOnly}
+                onChange={(e) => {
+                  const v = e.target.value
+                  patchSlide((s) => ({ ...s, notes: v }), { coalesceKey: `notes-${slide.id}` })
+                }}
+                onBlur={seal}
+              />
+            )}
           </div>
+
+          <StatusBar
+            slideIndex={si}
+            slideCount={body.slides.length}
+            presentableCount={presentableSlides(body).length}
+            objectCount={elements.length}
+            selectedCount={selectedEls.length}
+            schemaVersion={body.version}
+            unsaved={unsaved}
+            readOnly={readOnly}
+          />
         </div>
 
         {/* ---------- contextual inspector ---------- */}
         {!readOnly && (
           <Inspector
+            body={body}
             slide={slide}
+            slideIndex={si}
             themeColors={themeColors}
             selectedEls={selectedEls}
             selected={selected}
             maxZ={maxZ}
+            readOnly={readOnly}
             onPatchOne={patchOne}
             onPatchSlide={patchSlide}
-            onSelectId={(id) => setSelectedIds(new Set([id]))}
+            onToggleSlideHidden={() => toggleHidden(si)}
+            onSetReviewStatus={(status) => setReviewStatus(si, status)}
+            onSetTheme={(t) => apply((b) => ({ ...b, theme: t }))}
             onDeleteSelection={deleteSelection}
             onLayer={layer}
             onToggleFlag={toggleFlag}
@@ -686,46 +700,140 @@ export default function PresentationWorkspace({ meta }: { meta: PresentationDocM
   )
 }
 
+/**
+ * The deck status bar (19E.1) — where you are, what is on the slide, and
+ * whether the last edit is actually on disk. "Saved" here is derived from the
+ * persistence queue, not from a timer, so it never claims more than it knows.
+ */
+function StatusBar({
+  slideIndex,
+  slideCount,
+  presentableCount,
+  objectCount,
+  selectedCount,
+  schemaVersion,
+  unsaved,
+  readOnly,
+}: {
+  slideIndex: number
+  slideCount: number
+  presentableCount: number
+  objectCount: number
+  selectedCount: number
+  schemaVersion: number
+  unsaved: boolean
+  readOnly: boolean
+}) {
+  const hidden = slideCount - presentableCount
+  return (
+    <div
+      className="flex flex-none items-center gap-3 border-t border-bord px-3 py-1 text-[10.5px] text-muted"
+      role="status"
+    >
+      <span className="tabular-nums">
+        Slide {slideIndex + 1} of {slideCount}
+      </span>
+      {hidden > 0 && (
+        <span className="tabular-nums" title="Hidden slides are left out of every export">
+          {presentableCount} presented
+        </span>
+      )}
+      <span className="tabular-nums">
+        {objectCount} {objectCount === 1 ? 'object' : 'objects'}
+        {selectedCount > 0 && ` · ${selectedCount} selected`}
+      </span>
+      <span className="ml-auto">
+        {readOnly ? 'Read-only' : unsaved ? 'Saving…' : 'Saved'}
+      </span>
+      <span title="Deck schema version">v{schemaVersion}</span>
+    </div>
+  )
+}
+
 /* ==================== contextual inspector ==================== */
 
 function Inspector({
+  body,
   slide,
+  slideIndex,
   themeColors,
   selectedEls,
   selected,
   maxZ,
+  readOnly,
   onPatchOne,
   onPatchSlide,
-  onSelectId,
   onDeleteSelection,
   onLayer,
   onToggleFlag,
   onReplaceImage,
   onSeal,
+  onToggleSlideHidden,
+  onSetReviewStatus,
+  onSetTheme,
 }: {
+  body: PresentationBody
   slide: PresentSlide
+  slideIndex: number
   themeColors: { bg: string; text: string; accent: string }
   selectedEls: PresentElement[]
   selected: PresentElement | null
   maxZ: number
+  readOnly: boolean
   onPatchOne: (fn: (e: PresentElement) => PresentElement, opts?: { coalesceKey?: string }) => void
   onPatchSlide: (fn: (s: PresentSlide) => PresentSlide, opts?: { coalesceKey?: string }) => void
-  onSelectId: (id: string) => void
   onDeleteSelection: () => void
   onLayer: (mode: LayerMode) => void
   onToggleFlag: (flag: 'locked' | 'hidden') => void
   onReplaceImage: (id: string) => void
   onSeal: () => void
+  onToggleSlideHidden: () => void
+  onSetReviewStatus: (status: SlideReviewStatus | undefined) => void
+  onSetTheme: (theme: PresentTheme) => void
 }) {
   const count = selectedEls.length
   const anyLocked = selectedEls.some((e) => e.locked)
   const anyHidden = selectedEls.some((e) => e.hidden)
 
+  /**
+   * Three scopes (19E.1). The panel follows the selection — pick an element
+   * and it shows the element — but Deck stays reachable, and a selection
+   * change pulls you back out of it so the panel is never describing
+   * something you are no longer looking at.
+   */
+  const [scope, setScope] = useState<InspectorScope>(count ? 'element' : 'slide')
+  const hasSelection = count > 0
+  useEffect(() => {
+    setScope(hasSelection ? 'element' : 'slide')
+  }, [hasSelection])
+
+  const presentable = presentableSlides(body).length
+  const hiddenCount = body.slides.length - presentable
+
   return (
-    <aside className="w-56 flex-none overflow-y-auto border-l border-bord px-3 pb-4">
-      {count === 0 && (
+    <aside className="flex w-56 flex-none flex-col border-l border-bord" aria-label="Inspector">
+      <div className="flex flex-none border-b border-bord" role="tablist" aria-label="Inspector scope">
+        {(['slide', 'element', 'deck'] as const).map((s) => (
+          <button
+            key={s}
+            role="tab"
+            aria-selected={scope === s}
+            className={`flex-1 border-b-2 px-1 py-1.5 text-[11px] capitalize ${
+              scope === s
+                ? 'border-accent text-ink'
+                : 'border-transparent text-muted hover:text-ink'
+            }`}
+            onClick={() => setScope(s)}
+          >
+            {s}
+          </button>
+        ))}
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
+      {scope === 'slide' && (
         <>
-          <div className="insp-h">Slide</div>
+          <div className="insp-h">Slide {slideIndex + 1}</div>
           <label className="flex items-center gap-2 text-[11px] text-muted">
             Background
             <input
@@ -733,6 +841,7 @@ function Inspector({
               className="h-5 w-8 cursor-pointer border-0 bg-transparent p-0"
               value={slide.background ?? themeColors.bg}
               aria-label="Slide background color"
+              disabled={readOnly}
               onChange={(e) => {
                 const v = e.target.value
                 onPatchSlide((s) => ({ ...s, background: v }), { coalesceKey: `bg-${slide.id}` })
@@ -751,50 +860,81 @@ function Inspector({
             )}
           </label>
 
-          <div className="insp-h">Layers</div>
-          {slide.elements.length === 0 ? (
-            <p className="text-[11px] leading-relaxed text-muted">
-              Empty slide. Add a text box, image or shape from the toolbar.
+          <div className="insp-h">In the presentation</div>
+          <button
+            className="btn w-full justify-start"
+            aria-pressed={slide.hidden === true}
+            disabled={readOnly}
+            onClick={onToggleSlideHidden}
+          >
+            {slide.hidden ? <IcEyeOff size={12} /> : <IcEye size={12} />}
+            {slide.hidden ? 'Hidden — not exported' : 'Shown'}
+          </button>
+          <p className="mt-1 text-[10.5px] leading-relaxed text-muted">
+            A hidden slide stays in the deck and stays editable. It is left out
+            of PDF and PPTX export.
+          </p>
+
+          <div className="insp-h">Review</div>
+          <select
+            className="field h-6 w-full cursor-pointer px-1 py-0 text-[11.5px]"
+            aria-label="Review status"
+            disabled={readOnly}
+            value={slide.reviewStatus ?? ''}
+            onChange={(e) =>
+              onSetReviewStatus((e.target.value || undefined) as SlideReviewStatus | undefined)
+            }
+          >
+            <option value="">Not set</option>
+            <option value="draft">Draft</option>
+            <option value="review">In review</option>
+            <option value="approved">Approved</option>
+          </select>
+        </>
+      )}
+
+      {scope === 'deck' && (
+        <>
+          <div className="insp-h">Theme</div>
+          <select
+            className="field h-6 w-full cursor-pointer px-1 py-0 text-[11.5px]"
+            aria-label="Deck theme"
+            value={body.theme}
+            disabled={readOnly}
+            onChange={(e) => onSetTheme(e.target.value as PresentTheme)}
+          >
+            <option value="plain">Plain</option>
+            <option value="ink">Ink</option>
+            <option value="accent">Deep blue</option>
+          </select>
+
+          <div className="insp-h">Structure</div>
+          <dl className="flex flex-col gap-1 text-[11px]">
+            <DeckStat label="Slides" value={String(body.slides.length)} />
+            <DeckStat
+              label="In the presentation"
+              value={hiddenCount ? `${presentable} of ${body.slides.length}` : String(presentable)}
+            />
+            <DeckStat label="Sections" value={String(body.sections?.length ?? 0)} />
+            <DeckStat label="Schema" value={`v${body.version}`} />
+          </dl>
+          {hiddenCount > 0 && (
+            <p className="mt-1.5 text-[10.5px] leading-relaxed text-muted">
+              {hiddenCount} hidden {hiddenCount === 1 ? 'slide is' : 'slides are'} kept in the deck
+              and left out of every export.
             </p>
-          ) : (
-            <div className="flex flex-col gap-0.5">
-              {[...slide.elements]
-                .sort((a, b) => b.z - a.z)
-                .map((el) => (
-                  <div key={el.id} className="flex items-center gap-1 rounded px-1 py-0.5 hover:bg-panel2">
-                    <button
-                      className="min-w-0 flex-1 truncate text-left text-[11px] text-ink"
-                      onClick={() => onSelectId(el.id)}
-                      title="Select element"
-                    >
-                      {layerLabel(el)}
-                    </button>
-                    <button
-                      className="icon-btn h-5 w-5"
-                      title={el.hidden ? 'Show' : 'Hide'}
-                      aria-label={el.hidden ? 'Show element' : 'Hide element'}
-                      aria-pressed={!el.hidden}
-                      onClick={() => onPatchElementDirect(onPatchSlide, el.id, (e) => ({ ...e, hidden: !e.hidden }))}
-                    >
-                      <IcEye size={12} style={{ opacity: el.hidden ? 0.4 : 1 }} />
-                    </button>
-                    <button
-                      className="icon-btn h-5 w-5"
-                      title={el.locked ? 'Unlock' : 'Lock'}
-                      aria-label={el.locked ? 'Unlock element' : 'Lock element'}
-                      aria-pressed={el.locked}
-                      onClick={() => onPatchElementDirect(onPatchSlide, el.id, (e) => ({ ...e, locked: !e.locked }))}
-                    >
-                      {el.locked ? <IcLock size={12} /> : <IcUnlock size={12} style={{ opacity: 0.55 }} />}
-                    </button>
-                  </div>
-                ))}
-            </div>
           )}
         </>
       )}
 
-      {count >= 2 && (
+      {scope === 'element' && count === 0 && (
+        <p className="mt-3 text-[11px] leading-relaxed text-muted">
+          Nothing is selected. Pick an element on the canvas or in the layers
+          column to edit it.
+        </p>
+      )}
+
+      {scope === 'element' && count >= 2 && (
         <>
           <div className="insp-h">{count} elements</div>
           <p className="mb-2 text-[11px] leading-relaxed text-muted">
@@ -816,7 +956,7 @@ function Inspector({
         </>
       )}
 
-      {count === 1 && selected && (
+      {scope === 'element' && count === 1 && selected && (
         <>
           <div className="insp-h">
             {selected.kind === 'text' ? 'Text' : selected.kind === 'image' ? 'Image' : 'Shape'}
@@ -907,23 +1047,18 @@ function Inspector({
           </button>
         </>
       )}
+      </div>
     </aside>
   )
 }
 
-/** Patch one element via the slide-level patch (used by the layers list). */
-function onPatchElementDirect(
-  onPatchSlide: (fn: (s: PresentSlide) => PresentSlide) => void,
-  id: string,
-  fn: (e: PresentElement) => PresentElement,
-) {
-  onPatchSlide((s) => ({ ...s, elements: s.elements.map((e) => (e.id === id ? fn(e) : e)) }))
-}
-
-function layerLabel(el: PresentElement): string {
-  if (el.kind === 'text') return el.text.trim().slice(0, 20) || 'Text'
-  if (el.kind === 'image') return 'Image'
-  return el.shape === 'rect' ? 'Rectangle' : el.shape === 'ellipse' ? 'Ellipse' : 'Line'
+function DeckStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-2">
+      <dt className="text-muted">{label}</dt>
+      <dd className="font-semibold tabular-nums">{value}</dd>
+    </div>
+  )
 }
 
 function LayerButtons({ onLayer }: { onLayer: (mode: LayerMode) => void }) {

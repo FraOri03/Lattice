@@ -1,3 +1,4 @@
+import { presentableSlides } from './sections'
 import {
   SLIDE_H,
   SLIDE_W,
@@ -29,7 +30,8 @@ export async function exportPresentationPdf(
   })
   const theme = THEME_COLORS[body.theme]
 
-  body.slides.forEach((slide, i) => {
+  // hidden slides are part of the deck, not of the presentation (19E.1)
+  presentableSlides(body).forEach((slide, i) => {
     if (i > 0) doc.addPage([SLIDE_W, SLIDE_H], 'landscape')
     doc.setFillColor(hex(slide.background ?? theme.bg, theme.bg))
     doc.rect(0, 0, SLIDE_W, SLIDE_H, 'F')

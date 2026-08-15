@@ -18,9 +18,28 @@ export const SLIDE_H = 540
  * (Phase 1): additive optional element fields (rotation/opacity/locked/hidden)
  * and image `alt` — none required, so v1 bodies load unchanged.
  */
-export const PRESENT_BODY_VERSION = 2
+export const PRESENT_BODY_VERSION = 3
 
 export type PresentTheme = 'plain' | 'ink' | 'accent'
+
+/**
+ * A named group of slides in the rail (19E.1).
+ *
+ * Order is NOT stored here. The deck's `slides` array remains the single
+ * ordered list, and a slide points at its section — so a section and the deck
+ * can never disagree about where a slide sits, which is the failure mode a
+ * `slideIds` array on the section would invite. The rail groups consecutive
+ * runs, and the section operations keep those runs contiguous.
+ */
+export interface PresentSection {
+  id: string
+  title: string
+  /** collapsed in the rail; purely a view preference, but a persisted one */
+  collapsed?: boolean
+}
+
+/** Editorial state of a slide, shown in the rail (19E.1). */
+export type SlideReviewStatus = 'draft' | 'review' | 'approved'
 
 export interface PresentElementBase {
   id: string
@@ -74,6 +93,15 @@ export interface PresentSlide {
   background: string | null
   notes: string
   elements: PresentElement[]
+  /** the section this slide belongs to, if any (19E.1) */
+  sectionId?: string
+  /**
+   * Kept in the deck, left out of the presentation (19E.1). Hidden slides
+   * still edit and still export nothing — see `presentableSlides`.
+   */
+  hidden?: boolean
+  /** editorial state; absent means nobody has said (19E.1) */
+  reviewStatus?: SlideReviewStatus
 }
 
 export interface PresentationBody {
@@ -81,6 +109,8 @@ export interface PresentationBody {
   version: number
   theme: PresentTheme
   slides: PresentSlide[]
+  /** rail sections; absent on decks that never made one (19E.1) */
+  sections?: PresentSection[]
 }
 
 export const THEME_COLORS: Record<
@@ -199,12 +229,18 @@ function migrateSlide(raw: unknown): PresentSlide {
   const elements = Array.isArray(s.elements)
     ? (s.elements.map(migrateElement).filter(Boolean) as PresentElement[])
     : []
+  const review = s.reviewStatus
   return {
     ...(s as object),
     id: typeof s.id === 'string' && s.id ? (s.id as string) : nid('slide'),
     background: typeof s.background === 'string' ? (s.background as string) : null,
     notes: typeof s.notes === 'string' ? (s.notes as string) : '',
     elements,
+    sectionId: typeof s.sectionId === 'string' && s.sectionId ? (s.sectionId as string) : undefined,
+    hidden: s.hidden === true ? true : undefined,
+    reviewStatus: REVIEW_STATUSES.includes(review as SlideReviewStatus)
+      ? (review as SlideReviewStatus)
+      : undefined,
   } as PresentSlide
 }
 
@@ -214,17 +250,52 @@ function migrateSlide(raw: unknown): PresentSlide {
  * fields** (deck-, slide- and element-level spreads preserve them), so a body
  * written by a newer build round-trips through an older one without data loss.
  */
+const REVIEW_STATUSES: SlideReviewStatus[] = ['draft', 'review', 'approved']
+
+/**
+ * Repair the section list (v3): keep only well-formed entries with unique ids.
+ * A section is a label, so a missing title is survivable — a missing id is not,
+ * because slides point at it.
+ */
+function migrateSections(raw: unknown): PresentSection[] | undefined {
+  if (!Array.isArray(raw)) return undefined
+  const seen = new Set<string>()
+  const out: PresentSection[] = []
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue
+    const s = item as Record<string, unknown>
+    const id = typeof s.id === 'string' ? s.id : ''
+    if (!id || seen.has(id)) continue
+    seen.add(id)
+    out.push({
+      ...(s as object),
+      id,
+      title: typeof s.title === 'string' ? s.title : 'Section',
+      collapsed: s.collapsed === true ? true : undefined,
+    } as PresentSection)
+  }
+  return out.length ? out : undefined
+}
+
 export function migratePresentBody(raw: unknown): PresentationBody {
   const b = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : null
   if (!b || b.app !== 'lattice-present' || !Array.isArray(b.slides) || b.slides.length === 0) {
     return createPresentBody()
   }
+  const sections = migrateSections(b.sections)
+  const known = new Set(sections?.map((s) => s.id))
+  // a slide pointing at a section that no longer exists becomes unsectioned
+  // rather than invisible: the rail must never lose a slide
+  const slides = b.slides.map(migrateSlide).map((s) =>
+    s.sectionId && !known.has(s.sectionId) ? { ...s, sectionId: undefined } : s,
+  )
   return {
     ...(b as object),
     app: 'lattice-present',
     version: PRESENT_BODY_VERSION,
     theme: typeof b.theme === 'string' && b.theme in THEME_COLORS ? (b.theme as PresentTheme) : 'plain',
-    slides: b.slides.map(migrateSlide),
+    slides,
+    ...(sections ? { sections } : {}),
   } as PresentationBody
 }
 

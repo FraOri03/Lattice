@@ -1,4 +1,5 @@
 import JSZip from 'jszip'
+import { presentableSlides } from './sections'
 import {
   SLIDE_H,
   SLIDE_W,
@@ -98,7 +99,8 @@ export async function exportPresentationPptx(body: PresentationBody): Promise<Bl
     `<Relationship Id="rIdMaster" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster" Target="slideMasters/slideMaster1.xml"/>`,
   ]
 
-  body.slides.forEach((slide, i) => {
+  // hidden slides are part of the deck, not of the presentation (19E.1)
+  presentableSlides(body).forEach((slide, i) => {
     const n = i + 1
     const ctx: SlideCtx = { rels: [], media: [], seq: 1 }
     const els = [...slide.elements].sort((a, b) => a.z - b.z)

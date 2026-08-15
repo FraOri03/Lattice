@@ -109,3 +109,75 @@ describe('present body migration', () => {
     expect(normalizePresentBody(fresh).version).toBe(PRESENT_BODY_VERSION)
   })
 })
+
+/**
+ * v2 → v3 (19E.1) adds sections, hidden slides and a review status. Every
+ * field is optional, so a v2 body must load without gaining anything — and a
+ * corrupt section list must never cost the deck a slide.
+ */
+describe('migratePresentBody — v2 → v3', () => {
+  const v2 = {
+    app: 'lattice-present',
+    version: 2,
+    theme: 'ink',
+    slides: [{ id: 's1', background: null, notes: '', elements: [] }],
+  }
+
+  it('loads a v2 deck unchanged apart from the version', () => {
+    const out = migratePresentBody(v2)
+    expect(out.version).toBe(PRESENT_BODY_VERSION)
+    expect(out.sections).toBeUndefined()
+    expect(out.slides[0].sectionId).toBeUndefined()
+    expect(out.slides[0].hidden).toBeUndefined()
+    expect(out.slides[0].reviewStatus).toBeUndefined()
+  })
+
+  it('keeps well-formed sections and drops the malformed ones', () => {
+    const out = migratePresentBody({
+      ...v2,
+      sections: [
+        { id: 'a', title: 'Keep' },
+        { id: '', title: 'No id' },
+        'not an object',
+        { id: 'a', title: 'Duplicate id' },
+        { id: 'b' },
+      ],
+    })
+    expect(out.sections?.map((s) => s.id)).toEqual(['a', 'b'])
+    expect(out.sections?.[0].title).toBe('Keep')
+    expect(out.sections?.[1].title).toBe('Section')
+  })
+
+  it('unsections a slide whose section is gone rather than losing it', () => {
+    const out = migratePresentBody({
+      ...v2,
+      slides: [{ id: 's1', background: null, notes: '', elements: [], sectionId: 'vanished' }],
+    })
+    expect(out.slides).toHaveLength(1)
+    expect(out.slides[0].sectionId).toBeUndefined()
+  })
+
+  it('drops a review status it does not recognise', () => {
+    const out = migratePresentBody({
+      ...v2,
+      slides: [
+        { id: 's1', background: null, notes: '', elements: [], reviewStatus: 'approved' },
+        { id: 's2', background: null, notes: '', elements: [], reviewStatus: 'shipped' },
+      ],
+    })
+    expect(out.slides[0].reviewStatus).toBe('approved')
+    expect(out.slides[1].reviewStatus).toBeUndefined()
+  })
+
+  it('still preserves unknown fields from a newer schema', () => {
+    const out = migratePresentBody({
+      ...v2,
+      futureDeckField: 1,
+      sections: [{ id: 'a', title: 'S', futureSectionField: 2 }],
+      slides: [{ id: 's1', background: null, notes: '', elements: [], futureSlideField: 3 }],
+    }) as unknown as Record<string, unknown>
+    expect(out.futureDeckField).toBe(1)
+    expect((out.sections as Record<string, unknown>[])[0].futureSectionField).toBe(2)
+    expect((out.slides as Record<string, unknown>[])[0].futureSlideField).toBe(3)
+  })
+})

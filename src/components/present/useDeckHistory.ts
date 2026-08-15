@@ -42,11 +42,17 @@ export interface DeckHistory {
   canUndo: boolean
   canRedo: boolean
   readOnly: boolean
+  /**
+   * An edit is committed but not yet written to storage (19E.1). The status
+   * bar reports it, so "saved" is a fact rather than a reassuring label.
+   */
+  unsaved: boolean
 }
 
 export function useDeckHistory(meta: PresentationDocMeta): DeckHistory {
   const persistPresentBody = useStore((s) => s.persistPresentBody)
   const readOnly = useReadOnly()
+  const [unsaved, setUnsaved] = useState(false)
 
   const [hist, setHist] = useState<HistoryState<PresentationBody> | null>(null)
   const pending = useRef<PresentationBody | null>(null)
@@ -72,6 +78,7 @@ export function useDeckHistory(meta: PresentationDocMeta): DeckHistory {
       persistPresentBody(meta.id, pending.current)
       pending.current = null
     }
+    setUnsaved(false)
   }, [meta.id, persistPresentBody])
 
   // flush on unmount
@@ -80,6 +87,7 @@ export function useDeckHistory(meta: PresentationDocMeta): DeckHistory {
   const scheduleSave = useCallback(
     (body: PresentationBody) => {
       pending.current = body
+      setUnsaved(true)
       window.clearTimeout(saveTimer.current)
       saveTimer.current = window.setTimeout(flush, SAVE_DEBOUNCE_MS)
     },
@@ -131,5 +139,6 @@ export function useDeckHistory(meta: PresentationDocMeta): DeckHistory {
     canUndo: !!hist && histCanUndo(hist),
     canRedo: !!hist && histCanRedo(hist),
     readOnly,
+    unsaved,
   }
 }
