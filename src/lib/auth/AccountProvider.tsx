@@ -13,6 +13,7 @@ import { signInWithEmailCode } from './emailSignIn'
 import type { ProfilePatch } from './profile'
 import { hasGoogleAuth } from '@/lib/env'
 import { syncEngine } from '@/lib/sync/SyncEngine'
+import { sharedIndex } from '@/lib/dashboard/sharedIndex'
 
 /**
  * AccountProvider — session state for the personal account area.
@@ -79,6 +80,9 @@ export function AccountProvider({ children }: { children: ReactNode }) {
       setStatus('signed-in')
       localStorage.removeItem(SKIP_KEY)
       setLoginSkipped(false)
+      // whoever was here before is not this person: the shared index answers
+      // for one account, and it is a singleton that outlives a sign-in
+      sharedIndex.reset()
       if (authService.kind === 'google') void syncEngine.start()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sign-in failed')
@@ -96,6 +100,7 @@ export function AccountProvider({ children }: { children: ReactNode }) {
         setStatus('signed-in')
         localStorage.removeItem(SKIP_KEY)
         setLoginSkipped(false)
+        sharedIndex.reset()
         // no Drive token comes with an e-mail sign-in, so no sync to start:
         // "Connect Drive" is how this account gets one, if it wants one
       } catch (err) {
@@ -109,6 +114,10 @@ export function AccountProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     syncEngine.stop()
+    // before the await: the pages reading it stay mounted through a sign-out,
+    // and until this runs they are showing the departing account's projects
+    // and the invitations sent to their addresses
+    sharedIndex.reset()
     await authService.signOut()
     setAccount(null)
     setStatus('signed-out')
