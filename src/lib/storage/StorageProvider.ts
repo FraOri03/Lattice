@@ -1,3 +1,5 @@
+import { vaultKey } from './vaultScope'
+
 /**
  * Pluggable persistence for the vault. Small metadata lives in the Zustand
  * store; heavy payloads live behind this interface:
@@ -22,7 +24,13 @@ export interface StorageProvider {
   clear(): Promise<void>
 }
 
-const DB_NAME = 'lattice-vault-blobs'
+/**
+ * One database per account, not per browser (see `vaultScope`). Document
+ * bodies and asset binaries are the heaviest thing Lattice holds, and until
+ * this was scoped the next person to sign in on this machine inherited all
+ * of it.
+ */
+const DB_NAME = vaultKey('lattice-vault-blobs')
 const DB_VERSION = 2
 const BLOBS = 'blobs'
 const DOCS = 'docs'

@@ -1,4 +1,5 @@
 import type { PhotoElement } from '@/types/photo'
+import { vaultKey } from '@/lib/storage/vaultScope'
 
 /**
  * AI set generation for Photo mode. The standalone tool proxied Gemini
@@ -8,7 +9,9 @@ import type { PhotoElement } from '@/types/photo'
  * generator so the feature always produces a usable set.
  */
 
-const KEY_STORAGE = 'lattice-photo-gemini-key'
+// the user's own Gemini key — per account, never inherited by whoever signs
+// in next on this machine (see `lib/storage/vaultScope`)
+const KEY_STORAGE = vaultKey('lattice-photo-gemini-key')
 const GEMINI_MODEL = 'gemini-3.5-flash'
 
 export function getPhotoAiKey(): string {

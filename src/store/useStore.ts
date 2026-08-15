@@ -40,6 +40,7 @@ import { detectLocale } from '@/lib/i18n/messages'
 import { nid } from '@/lib/id'
 import { blobToDataUrl } from '@/lib/media'
 import { storage } from '@/lib/storage/StorageProvider'
+import { vaultKey } from '@/lib/storage/vaultScope'
 import { digestDocJson, EMPTY_DOC } from '@/lib/richdoc/docjson'
 import { digestCode } from '@/lib/code/digest'
 import { extForLang } from '@/lib/code/languages'
@@ -2493,7 +2494,10 @@ export const useStore = create<AppState>()(
       },
     }),
     {
-      name: 'lattice-vault-v1',
+      // one vault per account, not per browser — see `lib/storage/vaultScope`.
+      // The name is captured here, at import time, which is why switching
+      // accounts reloads the page rather than trying to swap it in place.
+      name: vaultKey('lattice-vault-v1'),
       version: 5,
       migrate: (persisted, version) => {
         // v0 → v1: introduce projects; the default project adopts everything

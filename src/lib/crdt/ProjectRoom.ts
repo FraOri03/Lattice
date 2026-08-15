@@ -1,5 +1,6 @@
 import * as Y from 'yjs'
 import { IndexeddbPersistence } from 'y-indexeddb'
+import { vaultKey } from '@/lib/storage/vaultScope'
 import {
   Awareness,
   applyAwarenessUpdate,
@@ -192,7 +193,17 @@ export class ProjectRoom {
         ['content', this.content],
         ['collab', this.collab],
       ] as const) {
-        const p = new IndexeddbPersistence(`lattice-yjs-${projectId}-${kind}`, doc)
+        /**
+         * Scoped per account, like every other local store (`vaultScope`).
+         * The project id alone was not enough to keep two accounts apart:
+         * every fresh vault seeds the SAME default project id, so the
+         * second account to sign in on this browser replayed the first
+         * one's CRDT history into their own default project.
+         */
+        const p = new IndexeddbPersistence(
+          vaultKey(`lattice-yjs-${projectId}-${kind}`),
+          doc,
+        )
         this.persistence.push(p)
         loads.push(p.whenSynced)
       }
@@ -200,9 +211,12 @@ export class ProjectRoom {
     this.loaded = Promise.all(loads).then(() => {
       if (this.destroyed) return
       // relays start after local load so the first state vector is real
+      // scoped for the same reason the persistence above is: two tabs signed
+      // into two accounts must not relay each other's edits over a channel
+      // whose name they both derive from the seeded default project id
       this.relays.push(
-        new BroadcastDocRelay(this.content, `lattice-yjs:${projectId}:content`),
-        new BroadcastDocRelay(this.collab, `lattice-yjs:${projectId}:collab`),
+        new BroadcastDocRelay(this.content, vaultKey(`lattice-yjs:${projectId}:content`)),
+        new BroadcastDocRelay(this.collab, vaultKey(`lattice-yjs:${projectId}:collab`)),
       )
     })
   }
@@ -227,7 +241,7 @@ export class ProjectRoom {
       aw = new Awareness(this.doc(kind))
       this.awarenessInstances.set(kind, aw)
       this.awarenessRelays.push(
-        new BroadcastAwarenessRelay(aw, `lattice-yaw:${this.projectId}:${kind}`),
+        new BroadcastAwarenessRelay(aw, vaultKey(`lattice-yaw:${this.projectId}:${kind}`)),
       )
     }
     return aw
