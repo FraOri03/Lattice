@@ -93,6 +93,63 @@ function unwrap(value: string): string {
   return out
 }
 
+/** True when every character can appear literally in a header. */
+function isPrintableAscii(value: string): boolean {
+  for (const ch of value) {
+    const cp = ch.codePointAt(0) ?? 0
+    if (cp < 0x20 || cp > 0x7e) return false
+  }
+  return true
+}
+
+/**
+ * RFC 5322 `specials`: a display name containing one of these is not an atom
+ * sequence, and has to be a quoted string or it changes what the header MEANS.
+ * A comma is the worst of them — `Ori, Francesco <a@b.com>` is not a name, it
+ * is two addresses, the first of which is malformed.
+ */
+const SPECIALS = /[()<>[\]:;@\\,."]/
+
+/** One RFC 2047 encoded word, which is plain ASCII whatever went in. */
+function encodedWord(part: string): string {
+  return `=?UTF-8?B?${Buffer.from(part, 'utf8').toString('base64')}?=`
+}
+
+/**
+ * A display name as a header may carry it: quoted when it holds specials,
+ * encoded when it holds anything that is not printable ASCII.
+ *
+ * Encoding is per code point, not per byte, so a chunk boundary never lands
+ * inside a character; 45 bytes keeps each word under the 75-char limit
+ * (base64 is 4/3, plus 12 characters of wrapper).
+ */
+function headerName(name: string): string {
+  if (!isPrintableAscii(name)) {
+    const words: string[] = []
+    let chunk = ''
+    for (const ch of name) {
+      if (chunk && Buffer.byteLength(chunk + ch, 'utf8') > 45) {
+        words.push(encodedWord(chunk))
+        chunk = ''
+      }
+      chunk += ch
+    }
+    if (chunk) words.push(encodedWord(chunk))
+    return words.join(' ')
+  }
+  if (SPECIALS.test(name)) return `"${name.replace(/([\\"])/g, '\\$1')}"`
+  return name
+}
+
+/** The display name as a person meant it: no quoting, no escapes. */
+function plainName(raw: string): string {
+  let out = unwrap(raw.trim()).replace(/\\(.)/g, '$1').trim()
+  // a quote with no partner cannot be quoting anything — it is half of a
+  // paste, and no one's name begins with it
+  out = out.replace(/^["'`]+|["'`]+$/g, '').trim()
+  return out
+}
+
 /**
  * `MAIL_FROM` as the provider will actually take it.
  *
@@ -106,19 +163,54 @@ function unwrap(value: string): string {
  * correct in the settings UI, and the message never leaves.
  *
  * So they are stripped here rather than trusting that nobody copies the
- * documented line. Only a MATCHING pair wrapping the whole value goes: a
- * quoted display name (`"Ori, Francesco" <a@b.com>`) is RFC 5322 valid, ends
- * in `>`, and is never touched. Newlines and doubled spaces — the other
- * thing a paste carries in — collapse, because a header value cannot hold
- * them either.
+ * documented line. Newlines and doubled spaces — the other thing a paste
+ * carries in — collapse, because a header value cannot hold them either.
+ *
+ * ## And then the DISPLAY NAME, which is the same bug one layer in
+ *
+ * Stripping the quotes was not enough, because the half of the value nobody
+ * thinks of as syntax is syntax too. `Lattice, Ori <no-reply@example.com>`
+ * looks like a name and an address; to a mail parser the comma ends the
+ * first address of a list, and Resend answers the identical bare 422. So
+ * does an accented or em-dashed name, which is not ASCII and cannot travel
+ * in a header literally.
+ *
+ * Both are fixable HERE, and are fixed rather than reported: a name is
+ * quoted when it needs quoting and encoded (RFC 2047) when it is not plain
+ * ASCII, so the value an operator typed by hand — which is correct as a
+ * NAME, and only wrong as a header — sends instead of failing forever. The
+ * address itself is left exactly as written: it is the part no rewriting can
+ * guess at.
  */
 export function normaliseFrom(raw: string): string {
-  return unwrap(raw.trim()).replace(/\s+/g, ' ').trim()
+  const flat = unwrap(raw.trim()).replace(/\s+/g, ' ').trim()
+  if (!flat.endsWith('>')) return flat
+  const open = flat.lastIndexOf('<')
+  if (open < 0) return flat
+  const address = flat.slice(open + 1, -1).trim()
+  const name = plainName(flat.slice(0, open))
+  // `<a@b.com>` alone is a legal header, but the bare form is the one every
+  // provider example shows and the one that survives a copy out of a log
+  if (!name) return address
+  return `${headerName(name)} <${address}>`
 }
 
-/** An address, loosely: enough to catch a typo, not an RFC implementation. */
-const ADDRESS = String.raw`[^\s<>@,;:"]+@[^\s<>@,;:"]+\.[^\s<>@,;:".]+`
+/**
+ * An address, strictly enough to catch what Resend catches.
+ *
+ * Loose was the old failure: a check that accepted everything the provider
+ * then refused turned a typo into a 422 — one round trip, one rate-limit
+ * slot and one row in `mail_sends` later, with an error naming no variable.
+ * Dots may separate atoms and may not lead, trail or double; a domain is
+ * labels and a real TLD, so `no-reply@localhost` and `a@-x.com` stop here.
+ */
+const ATOM = String.raw`[^\s<>@,;:"\\.]+`
+const LOCAL = `${ATOM}(?:\\.${ATOM})*`
+const LABEL = String.raw`[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?`
+const DOMAIN = `(?:${LABEL}\\.)+[A-Za-z]{2,}`
+const ADDRESS = `${LOCAL}@${DOMAIN}`
 const BARE = new RegExp(`^${ADDRESS}$`)
+/** The name has been through `headerName`, so only the address is in doubt. */
 const NAMED = new RegExp(`^[^<>]*<${ADDRESS}>$`)
 
 /**
@@ -131,10 +223,89 @@ const NAMED = new RegExp(`^[^<>]*<${ADDRESS}>$`)
  */
 export function fromProblem(from: string): string | null {
   if (BARE.test(from) || NAMED.test(from)) return null
+  // the value itself, because "MAIL_FROM is wrong" and the settings page
+  // showing something that looks right is the whole of this bug: an operator
+  // compares two strings in a second and guesses for an afternoon
   return (
-    'MAIL_FROM is not a valid From address: it has to be name@example.com ' +
-    'or Name <name@example.com>, on a domain verified with Resend.'
+    `MAIL_FROM is not a valid From address (Lattice reads it as: ${from}). ` +
+    'It has to be name@example.com or Name <name@example.com>, ' +
+    'on a domain verified with Resend.'
   )
+}
+
+/** The provider's sentence, out of whatever shape the body arrived in. */
+function providerMessage(body: string): string {
+  try {
+    const parsed: unknown = JSON.parse(body)
+    if (parsed && typeof parsed === 'object' && 'message' in parsed) {
+      const message = (parsed as { message: unknown }).message
+      if (typeof message === 'string' && message.trim()) return message.trim()
+    }
+  } catch {
+    // not JSON: the raw body is still the most informative thing there is
+  }
+  return body.trim()
+}
+
+/** A refusal whose message already names the fix, and names it better. */
+const SELF_EXPLAINING = /verify a domain|resend\.com\/domains|not verified|testing emails/i
+
+/**
+ * A refusal the provider makes about this DEPLOYMENT, not about this message.
+ *
+ * An unverified domain, the sandbox that only delivers to the account's own
+ * address, a key that is not a key, a `From` the parser will not take: none of
+ * them touched a mailbox, all of them will fail identically on the next
+ * attempt, and none of them is fixable by the person who pressed the button.
+ *
+ * The distinction is not cosmetic — see `deliver` in `api/invitations.ts`,
+ * where it decides whether the hour's mail allowance is spent.
+ */
+export function isConfigurationRejection(status: number, said: string): boolean {
+  if (status === 401 || status === 403) return true
+  // a 422 can be about `from` (ours) or `to` (the address just typed)
+  return status === 422 && /\bfrom\b/i.test(said)
+}
+
+/** Thrown when the provider answered, and said no. */
+export class MailRejected extends Error {
+  override readonly name = 'MailRejected'
+  constructor(
+    readonly status: number,
+    /** True when this deployment is misconfigured — not this message. */
+    readonly configuration: boolean,
+    message: string,
+  ) {
+    super(message)
+  }
+}
+
+/** Whether a thrown value is a refusal about configuration. */
+export function isConfigurationFailure(err: unknown): boolean {
+  return err instanceof MailRejected && err.configuration
+}
+
+/**
+ * A refusal, as something the one person who can fix it can act on.
+ *
+ * Two failure modes, and the fix is opposite in each. When the provider only
+ * names a field — 422 ``Invalid `from` field`` — it never quotes the value
+ * back, so the sender reads a complaint about a string they have never seen
+ * next to a settings page showing an address that looks correct: the value
+ * Lattice actually sent goes in, and the mismatch becomes visible instead of
+ * deduced. When the provider names the fix itself ("verify a domain at
+ * resend.com/domains"), nothing added here is worth as much as its own
+ * sentence — and padding it is what pushes the useful half past the length
+ * the toast can hold, which is how "please verify a do" reached a user.
+ */
+export function explainRejection(status: number, body: string, from: string): string {
+  const said = providerMessage(body)
+  const head = `[mail] send failed (${status})`
+  if (SELF_EXPLAINING.test(said)) return `${head}: ${said.slice(0, 260)}`
+  if (isConfigurationRejection(status, said)) {
+    return `${head}: the provider refused the From address — Lattice sent MAIL_FROM as: ${from} — ${said.slice(0, 140)}`
+  }
+  return `${head}: ${said.slice(0, 200)}`
 }
 
 /** The transport for this deployment, or null when it has none. */
@@ -193,9 +364,13 @@ class ResendSender implements MailSender {
       }),
     })
     if (!res.ok) {
-      // the caller turns this into a neutral answer; the detail is for logs
       const detail = await res.text().catch(() => '')
-      throw new Error(`[mail] send failed (${res.status}): ${detail.slice(0, 200)}`)
+      const said = providerMessage(detail.slice(0, 400))
+      throw new MailRejected(
+        res.status,
+        isConfigurationRejection(res.status, said),
+        explainRejection(res.status, detail.slice(0, 400), this.from),
+      )
     }
   }
 }
