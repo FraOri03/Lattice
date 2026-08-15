@@ -18,6 +18,7 @@ import {
   type RoomAcl,
 } from '../../src/lib/collab/acl.js'
 import { CANONICAL_USER_ID } from '../../src/lib/auth/identity.js'
+import { repositories } from '../_lib/db/index.js'
 import { roomIdsForProject } from '../../src/lib/collab/roleAccess.js'
 import {
   assignableRoles,
@@ -33,6 +34,7 @@ import type { ApiRequest } from '../_lib/session.js'
  *  - ensure   {projectId, projectName?}      create rooms / report my role
  *  - members  {projectId}                    list the server-side ACL
  *  - set-role {projectId, email, role|null}  add/change/remove a member
+ *  - transfer-ownership {projectId, email}   owner only — hand the project over
  *  - delete   {projectId}                    owner only — delete the rooms
  *
  * EVERY action verifies the caller's Google token and derives the
@@ -207,6 +209,78 @@ export default async function handler(req: ApiRequest, res: ApiRes): Promise<voi
       }
       const next = newRole ? addEmail(acl, email, newRole) : stripEmail(acl, email)
       await writeAcl(lb, projectId, next)
+      res.status(200).json({ acl: next })
+      return
+    }
+
+    /**
+     * Hand the project to another member (the action `set-role` refuses).
+     *
+     * `set-role` will not touch the owner slot, and rightly: "make this
+     * address the owner" and "stop being the owner" are one indivisible
+     * change, and offering half of it is how a project ends up with two
+     * owners or none. So the transfer is its own action, and it is the only
+     * place `ownerEmail` moves.
+     *
+     * It existed nowhere before this: `membersService.transferOwnership`
+     * rewrote the local member list and mirrored nothing, so on a realtime
+     * project the ACL that actually decides kept naming the previous owner —
+     * the new one could not manage admins or delete the rooms, and the old
+     * one still could. The UI reported success either way.
+     */
+    case 'transfer-ownership': {
+      if (!acl) {
+        sendError(res, 404, 'This project has no realtime rooms yet.')
+        return
+      }
+      if (roleOf(acl, principal) !== 'owner') {
+        sendError(res, 403, 'Only the project owner can transfer ownership.')
+        return
+      }
+      const email =
+        typeof body.email === 'string' ? body.email.trim().toLowerCase() : ''
+      if (!email || !email.includes('@') || email.length > 254) {
+        sendError(res, 400, 'Invalid email.')
+        return
+      }
+      const previousOwner = acl.ownerEmail
+      if (email === previousOwner) {
+        sendError(res, 409, `${email} already owns this project.`)
+        return
+      }
+      /**
+       * The recipient has to be a member already. Ownership is handed over,
+       * not granted: making a stranger the owner in one step would turn the
+       * one action nobody else can authorise into a way to give the project
+       * away to an address that has never been checked against anything.
+       */
+      if (!roleOfSlot(acl, email)) {
+        sendError(res, 404, `${email} is not a member of this project.`)
+        return
+      }
+      // both halves, in one write: the new owner, then the old one as admin.
+      // `addEmail` carries each slot's binding across, so neither person has
+      // to re-prove an address they have already proved.
+      const next = addEmail(addEmail(acl, email, 'owner'), previousOwner, 'admin')
+      await writeAcl(lb, projectId, next)
+
+      /**
+       * Postgres holds the same membership when 17.1's tables are populated
+       * for this project, and `/api/shared` reads the owner from THERE — so a
+       * transfer that stopped at the room metadata would still show the old
+       * owner on everyone's dashboard.
+       *
+       * Only when rows already exist: `setRole` would otherwise insert a
+       * lone owner row for a project whose members live only in Liveblocks,
+       * and `api/invitations` reads Postgres FIRST — it would then see a
+       * one-member ACL and refuse everybody else.
+       */
+      const db = repositories()
+      if (db && (await db.memberships.aclOf(projectId))) {
+        // demotes the incumbent owner to admin in the same call, which is
+        // exactly the half of the swap the ACL above just made
+        await db.memberships.setRole(projectId, email, 'owner')
+      }
       res.status(200).json({ acl: next })
       return
     }
