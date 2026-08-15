@@ -76,6 +76,11 @@ interface CollabState {
   setComments: (projectId: string, comments: CommentThread[]) => void
   setActivity: (projectId: string, events: ActivityEvent[]) => void
   setVersions: (projectId: string, versions: VersionEntry[]) => void
+  /**
+   * Drop everything this store holds about a project. Called by
+   * `purgeProject` — "delete forever" has to reach here too.
+   */
+  forgetProject: (projectId: string) => void
 
   upsertPeer: (peer: PresencePeer) => void
   removePeer: (sessionId: string) => void
@@ -137,6 +142,34 @@ export const useCollabStore = create<CollabState>()(
         set((s) => ({ activity: { ...s.activity, [projectId]: list } })),
       setVersions: (projectId, list) =>
         set((s) => ({ versions: { ...s.versions, [projectId]: list } })),
+
+      /**
+       * Every persisted map is keyed by project id, and none of them was
+       * ever emptied: purging a project removed it from the vault and left
+       * its member list, its invitations — addresses included — its comments,
+       * its activity trail and its version index here for good. Unbounded
+       * growth, and personal data outliving the "delete forever" that was
+       * supposed to have taken it.
+       *
+       * Only the durable, project-keyed maps: `notifications` is a per-device
+       * read trail, and peers and locks are ephemeral and die with the tab.
+       */
+      forgetProject: (projectId) =>
+        set((s) => {
+          const drop = <T>(rec: Record<string, T>): Record<string, T> => {
+            if (!(projectId in rec)) return rec
+            const next = { ...rec }
+            delete next[projectId]
+            return next
+          }
+          return {
+            members: drop(s.members),
+            invites: drop(s.invites),
+            comments: drop(s.comments),
+            activity: drop(s.activity),
+            versions: drop(s.versions),
+          }
+        }),
 
       upsertPeer: (peer) =>
         set((s) => ({ peers: { ...s.peers, [peer.sessionId]: peer } })),
