@@ -1,11 +1,10 @@
 import {
   SLIDE_H,
   SLIDE_W,
-  THEME_COLORS,
   type PresentElement,
   type PresentSlide,
-  type PresentTheme,
 } from '@/lib/present/presentModel'
+import type { ThemeTokens } from '@/lib/present/theme'
 
 /**
  * Shared, dependency-light slide rendering used by BOTH the presentation
@@ -120,14 +119,17 @@ export function StaticElement({
 /** Read-only mini render of a whole slide, scaled to `width`px. */
 export function SlideView({
   slide,
-  theme,
+  tokens,
+  decor = [],
   width,
 }: {
   slide: PresentSlide
-  theme: PresentTheme
+  tokens: ThemeTokens
+  /** master furniture, drawn with the slide but never part of it (19E.2) */
+  decor?: PresentElement[]
   width: number
 }) {
-  const t = THEME_COLORS[theme]
+  const t = tokens
   const scale = width / SLIDE_W
   return (
     <div
@@ -145,7 +147,7 @@ export function SlideView({
           pointerEvents: 'none',
         }}
       >
-        {[...slide.elements]
+        {[...slide.elements, ...decor]
           .filter((el) => !el.hidden)
           .sort((a, b) => a.z - b.z)
           .map((el) => (

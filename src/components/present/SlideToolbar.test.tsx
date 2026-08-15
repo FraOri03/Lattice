@@ -18,6 +18,7 @@ const handlers = {
   onBackground: vi.fn(),
   onResetBackground: vi.fn(),
   onToggleSnap: vi.fn(),
+  onOpenLayouts: vi.fn(),
   onAlign: vi.fn(),
   onDistribute: vi.fn(),
 }
@@ -29,6 +30,7 @@ const renderBar = (
     slideCount: number
     selectedCount: number
     snapEnabled: boolean
+    layoutName: string | null
   }> = {},
 ) =>
   render(
@@ -39,6 +41,7 @@ const renderBar = (
       themeBackground="#ffffff"
       selectedCount={props.selectedCount ?? 0}
       snapEnabled={props.snapEnabled ?? true}
+      layoutName={props.layoutName ?? null}
       {...handlers}
     />,
   )

@@ -1,9 +1,9 @@
 import JSZip from 'jszip'
 import { presentableSlides } from './sections'
+import { furnitureElements, masterTokensFor } from './masters'
 import {
   SLIDE_H,
   SLIDE_W,
-  THEME_COLORS,
   type PresentationBody,
   type PresentElement,
   type TextElement,
@@ -91,7 +91,6 @@ const LAYOUT_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 
 /** Build a valid .pptx from a deck. */
 export async function exportPresentationPptx(body: PresentationBody): Promise<Blob> {
-  const theme = THEME_COLORS[body.theme]
   const zip = new JSZip()
   const slideOverrides: string[] = []
   const slideRefs: string[] = []
@@ -103,7 +102,10 @@ export async function exportPresentationPptx(body: PresentationBody): Promise<Bl
   presentableSlides(body).forEach((slide, i) => {
     const n = i + 1
     const ctx: SlideCtx = { rels: [], media: [], seq: 1 }
-    const els = [...slide.elements].sort((a, b) => a.z - b.z)
+    const theme = masterTokensFor(body, slide)
+    const els = [...slide.elements, ...furnitureElements(body, slide, n, theme)].sort(
+      (a, b) => a.z - b.z,
+    )
     const shapes = els.map((el) => elementXml(ctx, el, theme.text)).join('')
     const bg = `<p:bg><p:bgPr><a:solidFill><a:srgbClr val="${srgb(slide.background ?? theme.bg, theme.bg)}"/></a:solidFill><a:effectLst/></p:bgPr></p:bg>`
     const slideXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>

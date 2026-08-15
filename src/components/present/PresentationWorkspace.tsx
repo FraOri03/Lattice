@@ -16,6 +16,30 @@ import {
   type SlideReviewStatus,
 } from '@/lib/present/presentModel'
 import {
+  addMaster,
+  assignMaster,
+  furnitureElements,
+  masterTokensFor,
+  removeMaster,
+  setMasterToken,
+  updateMaster,
+  type MasterFurniture,
+  type PresentMaster,
+} from '@/lib/present/masters'
+import {
+  OVERRIDE_LABEL,
+  applyLayoutPlan,
+  layoutById,
+  placeholderFor,
+  placeholderOverrides,
+  revertOverride,
+  type LayoutPlan,
+  type OverrideKey,
+} from '@/lib/present/layouts'
+import { LayoutPicker } from './LayoutPicker'
+import { MasterPanel } from './MasterPanel'
+import { THEME_PRESETS, type ThemeTokens } from '@/lib/present/theme'
+import {
   moveSection,
   presentableSlides,
   removeSection,
@@ -98,6 +122,7 @@ export default function PresentationWorkspace({ meta }: { meta: PresentationDocM
   const [layersCollapsed, setLayersCollapsed] = useState(false)
   // notes collapse to a strip: the canvas is what this screen is for (19E.1)
   const [notesOpen, setNotesOpen] = useState(false)
+  const [layoutsOpen, setLayoutsOpen] = useState(false)
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const imageInput = useRef<HTMLInputElement>(null)
@@ -154,6 +179,8 @@ export default function PresentationWorkspace({ meta }: { meta: PresentationDocM
   const slide: PresentSlide | null = body ? body.slides[si] : null
   const theme: PresentTheme = body?.theme ?? 'plain'
   const themeColors = THEME_COLORS[theme]
+  // what this slide actually paints with: deck tokens, then its master's
+  const slideTokens = body && slide ? masterTokensFor(body, slide) : THEME_PRESETS.plain
 
   const elements = slide?.elements ?? []
   const maxZ = elements.reduce((m, e) => Math.max(m, e.z), 0)
@@ -382,6 +409,34 @@ export default function PresentationWorkspace({ meta }: { meta: PresentationDocM
     onRemoveSection: (id) => apply((b) => removeSection(b, id)),
   }
 
+  const applyLayout = (plan: LayoutPlan) => {
+    apply((b) => applyLayoutPlan(b, si, plan, slideTokens))
+    setLayoutsOpen(false)
+    toast.info(
+      `Layout “${plan.layout.name}” applied`,
+      plan.freeElementIds.length
+        ? `${plan.freeElementIds.length} object(s) kept their own position as free objects. Undo restores the previous arrangement.`
+        : 'Undo restores the previous arrangement.',
+    )
+  }
+
+  const masterActions: MasterActions = {
+    add: (master) => apply((b) => addMaster(b, master)),
+    remove: (id) => apply((b) => removeMaster(b, id)),
+    rename: (id, name) => apply((b) => updateMaster(b, id, { name }), { coalesceKey: `mname-${id}` }),
+    setToken: (id, key, value) =>
+      apply((b) => setMasterToken(b, id, key, value as never), { coalesceKey: `mtok-${id}-${key}` }),
+    assign: (id) => apply((b) => assignMaster(b, slide!.id, id)),
+    setFurniture: (id, patch) =>
+      apply(
+        (b) => {
+          const m = b.masters?.find((x) => x.id === id)
+          return updateMaster(b, id, { furniture: { ...(m?.furniture ?? {}), ...patch } })
+        },
+        { coalesceKey: `mfurn-${id}` },
+      ),
+  }
+
   /* ---------- export ---------- */
 
   const exportPdf = async () => {
@@ -557,6 +612,7 @@ export default function PresentationWorkspace({ meta }: { meta: PresentationDocM
 
         <LayersPanel
           elements={elements}
+          inherited={furnitureElements(body, slide, si + 1, slideTokens)}
           selectedIds={selectedIds}
           collapsed={layersCollapsed}
           readOnly={readOnly}
@@ -584,6 +640,7 @@ export default function PresentationWorkspace({ meta }: { meta: PresentationDocM
               themeBackground={themeColors.bg}
               selectedCount={selectedEls.length}
               snapEnabled={snapEnabled}
+              layoutName={layoutById(slide.layoutId)?.name ?? null}
               onAddText={addText}
               onAddImage={() => imageInput.current?.click()}
               onAddShape={addShape}
@@ -592,6 +649,7 @@ export default function PresentationWorkspace({ meta }: { meta: PresentationDocM
               }
               onResetBackground={() => patchSlide((s) => ({ ...s, background: null }))}
               onToggleSnap={() => setSnapEnabled((v) => !v)}
+              onOpenLayouts={() => setLayoutsOpen((v) => !v)}
               onAlign={align}
               onDistribute={distribute}
             />
@@ -599,11 +657,20 @@ export default function PresentationWorkspace({ meta }: { meta: PresentationDocM
 
           <div
             ref={scrollRef}
-            className="flex min-h-0 flex-1 items-center justify-center overflow-auto bg-panel2 p-4"
+            className="relative flex min-h-0 flex-1 items-center justify-center overflow-auto bg-panel2 p-4"
           >
+            {layoutsOpen && !readOnly && (
+              <LayoutPicker
+                body={body}
+                slideIndex={si}
+                onApply={applyLayout}
+                onClose={() => setLayoutsOpen(false)}
+              />
+            )}
             <SlideCanvas
               slide={slide}
-              theme={body.theme}
+              tokens={slideTokens}
+              decor={furnitureElements(body, slide, si + 1, slideTokens)}
               readOnly={readOnly}
               scale={scale}
               snapEnabled={snapEnabled}
@@ -674,6 +741,12 @@ export default function PresentationWorkspace({ meta }: { meta: PresentationDocM
             onToggleSlideHidden={() => toggleHidden(si)}
             onSetReviewStatus={(status) => setReviewStatus(si, status)}
             onSetTheme={(t) => apply((b) => ({ ...b, theme: t }))}
+            slideTokens={slideTokens}
+            masterActions={masterActions}
+            onRevertOverride={(key) => {
+              const ph = placeholderFor(slide.layoutId, selected!)
+              if (ph) patchOne((el) => revertOverride(el, ph, slideTokens, key))
+            }}
             onDeleteSelection={deleteSelection}
             onLayer={layer}
             onToggleFlag={toggleFlag}
@@ -697,6 +770,70 @@ export default function PresentationWorkspace({ meta }: { meta: PresentationDocM
         }}
       />
     </section>
+  )
+}
+
+/** What the master panel can do, gathered so the Inspector props stay legible. */
+interface MasterActions {
+  add: (master: PresentMaster) => void
+  remove: (id: string) => void
+  rename: (id: string, name: string) => void
+  setToken: (id: string, key: keyof ThemeTokens, value: string | number | undefined) => void
+  assign: (id: string | undefined) => void
+  setFurniture: (id: string, patch: MasterFurniture) => void
+}
+
+/**
+ * What this element has changed about its placeholder (19E.2).
+ *
+ * An override is not a mistake — a title nudged 20px left is a decision. It
+ * just has to be visible, and undoable one property at a time, so applying a
+ * layout never feels like a trap.
+ */
+function LayoutOverrides({
+  selected,
+  layoutId,
+  tokens,
+  readOnly,
+  onRevert,
+}: {
+  selected: PresentElement
+  layoutId: string | undefined
+  tokens: ThemeTokens
+  readOnly: boolean
+  onRevert: (key: OverrideKey) => void
+}) {
+  const ph = placeholderFor(layoutId, selected)
+  if (!ph) return null
+  const keys = placeholderOverrides(selected, ph, tokens)
+  return (
+    <>
+      <div className="insp-h">Placeholder · {selected.role}</div>
+      {keys.length === 0 ? (
+        <p className="text-[10.5px] text-muted">Matches the layout exactly.</p>
+      ) : (
+        <>
+          <p className="mb-1 text-[10.5px] text-muted">
+            {keys.length} {keys.length === 1 ? 'property overrides' : 'properties override'} the
+            layout.
+          </p>
+          <div className="flex flex-wrap gap-1">
+            {keys.map((k) => (
+              <button
+                key={k}
+                className="toolbar-control toolbar-control--sm text-[10px]"
+                title={`Revert ${OVERRIDE_LABEL[k]} to the layout`}
+                aria-label={`Revert ${OVERRIDE_LABEL[k]}`}
+                disabled={readOnly}
+                onClick={() => onRevert(k)}
+              >
+                <span aria-hidden>↺ {OVERRIDE_LABEL[k]}</span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </>
   )
 }
 
@@ -771,6 +908,9 @@ function Inspector({
   onToggleSlideHidden,
   onSetReviewStatus,
   onSetTheme,
+  slideTokens,
+  masterActions,
+  onRevertOverride,
 }: {
   body: PresentationBody
   slide: PresentSlide
@@ -790,6 +930,9 @@ function Inspector({
   onToggleSlideHidden: () => void
   onSetReviewStatus: (status: SlideReviewStatus | undefined) => void
   onSetTheme: (theme: PresentTheme) => void
+  slideTokens: ThemeTokens
+  masterActions: MasterActions
+  onRevertOverride: (key: OverrideKey) => void
 }) {
   const count = selectedEls.length
   const anyLocked = selectedEls.some((e) => e.locked)
@@ -924,6 +1067,18 @@ function Inspector({
               and left out of every export.
             </p>
           )}
+
+          <MasterPanel
+            body={body}
+            slide={slide}
+            readOnly={readOnly}
+            onAddMaster={masterActions.add}
+            onRemoveMaster={masterActions.remove}
+            onRenameMaster={masterActions.rename}
+            onSetToken={masterActions.setToken}
+            onAssignToSlide={masterActions.assign}
+            onSetFurniture={masterActions.setFurniture}
+          />
         </>
       )}
 
@@ -958,6 +1113,13 @@ function Inspector({
 
       {scope === 'element' && count === 1 && selected && (
         <>
+          <LayoutOverrides
+            selected={selected}
+            layoutId={slide.layoutId}
+            tokens={slideTokens}
+            readOnly={readOnly}
+            onRevert={onRevertOverride}
+          />
           <div className="insp-h">
             {selected.kind === 'text' ? 'Text' : selected.kind === 'image' ? 'Image' : 'Shape'}
           </div>

@@ -1,4 +1,8 @@
 import { nid } from '@/lib/id'
+import type { ThemeTokenOverride } from './theme'
+import { sanitizeTokens } from './theme'
+import type { PlaceholderRole } from './layouts'
+import { migrateMasters, type PresentMaster } from './masters'
 
 /**
  * Presentation model (Phase 8) — the internal JSON source format.
@@ -16,9 +20,12 @@ export const SLIDE_H = 540
  * Body schema version. Bumped when the shape grows; `migratePresentBody`
  * upgrades older bodies and never drops unknown fields (Phase 0). v1 → v2
  * (Phase 1): additive optional element fields (rotation/opacity/locked/hidden)
- * and image `alt` — none required, so v1 bodies load unchanged.
+ * and image `alt`. v2 → v3 (19E.1): sections, hidden slides, review status.
+ * v3 → v4 (19E.2): theme tokens, masters, slide `masterId`/`layoutId` and
+ * element `role`. Every addition is optional, so a body of any version loads
+ * unchanged and renders exactly as it did.
  */
-export const PRESENT_BODY_VERSION = 3
+export const PRESENT_BODY_VERSION = 4
 
 export type PresentTheme = 'plain' | 'ink' | 'accent'
 
@@ -57,6 +64,12 @@ export interface PresentElementBase {
   locked?: boolean
   /** hidden elements don't render on the slide/thumbnail (Phase 1) */
   hidden?: boolean
+  /**
+   * The layout placeholder this element fills (19E.2). It is what makes a
+   * layout change non-destructive: the title knows it is the title, so it
+   * lands in the new layout's title rather than wherever the old one sat.
+   */
+  role?: PlaceholderRole
 }
 
 export interface TextElement extends PresentElementBase {
@@ -102,6 +115,10 @@ export interface PresentSlide {
   hidden?: boolean
   /** editorial state; absent means nobody has said (19E.1) */
   reviewStatus?: SlideReviewStatus
+  /** the master whose design this slide inherits (19E.2) */
+  masterId?: string
+  /** the layout this slide was last arranged with (19E.2) */
+  layoutId?: string
 }
 
 export interface PresentationBody {
@@ -111,6 +128,10 @@ export interface PresentationBody {
   slides: PresentSlide[]
   /** rail sections; absent on decks that never made one (19E.1) */
   sections?: PresentSection[]
+  /** deck-level overrides of the theme preset's tokens (19E.2) */
+  tokens?: ThemeTokenOverride
+  /** the deck's masters; absent means every slide follows the deck (19E.2) */
+  masters?: PresentMaster[]
 }
 
 export const THEME_COLORS: Record<
@@ -237,6 +258,12 @@ function migrateSlide(raw: unknown): PresentSlide {
     notes: typeof s.notes === 'string' ? (s.notes as string) : '',
     elements,
     sectionId: typeof s.sectionId === 'string' && s.sectionId ? (s.sectionId as string) : undefined,
+    masterId: typeof s.masterId === 'string' && s.masterId ? (s.masterId as string) : undefined,
+    // Kept as written rather than validated against the layout catalogue:
+    // `layouts.ts` reads SLIDE_W from this module, so importing it back here
+    // would be a load-time cycle. An id that matches no layout resolves to
+    // null everywhere it is read, which is the same outcome without the cycle.
+    layoutId: typeof s.layoutId === 'string' && s.layoutId ? (s.layoutId as string) : undefined,
     hidden: s.hidden === true ? true : undefined,
     reviewStatus: REVIEW_STATUSES.includes(review as SlideReviewStatus)
       ? (review as SlideReviewStatus)
@@ -283,12 +310,23 @@ export function migratePresentBody(raw: unknown): PresentationBody {
     return createPresentBody()
   }
   const sections = migrateSections(b.sections)
-  const known = new Set(sections?.map((s) => s.id))
-  // a slide pointing at a section that no longer exists becomes unsectioned
-  // rather than invisible: the rail must never lose a slide
-  const slides = b.slides.map(migrateSlide).map((s) =>
-    s.sectionId && !known.has(s.sectionId) ? { ...s, sectionId: undefined } : s,
-  )
+  const masters = migrateMasters(b.masters)
+  const knownSections = new Set(sections?.map((s) => s.id))
+  const knownMasters = new Set(masters?.map((m) => m.id))
+  // a slide pointing at something that no longer exists falls back to the
+  // deck's own design rather than disappearing: the rail must never lose a
+  // slide, and a missing master must not make one unpaintable
+  const slides = b.slides.map(migrateSlide).map((s) => {
+    let next = s
+    if (next.sectionId && !knownSections.has(next.sectionId)) {
+      next = { ...next, sectionId: undefined }
+    }
+    if (next.masterId && !knownMasters.has(next.masterId)) {
+      next = { ...next, masterId: undefined }
+    }
+    return next
+  })
+  const tokens = sanitizeTokens(b.tokens)
   return {
     ...(b as object),
     app: 'lattice-present',
@@ -296,6 +334,8 @@ export function migratePresentBody(raw: unknown): PresentationBody {
     theme: typeof b.theme === 'string' && b.theme in THEME_COLORS ? (b.theme as PresentTheme) : 'plain',
     slides,
     ...(sections ? { sections } : {}),
+    ...(tokens ? { tokens } : {}),
+    ...(masters ? { masters } : {}),
   } as PresentationBody
 }
 

@@ -18,6 +18,7 @@ export function layerLabel(el: PresentElement): string {
 
 export function LayersPanel({
   elements,
+  inherited = [],
   selectedIds,
   collapsed,
   readOnly,
@@ -26,6 +27,8 @@ export function LayersPanel({
   onToggleFlag,
 }: {
   elements: PresentElement[]
+  /** master furniture: listed, never editable from here (19E.2) */
+  inherited?: PresentElement[]
   selectedIds: Set<string>
   collapsed: boolean
   readOnly: boolean
@@ -114,6 +117,29 @@ export function LayersPanel({
               )}
             </div>
           ))
+        )}
+
+        {/* 19E.2: furniture belongs to the master, so it is listed for
+            orientation and offered no controls — it cannot be selected,
+            hidden or locked from a slide. */}
+        {inherited.length > 0 && (
+          <>
+            <div className="mt-2 border-t border-bord px-1 pt-1.5 text-[9.5px] tracking-wide text-muted uppercase">
+              From master
+            </div>
+            {inherited.map((el) => (
+              <div
+                key={el.id}
+                className="flex items-center gap-1 rounded px-1 py-0.5 opacity-70"
+                title="Inherited from this slide’s master — edit it in the Deck panel"
+              >
+                <span className="min-w-0 flex-1 truncate text-[11px] text-muted">
+                  {layerLabel(el)}
+                </span>
+                <IcLock size={11} className="flex-none text-muted" />
+              </div>
+            ))}
+          </>
         )}
       </div>
     </aside>

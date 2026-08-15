@@ -594,6 +594,13 @@ export const IcGrip = (p: P) => (
 )
 
 /* ---------------- presentation editor (Phase 1) ---------------- */
+/** Slide layout: a title band over a content area (19E.2). */
+export const IcLayout = (p: P) => (
+  <S {...p}>
+    <rect x="3" y="4" width="18" height="16" rx="2" />
+    <path d="M3 9.5h18M12 9.5V20" />
+  </S>
+)
 /* IcUndo / IcRedo are already defined above and reused here. */
 export const IcZoomIn = (p: P) => (
   <S {...p}>

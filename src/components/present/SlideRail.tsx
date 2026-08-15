@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { PresentSection, PresentationBody, SlideReviewStatus } from '@/lib/present/presentModel'
 import { sectionRuns } from '@/lib/present/sections'
+import { furnitureElements, masterTokensFor } from '@/lib/present/masters'
 import { SlideView } from './SlideView'
 import { IcChevronDown, IcChevronRight, IcCopy, IcEyeOff, IcPlus, IcTrash } from '@/components/Icons'
 
@@ -73,7 +74,12 @@ export function SlideRail({
                   aria-label={`Slide ${index + 1}${slide.hidden ? ' (hidden)' : ''}`}
                   aria-current={index === currentIndex}
                 >
-                  <SlideView slide={slide} theme={body.theme} width={156} />
+                  <SlideView
+                    slide={slide}
+                    tokens={masterTokensFor(body, slide)}
+                    decor={furnitureElements(body, slide, index + 1, masterTokensFor(body, slide))}
+                    width={156}
+                  />
 
                   <span className="absolute top-1 left-1 flex items-center gap-1 rounded bg-panel/85 px-1 text-[9px] font-bold">
                     {index + 1}

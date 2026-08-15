@@ -1,3 +1,4 @@
+import type { ThemeTokens } from '@/lib/present/theme'
 import {
   useMemo,
   useRef,
@@ -7,10 +8,8 @@ import {
 import {
   SLIDE_H,
   SLIDE_W,
-  THEME_COLORS,
   type PresentElement,
   type PresentSlide,
-  type PresentTheme,
 } from '@/lib/present/presentModel'
 import {
   RESIZE_HANDLES,
@@ -77,7 +76,13 @@ type Gesture =
 
 export interface SlideCanvasProps {
   slide: PresentSlide
-  theme: PresentTheme
+  tokens: ThemeTokens
+  /**
+   * Master furniture (19E.2). Drawn under the interaction layer and never
+   * hit-tested: it belongs to the master, so it cannot be selected, dragged
+   * or deleted from a slide.
+   */
+  decor?: PresentElement[]
   readOnly: boolean
   scale: number
   snapEnabled: boolean
@@ -94,7 +99,8 @@ let gestureSeq = 0
 
 export function SlideCanvas({
   slide,
-  theme,
+  tokens,
+  decor = [],
   readOnly,
   scale,
   snapEnabled,
@@ -105,7 +111,7 @@ export function SlideCanvas({
   setSlideElements,
   onSeal,
 }: SlideCanvasProps) {
-  const t = THEME_COLORS[theme]
+  const t = tokens
   const innerRef = useRef<HTMLDivElement>(null)
   const gesture = useRef<Gesture | null>(null)
   const [guides, setGuides] = useState<Guide[]>([])
@@ -308,6 +314,16 @@ export function SlideCanvas({
         }}
         onPointerDown={onBackgroundPointerDown}
       >
+        {decor.map((el) => (
+          <div
+            key={el.id}
+            style={{ ...elementStyle(el), pointerEvents: 'none' }}
+            aria-hidden
+          >
+            <ElementContent el={el} themeText={t.text} />
+          </div>
+        ))}
+
         {visible.map((el) => {
           const isSelected = selectedIds.has(el.id)
           const isEditing = el.id === editingTextId

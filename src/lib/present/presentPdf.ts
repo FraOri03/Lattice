@@ -1,8 +1,8 @@
 import { presentableSlides } from './sections'
+import { furnitureElements, masterTokensFor } from './masters'
 import {
   SLIDE_H,
   SLIDE_W,
-  THEME_COLORS,
   type PresentationBody,
   type PresentElement,
 } from './presentModel'
@@ -28,15 +28,18 @@ export async function exportPresentationPdf(
     format: [SLIDE_W, SLIDE_H],
     compress: true,
   })
-  const theme = THEME_COLORS[body.theme]
-
   // hidden slides are part of the deck, not of the presentation (19E.1)
   presentableSlides(body).forEach((slide, i) => {
+    // each slide paints with its own master's tokens (19E.2), so a deck of
+    // several masters exports the way it looks
+    const theme = masterTokensFor(body, slide)
     if (i > 0) doc.addPage([SLIDE_W, SLIDE_H], 'landscape')
     doc.setFillColor(hex(slide.background ?? theme.bg, theme.bg))
     doc.rect(0, 0, SLIDE_W, SLIDE_H, 'F')
 
-    const els = [...slide.elements].sort((a, b) => a.z - b.z)
+    const els = [...slide.elements, ...furnitureElements(body, slide, i + 1, theme)].sort(
+      (a, b) => a.z - b.z,
+    )
     for (const el of els) drawElement(doc, el, theme.text)
   })
 

@@ -9,6 +9,7 @@ import {
   IcDistributeH,
   IcDistributeV,
   IcImage,
+  IcLayout,
   IcMagnet,
 } from '@/components/Icons'
 import {
@@ -46,12 +47,14 @@ export function SlideToolbar({
   themeBackground,
   selectedCount,
   snapEnabled,
+  layoutName,
   onAddText,
   onAddImage,
   onAddShape,
   onBackground,
   onResetBackground,
   onToggleSnap,
+  onOpenLayouts,
   onAlign,
   onDistribute,
 }: {
@@ -63,12 +66,14 @@ export function SlideToolbar({
   /** how many elements the canvas has selected — drives the arrange group */
   selectedCount: number
   snapEnabled: boolean
+  layoutName: string | null
   onAddText: () => void
   onAddImage: () => void
   onAddShape: (shape: SlideShape) => void
   onBackground: (color: string) => void
   onResetBackground: () => void
   onToggleSnap: () => void
+  onOpenLayouts: () => void
   onAlign: (edge: AlignEdge) => void
   onDistribute: (axis: DistributeAxis) => void
 }) {
@@ -125,6 +130,19 @@ export function SlideToolbar({
           {background && (
             <ToolbarAction icon="✕" label={t.resetBackground} onRun={onResetBackground} />
           )}
+        </ToolbarGroup>
+
+        <ToolbarSeparator />
+
+        <ToolbarGroup label={t.groups.design}>
+          <ToolbarAction
+            icon={<IcLayout size={13} />}
+            content="icon-text"
+            label={layoutName ?? t.layout}
+            description={t.layoutDescription}
+            haspopup="dialog"
+            onRun={onOpenLayouts}
+          />
         </ToolbarGroup>
 
         <ToolbarSeparator />
