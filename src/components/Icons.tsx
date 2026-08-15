@@ -594,6 +594,12 @@ export const IcGrip = (p: P) => (
 )
 
 /* ---------------- presentation editor (Phase 1) ---------------- */
+/** A bar chart, for slide charts read from a sheet (19E.4). */
+export const IcChart = (p: P) => (
+  <S {...p}>
+    <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />
+  </S>
+)
 /** Slide layout: a title band over a content area (19E.2). */
 export const IcLayout = (p: P) => (
   <S {...p}>

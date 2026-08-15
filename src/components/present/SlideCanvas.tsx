@@ -1,6 +1,7 @@
 import type { ThemeTokens } from '@/lib/present/theme'
 import { resolveTextRender, type DeckTextStyles } from '@/lib/present/textStyles'
 import { docOf } from '@/lib/present/richtext'
+import { useAssetUrl } from '@/lib/assets/AssetRegistry'
 import { RichTextBox } from './RichTextBox'
 import {
   useMemo,
@@ -372,11 +373,7 @@ export function SlideCanvas({
                   }}
                 />
               ) : (
-                <ElementContent
-                  el={el}
-                  themeText={t.text}
-                  render={el.kind === 'text' ? resolveTextRender(el, tokens, textStyles) : undefined}
-                />
+                <ElementBody el={el} themeText={t.text} tokens={tokens} textStyles={textStyles} />
               )}
 
               {/* single-selection transform handles */}
@@ -483,6 +480,34 @@ function MultiBounds({ elements, inv }: { elements: PresentElement[]; inv: numbe
         pointerEvents: 'none',
         zIndex: 90,
       }}
+    />
+  )
+}
+
+/**
+ * One element's visual. It exists so a picture held **by reference** (19E.4)
+ * can resolve its asset through the registry — a hook cannot be called inside
+ * the render loop above, and inlining the URL lookup would mean every deck
+ * carrying its pictures as 4 MB data URLs forever.
+ */
+function ElementBody({
+  el,
+  themeText,
+  tokens,
+  textStyles,
+}: {
+  el: PresentElement
+  themeText: string
+  tokens: ThemeTokens
+  textStyles?: DeckTextStyles
+}) {
+  const assetUrl = useAssetUrl(el.kind === 'image' ? el.assetId : undefined)
+  return (
+    <ElementContent
+      el={el}
+      themeText={themeText}
+      src={assetUrl}
+      render={el.kind === 'text' ? resolveTextRender(el, tokens, textStyles) : undefined}
     />
   )
 }

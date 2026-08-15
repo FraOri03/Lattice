@@ -19,6 +19,8 @@ const handlers = {
   onResetBackground: vi.fn(),
   onToggleSnap: vi.fn(),
   onOpenLayouts: vi.fn(),
+  onInsertChart: vi.fn(),
+  onInsertTable: vi.fn(),
   onAlign: vi.fn(),
   onDistribute: vi.fn(),
 }

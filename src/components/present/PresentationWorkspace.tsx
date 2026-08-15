@@ -37,6 +37,18 @@ import {
   type OverrideKey,
 } from '@/lib/present/layouts'
 import { LayoutPicker } from './LayoutPicker'
+import { ChartInsertDialog } from './ChartInsertDialog'
+import { LinkedContentPanel } from './LinkedContentPanel'
+import { storage } from '@/lib/storage/StorageProvider'
+import type { SheetData } from '@/lib/sheet/sheetModel'
+import { chartDataOf, parseRange, readRange, type ChartData } from '@/lib/present/sheetRange'
+import {
+  detached,
+  planUpdates,
+  withCapturedRev,
+  type LinkedItem,
+  type SourceState,
+} from '@/lib/present/linked'
 import { TypographyPanel } from './TypographyPanel'
 import { MasterPanel } from './MasterPanel'
 import { THEME_PRESETS, type ThemeTokens } from '@/lib/present/theme'
@@ -47,6 +59,13 @@ import {
   type TextStyleSpec,
 } from '@/lib/present/textStyles'
 import { measureOverflow, type AutoSizeMode, type OverflowReport } from '@/lib/present/overflow'
+import {
+  isFullCrop,
+  normalizeCrop,
+  normalizeFocal,
+  sanitizeAdjustments,
+  type ImageFit,
+} from '@/lib/present/media'
 import {
   moveSection,
   presentableSlides,
@@ -131,6 +150,7 @@ export default function PresentationWorkspace({ meta }: { meta: PresentationDocM
   // notes collapse to a strip: the canvas is what this screen is for (19E.1)
   const [notesOpen, setNotesOpen] = useState(false)
   const [layoutsOpen, setLayoutsOpen] = useState(false)
+  const [chartOpen, setChartOpen] = useState(false)
   const [overflow, setOverflow] = useState<OverflowReport | null>(null)
 
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -425,6 +445,133 @@ export default function PresentationWorkspace({ meta }: { meta: PresentationDocM
       return
     apply((b) => ({ ...b, slides: b.slides.filter((_, j) => j !== i) }))
     goToSlide(Math.max(0, i > 0 ? i - 1 : 0))
+  }
+
+  /**
+   * What every linkable source looks like right now (19E.4). `updatedAt` is
+   * the revision: it only moves forward, and it is what the deck compares its
+   * captured revision against.
+   */
+  const sheetDocs = useStore((st) => st.sheetDocs)
+  const boards = useStore((st) => st.boards)
+  const docs = useStore((st) => st.docs)
+  const linkSources = useMemo(() => {
+    const map = new Map<string, SourceState>()
+    for (const d of Object.values(sheetDocs)) map.set(d.id, { id: d.id, rev: d.updatedAt, label: d.title })
+    // a board carries no revision, so a board-backed link can never be told
+    // it is stale — rev 0 means "present, and never claiming an update"
+    for (const b of Object.values(boards)) map.set(b.id, { id: b.id, rev: 0, label: b.name })
+    for (const d of Object.values(docs)) map.set(d.id, { id: d.id, rev: d.updatedAt, label: d.title })
+    return map
+  }, [sheetDocs, boards, docs])
+
+  const linkActions = {
+    goTo: (slideIndex: number, elementId: string) => {
+      goToSlide(slideIndex)
+      setSelectedIds(new Set([elementId]))
+    },
+    updateOne: async (item: LinkedItem) => {
+      const fresh = await readLinkedChart(item)
+      apply((b) => ({
+        ...b,
+        slides: b.slides.map((sl, i) =>
+          i !== item.slideIndex
+            ? sl
+            : {
+                ...sl,
+                elements: sl.elements.map((el) =>
+                  el.id !== item.elementId
+                    ? el
+                    : {
+                        ...el,
+                        ...(fresh && el.kind === 'chart' ? { data: fresh } : {}),
+                        linkRef: withCapturedRev(item.link, item.sourceRev ?? item.link.rev ?? 0),
+                      },
+                ),
+              },
+        ),
+      }))
+    },
+    detach: (item: LinkedItem) =>
+      apply((b) => ({
+        ...b,
+        slides: b.slides.map((sl, i) =>
+          i !== item.slideIndex
+            ? sl
+            : {
+                ...sl,
+                elements: sl.elements.map((el) =>
+                  el.id === item.elementId ? { ...el, linkRef: detached(item.link) } : el,
+                ),
+              },
+        ),
+      })),
+  }
+
+  /** Re-read a chart's range from its source, when it still has one. */
+  const readLinkedChart = async (item: LinkedItem) => {
+    if (item.link.kind !== 'sheet' || !item.link.ref) return null
+    const raw = (await storage.getDocument(item.link.id)) as { sheets?: SheetData[] } | null
+    const parsed = parseRange(item.link.ref)
+    const sheet = raw?.sheets?.find((sh) => !parsed?.sheet || sh.name === parsed.sheet) ?? raw?.sheets?.[0]
+    if (!parsed || !sheet) return null
+    return chartDataOf(readRange(sheet, parsed))
+  }
+
+  const updateAllLinked = async () => {
+    const plan = planUpdates(body!, linkSources)
+    for (const item of plan.items) await linkActions.updateOne(item)
+    toast.info(
+      `${plan.items.length} updated`,
+      `Rewrote slide${plan.slideNumbers.length === 1 ? '' : 's'} ${plan.slideNumbers.join(', ')}. Undo restores them.`,
+    )
+  }
+
+  const openLinkedSource = (item: LinkedItem) => {
+    if (item.link.kind === 'sheet') useStore.getState().openSheet?.(item.link.id)
+    else if (item.link.kind === 'document') useStore.getState().openDoc?.(item.link.id)
+    else toast.info('Open the source', `${item.label} lives in ${item.link.kind}.`)
+  }
+
+  const insertTable = () =>
+    addElement({
+      id: nid('el'),
+      kind: 'table',
+      headerRow: true,
+      cells: [
+        ['Section', 'Q2', 'Q3'],
+        ['Board', '', ''],
+        ['Present', '', ''],
+      ],
+      x: 160,
+      y: 150,
+      w: 640,
+      h: 200,
+      z: maxZ + 1,
+    })
+
+  const insertChart = (args: {
+    data: ChartData
+    chart: 'bar' | 'line'
+    title: string
+    sheetId: string
+    range: string
+    rev: number
+  }) => {
+    addElement({
+      id: nid('el'),
+      kind: 'chart',
+      chart: args.chart,
+      data: args.data,
+      title: args.title,
+      x: 120,
+      y: 120,
+      w: 520,
+      h: 300,
+      z: maxZ + 1,
+      linkRef: { mode: 'link', kind: 'sheet', id: args.sheetId, ref: args.range, rev: args.rev, label: args.title },
+    })
+    setChartOpen(false)
   }
 
   /* ---------- deck structure (19E.1) ---------- */
@@ -751,6 +898,8 @@ export default function PresentationWorkspace({ meta }: { meta: PresentationDocM
               onResetBackground={() => patchSlide((s) => ({ ...s, background: null }))}
               onToggleSnap={() => setSnapEnabled((v) => !v)}
               onOpenLayouts={() => setLayoutsOpen((v) => !v)}
+              onInsertChart={() => setChartOpen((v) => !v)}
+              onInsertTable={insertTable}
               onAlign={align}
               onDistribute={distribute}
             />
@@ -760,6 +909,9 @@ export default function PresentationWorkspace({ meta }: { meta: PresentationDocM
             ref={scrollRef}
             className="relative flex min-h-0 flex-1 items-center justify-center overflow-auto bg-panel2 p-4"
           >
+            {chartOpen && !readOnly && (
+              <ChartInsertDialog onInsert={insertChart} onClose={() => setChartOpen(false)} />
+            )}
             {layoutsOpen && !readOnly && (
               <LayoutPicker
                 body={body}
@@ -847,6 +999,10 @@ export default function PresentationWorkspace({ meta }: { meta: PresentationDocM
             masterActions={masterActions}
             overflow={overflow}
             textActions={textActions}
+            linkSources={linkSources}
+            linkActions={linkActions}
+            updateAllLinked={() => void updateAllLinked()}
+            openLinkedSource={openLinkedSource}
             onRevertOverride={(key) => {
               const ph = placeholderFor(slide.layoutId, selected!)
               if (ph) patchOne((el) => revertOverride(el, ph, slideTokens, key))
@@ -1026,6 +1182,10 @@ function Inspector({
   onRevertOverride,
   overflow,
   textActions,
+  linkSources,
+  linkActions,
+  updateAllLinked,
+  openLinkedSource,
 }: {
   body: PresentationBody
   slide: PresentSlide
@@ -1050,6 +1210,14 @@ function Inspector({
   onRevertOverride: (key: OverrideKey) => void
   overflow: OverflowReport | null
   textActions: TextActions
+  linkSources: ReadonlyMap<string, SourceState>
+  linkActions: {
+    goTo: (slideIndex: number, elementId: string) => void
+    updateOne: (item: LinkedItem) => Promise<void> | void
+    detach: (item: LinkedItem) => void
+  }
+  updateAllLinked: () => void
+  openLinkedSource: (item: LinkedItem) => void
 }) {
   const count = selectedEls.length
   const anyLocked = selectedEls.some((e) => e.locked)
@@ -1184,6 +1352,17 @@ function Inspector({
               and left out of every export.
             </p>
           )}
+
+          <LinkedContentPanel
+            body={body}
+            sources={linkSources}
+            readOnly={readOnly}
+            onGoTo={linkActions.goTo}
+            onUpdateOne={(item) => void linkActions.updateOne(item)}
+            onUpdateAll={() => void updateAllLinked()}
+            onDetach={linkActions.detach}
+            onOpenSource={(item) => openLinkedSource(item)}
+          />
 
           <MasterPanel
             body={body}
@@ -1491,8 +1670,141 @@ function ImageControls({
           }
         />
       </label>
+      <div className="insp-h">Frame</div>
+      <div className="grid grid-cols-2 gap-1.5">
+        <label className="text-[10px] text-muted uppercase">
+          Fit
+          <select
+            className="field mt-0.5 h-6 w-full cursor-pointer px-1 py-0 text-[11.5px]"
+            aria-label="Image fit"
+            value={selected.fit ?? 'fill'}
+            onChange={(e) =>
+              onPatchOne((el) => (el.kind === 'image' ? { ...el, fit: e.target.value as ImageFit } : el))
+            }
+          >
+            <option value="fill">Fill</option>
+            <option value="cover">Cover</option>
+            <option value="contain">Contain</option>
+          </select>
+        </label>
+        <label className="text-[10px] text-muted uppercase">
+          Radius
+          <input
+            type="number"
+            min={0}
+            className="field mt-0.5 w-full !px-1.5 !py-0.5 text-[11.5px]"
+            aria-label="Image radius"
+            value={selected.radius ?? 0}
+            onChange={(e) => {
+              const n = Number(e.target.value)
+              if (Number.isFinite(n) && n >= 0) {
+                onPatchOne((el) => (el.kind === 'image' ? { ...el, radius: n } : el), {
+                  coalesceKey: `radius-${selected.id}`,
+                })
+              }
+            }}
+          />
+        </label>
+      </div>
+
+      {/* crop and focal point are a window onto the source, never a rewrite */}
+      <div className="insp-h">Crop</div>
+      <div className="grid grid-cols-2 gap-1.5">
+        {(['x', 'y', 'w', 'h'] as const).map((k) => (
+          <label key={k} className="text-[10px] text-muted uppercase">
+            {k === 'w' ? 'width %' : k === 'h' ? 'height %' : `${k} %`}
+            <input
+              type="number"
+              min={0}
+              max={100}
+              className="field mt-0.5 w-full !px-1.5 !py-0.5 text-[11.5px]"
+              aria-label={`Crop ${k}`}
+              value={Math.round(normalizeCrop(selected.crop)[k] * 100)}
+              onChange={(e) => {
+                const n = Number(e.target.value)
+                if (!Number.isFinite(n)) return
+                onPatchOne(
+                  (el) =>
+                    el.kind === 'image'
+                      ? { ...el, crop: normalizeCrop({ ...normalizeCrop(el.crop), [k]: n / 100 }) }
+                      : el,
+                  { coalesceKey: `crop-${k}-${selected.id}` },
+                )
+              }}
+            />
+          </label>
+        ))}
+      </div>
+      {!isFullCrop(normalizeCrop(selected.crop)) && (
+        <button
+          className="btn mt-1 w-full"
+          onClick={() => onPatchOne((el) => (el.kind === 'image' ? { ...el, crop: undefined } : el))}
+        >
+          Reset crop — the whole picture is still there
+        </button>
+      )}
+
+      <div className="insp-h">Focal point</div>
+      <div className="grid grid-cols-2 gap-1.5">
+        {(['x', 'y'] as const).map((k) => (
+          <label key={k} className="text-[10px] text-muted uppercase">
+            {k} %
+            <input
+              type="number"
+              min={0}
+              max={100}
+              className="field mt-0.5 w-full !px-1.5 !py-0.5 text-[11.5px]"
+              aria-label={`Focal ${k}`}
+              value={Math.round(normalizeFocal(selected.focalPoint)[k] * 100)}
+              onChange={(e) => {
+                const n = Number(e.target.value)
+                if (!Number.isFinite(n)) return
+                onPatchOne(
+                  (el) =>
+                    el.kind === 'image'
+                      ? { ...el, focalPoint: normalizeFocal({ ...normalizeFocal(el.focalPoint), [k]: n / 100 }) }
+                      : el,
+                  { coalesceKey: `focal-${k}-${selected.id}` },
+                )
+              }}
+            />
+          </label>
+        ))}
+      </div>
+
+      <div className="insp-h">Adjustments</div>
+      {(['brightness', 'contrast', 'saturation'] as const).map((k) => (
+        <label key={k} className="mt-1 flex items-center gap-2 text-[10px] text-muted uppercase">
+          <span className="w-16 flex-none">{k}</span>
+          <input
+            type="range"
+            min={-100}
+            max={100}
+            className="min-w-0 flex-1"
+            aria-label={k}
+            value={selected.adjustments?.[k] ?? 0}
+            onChange={(e) =>
+              onPatchOne(
+                (el) =>
+                  el.kind === 'image'
+                    ? { ...el, adjustments: sanitizeAdjustments({ ...(el.adjustments ?? {}), [k]: Number(e.target.value) }) }
+                    : el,
+                { coalesceKey: `adj-${k}-${selected.id}` },
+              )
+            }
+          />
+          <span className="w-8 flex-none text-right tabular-nums">
+            {selected.adjustments?.[k] ?? 0}
+          </span>
+        </label>
+      ))}
+      <p className="mt-1 text-[10.5px] leading-relaxed text-muted">
+        Crop, focal point and adjustments are stored as metadata. The original
+        is untouched and exports at full resolution.
+      </p>
+
       <button className="btn mt-2 w-full" onClick={onReplace}>
-        <IcImage size={12} /> Replace image
+        <IcImage size={12} /> Replace, keep the frame
       </button>
     </>
   )

@@ -13,6 +13,10 @@ import { IcChevronRight, IcEye, IcLayers, IcLock, IcUnlock } from '@/components/
 export function layerLabel(el: PresentElement): string {
   if (el.kind === 'text') return el.text.trim().split('\n')[0].slice(0, 28) || 'Text'
   if (el.kind === 'image') return el.alt?.trim() || 'Image'
+  if (el.kind === 'table') return `Table ${el.cells.length}×${el.cells[0]?.length ?? 0}`
+  if (el.kind === 'chart') {
+    return el.title?.trim() || (el.chart === 'bar' ? 'Bar chart' : 'Line chart')
+  }
   return el.shape[0].toUpperCase() + el.shape.slice(1)
 }
 

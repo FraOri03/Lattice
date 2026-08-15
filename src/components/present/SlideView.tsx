@@ -7,6 +7,9 @@ import {
 import type { ThemeTokens } from '@/lib/present/theme'
 import { resolveTextRender, type DeckTextStyles, type TextRender } from '@/lib/present/textStyles'
 import { docOf, linesOf, type TextLine } from '@/lib/present/richtext'
+import { adjustmentFilter, cropStyle, focalPosition, isFullCrop, normalizeCrop } from '@/lib/present/media'
+import type { ChartElement, TableElement } from '@/lib/present/presentModel'
+import { isEmptyChart } from '@/lib/present/sheetRange'
 
 /**
  * Shared, dependency-light slide rendering used by BOTH the presentation
@@ -48,9 +51,12 @@ export function ElementContent({
   themeText,
   render,
   measureRef,
+  src,
 }: {
   el: PresentElement
   themeText: string
+  /** resolved asset URL for a picture held by reference (19E.4) */
+  src?: string
   /** resolved typography (19E.3); absent falls back to the flat fields */
   render?: TextRender
   /** the inner box, so the editor can measure what the text really needs */
@@ -100,14 +106,45 @@ export function ElementContent({
     )
   }
   if (el.kind === 'image') {
-    return (
+    const crop = normalizeCrop(el.crop)
+    const filter = adjustmentFilter(el.adjustments)
+    const img = (
       <img
-        src={el.src}
+        src={src ?? el.src}
         alt={el.alt ?? ''}
-        style={{ width: '100%', height: '100%', objectFit: 'fill', display: 'block' }}
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: el.fit ?? 'fill',
+          objectPosition: focalPosition(el.focalPoint),
+          display: 'block',
+          filter,
+          ...(isFullCrop(crop) ? {} : cropStyle(crop)),
+        }}
         draggable={false}
       />
     )
+    // the crop is a window onto a larger image: the frame does the clipping,
+    // so the stored picture is never touched
+    return (
+      <div
+        style={{
+          width: '100%',
+          height: '100%',
+          overflow: 'hidden',
+          position: 'relative',
+          borderRadius: el.radius ?? 0,
+        }}
+      >
+        {img}
+      </div>
+    )
+  }
+  if (el.kind === 'table') {
+    return <TableContent el={el} themeText={themeText} accent={render?.color ?? themeText} />
+  }
+  if (el.kind === 'chart') {
+    return <ChartContent el={el} themeText={themeText} />
   }
   if (el.shape === 'line') {
     return (
@@ -127,6 +164,110 @@ export function ElementContent({
         boxSizing: 'border-box',
       }}
     />
+  )
+}
+
+/** A grid, drawn from the cells as captured (19E.4). */
+function TableContent({
+  el,
+  themeText,
+  accent,
+}: {
+  el: TableElement
+  themeText: string
+  accent: string
+}) {
+  const cols = el.cells.reduce((n, r) => Math.max(n, r.length), 0)
+  return (
+    <table
+      style={{
+        width: '100%',
+        height: '100%',
+        borderCollapse: 'collapse',
+        color: themeText,
+        fontSize: '0.8em',
+        tableLayout: 'fixed',
+      }}
+    >
+      <tbody>
+        {el.cells.map((row, r) => (
+          <tr key={r}>
+            {Array.from({ length: cols }, (_, c) => {
+              const header = el.headerRow && r === 0
+              const Tag = header ? 'th' : 'td'
+              return (
+                <Tag
+                  key={c}
+                  style={{
+                    border: `1px solid ${themeText}33`,
+                    padding: '0.25em 0.4em',
+                    textAlign: c === 0 ? 'left' : 'right',
+                    fontWeight: header ? 700 : 400,
+                    color: header ? accent : themeText,
+                    overflow: 'hidden',
+                    whiteSpace: 'nowrap',
+                    textOverflow: 'ellipsis',
+                  }}
+                >
+                  {row[c] ?? ''}
+                </Tag>
+              )
+            })}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+}
+
+/**
+ * A chart drawn from the element's captured data (19E.4).
+ *
+ * It reads nothing live. A slide showing a number cannot have that number
+ * change while it is on a projector, so the data it draws is the data the
+ * deck holds — refreshing it is an act taken in the editor.
+ */
+function ChartContent({ el, themeText }: { el: ChartElement; themeText: string }) {
+  const data = el.data
+  if (isEmptyChart(data)) {
+    return (
+      <div style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', color: themeText, opacity: 0.6, fontSize: '0.8em' }}>
+        No data in this range
+      </div>
+    )
+  }
+  const W = 100
+  const H = 60
+  const max = Math.max(1, ...data.series.flatMap((s) => s.values))
+  const groups = data.categories.length
+  const palette = ['#0d99ff', '#14ae5c', '#ffa629', '#9747ff', '#f24822']
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: '100%', height: '100%' }} role="img" aria-label={el.title ?? 'Chart'}>
+      <line x1="0" y1={H - 8} x2={W} y2={H - 8} stroke={themeText} strokeOpacity="0.25" strokeWidth="0.4" />
+      {el.chart === 'bar'
+        ? data.series.map((s, si) =>
+            s.values.map((v, i) => {
+              const bw = (W / Math.max(1, groups)) / (data.series.length + 1)
+              const x = (i * W) / groups + si * bw + bw * 0.4
+              const h = (v / max) * (H - 12)
+              return (
+                <rect key={`${si}-${i}`} x={x} y={H - 8 - h} width={bw * 0.9} height={h} fill={palette[si % palette.length]} />
+              )
+            }),
+          )
+        : data.series.map((s, si) => (
+            <polyline
+              key={si}
+              fill="none"
+              stroke={palette[si % palette.length]}
+              strokeWidth="1"
+              points={s.values
+                .map((v, i) => `${(i * W) / Math.max(1, groups - 1)},${H - 8 - (v / max) * (H - 12)}`)
+                .join(' ')}
+            />
+          ))}
+    </svg>
   )
 }
 

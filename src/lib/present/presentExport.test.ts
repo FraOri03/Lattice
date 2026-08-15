@@ -169,3 +169,74 @@ describe('PPTX export — structured text (19E.3)', () => {
     expect(xml).toContain('<a:t>plain bold</a:t>')
   })
 })
+
+/**
+ * A chart has to leave as a chart (19E.4): the file holds the numbers, so
+ * PowerPoint can re-plot and re-type them. An image of a chart would look the
+ * same in a screenshot and be useless in the file.
+ */
+describe('PPTX export — charts and tables (19E.4)', () => {
+  const chartDeck = (): PresentationBody => ({
+    app: 'lattice-present',
+    version: 6,
+    theme: 'plain',
+    slides: [
+      createSlide({
+        id: 'a',
+        elements: [
+          {
+            id: 'c1',
+            kind: 'chart',
+            chart: 'bar',
+            title: 'Adoption',
+            x: 40, y: 40, w: 400, h: 300, z: 0,
+            data: {
+              categories: ['Board', 'Present'],
+              series: [{ name: 'Q3', values: [3120, 1480] }],
+            },
+          },
+          {
+            id: 't1',
+            kind: 'table',
+            headerRow: true,
+            x: 500, y: 40, w: 380, h: 200, z: 1,
+            cells: [['Section', 'Q3'], ['Board', '3 120']],
+          },
+        ],
+      }),
+    ],
+  })
+
+  it('writes a real chart part, not a picture', async () => {
+    const zip = await open(await exportPresentationPptx(chartDeck()))
+    expect(Object.keys(zip.files)).toContain('ppt/charts/chart1.xml')
+    const slide = await zip.files['ppt/slides/slide1.xml'].async('text')
+    expect(slide).toContain('drawingml/2006/chart')
+    expect(slide).not.toContain('<p:pic>')
+  })
+
+  it('carries the cached numbers PowerPoint needs to re-plot', async () => {
+    const zip = await open(await exportPresentationPptx(chartDeck()))
+    const chart = await zip.files['ppt/charts/chart1.xml'].async('text')
+    expect(chart).toContain('<c:barChart>')
+    expect(chart).toContain('<c:v>3120</c:v>')
+    expect(chart).toContain('<c:v>Board</c:v>')
+    expect(chart).toContain('<c:v>Q3</c:v>')
+  })
+
+  it('declares the chart part so the package stays valid', async () => {
+    const zip = await open(await exportPresentationPptx(chartDeck()))
+    const types = await zip.files['[Content_Types].xml'].async('text')
+    expect(types).toContain('/ppt/charts/chart1.xml')
+    const rels = await zip.files['ppt/slides/_rels/slide1.xml.rels'].async('text')
+    expect(rels).toContain('../charts/chart1.xml')
+  })
+
+  it('writes a table as cells, not as text in a box', async () => {
+    const zip = await open(await exportPresentationPptx(chartDeck()))
+    const slide = await zip.files['ppt/slides/slide1.xml'].async('text')
+    expect(slide).toContain('<a:tbl>')
+    expect(slide).toContain('<a:t>Section</a:t>')
+    expect(slide).toContain('<a:t>3 120</a:t>')
+  })
+})

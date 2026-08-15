@@ -3,6 +3,9 @@ import type { ThemeTokenOverride } from './theme'
 import { sanitizeTokens } from './theme'
 import type { PlaceholderRole } from './layouts'
 import type { JSONContent } from '@tiptap/core'
+import { sanitizeAdjustments, type Crop, type FocalPoint, type ImageAdjustments, type ImageFit } from './media'
+import { sanitizeLinkRef, type LinkRef } from './linked'
+import type { ChartData } from './sheetRange'
 import type { AutoSizeMode } from './overflow'
 import {
   sanitizeTextStyles,
@@ -32,10 +35,12 @@ export const SLIDE_H = 540
  * and image `alt`. v2 → v3 (19E.1): sections, hidden slides, review status.
  * v3 → v4 (19E.2): theme tokens, masters, slide `masterId`/`layoutId` and
  * element `role`. v4 → v5 (19E.3): structured text (`doc`), named text styles
- * and box typography. Every addition is optional, so a body of any version
- * loads unchanged and renders exactly as it did.
+ * and box typography. v5 → v6 (19E.4): media metadata and assets by
+ * reference, table and chart elements, and a link record any element may
+ * carry. Every addition is optional, so a body of any version loads unchanged
+ * and renders exactly as it did.
  */
-export const PRESENT_BODY_VERSION = 5
+export const PRESENT_BODY_VERSION = 6
 
 export type PresentTheme = 'plain' | 'ink' | 'accent'
 
@@ -80,6 +85,12 @@ export interface PresentElementBase {
    * lands in the new layout's title rather than wherever the old one sat.
    */
   role?: PlaceholderRole
+  /**
+   * Where this element's content came from, when it came from somewhere
+   * (19E.4). Any element may carry one — a picture, a chart, a group of
+   * shapes pasted from a board.
+   */
+  linkRef?: LinkRef
 }
 
 export interface TextElement extends PresentElementBase {
@@ -112,10 +123,44 @@ export interface TextElement extends PresentElementBase {
 
 export interface ImageElement extends PresentElementBase {
   kind: 'image'
-  /** data URL (self-contained decks survive export/import/Drive) */
+  /**
+   * data URL — still the fallback, so a deck stays self-contained through
+   * export, import and Drive. `assetId` is preferred when present.
+   */
   src: string
   /** alternative text for accessibility + export descr (Phase 1 field) */
   alt?: string
+  /** the asset this picture really is (19E.4); resolved through the registry */
+  assetId?: string
+  /** all display-time metadata: the stored asset is never rewritten */
+  crop?: Crop
+  focalPoint?: FocalPoint
+  adjustments?: ImageAdjustments
+  fit?: ImageFit
+  radius?: number
+}
+
+/** A grid of text on a slide (19E.4). */
+export interface TableElement extends PresentElementBase {
+  kind: 'table'
+  /** rows of display strings; ragged rows are padded on read */
+  cells: string[][]
+  /** draw the first row as a header */
+  headerRow?: boolean
+}
+
+/** A chart drawn from cached data, usually read from a sheet range (19E.4). */
+export interface ChartElement extends PresentElementBase {
+  kind: 'chart'
+  chart: 'bar' | 'line'
+  /**
+   * The data as captured. A deck renders from this, never from a live read —
+   * which is what makes a presentation immune to a source changing under it.
+   */
+  data: ChartData
+  title?: string
+  showLegend?: boolean
+  showValues?: boolean
 }
 
 export interface ShapeElement extends PresentElementBase {
@@ -126,7 +171,12 @@ export interface ShapeElement extends PresentElementBase {
   strokeWidth: number
 }
 
-export type PresentElement = TextElement | ImageElement | ShapeElement
+export type PresentElement =
+  | TextElement
+  | ImageElement
+  | ShapeElement
+  | TableElement
+  | ChartElement
 
 export interface PresentSlide {
   id: string
@@ -281,9 +331,21 @@ function migrateElement(raw: unknown): PresentElement | null {
     valign: VALIGNS.includes(e.valign as string) ? (e.valign as 'top') : undefined,
     autoSize: AUTOSIZE_MODES.includes(e.autoSize as string) ? (e.autoSize as AutoSizeMode) : undefined,
   }
+  // 19E.4: display-time media metadata and the link record, both sanitised so
+  // a corrupt body can never produce an unpaintable picture or a dangling tie
+  const media =
+    e.kind === 'image'
+      ? {
+          adjustments: sanitizeAdjustments(e.adjustments),
+          crop: e.crop && typeof e.crop === 'object' ? (e.crop as Crop) : undefined,
+          assetId: typeof e.assetId === 'string' && e.assetId ? (e.assetId as string) : undefined,
+        }
+      : {}
   return {
     ...(e as unknown as PresentElement),
     ...(e.kind === 'text' ? rich : {}),
+    ...media,
+    linkRef: sanitizeLinkRef(e.linkRef),
     id: typeof e.id === 'string' && e.id ? (e.id as string) : nid('el'),
     x: num(e.x, 0),
     y: num(e.y, 0),

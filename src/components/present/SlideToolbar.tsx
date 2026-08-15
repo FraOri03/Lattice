@@ -8,9 +8,11 @@ import {
   IcAlignTop,
   IcDistributeH,
   IcDistributeV,
+  IcChart,
   IcImage,
   IcLayout,
   IcMagnet,
+  IcTable,
 } from '@/components/Icons'
 import {
   ToolbarAction,
@@ -55,6 +57,8 @@ export function SlideToolbar({
   onResetBackground,
   onToggleSnap,
   onOpenLayouts,
+  onInsertChart,
+  onInsertTable,
   onAlign,
   onDistribute,
 }: {
@@ -74,6 +78,8 @@ export function SlideToolbar({
   onResetBackground: () => void
   onToggleSnap: () => void
   onOpenLayouts: () => void
+  onInsertChart: () => void
+  onInsertTable: () => void
   onAlign: (edge: AlignEdge) => void
   onDistribute: (axis: DistributeAxis) => void
 }) {
@@ -97,6 +103,21 @@ export function SlideToolbar({
             label={t.image}
             description={t.addImage}
             onRun={onAddImage}
+          />
+          <ToolbarAction
+            icon={<IcChart size={12} />}
+            content="icon-text"
+            label={t.chart}
+            description={t.chartDescription}
+            haspopup="dialog"
+            onRun={onInsertChart}
+          />
+          <ToolbarAction
+            icon={<IcTable size={12} />}
+            content="icon-text"
+            label={t.table}
+            description={t.tableDescription}
+            onRun={onInsertTable}
           />
         </ToolbarGroup>
 
