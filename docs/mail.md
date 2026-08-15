@@ -26,6 +26,49 @@ paste brings, and refuses a value that is still not an address with a sentence
 naming the variable rather than letting the provider say it in a 422. That is a
 safety net, not the instruction.
 
+### The display name is syntax too
+
+Stripping the outer quotes was not the whole bug, because the half of the value
+nobody reads as syntax is syntax as well. `MAIL_FROM=Lattice, Ori
+<no-reply@yourdomain.com>` is a name and an address to a person; to a mail
+parser the comma ends the first address of a *list*, and Resend answers the
+same bare 422 ``Invalid `from` field``. A name carrying an accent or an em dash
+fails for a different reason: a header cannot hold a byte that is not ASCII.
+
+Both are fixed rather than reported, because the value is correct as a **name**
+and wrong only as a **header**, and an operator cannot see the difference:
+
+| `MAIL_FROM` | sent as |
+|---|---|
+| `Lattice <no-reply@d.com>` | unchanged |
+| `Lattice, Ori <no-reply@d.com>` | `"Lattice, Ori" <no-reply@d.com>` |
+| `Cognomé <no-reply@d.com>` | `=?UTF-8?B?…?= <no-reply@d.com>` (RFC 2047) |
+| `"Lattice <no-reply@d.com>` | `Lattice <no-reply@d.com>` |
+
+The **address** is never rewritten — it is the one part no guess here can
+recover — so it is validated instead, strictly enough to catch what Resend
+catches: a dot may not lead, trail or double, and a domain needs labels and a
+real TLD. A bad one now stops before the request, which costs no round trip, no
+rate-limit slot and no row in `mail_sends`.
+
+When a send is refused anyway, `explainRejection` puts **the address Lattice
+actually sent** in the error the sender sees. The provider quotes a field name
+and never the value, which leaves an operator comparing a 422 against a
+settings page that looks right; the mismatch should be visible, not deduced.
+
+When the provider's own sentence already names the fix — "please verify a
+domain at resend.com/domains" — nothing is added to it, and the JSON envelope
+around it is dropped. Padding an error that is already an instruction is what
+pushed the useful half of it past the length a toast can hold, and delivered
+`please verify a do` to a user.
+
+### Before a domain is verified
+
+Resend's `onboarding@resend.dev` sends without any DNS work but **delivers only
+to the address the Resend account was registered with**; everyone else gets a
+403 naming that address. It is a smoke test, not a configuration: invitations
+to anyone else cannot work until a real domain is verified.
+
 **The sending domain has to be verified with Resend or nothing arrives.** This
 is the external blocker #89 names, and no amount of correct code substitutes
 for it: an unverified domain is rejected at the API, and every message fails
@@ -107,9 +150,21 @@ not insert at all. Counting rows would count *offers*, while the thing being
 limited is *messages* — a sender who resends fifty times produces one row and
 fifty e-mails.
 
-A send is recorded **before** the attempt and whether or not the provider then
-accepts it. A failure that did not count would make retrying a way around the
-ceiling.
+A send is recorded whether or not the provider then accepts it. A failure that
+did not count would make retrying a way around the ceiling.
+
+**Except a refusal about the deployment**, which is the same exception already
+made for a malformed `MAIL_FROM` and a template that throws. An unverified
+domain — or Resend's sandbox, which delivers only to the account's own address
+— refuses every message identically until somebody changes a setting: no
+mailbox was touched, and the next attempt cannot go differently. Counting those
+spent an address's five-an-hour on nothing, so an operator locked the feature
+out *precisely by trying to fix it*, and then could not tell a broken
+configuration from a ceiling. `isConfigurationRejection` in `mail.ts` draws the
+line — 401, 403, and a 422 naming `from` — and everything else (429, 5xx, a 422
+naming `to`) still counts, because it may well have reached a mailbox. Nothing
+is bypassed by this: it is not a route to sending mail, it is the route to
+sending none.
 
 Unlike the OTP throttle, this one is **visible**: 17.3 hides its limit because
 admitting it would confirm that earlier requests for an address were counted,

@@ -46,18 +46,32 @@ vi.mock('./_lib/mailTemplates.js', async (importOriginal) => {
 /** Configured, and configured wrongly — a `MAIL_FROM` the provider refuses. */
 let mailProblem = ''
 
-vi.mock('./_lib/mail.js', () => ({
-  mailSender: () =>
-    mailConfigured
-      ? {
-          problem: mailProblem || undefined,
-          send: async (message: { to: string; subject: string; text: string; html?: string }) => {
-            if (mailFails) throw new Error('provider said no')
-            outbox.push(message)
-          },
-        }
-      : null,
-}))
+/**
+ * A refusal about the DEPLOYMENT rather than about this message: the
+ * unverified domain and the sandbox that only delivers to the account's own
+ * address. Deterministic, and no mailbox was touched.
+ */
+let mailRejectsConfiguration = false
+
+vi.mock('./_lib/mail.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./_lib/mail.js')>()
+  return {
+    ...actual,
+    mailSender: () =>
+      mailConfigured
+        ? {
+            problem: mailProblem || undefined,
+            send: async (message: { to: string; subject: string; text: string; html?: string }) => {
+              if (mailRejectsConfiguration) {
+                throw new actual.MailRejected(403, true, 'the domain is not verified')
+              }
+              if (mailFails) throw new Error('provider said no')
+              outbox.push(message)
+            },
+          }
+        : null,
+  }
+})
 
 const handler = (await import('./invitations.js')).default
 
@@ -140,6 +154,7 @@ beforeEach(async () => {
   databasePresent = true
   mailConfigured = true
   mailFails = false
+  mailRejectsConfiguration = false
   mailProblem = ''
   templateThrows = false
   outbox.length = 0
@@ -545,6 +560,27 @@ describe('delivery (18.2)', () => {
     templateThrows = true
     await seedInvite()
     expect(await db.mailSends.countForRecipient('grace@example.com', 0)).toBe(0)
+  })
+
+  /**
+   * An unverified domain — or Resend's sandbox, which only delivers to the
+   * account's own address — refuses every message identically until somebody
+   * changes a setting. Counting those spent an address's five-an-hour on
+   * messages no mailbox ever saw, so the operator locked the feature out
+   * precisely by trying to fix it, and then could not tell the broken
+   * configuration from the ceiling.
+   */
+  it('does not spend the allowance on a refusal about the deployment', async () => {
+    mailRejectsConfiguration = true
+    await seedInvite()
+    expect(await db.mailSends.countForRecipient('grace@example.com', 0)).toBe(0)
+  })
+
+  it('still spends it on a failure that may well have reached a mailbox', async () => {
+    // nothing here is a way around the ceiling: a transient refusal counts
+    mailFails = true
+    await seedInvite()
+    expect(await db.mailSends.countForRecipient('grace@example.com', 0)).toBe(1)
   })
 
   it('calls a broken MAIL_FROM broken, not missing', async () => {

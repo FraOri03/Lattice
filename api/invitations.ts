@@ -9,7 +9,7 @@ import {
   type VerifiedIdentity,
 } from './_lib/realtime.js'
 import { hashToken, mintToken, originOf, type ApiRequest } from './_lib/session.js'
-import { mailSender, type MailSender } from './_lib/mail.js'
+import { isConfigurationFailure, mailSender, type MailSender } from './_lib/mail.js'
 import { invitationMessage, normaliseLocale } from './_lib/mailTemplates.js'
 import { limitMessage, mailAllowance, recordSend } from './_lib/mailLimits.js'
 import type { MailDelivery } from '../src/types/mail.js'
@@ -211,13 +211,25 @@ async function deliver(
     return { delivery: 'failed', reason: 'Lattice could not compose the message.' }
   }
 
-  // recorded before the attempt: a send that failed still consumed the
-  // sender's allowance, or retrying would be a way around the ceiling
-  await recordSend(db.mailSends, 'invitation', invite.email, invite.projectId, now)
+  /**
+   * The attempt is written down whether or not the provider accepts it: the
+   * ceiling bounds what Lattice *tries* to send, and a failure that did not
+   * count would make retrying a way around it.
+   *
+   * With ONE exception, and it is the same one already made above for a
+   * malformed `MAIL_FROM` and an unbuildable template: a refusal about this
+   * DEPLOYMENT — an unverified domain, the sandbox that only delivers to the
+   * account's own address, a rejected From — touched no mailbox and will
+   * repeat identically until somebody changes a setting. Counting those
+   * spends an address's five-an-hour on nothing, so the operator locks the
+   * feature out precisely by trying to fix it, and then cannot tell the
+   * broken configuration from the ceiling. Nothing is bypassed: it is not a
+   * route to sending mail, it is the route to sending none.
+   */
+  const spend = () => recordSend(db.mailSends, 'invitation', invite.email, invite.projectId, now)
 
   try {
     await mail.send(message)
-    return { delivery: 'sent' }
   } catch (err) {
     /**
      * The provider's own words, handed to the sender.
@@ -229,8 +241,13 @@ async function deliver(
      */
     const detail = err instanceof Error ? err.message : String(err)
     console.warn('[invitations] delivery failed:', detail)
-    return { delivery: 'failed', reason: detail.slice(0, 300) }
+    if (!isConfigurationFailure(err)) await spend()
+    // the `[mail]` tag is for a log stream; in a toast it is only noise
+    return { delivery: 'failed', reason: detail.replace(/^\[mail\]\s*/, '').slice(0, 300) }
   }
+
+  await spend()
+  return { delivery: 'sent' }
 }
 
 /**

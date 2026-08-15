@@ -228,6 +228,36 @@ All notable changes to Lattice are recorded here. The format follows
 
 ### Fixed
 
+- **An invitation e-mail was rejected over the name in front of the address.** The sender saw
+  "the invitation exists, but the e-mail was not sent" next to a settings page showing a
+  sender address that looked perfectly correct, and Resend's own answer — a bare 422
+  ``Invalid `from` field`` — named a field without naming which setting held it or quoting
+  the value back. The half nobody reads as syntax is syntax: in `Lattice, Ori <no-reply@…>` the comma
+  ends the first address of a *list*, and an accent or an em dash cannot travel in a header
+  at all. Both are now fixed rather than reported, because the value is right as a **name**
+  and wrong only as a **header** — the name is quoted when it needs quoting and encoded (RFC
+  2047) when it is not ASCII, while the address, the one part no guess can recover, is left
+  exactly as written and validated more strictly instead, so a typo stops before it costs a
+  round trip, a rate-limit slot and a row in `mail_sends`. When the provider refuses anyway,
+  the error now carries the address Lattice actually sent.
+
+- **A provider error arrived cut mid-instruction: "please verify a do".** The message that
+  tells an operator exactly what to do — verify a domain, and which address the sandbox is
+  limited to — was truncated because the JSON envelope around it was included in the budget
+  and Lattice appended advice of its own to a sentence that was already an instruction. The
+  envelope is dropped now, and a refusal that names its own fix is passed through whole and
+  unpadded.
+
+- **Trying to fix a mail misconfiguration locked the mailbox out of being invited.** A send
+  was counted against the hourly ceiling (five per recipient) before the attempt, so five
+  attempts against an unverified domain — or against Resend's sandbox, which delivers only
+  to the account's own address — spent the whole allowance on messages no mailbox ever saw,
+  and from then on the broken configuration was indistinguishable from the limit. A refusal
+  about the *deployment* (401, 403, a 422 naming `from`) no longer counts: it touched nothing
+  and will repeat identically until a setting changes. Everything else — 429, 5xx, a 422
+  naming `to` — still counts, because it may well have reached a mailbox, so retrying is
+  still not a way around the ceiling.
+
 - **Every realtime feature returned 500, on a deployment that was configured correctly.**
   Opening a project logged `realtime attach failed (HTTP 500)` and no project call could be
   joined, while the endpoints' own answers — 501 for a missing key, 401 for a rejected token
