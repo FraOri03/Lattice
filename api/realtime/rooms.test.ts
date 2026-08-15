@@ -251,3 +251,119 @@ describe('set-role — rank rules survive the migration', () => {
     expect(lastWrite()?.bound ?? null).toBeNull()
   })
 })
+
+/**
+ * transfer-ownership — the action `set-role` refuses to perform.
+ *
+ * `membersService.transferOwnership` rewrote the local member list and
+ * mirrored nothing, so on a realtime project the ACL that actually decides
+ * kept naming the previous owner: the recipient could not manage admins or
+ * delete the rooms, and the sender still could. The UI reported success.
+ */
+describe('transfer-ownership', () => {
+  const OWNED: Meta = {
+    ownerEmail: 'ada@example.com',
+    admins: [],
+    editors: ['bob@example.com'],
+  }
+
+  it('swaps the two slots in a single write', async () => {
+    getRoom.mockResolvedValue(room(OWNED))
+    mockGoogle('ada@example.com')
+    const sent = await call({
+      action: 'transfer-ownership',
+      projectId: 'proj_1',
+      email: 'bob@example.com',
+      googleToken: 'ya29',
+    })
+
+    expect(sent.code).toBe(200)
+    expect(lastWrite()?.ownerEmail).toBe('bob@example.com')
+    // the sender lands as admin — never dropped, never left as owner too
+    expect(lastWrite()?.admins).toEqual(['ada@example.com'])
+    expect(lastWrite()?.editors ?? null).toBeNull()
+    // both rooms, like every other ACL write
+    expect(updateRoom).toHaveBeenCalledTimes(2)
+  })
+
+  it('carries both bindings across, so neither has to prove an address again', async () => {
+    getRoom.mockResolvedValue(
+      room({
+        ...OWNED,
+        bound: [`${canonical} ada@example.com`, 'usr_bob bob@example.com'],
+      }),
+    )
+    mockGoogle('ada@example.com')
+    const sent = await call({
+      action: 'transfer-ownership',
+      projectId: 'proj_1',
+      email: 'bob@example.com',
+      googleToken: 'ya29',
+    })
+
+    expect(sent.code).toBe(200)
+    expect(lastWrite()?.bound).toContain(`${canonical} ada@example.com`)
+    expect(lastWrite()?.bound).toContain('usr_bob bob@example.com')
+  })
+
+  it('is refused to everybody but the owner', async () => {
+    getRoom.mockResolvedValue(
+      room({ ownerEmail: 'owner@example.com', admins: ['ada@example.com'] }),
+    )
+    mockGoogle('ada@example.com') // an admin, the highest rank below owner
+    const sent = await call({
+      action: 'transfer-ownership',
+      projectId: 'proj_1',
+      email: 'ada@example.com',
+      googleToken: 'ya29',
+    })
+
+    expect(sent.code).toBe(403)
+    expect(updateRoom).not.toHaveBeenCalled()
+  })
+
+  it('refuses an address that is not already a member', async () => {
+    // ownership is handed over, not granted: otherwise the one action nobody
+    // else can authorise becomes a way to give the project to a stranger
+    getRoom.mockResolvedValue(room(OWNED))
+    mockGoogle('ada@example.com')
+    const sent = await call({
+      action: 'transfer-ownership',
+      projectId: 'proj_1',
+      email: 'nobody@example.com',
+      googleToken: 'ya29',
+    })
+
+    expect(sent.code).toBe(404)
+    expect(updateRoom).not.toHaveBeenCalled()
+  })
+
+  it('refuses to hand the project to the person who already owns it', async () => {
+    getRoom.mockResolvedValue(room(OWNED))
+    mockGoogle('ada@example.com')
+    const sent = await call({
+      action: 'transfer-ownership',
+      projectId: 'proj_1',
+      email: 'ada@example.com',
+      googleToken: 'ya29',
+    })
+
+    expect(sent.code).toBe(409)
+    expect(updateRoom).not.toHaveBeenCalled()
+  })
+
+  it('still refuses to move the owner slot through set-role', async () => {
+    getRoom.mockResolvedValue(room(OWNED))
+    mockGoogle('ada@example.com')
+    const sent = await call({
+      action: 'set-role',
+      projectId: 'proj_1',
+      email: 'ada@example.com',
+      role: 'admin',
+      googleToken: 'ya29',
+    })
+
+    expect(sent.code).toBe(403)
+    expect(updateRoom).not.toHaveBeenCalled()
+  })
+})

@@ -53,6 +53,29 @@ export function isConflict(
   return local.updatedAt > lastSyncAt && remote.updatedAt > lastSyncAt
 }
 
+/**
+ * Whether the local body holds edits that never reached Drive.
+ *
+ * The question the `.conflict-` backup exists to answer, and it is about the
+ * local copy alone: `pushedUpdatedAt` is the version last uploaded
+ * (`SyncMeta.bodyPush`), so anything newer than it is work that lives on this
+ * device and nowhere else. Overwriting *that* on a pull is the one outcome
+ * newest-wins is not allowed to produce silently.
+ *
+ * Named parameters rather than two `VersionedEntity` values on purpose: the
+ * bug this replaces was passing the pushed timestamp where the local one
+ * belonged, which reads as plausible until you know which is which. It also
+ * deliberately does not take `lastSyncAt` — that advances on a push-only sync
+ * too, so it cannot say whether one particular body is on Drive. Only
+ * `bodyPush` can.
+ */
+export function hasUnpushedBody(
+  localUpdatedAt: number,
+  pushedUpdatedAt: number,
+): boolean {
+  return localUpdatedAt > pushedUpdatedAt
+}
+
 export function describeConflict(
   kind: string,
   local: VersionedEntity,

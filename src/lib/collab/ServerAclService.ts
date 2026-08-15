@@ -55,6 +55,20 @@ class ServerAclService {
     return result
   }
 
+  /**
+   * Owner only: hand the project to another member.
+   *
+   * Its own call rather than `setRole(email, 'owner')`, because the endpoint
+   * refuses to move the owner slot through `set-role` — the swap has to be
+   * one write, or a project ends up with two owners or none.
+   */
+  async transferOwnership(projectId: string, email: string): Promise<AclResult> {
+    if (!email) return { ok: false, error: 'Member has no e-mail address.' }
+    const result = await this.post({ action: 'transfer-ownership', projectId, email })
+    if (!result.ok) console.warn('[collab/acl] ownership transfer failed:', result.error)
+    return result
+  }
+
   /** Owner only: delete the project's realtime rooms. */
   async deleteRooms(projectId: string): Promise<AclResult> {
     const result = await this.post({ action: 'delete', projectId })

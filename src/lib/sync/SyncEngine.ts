@@ -11,7 +11,12 @@ import { PROJECT_ID_PROPERTY } from '@/lib/storage/driveProjectFolder'
 import { authService } from '@/lib/auth/AuthService'
 import { buildStandaloneHtml, companionFileName } from '@/lib/export/ExportService'
 import { useSyncStore } from './syncStore'
-import { describeConflict, isConflict, resolveVersions } from './ConflictResolver'
+import {
+  describeConflict,
+  hasUnpushedBody,
+  isConflict,
+  resolveVersions,
+} from './ConflictResolver'
 import type {
   AssetDoc,
   Board,
@@ -93,31 +98,41 @@ interface SyncMeta {
   docCompanions: Record<string, string>
 }
 
+/** One entity the pull is about to replace, and what it was worth locally. */
+interface PulledEntity {
+  id: string
+  /** Its local `updatedAt` BEFORE the remote copy overwrote it; 0 if new here. */
+  localUpdatedAt: number
+}
+
 const META_KEY = 'lattice-sync-meta'
 const PUSH_DEBOUNCE_MS = 10_000
+
+/**
+ * `lastSyncAt` is listed among the defaults, not only in the fallback below.
+ *
+ * Stored meta is spread over these, and `JSON.parse` is `any` — so a payload
+ * without the key produced `undefined` rather than `null`, which slips past
+ * the `lastSyncAt === null` guard in `isConflict` and makes every comparison
+ * against it quietly false. `JSON.stringify` then drops the key again on the
+ * next save, so the state persists once reached.
+ */
+const EMPTY_META: SyncMeta = {
+  lastSyncAt: null,
+  projectPush: {},
+  bodyPush: {},
+  uploadedAssets: [],
+  docCompanions: {},
+}
 
 function loadMeta(): SyncMeta {
   try {
     const raw = localStorage.getItem(META_KEY)
-    if (raw) {
-      return {
-        projectPush: {},
-        bodyPush: {},
-        uploadedAssets: [],
-        docCompanions: {},
-        ...JSON.parse(raw),
-      }
-    }
+    if (raw) return { ...EMPTY_META, ...JSON.parse(raw) }
   } catch {
     /* corrupted meta → resync from scratch (uploads are idempotent) */
   }
-  return {
-    lastSyncAt: null,
-    projectPush: {},
-    bodyPush: {},
-    uploadedAssets: [],
-    docCompanions: {},
-  }
+  return { ...EMPTY_META }
 }
 
 class SyncEngine {
@@ -589,9 +604,9 @@ class SyncEngine {
       kind: string,
       local: Record<string, T>,
       remote: Record<string, T>,
-    ): { next: Record<string, T>; pulledIds: string[] } => {
+    ): { next: Record<string, T>; pulled: PulledEntity[] } => {
       const next = { ...local }
-      const pulledIds: string[] = []
+      const pulled: PulledEntity[] = []
       for (const [id, remoteEntity] of Object.entries(remote)) {
         const localEntity = local[id]
         const res = resolveVersions(localEntity, remoteEntity)
@@ -600,9 +615,18 @@ class SyncEngine {
           conflicts.push(describeConflict(kind, localEntity!, remoteEntity, 'remote'))
         }
         next[id] = remoteEntity
-        pulledIds.push(id)
+        /**
+         * The local timestamp is carried out of this loop because it is about
+         * to stop existing: `setState` below replaces the entity with the
+         * remote one, so anything reading the store afterwards — `pullBody`
+         * included — sees the remote `updatedAt` for both sides.
+         *
+         * 0 for an entity this device has never held: there is no local body
+         * to lose, so there is nothing to back up either.
+         */
+        pulled.push({ id, localUpdatedAt: localEntity?.updatedAt ?? 0 })
       }
-      return { next, pulledIds }
+      return { next, pulled }
     }
 
     const notes = mergeRecord('note', s.notes, snapshot.notes)
@@ -650,16 +674,23 @@ class SyncEngine {
       name: string,
       json: boolean,
       remoteUpdatedAt: number,
+      localUpdatedAt: number,
     ) => {
-      const hadUnpushedLocal = (this.meta.bodyPush[id] ?? 0) > 0 &&
-        (await storage.getDocument(id)) !== undefined &&
-        isConflict(
-          { id, updatedAt: this.meta.bodyPush[id] ?? 0 },
-          { id, updatedAt: remoteUpdatedAt },
-          lastSyncAt,
-        )
-      if (hadUnpushedLocal) {
-        const localBody = await storage.getDocument(id)
+      /**
+       * The backup fires when this device holds body edits Drive has never
+       * seen — `hasUnpushedBody` says what that means and why it is measured
+       * against `bodyPush` rather than against `lastSyncAt`.
+       *
+       * The test used to be `isConflict(bodyPush[id], remote, lastSyncAt)`,
+       * which asks whether the body HAD been pushed since the last sync —
+       * that is, whether Drive already has it. So the backup was written
+       * exactly when it was pointless and skipped exactly when it mattered,
+       * and the overwrite below destroyed the only copy of an offline edit.
+       */
+      const localBody = hasUnpushedBody(localUpdatedAt, this.meta.bodyPush[id] ?? 0)
+        ? await storage.getDocument(id)
+        : undefined
+      if (localBody !== undefined) {
         await drive.putFile(
           ['projects', projectId, folder],
           `${id}.conflict-${Date.now()}.json`,
@@ -677,15 +708,19 @@ class SyncEngine {
       this.saveMeta()
     }
 
-    for (const id of docs.pulledIds) {
-      await pullBody(id, 'documents', `${id}.json`, true, snapshot.docs[id].updatedAt)
+    for (const { id, localUpdatedAt } of docs.pulled) {
+      const name = `${id}.json`
+      await pullBody(id, 'documents', name, true, snapshot.docs[id].updatedAt, localUpdatedAt)
     }
-    for (const id of sheetDocs.pulledIds) {
-      await pullBody(id, 'spreadsheets', `${id}.json`, true, snapshot.sheetDocs[id].updatedAt)
+    for (const { id, localUpdatedAt } of sheetDocs.pulled) {
+      const name = `${id}.json`
+      const at = snapshot.sheetDocs[id].updatedAt
+      await pullBody(id, 'spreadsheets', name, true, at, localUpdatedAt)
     }
-    for (const id of codeDocs.pulledIds) {
+    for (const { id, localUpdatedAt } of codeDocs.pulled) {
       const c = snapshot.codeDocs[id]
-      await pullBody(id, 'code', `${id}.${c.extension || 'txt'}`, false, c.updatedAt)
+      const name = `${id}.${c.extension || 'txt'}`
+      await pullBody(id, 'code', name, false, c.updatedAt, localUpdatedAt)
     }
 
     // asset binaries we reference but don't have locally

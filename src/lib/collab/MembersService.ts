@@ -130,7 +130,15 @@ class MembersService {
     return true
   }
 
-  /** Owner-only. The previous owner becomes an admin. */
+  /**
+   * Owner-only. The previous owner becomes an admin.
+   *
+   * Mirrored to the server like every other membership change in this file.
+   * It was not, and it was the only one: on a realtime project the local list
+   * said the recipient owned it while the ACL the endpoints enforce still
+   * named the sender — so the new owner could not manage admins or delete the
+   * rooms, and the old one still could.
+   */
   transferOwnership(projectId: string, toUserId: string): boolean {
     if (this.actualRole(projectId) !== 'owner') return false
     const s = useCollabStore.getState()
@@ -157,6 +165,7 @@ class MembersService {
       toUserId,
     )
     collabHub.broadcastState(projectId)
+    void serverAcl.transferOwnership(projectId, target.email)
     return true
   }
 

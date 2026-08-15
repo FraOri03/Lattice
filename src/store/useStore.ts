@@ -33,6 +33,9 @@ import type {
   Workspace,
 } from '@/types/model'
 import { currentIdentity } from '@/lib/collab/localIdentity'
+// a leaf store (zustand + types only), so unlike ServerAclService it needs no
+// dynamic import to stay out of a cycle
+import { useCollabStore } from '@/lib/collab/collabStore'
 import { detectLocale } from '@/lib/i18n/messages'
 import { nid } from '@/lib/id'
 import { blobToDataUrl } from '@/lib/media'
@@ -1122,6 +1125,10 @@ export const useStore = create<AppState>()(
         void import('@/lib/collab/ServerAclService').then(({ serverAcl }) =>
           serverAcl.deleteRooms(id),
         )
+        // and the collaboration records, which live in their own persisted
+        // store: members, invitations (addresses included), comments, the
+        // activity trail and the version index all outlived the project
+        useCollabStore.getState().forgetProject(id)
         // collect and remove everything the project owns
         const ownedBoards = Object.values(s.boards).filter((b) => b.projectId === id)
         const ownedNotes = Object.values(s.notes).filter((n) => n.projectId === id)
