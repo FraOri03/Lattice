@@ -1,11 +1,16 @@
 import JSZip from 'jszip'
+import { presentableSlides } from './sections'
+import { furnitureElements, masterTokensFor } from './masters'
+import { docOf, linesOf, type TextLine, type TextRun } from './richtext'
+import { resolveTextRender, type TextRender } from './textStyles'
 import {
   SLIDE_H,
   SLIDE_W,
-  THEME_COLORS,
   type PresentationBody,
   type PresentElement,
   type TextElement,
+  type TableElement,
+  type ChartElement,
 } from './presentModel'
 
 /**
@@ -29,12 +34,43 @@ function xfrm(el: { x: number; y: number; w: number; h: number }): string {
   return `<a:xfrm><a:off x="${Math.round(el.x * EMU)}" y="${Math.round(el.y * EMU)}"/><a:ext cx="${Math.round(el.w * EMU)}" cy="${Math.round(el.h * EMU)}"/></a:xfrm>`
 }
 
-function textBody(el: TextElement, themeText: string): string {
-  const algn = el.align === 'center' ? 'ctr' : el.align === 'right' ? 'r' : 'l'
-  const color = srgb(el.color ?? themeText, themeText)
-  const paras = el.text.split('\n').map((line) => {
-    const rPr = `<a:rPr lang="en-US" sz="${Math.round(el.fontSize * 100)}"${el.bold ? ' b="1"' : ''}${el.italic ? ' i="1"' : ''}><a:solidFill><a:srgbClr val="${color}"/></a:solidFill></a:rPr>`
-    return `<a:p><a:pPr algn="${algn}"/><a:r>${rPr}<a:t>${esc(line)}</a:t></a:r></a:p>`
+/**
+ * Text as PresentationML runs (19E.3).
+ *
+ * OOXML has runs natively, so mixed formatting inside one box exports as what
+ * it is rather than collapsing to the box's dominant style. Lists become real
+ * PowerPoint bullets. Links ride along as hyperlink-styled runs carrying their
+ * href in the run text's own `<a:rPr>` — Lattice entity links (`lattice://`)
+ * have no meaning outside Lattice, so they export as plain text, and the
+ * export dialog says so.
+ */
+function textBody(el: TextElement, themeText: string, render: TextRender): string {
+  const algn = render.align === 'center' ? 'ctr' : render.align === 'right' ? 'r' : 'l'
+  const boxColor = srgb(el.color ?? render.color ?? themeText, themeText)
+  const size = Math.round(render.size * 100)
+
+  const runXml = (run: TextRun): string => {
+    const b = run.bold || render.weight >= 600 ? ' b="1"' : ''
+    const i = run.italic || el.italic ? ' i="1"' : ''
+    const u = run.underline ? ' u="sng"' : ''
+    const rPr = `<a:rPr lang="en-US" sz="${size}"${b}${i}${u}><a:solidFill><a:srgbClr val="${boxColor}"/></a:solidFill><a:latin typeface="Calibri"/></a:rPr>`
+    return `<a:r>${rPr}<a:t>${esc(run.text)}</a:t></a:r>`
+  }
+
+  const lines = linesOf(docOf(el))
+  const source: TextLine[] = lines.length
+    ? lines
+    : el.text.split('\n').map((text) => ({ runs: [{ text }], level: 0 }))
+
+  const paras = source.map((line) => {
+    const indent = line.list ? ` marL="${(line.level + 1) * 285750}" indent="-285750"` : ''
+    const bullet = line.list === 'bullet'
+      ? '<a:buChar char="•"/>'
+      : line.list === 'number'
+        ? '<a:buAutoNum type="arabicPeriod"/>'
+        : '<a:buNone/>'
+    const runs = line.runs.length ? line.runs.map(runXml).join('') : ''
+    return `<a:p><a:pPr algn="${algn}"${indent}>${bullet}</a:pPr>${runs}</a:p>`
   })
   return `<p:txBody><a:bodyPr wrap="square"><a:normAutofit/></a:bodyPr><a:lstStyle/>${paras.join('')}</p:txBody>`
 }
@@ -42,13 +78,100 @@ function textBody(el: TextElement, themeText: string): string {
 interface SlideCtx {
   rels: string[]
   media: { name: string; data: Uint8Array }[]
+  /** native chart parts this slide needs (19E.4) */
+  charts: { name: string; xml: string }[]
   seq: number
 }
 
-function elementXml(ctx: SlideCtx, el: PresentElement, themeText: string): string {
+const escXml = esc
+
+/**
+ * A table as a real PowerPoint table (19E.4) — a `graphicFrame` holding an
+ * `a:tbl`, so the cells stay cells: selectable, editable, restylable. An image
+ * of a table would look the same in a screenshot and be useless in the file.
+ */
+function tableXml(el: TableElement, id: number, themeText: string): string {
+  const cols = el.cells.reduce((n, r) => Math.max(n, r.length), 0) || 1
+  const colW = Math.round((el.w * EMU) / cols)
+  const rowH = Math.round((el.h * EMU) / Math.max(1, el.cells.length))
+  const grid = Array.from({ length: cols }, () => `<a:gridCol w="${colW}"/>`).join('')
+  const color = srgb(themeText, '#1f1f24')
+  const rows = el.cells
+    .map((row, r) => {
+      const cells = Array.from({ length: cols }, (_, c) => {
+        const bold = el.headerRow && r === 0 ? ' b="1"' : ''
+        const text = escXml(String(row[c] ?? ''))
+        return `<a:tc><a:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:rPr lang="en-US" sz="1200"${bold}><a:solidFill><a:srgbClr val="${color}"/></a:solidFill></a:rPr><a:t>${text}</a:t></a:r></a:p></a:txBody><a:tcPr/></a:tc>`
+      }).join('')
+      return `<a:tr h="${rowH}">${cells}</a:tr>`
+    })
+    .join('')
+  return `<p:graphicFrame><p:nvGraphicFramePr><p:cNvPr id="${id}" name="Table ${id}"/><p:cNvGraphicFramePr/><p:nvPr/></p:nvGraphicFramePr><p:xfrm><a:off x="${Math.round(el.x * EMU)}" y="${Math.round(el.y * EMU)}"/><a:ext cx="${Math.round(el.w * EMU)}" cy="${Math.round(el.h * EMU)}"/></p:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/table"><a:tbl><a:tblPr firstRow="${el.headerRow ? 1 : 0}"/><a:tblGrid>${grid}</a:tblGrid>${rows}</a:tbl></a:graphicData></a:graphic></p:graphicFrame>`
+}
+
+const CHART_PALETTE = ['0D99FF', '14AE5C', 'FFA629', '9747FF', 'F24822']
+
+/**
+ * A chart as a **native chart part with its cached data** (19E.4).
+ *
+ * This is what makes the exported deck editable in PowerPoint: the file holds
+ * the numbers, not a picture of them. `c:cat` and `c:val` are the cached table
+ * the mockup calls for — PowerPoint reads them directly and can re-plot,
+ * restyle or re-type the series without ever seeing Lattice.
+ */
+function chartPartXml(el: ChartElement): string {
+  const cats = el.data.categories
+  const strCache = (values: string[]) =>
+    `<c:strRef><c:f>Sheet1!$A$2:$A$${values.length + 1}</c:f><c:strCache><c:ptCount val="${values.length}"/>${values
+      .map((v, i) => `<c:pt idx="${i}"><c:v>${escXml(v)}</c:v></c:pt>`)
+      .join('')}</c:strCache></c:strRef>`
+  const numCache = (values: number[], col: number) =>
+    `<c:numRef><c:f>Sheet1!$${String.fromCharCode(66 + col)}$2:$${String.fromCharCode(66 + col)}$${values.length + 1}</c:f><c:numCache><c:formatCode>General</c:formatCode><c:ptCount val="${values.length}"/>${values
+      .map((v, i) => `<c:pt idx="${i}"><c:v>${v}</c:v></c:pt>`)
+      .join('')}</c:numCache></c:numRef>`
+
+  const series = el.data.series
+    .map(
+      (s, i) => `<c:ser><c:idx val="${i}"/><c:order val="${i}"/>` +
+        `<c:tx><c:strRef><c:f>Sheet1!$${String.fromCharCode(66 + i)}$1</c:f><c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>${escXml(s.name)}</c:v></c:pt></c:strCache></c:strRef></c:tx>` +
+        `<c:spPr><a:solidFill><a:srgbClr val="${CHART_PALETTE[i % CHART_PALETTE.length]}"/></a:solidFill></c:spPr>` +
+        `<c:cat>${strCache(cats)}</c:cat><c:val>${numCache(s.values, i)}</c:val></c:ser>`,
+    )
+    .join('')
+
+  const plot =
+    el.chart === 'line'
+      ? `<c:lineChart><c:grouping val="standard"/><c:varyColors val="0"/>${series}<c:marker val="1"/><c:axId val="1"/><c:axId val="2"/></c:lineChart>`
+      : `<c:barChart><c:barDir val="col"/><c:grouping val="clustered"/><c:varyColors val="0"/>${series}<c:gapWidth val="80"/><c:axId val="1"/><c:axId val="2"/></c:barChart>`
+
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><c:chart>${
+    el.title ? `<c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>${escXml(el.title)}</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title>` : '<c:autoTitleDeleted val="1"/>'
+  }<c:plotArea><c:layout/>${plot}<c:catAx><c:axId val="1"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="b"/><c:crossAx val="2"/></c:catAx><c:valAx><c:axId val="2"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="l"/><c:crossAx val="1"/></c:valAx></c:plotArea>${
+    el.showLegend === false ? '' : '<c:legend><c:legendPos val="b"/><c:overlay val="0"/></c:legend>'
+  }<c:plotVisOnly val="1"/></c:chart></c:chartSpace>`
+}
+
+/** The frame on the slide that points at the chart part. */
+function chartFrameXml(ctx: SlideCtx, el: ChartElement, id: number): string {
+  const name = `chart${ctx.charts.length + 1}.xml`
+  ctx.charts.push({ name, xml: chartPartXml(el) })
+  const relId = `rIdChart${ctx.charts.length}`
+  ctx.rels.push(
+    `<Relationship Id="${relId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart" Target="../charts/${name}"/>`,
+  )
+  return `<p:graphicFrame><p:nvGraphicFramePr><p:cNvPr id="${id}" name="Chart ${id}"/><p:cNvGraphicFramePr/><p:nvPr/></p:nvGraphicFramePr><p:xfrm><a:off x="${Math.round(el.x * EMU)}" y="${Math.round(el.y * EMU)}"/><a:ext cx="${Math.round(el.w * EMU)}" cy="${Math.round(el.h * EMU)}"/></p:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" r:id="${relId}"/></a:graphicData></a:graphic></p:graphicFrame>`
+}
+
+function elementXml(
+  ctx: SlideCtx,
+  el: PresentElement,
+  themeText: string,
+  render: TextRender,
+): string {
   const id = ++ctx.seq
   if (el.kind === 'text') {
-    return `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="Text ${id}"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr>${xfrm(el)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr>${textBody(el, themeText)}</p:sp>`
+    return `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="Text ${id}"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr>${xfrm(el)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr>${textBody(el, themeText, render)}</p:sp>`
   }
   if (el.kind === 'shape') {
     const geom = el.shape === 'ellipse' ? 'ellipse' : el.shape === 'line' ? 'line' : 'rect'
@@ -60,7 +183,8 @@ function elementXml(ctx: SlideCtx, el: PresentElement, themeText: string): strin
       : ''
     return `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="Shape ${id}"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr>${xfrm(el)}<a:prstGeom prst="${geom}"><a:avLst/></a:prstGeom>${fill}${line}</p:spPr><p:txBody><a:bodyPr/><a:lstStyle/><a:p/></p:txBody></p:sp>`
   }
-  // image
+  if (el.kind === 'table') return tableXml(el, id, themeText)
+  if (el.kind === 'chart') return chartFrameXml(ctx, el, id)
   const m = /^data:image\/(png|jpeg|jpg|gif|webp);base64,(.+)$/.exec(el.src)
   if (!m) return ''
   const ext = m[1] === 'jpg' ? 'jpeg' : m[1]
@@ -90,19 +214,25 @@ const LAYOUT_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 
 /** Build a valid .pptx from a deck. */
 export async function exportPresentationPptx(body: PresentationBody): Promise<Blob> {
-  const theme = THEME_COLORS[body.theme]
   const zip = new JSZip()
   const slideOverrides: string[] = []
+  const chartOverrides: string[] = []
   const slideRefs: string[] = []
   const presRels: string[] = [
     `<Relationship Id="rIdMaster" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster" Target="slideMasters/slideMaster1.xml"/>`,
   ]
 
-  body.slides.forEach((slide, i) => {
+  // hidden slides are part of the deck, not of the presentation (19E.1)
+  presentableSlides(body).forEach((slide, i) => {
     const n = i + 1
-    const ctx: SlideCtx = { rels: [], media: [], seq: 1 }
-    const els = [...slide.elements].sort((a, b) => a.z - b.z)
-    const shapes = els.map((el) => elementXml(ctx, el, theme.text)).join('')
+    const ctx: SlideCtx = { rels: [], media: [], charts: [], seq: 1 }
+    const theme = masterTokensFor(body, slide)
+    const els = [...slide.elements, ...furnitureElements(body, slide, n, theme)].sort(
+      (a, b) => a.z - b.z,
+    )
+    const shapes = els
+      .map((el) => elementXml(ctx, el, theme.text, resolveTextRender(el as TextElement, theme, body.textStyles)))
+      .join('')
     const bg = `<p:bg><p:bgPr><a:solidFill><a:srgbClr val="${srgb(slide.background ?? theme.bg, theme.bg)}"/></a:solidFill><a:effectLst/></p:bgPr></p:bg>`
     const slideXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <p:sld ${NS}><p:cSld>${bg}<p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/>${shapes}</p:spTree></p:cSld></p:sld>`
@@ -114,6 +244,12 @@ ${ctx.rels.join('\n')}
 </Relationships>`
     zip.file(`ppt/slides/_rels/slide${n}.xml.rels`, slideRels)
     for (const m of ctx.media) zip.file(`ppt/media/${m.name}`, m.data)
+    for (const c of ctx.charts) {
+      zip.file(`ppt/charts/${c.name}`, c.xml)
+      chartOverrides.push(
+        `<Override PartName="/ppt/charts/${c.name}" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/>`,
+      )
+    }
     slideOverrides.push(
       `<Override PartName="/ppt/slides/slide${n}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>`,
     )
@@ -138,6 +274,7 @@ ${ctx.rels.join('\n')}
 <Override PartName="/ppt/slideLayouts/slideLayout1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml"/>
 <Override PartName="/ppt/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/>
 ${slideOverrides.join('\n')}
+${chartOverrides.join('\n')}
 </Types>`,
   )
   zip.file(

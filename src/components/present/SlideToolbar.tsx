@@ -1,12 +1,28 @@
 import { useI18n } from '@/lib/i18n'
-import { IcImage } from '@/components/Icons'
+import {
+  IcAlignBottom,
+  IcAlignCenter,
+  IcAlignLeft,
+  IcAlignMiddle,
+  IcAlignRight,
+  IcAlignTop,
+  IcDistributeH,
+  IcDistributeV,
+  IcChart,
+  IcImage,
+  IcLayout,
+  IcMagnet,
+  IcTable,
+} from '@/components/Icons'
 import {
   ToolbarAction,
   ToolbarGroup,
   ToolbarRoot,
   ToolbarSeparator,
+  ToolbarToggle,
   TOOLBAR_CONTROL_ATTR,
 } from '@/components/ui/toolbar'
+import type { AlignEdge, DistributeAxis } from '@/lib/present/align'
 
 export type SlideShape = 'rect' | 'ellipse' | 'line'
 
@@ -15,7 +31,14 @@ export type SlideShape = 'rect' | 'ellipse' | 'line'
  *
  * Extracted from PresentationWorkspace so it has the same shape as every other
  * mode's bar — its own file, its own test — rather than living inline in a
- * 900-line workspace. The controls are unchanged.
+ * 900-line workspace.
+ *
+ * 19E.0 adds the precision controls the Phase 1 canvas needs: a snapping
+ * toggle, and an align/distribute group that appears only once more than one
+ * element is selected — a bar that offered them against a single element would
+ * be offering nothing. They are built from the same primitives as the rest of
+ * the bar rather than the hand-rolled `.tbtn` buttons the original branch used,
+ * because that class was retired in 12.4.
  *
  * Hidden entirely for a viewer by its caller, as before.
  */
@@ -24,22 +47,41 @@ export function SlideToolbar({
   slideCount,
   background,
   themeBackground,
+  selectedCount,
+  snapEnabled,
+  layoutName,
   onAddText,
   onAddImage,
   onAddShape,
   onBackground,
   onResetBackground,
+  onToggleSnap,
+  onOpenLayouts,
+  onInsertChart,
+  onInsertTable,
+  onAlign,
+  onDistribute,
 }: {
   slideIndex: number
   slideCount: number
   /** the slide's own background, or null when it follows the theme */
   background: string | null | undefined
   themeBackground: string
+  /** how many elements the canvas has selected — drives the arrange group */
+  selectedCount: number
+  snapEnabled: boolean
+  layoutName: string | null
   onAddText: () => void
   onAddImage: () => void
   onAddShape: (shape: SlideShape) => void
   onBackground: (color: string) => void
   onResetBackground: () => void
+  onToggleSnap: () => void
+  onOpenLayouts: () => void
+  onInsertChart: () => void
+  onInsertTable: () => void
+  onAlign: (edge: AlignEdge) => void
+  onDistribute: (axis: DistributeAxis) => void
 }) {
   const t = useI18n().toolbar.presentation
   return (
@@ -61,6 +103,21 @@ export function SlideToolbar({
             label={t.image}
             description={t.addImage}
             onRun={onAddImage}
+          />
+          <ToolbarAction
+            icon={<IcChart size={12} />}
+            content="icon-text"
+            label={t.chart}
+            description={t.chartDescription}
+            haspopup="dialog"
+            onRun={onInsertChart}
+          />
+          <ToolbarAction
+            icon={<IcTable size={12} />}
+            content="icon-text"
+            label={t.table}
+            description={t.tableDescription}
+            onRun={onInsertTable}
           />
         </ToolbarGroup>
 
@@ -95,11 +152,66 @@ export function SlideToolbar({
             <ToolbarAction icon="✕" label={t.resetBackground} onRun={onResetBackground} />
           )}
         </ToolbarGroup>
+
+        <ToolbarSeparator />
+
+        <ToolbarGroup label={t.groups.design}>
+          <ToolbarAction
+            icon={<IcLayout size={13} />}
+            content="icon-text"
+            label={layoutName ?? t.layout}
+            description={t.layoutDescription}
+            haspopup="dialog"
+            onRun={onOpenLayouts}
+          />
+        </ToolbarGroup>
+
+        <ToolbarSeparator />
+
+        <ToolbarGroup label={t.groups.precision}>
+          <ToolbarToggle
+            icon={<IcMagnet size={13} />}
+            label={t.snap}
+            description={t.snapDescription}
+            pressed={snapEnabled}
+            onRun={onToggleSnap}
+          />
+        </ToolbarGroup>
+
+        {/* Alignment needs something to align against: below two elements the
+            group would be a row of controls that cannot do anything. */}
+        {selectedCount > 1 && (
+          <>
+            <ToolbarSeparator />
+            <ToolbarGroup label={t.groups.arrange}>
+              <ToolbarAction icon={<IcAlignLeft size={13} />} label={t.alignLeft} onRun={() => onAlign('left')} />
+              <ToolbarAction icon={<IcAlignCenter size={13} />} label={t.alignCenter} onRun={() => onAlign('hcenter')} />
+              <ToolbarAction icon={<IcAlignRight size={13} />} label={t.alignRight} onRun={() => onAlign('right')} />
+              <ToolbarAction icon={<IcAlignTop size={13} />} label={t.alignTop} onRun={() => onAlign('top')} />
+              <ToolbarAction icon={<IcAlignMiddle size={13} />} label={t.alignMiddle} onRun={() => onAlign('vcenter')} />
+              <ToolbarAction icon={<IcAlignBottom size={13} />} label={t.alignBottom} onRun={() => onAlign('bottom')} />
+              <ToolbarAction
+                icon={<IcDistributeH size={13} />}
+                label={t.distributeH}
+                disabled={selectedCount < 3}
+                disabledReason={t.needsThree}
+                onRun={() => onDistribute('h')}
+              />
+              <ToolbarAction
+                icon={<IcDistributeV size={13} />}
+                label={t.distributeV}
+                disabled={selectedCount < 3}
+                disabledReason={t.needsThree}
+                onRun={() => onDistribute('v')}
+              />
+            </ToolbarGroup>
+          </>
+        )}
       </ToolbarRoot>
 
       {/* status, not a control */}
       <span className="ml-auto text-[10.5px] text-muted">
-        {t.status(slideIndex + 1, slideCount)}
+        {selectedCount > 0 ? t.selection(selectedCount) : t.status(slideIndex + 1, slideCount)}
       </span>
     </div>
   )

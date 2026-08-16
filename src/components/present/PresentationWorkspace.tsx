@@ -1,80 +1,165 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type PointerEvent as ReactPointerEvent,
-} from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '@/store/useStore'
 import type { PresentationDocMeta } from '@/types/model'
-import { storage } from '@/lib/storage/StorageProvider'
 import { downloadBlob, slugify } from '@/lib/download'
-import { useReadOnly } from '@/lib/collab/useCollab'
 import { presenceService } from '@/lib/collab/PresenceService'
 import { nid } from '@/lib/id'
 import {
-  SLIDE_H,
-  SLIDE_W,
   THEME_COLORS,
   createSlide,
   createTextElement,
-  normalizePresentBody,
   type PresentElement,
   type PresentSlide,
-  type PresentTheme,
   type PresentationBody,
+  type PresentTheme,
   type ShapeElement,
+  type SlideReviewStatus,
 } from '@/lib/present/presentModel'
+import {
+  addMaster,
+  assignMaster,
+  furnitureElements,
+  masterTokensFor,
+  removeMaster,
+  setMasterToken,
+  updateMaster,
+  type MasterFurniture,
+  type PresentMaster,
+} from '@/lib/present/masters'
+import {
+  OVERRIDE_LABEL,
+  applyLayoutPlan,
+  layoutById,
+  placeholderFor,
+  placeholderOverrides,
+  revertOverride,
+  type LayoutPlan,
+  type OverrideKey,
+} from '@/lib/present/layouts'
+import { LayoutPicker } from './LayoutPicker'
+import { ChartInsertDialog } from './ChartInsertDialog'
+import { LinkedContentPanel } from './LinkedContentPanel'
+import { storage } from '@/lib/storage/StorageProvider'
+import type { SheetData } from '@/lib/sheet/sheetModel'
+import { chartDataOf, parseRange, readRange, type ChartData } from '@/lib/present/sheetRange'
+import {
+  detached,
+  planUpdates,
+  withCapturedRev,
+  type LinkedItem,
+  type SourceState,
+} from '@/lib/present/linked'
+import { TypographyPanel } from './TypographyPanel'
+import { MasterPanel } from './MasterPanel'
+import { THEME_PRESETS, type ThemeTokens } from '@/lib/present/theme'
+import {
+  resolveTextRender,
+  withStyleOverride,
+  type TextStyleName,
+  type TextStyleSpec,
+} from '@/lib/present/textStyles'
+import { measureOverflow, type AutoSizeMode, type OverflowReport } from '@/lib/present/overflow'
+import {
+  isFullCrop,
+  normalizeCrop,
+  normalizeFocal,
+  sanitizeAdjustments,
+  type ImageFit,
+} from '@/lib/present/media'
+import {
+  moveSection,
+  presentableSlides,
+  removeSection,
+  renameSection,
+  setSectionCollapsed,
+  startSectionAt,
+} from '@/lib/present/sections'
+import { clampPosition, normalizedZ, rectOf } from '@/lib/present/geometry'
+import { alignElements, distributeElements, type AlignEdge, type DistributeAxis } from '@/lib/present/align'
 import { toast } from '@/components/ui/Toaster'
 import { confirmDialog } from '@/components/ui/ConfirmDialog'
 import { ToolbarDivider } from '@/components/ui/ToolbarDivider'
 import { SlideToolbar } from './SlideToolbar'
 import { ActionIcon } from '@/components/ActionIcons'
-import { IcCopy, IcPlus, IcTrash, IcX } from '@/components/Icons'
-import { SlideView, StaticElement, elementStyle } from './SlideView'
+import {
+  IcChevronDown,
+  IcChevronRight,
+  IcEye,
+  IcEyeOff,
+  IcImage,
+  IcLock,
+  IcRedo,
+  IcTrash,
+  IcUndo,
+  IcUnlock,
+  IcX,
+  IcZoomIn,
+  IcZoomOut,
+} from '@/components/Icons'
+import { SlideCanvas } from './SlideCanvas'
+import { LayersPanel } from './LayersPanel'
+import { SlideRail, type SlideRailHandlers } from './SlideRail'
+import { useDeckHistory } from './useDeckHistory'
 
 /**
- * PresentationWorkspace (Phase 8) — the first production slide editor.
- * Slide list · 960×540 canvas with select/move/resize/inline text edit ·
- * element inspector (geometry, typography, fill/stroke, z-order) ·
- * per-slide background · themes · speaker notes · PDF + PPTX export.
- * The deck body is the internal JSON source format (presentModel.ts),
- * persisted through the store like docs/sheets/code.
+ * PresentationWorkspace (Phase 1) — the precise, non-destructive slide editor.
+ * Undo/redo (history hook), multi-select + marquee, snapping + smart guides,
+ * alignment/distribution, keyboard nudge, constrained resize, rotation, zoom,
+ * layer ops and a contextual inspector. Deck state lives in `useDeckHistory`;
+ * the canvas interaction is `SlideCanvas`; the geometry is pure + tested.
  */
 
-const SAVE_DEBOUNCE_MS = 700
+const MIN_ZOOM = 0.1
+const MAX_ZOOM = 4
+const clampZoom = (z: number) => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z))
 
-type Patch = (body: PresentationBody) => PresentationBody
+type LayerMode = 'front' | 'back' | 'forward' | 'backward'
+
+/** Which part of the deck the right panel is describing (19E.1). */
+type InspectorScope = 'slide' | 'element' | 'deck'
+
+/** Recompute z after a layer op so order stays contiguous (audit DM-8). */
+function reorderZ(elements: PresentElement[], ids: Set<string>, mode: LayerMode): PresentElement[] {
+  const maxZ = elements.reduce((m, e) => Math.max(m, e.z), 0)
+  const bumped = elements.map((e) => {
+    if (!ids.has(e.id)) return e
+    let z = e.z
+    if (mode === 'front') z = maxZ + 1
+    else if (mode === 'back') z = -1
+    else if (mode === 'forward') z = e.z + 1.5
+    else z = e.z - 1.5
+    return { ...e, z }
+  })
+  const zmap = normalizedZ(bumped)
+  return bumped.map((e) => ({ ...e, z: zmap.get(e.id) ?? e.z }))
+}
 
 export default function PresentationWorkspace({ meta }: { meta: PresentationDocMeta }) {
-  const persistPresentBody = useStore((s) => s.persistPresentBody)
   const updatePresentMeta = useStore((s) => s.updatePresentMeta)
   const closePresent = useStore((s) => s.closePresent)
-  const readOnly = useReadOnly()
+  const { body, apply, undo, redo, seal, flush, canUndo, canRedo, readOnly, unsaved } =
+    useDeckHistory(meta)
 
-  const [body, setBody] = useState<PresentationBody | null>(null)
   const [slideIndex, setSlideIndex] = useState(0)
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [editingTextId, setEditingTextId] = useState<string | null>(null)
-  const saveTimer = useRef<number | undefined>(undefined)
-  const pending = useRef<PresentationBody | null>(null)
+  const [zoom, setZoom] = useState<number | 'fit'>('fit')
+  const [fitScale, setFitScale] = useState(0.6)
+  const [snapEnabled, setSnapEnabled] = useState(true)
+  const [layersCollapsed, setLayersCollapsed] = useState(false)
+  // notes collapse to a strip: the canvas is what this screen is for (19E.1)
+  const [notesOpen, setNotesOpen] = useState(false)
+  const [layoutsOpen, setLayoutsOpen] = useState(false)
+  const [chartOpen, setChartOpen] = useState(false)
+  const [overflow, setOverflow] = useState<OverflowReport | null>(null)
 
-  useEffect(() => {
-    let alive = true
-    setBody(null)
-    setSlideIndex(0)
-    setSelectedId(null)
-    setEditingTextId(null)
-    pending.current = null
-    void storage
-      .getDocument(meta.id)
-      .then((raw) => alive && setBody(normalizePresentBody(raw)))
-      .catch(() => alive && setBody(normalizePresentBody(undefined)))
-    return () => {
-      alive = false
-    }
-  }, [meta.id])
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const imageInput = useRef<HTMLInputElement>(null)
+  const replaceTarget = useRef<string | null>(null)
+  const clipboard = useRef<PresentElement[]>([])
+  const nudgeTimer = useRef<number | undefined>(undefined)
+  const fitScaleRef = useRef(fitScale)
+  fitScaleRef.current = fitScale
 
   // presence: which deck is open
   useEffect(() => {
@@ -82,89 +167,124 @@ export default function PresentationWorkspace({ meta }: { meta: PresentationDocM
     return () => presenceService.setEditing(undefined)
   }, [meta.id, meta.title])
 
-  const flush = useCallback(() => {
-    if (pending.current) {
-      window.clearTimeout(saveTimer.current)
-      persistPresentBody(meta.id, pending.current)
-      pending.current = null
-    }
-  }, [meta.id, persistPresentBody])
-  useEffect(() => () => flush(), [flush])
-
-  const apply = useCallback(
-    (patch: Patch) => {
-      if (readOnly) return
-      setBody((prev) => {
-        if (!prev) return prev
-        const next = patch(prev)
-        pending.current = next
-        window.clearTimeout(saveTimer.current)
-        saveTimer.current = window.setTimeout(flush, SAVE_DEBOUNCE_MS)
-        return next
-      })
-    },
-    [flush, readOnly],
-  )
-
-  const patchSlide = useCallback(
-    (index: number, fn: (s: PresentSlide) => PresentSlide) =>
-      apply((b) => ({
-        ...b,
-        slides: b.slides.map((s, i) => (i === index ? fn(s) : s)),
-      })),
-    [apply],
-  )
-
-  const patchElement = useCallback(
-    (elementId: string, fn: (e: PresentElement) => PresentElement) =>
-      patchSlide(slideIndex, (s) => ({
-        ...s,
-        elements: s.elements.map((e) => (e.id === elementId ? fn(e) : e)),
-      })),
-    [patchSlide, slideIndex],
-  )
-
-  // Delete/Escape shortcuts (never while typing)
+  // reset transient view state when switching decks
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const el = e.target as HTMLElement | null
-      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable))
-        return
-      if (e.key === 'Escape') {
-        setEditingTextId(null)
-        setSelectedId(null)
-      }
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId && !readOnly) {
-        patchSlide(slideIndex, (s) => ({
-          ...s,
-          elements: s.elements.filter((el2) => el2.id !== selectedId),
-        }))
-        setSelectedId(null)
-      }
+    setSlideIndex(0)
+    setSelectedIds(new Set())
+    setEditingTextId(null)
+  }, [meta.id])
+
+  // fit-to-viewport scale
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const compute = () => {
+      const pad = 56
+      setFitScale(
+        Math.max(0.1, Math.min((el.clientWidth - pad) / 960, (el.clientHeight - pad) / 540, 1.5)),
+      )
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [selectedId, slideIndex, patchSlide, readOnly])
+    compute()
+    const ro = new ResizeObserver(compute)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
-  const imageInput = useRef<HTMLInputElement>(null)
+  // Ctrl/Cmd + wheel zoom (native listener so we can preventDefault)
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return
+      e.preventDefault()
+      setZoom((z) => clampZoom((z === 'fit' ? fitScaleRef.current : z) * (e.deltaY < 0 ? 1.1 : 0.9)))
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [])
 
-  if (!body) {
-    return (
-      <section className="flex h-full min-w-0 flex-1 items-center justify-center bg-panel text-xs text-muted">
-        Loading presentation…
-      </section>
+  const scale = zoom === 'fit' ? fitScale : zoom
+  const si = body ? Math.min(slideIndex, body.slides.length - 1) : 0
+  const slide: PresentSlide | null = body ? body.slides[si] : null
+  const theme: PresentTheme = body?.theme ?? 'plain'
+  const themeColors = THEME_COLORS[theme]
+  // what this slide actually paints with: deck tokens, then its master's
+  const slideTokens = body && slide ? masterTokensFor(body, slide) : THEME_PRESETS.plain
+
+  const elements = slide?.elements ?? []
+  const maxZ = elements.reduce((m, e) => Math.max(m, e.z), 0)
+  const selectedEls = useMemo(
+    () => elements.filter((e) => selectedIds.has(e.id)),
+    [elements, selectedIds],
+  )
+  const selected = selectedEls.length === 1 ? selectedEls[0] : null
+
+  /**
+   * Overflow is measured, not estimated (19E.3): the rendered box knows how
+   * tall its text really is, and the panel reports that rather than guessing
+   * from character counts.
+   */
+  const selectedTextId = selected?.kind === 'text' ? selected.id : null
+  useEffect(() => {
+    if (!selectedTextId || !slide) {
+      setOverflow(null)
+      return
+    }
+    const inner = document.querySelector<HTMLElement>(
+      `[data-el-id="${selectedTextId}"] [data-text-measure]`,
     )
-  }
+    const el = slide.elements.find((e) => e.id === selectedTextId)
+    if (!inner || !el || el.kind !== 'text') {
+      setOverflow(null)
+      return
+    }
+    const r = resolveTextRender(el, slideTokens, body?.textStyles)
+    const next = measureOverflow({
+      contentHeight: inner.scrollHeight,
+      boxHeight: el.h,
+      fontSize: r.size,
+      lineHeight: r.lineHeight,
+    })
+    // measuring produces a fresh object every time; storing an equal one would
+    // re-render, re-measure and never settle
+    setOverflow((prev) =>
+      prev &&
+      prev.overflowing === next.overflowing &&
+      prev.overBy === next.overBy &&
+      prev.shrunkFontSize === next.shrunkFontSize &&
+      prev.grownHeight === next.grownHeight
+        ? prev
+        : next,
+    )
+  }, [selectedTextId, slide, slideTokens, body?.textStyles, scale])
 
-  const slide = body.slides[Math.min(slideIndex, body.slides.length - 1)]
-  const theme = THEME_COLORS[body.theme]
-  const selected = slide.elements.find((e) => e.id === selectedId) ?? null
-  const maxZ = slide.elements.reduce((m, e) => Math.max(m, e.z), 0)
+  /* ---------- mutation helpers (all through history) ---------- */
+
+  const setSlideElements = (next: PresentElement[], opts?: { coalesceKey?: string }) =>
+    apply((b) => ({ ...b, slides: b.slides.map((s, i) => (i === si ? { ...s, elements: next } : s)) }), opts)
+
+  const patchSlide = (fn: (s: PresentSlide) => PresentSlide, opts?: { coalesceKey?: string }) =>
+    apply((b) => ({ ...b, slides: b.slides.map((s, i) => (i === si ? fn(s) : s)) }), opts)
+
+  const patchElement = (
+    id: string,
+    fn: (e: PresentElement) => PresentElement,
+    opts?: { coalesceKey?: string },
+  ) => setSlideElements(elements.map((e) => (e.id === id ? fn(e) : e)), opts)
+
+  const patchOne = (fn: (e: PresentElement) => PresentElement, opts?: { coalesceKey?: string }) => {
+    if (selected) patchElement(selected.id, fn, opts)
+  }
+  const patchSelected = (fn: (e: PresentElement) => PresentElement, opts?: { coalesceKey?: string }) =>
+    setSlideElements(elements.map((e) => (selectedIds.has(e.id) ? fn(e) : e)), opts)
 
   const addElement = (el: PresentElement) => {
-    patchSlide(slideIndex, (s) => ({ ...s, elements: [...s.elements, el] }))
-    setSelectedId(el.id)
+    setSlideElements([...elements, el])
+    setSelectedIds(new Set([el.id]))
+    setEditingTextId(null)
   }
+
+  const addText = () => addElement(createTextElement({ z: maxZ + 1 }))
 
   const addShape = (shape: ShapeElement['shape']) =>
     addElement({
@@ -176,8 +296,8 @@ export default function PresentationWorkspace({ meta }: { meta: PresentationDocM
       w: shape === 'line' ? 320 : 280,
       h: shape === 'line' ? 4 : 160,
       z: maxZ + 1,
-      fill: shape === 'line' ? null : theme.accent + '55',
-      stroke: theme.accent,
+      fill: shape === 'line' ? null : themeColors.accent + '55',
+      stroke: themeColors.accent,
       strokeWidth: 2,
     })
 
@@ -193,38 +313,480 @@ export default function PresentationWorkspace({ meta }: { meta: PresentationDocM
       r.onload = () => resolve(String(r.result))
       r.readAsDataURL(file)
     })
-    addElement({
-      id: nid('el'),
-      kind: 'image',
-      src,
-      x: 280,
-      y: 130,
-      w: 400,
-      h: 280,
-      z: maxZ + 1,
-    })
+    const target = replaceTarget.current
+    replaceTarget.current = null
+    if (target) {
+      patchElement(target, (e) => (e.kind === 'image' ? { ...e, src } : e))
+      return
+    }
+    addElement({ id: nid('el'), kind: 'image', src, x: 280, y: 130, w: 400, h: 280, z: maxZ + 1 })
   }
 
+  /* ---------- selection-level operations ---------- */
+
+  const goToSlide = (i: number) => {
+    setSlideIndex(i)
+    setSelectedIds(new Set())
+    setEditingTextId(null)
+    seal()
+  }
+
+  const selectAll = () =>
+    setSelectedIds(new Set(elements.filter((e) => !e.hidden && !e.locked).map((e) => e.id)))
+
+  const deleteSelection = () => {
+    if (!selectedIds.size) return
+    setSlideElements(elements.filter((e) => !selectedIds.has(e.id)))
+    setSelectedIds(new Set())
+  }
+
+  const cloneEls = (src: PresentElement[], offset: number): PresentElement[] =>
+    src.map((e, i) => ({
+      ...(JSON.parse(JSON.stringify(e)) as PresentElement),
+      id: nid('el'),
+      x: e.x + offset,
+      y: e.y + offset,
+      z: maxZ + 1 + i,
+    }))
+
+  const duplicateSelection = () => {
+    if (!selectedEls.length) return
+    const copies = cloneEls(selectedEls, 16)
+    setSlideElements([...elements, ...copies])
+    setSelectedIds(new Set(copies.map((c) => c.id)))
+  }
+
+  const copySelection = () => {
+    if (!selectedEls.length) return
+    clipboard.current = selectedEls.map((e) => JSON.parse(JSON.stringify(e)) as PresentElement)
+    toast.info(`Copied ${selectedEls.length} element${selectedEls.length === 1 ? '' : 's'}`)
+  }
+
+  const pasteClipboard = () => {
+    if (!clipboard.current.length) return
+    const copies = cloneEls(clipboard.current, 24)
+    setSlideElements([...elements, ...copies])
+    setSelectedIds(new Set(copies.map((c) => c.id)))
+  }
+
+  const nudge = (dx: number, dy: number) => {
+    patchSelected(
+      (e) => {
+        const p = clampPosition(e.x + dx, e.y + dy, e.w, e.h)
+        return { ...e, x: p.x, y: p.y }
+      },
+      { coalesceKey: 'nudge' },
+    )
+    window.clearTimeout(nudgeTimer.current)
+    nudgeTimer.current = window.setTimeout(() => seal(), 500)
+  }
+
+  const layer = (mode: LayerMode) => {
+    if (!selectedIds.size) return
+    setSlideElements(reorderZ(elements, selectedIds, mode))
+  }
+
+  const align = (edge: AlignEdge) => {
+    if (selectedEls.length < 2) return
+    const map = alignElements(selectedEls.map((e) => ({ id: e.id, ...rectOf(e) })), edge)
+    setSlideElements(elements.map((e) => (map.has(e.id) ? { ...e, ...map.get(e.id)! } : e)))
+  }
+
+  const distribute = (axis: DistributeAxis) => {
+    if (selectedEls.length < 3) return
+    const map = distributeElements(selectedEls.map((e) => ({ id: e.id, ...rectOf(e) })), axis)
+    setSlideElements(elements.map((e) => (map.has(e.id) ? { ...e, ...map.get(e.id)! } : e)))
+  }
+
+  const toggleFlag = (flag: 'locked' | 'hidden') => {
+    if (!selectedEls.length) return
+    const anyOff = selectedEls.some((e) => !e[flag])
+    patchSelected((e) => ({ ...e, [flag]: anyOff }))
+    if (flag === 'locked' && anyOff) setSelectedIds(new Set())
+  }
+
+  /* ---------- slide-list operations ---------- */
+
+  const addSlide = () => {
+    apply((b) => {
+      const slides = [...b.slides]
+      slides.splice(si + 1, 0, createSlide())
+      return { ...b, slides }
+    })
+    goToSlide(si + 1)
+  }
+
+  const duplicateSlide = (i: number) =>
+    apply((b) => {
+      const copy: PresentSlide = JSON.parse(JSON.stringify(b.slides[i]))
+      copy.id = nid('slide')
+      copy.elements = copy.elements.map((e) => ({ ...e, id: nid('el') }))
+      const slides = [...b.slides]
+      slides.splice(i + 1, 0, copy)
+      return { ...b, slides }
+    })
+
+  const moveSlide = (i: number, dir: -1 | 1) => {
+    const j = i + dir
+    apply((b) => {
+      const slides = [...b.slides]
+      ;[slides[i], slides[j]] = [slides[j], slides[i]]
+      return { ...b, slides }
+    })
+    goToSlide(j)
+  }
+
+  const deleteSlide = async (i: number) => {
+    if (!body || body.slides.length <= 1) {
+      toast.warning('A deck needs at least one slide')
+      return
+    }
+    if (!(await confirmDialog({ title: `Delete slide ${i + 1}?`, confirmLabel: 'Delete slide', danger: true })))
+      return
+    apply((b) => ({ ...b, slides: b.slides.filter((_, j) => j !== i) }))
+    goToSlide(Math.max(0, i > 0 ? i - 1 : 0))
+  }
+
+  /**
+   * What every linkable source looks like right now (19E.4). `updatedAt` is
+   * the revision: it only moves forward, and it is what the deck compares its
+   * captured revision against.
+   */
+  const sheetDocs = useStore((st) => st.sheetDocs)
+  const boards = useStore((st) => st.boards)
+  const docs = useStore((st) => st.docs)
+  const linkSources = useMemo(() => {
+    const map = new Map<string, SourceState>()
+    for (const d of Object.values(sheetDocs)) map.set(d.id, { id: d.id, rev: d.updatedAt, label: d.title })
+    // a board carries no revision, so a board-backed link can never be told
+    // it is stale — rev 0 means "present, and never claiming an update"
+    for (const b of Object.values(boards)) map.set(b.id, { id: b.id, rev: 0, label: b.name })
+    for (const d of Object.values(docs)) map.set(d.id, { id: d.id, rev: d.updatedAt, label: d.title })
+    return map
+  }, [sheetDocs, boards, docs])
+
+  const linkActions = {
+    goTo: (slideIndex: number, elementId: string) => {
+      goToSlide(slideIndex)
+      setSelectedIds(new Set([elementId]))
+    },
+    updateOne: async (item: LinkedItem) => {
+      const fresh = await readLinkedChart(item)
+      apply((b) => ({
+        ...b,
+        slides: b.slides.map((sl, i) =>
+          i !== item.slideIndex
+            ? sl
+            : {
+                ...sl,
+                elements: sl.elements.map((el) =>
+                  el.id !== item.elementId
+                    ? el
+                    : {
+                        ...el,
+                        ...(fresh && el.kind === 'chart' ? { data: fresh } : {}),
+                        linkRef: withCapturedRev(item.link, item.sourceRev ?? item.link.rev ?? 0),
+                      },
+                ),
+              },
+        ),
+      }))
+    },
+    detach: (item: LinkedItem) =>
+      apply((b) => ({
+        ...b,
+        slides: b.slides.map((sl, i) =>
+          i !== item.slideIndex
+            ? sl
+            : {
+                ...sl,
+                elements: sl.elements.map((el) =>
+                  el.id === item.elementId ? { ...el, linkRef: detached(item.link) } : el,
+                ),
+              },
+        ),
+      })),
+  }
+
+  /** Re-read a chart's range from its source, when it still has one. */
+  const readLinkedChart = async (item: LinkedItem) => {
+    if (item.link.kind !== 'sheet' || !item.link.ref) return null
+    const raw = (await storage.getDocument(item.link.id)) as { sheets?: SheetData[] } | null
+    const parsed = parseRange(item.link.ref)
+    const sheet = raw?.sheets?.find((sh) => !parsed?.sheet || sh.name === parsed.sheet) ?? raw?.sheets?.[0]
+    if (!parsed || !sheet) return null
+    return chartDataOf(readRange(sheet, parsed))
+  }
+
+  const updateAllLinked = async () => {
+    const plan = planUpdates(body!, linkSources)
+    for (const item of plan.items) await linkActions.updateOne(item)
+    toast.info(
+      `${plan.items.length} updated`,
+      `Rewrote slide${plan.slideNumbers.length === 1 ? '' : 's'} ${plan.slideNumbers.join(', ')}. Undo restores them.`,
+    )
+  }
+
+  const openLinkedSource = (item: LinkedItem) => {
+    if (item.link.kind === 'sheet') useStore.getState().openSheet?.(item.link.id)
+    else if (item.link.kind === 'document') useStore.getState().openDoc?.(item.link.id)
+    else toast.info('Open the source', `${item.label} lives in ${item.link.kind}.`)
+  }
+
+  const insertTable = () =>
+    addElement({
+      id: nid('el'),
+      kind: 'table',
+      headerRow: true,
+      cells: [
+        ['Section', 'Q2', 'Q3'],
+        ['Board', '', ''],
+        ['Present', '', ''],
+      ],
+      x: 160,
+      y: 150,
+      w: 640,
+      h: 200,
+      z: maxZ + 1,
+    })
+
+  const insertChart = (args: {
+    data: ChartData
+    chart: 'bar' | 'line'
+    title: string
+    sheetId: string
+    range: string
+    rev: number
+  }) => {
+    addElement({
+      id: nid('el'),
+      kind: 'chart',
+      chart: args.chart,
+      data: args.data,
+      title: args.title,
+      x: 120,
+      y: 120,
+      w: 520,
+      h: 300,
+      z: maxZ + 1,
+      linkRef: { mode: 'link', kind: 'sheet', id: args.sheetId, ref: args.range, rev: args.rev, label: args.title },
+    })
+    setChartOpen(false)
+  }
+
+  /* ---------- deck structure (19E.1) ---------- */
+
+  const toggleHidden = (i: number) =>
+    apply((b) => ({
+      ...b,
+      slides: b.slides.map((s, j) => (j === i ? { ...s, hidden: s.hidden ? undefined : true } : s)),
+    }))
+
+  const setReviewStatus = (i: number, status: SlideReviewStatus | undefined) =>
+    apply((b) => ({
+      ...b,
+      slides: b.slides.map((s, j) => (j === i ? { ...s, reviewStatus: status } : s)),
+    }))
+
+  const railHandlers: SlideRailHandlers = {
+    onGoTo: goToSlide,
+    onMove: moveSlide,
+    onDuplicate: duplicateSlide,
+    onDelete: (i) => void deleteSlide(i),
+    onAdd: addSlide,
+    onStartSection: (i) => apply((b) => startSectionAt(b, i)),
+    onRenameSection: (id, title) => apply((b) => renameSection(b, id, title)),
+    // collapsing is a view preference, but a persisted one, so it goes through
+    // history like everything else rather than living in component state
+    onToggleCollapsed: (section) =>
+      apply((b) => setSectionCollapsed(b, section.id, section.collapsed !== true)),
+    onMoveSection: (id, direction) => apply((b) => moveSection(b, id, direction)),
+    onRemoveSection: (id) => apply((b) => removeSection(b, id)),
+  }
+
+  const applyLayout = (plan: LayoutPlan) => {
+    apply((b) => applyLayoutPlan(b, si, plan, slideTokens))
+    setLayoutsOpen(false)
+    toast.info(
+      `Layout “${plan.layout.name}” applied`,
+      plan.freeElementIds.length
+        ? `${plan.freeElementIds.length} object(s) kept their own position as free objects. Undo restores the previous arrangement.`
+        : 'Undo restores the previous arrangement.',
+    )
+  }
+
+  const textActions: TextActions = {
+    setStyleRef: (name) =>
+      patchOne((el) => (el.kind === 'text' ? { ...el, styleRef: name } : el)),
+    setOverride: (key, value) =>
+      patchOne(
+        (el) => {
+          if (el.kind !== 'text') return el
+          // one visible Size control: it edits the box when the box is on its
+          // own, and the style override when the box follows a style
+          if (key === 'size' && !el.styleRef) {
+            return { ...el, fontSize: Math.max(1, Number(value) || el.fontSize) }
+          }
+          return { ...el, styleOverride: withStyleOverride(el.styleOverride, key, value) }
+        },
+        { coalesceKey: `type-${key}-${selected?.id}` },
+      ),
+    setBoxProp: (patch) => patchOne((el) => (el.kind === 'text' ? { ...el, ...patch } : el)),
+    /**
+     * Promote this box's overrides into its style. Every other box on that
+     * style has no value of its own to keep, so they all follow — in one
+     * history entry, because it is one patch to the deck.
+     */
+    updateStyle: () => {
+      const el = selected
+      if (!el || el.kind !== 'text' || !el.styleRef || !el.styleOverride) return
+      const name = el.styleRef
+      const promoted = el.styleOverride
+      apply((b) => ({
+        ...b,
+        textStyles: { ...(b.textStyles ?? {}), [name]: { ...(b.textStyles?.[name] ?? {}), ...promoted } },
+        slides: b.slides.map((s, i) =>
+          i !== si
+            ? s
+            : { ...s, elements: s.elements.map((x) => (x.id === el.id ? { ...x, styleOverride: undefined } : x)) },
+        ),
+      }))
+      toast.info(`${name} style updated`, 'Every box on this style follows. Undo restores it.')
+    },
+    applyRemedy: (mode, report) =>
+      patchOne((el) => {
+        if (el.kind !== 'text') return el
+        if (mode === 'shrink' && report.shrunkFontSize !== null) {
+          return el.styleRef
+            ? { ...el, autoSize: mode, styleOverride: withStyleOverride(el.styleOverride, 'size', report.shrunkFontSize) }
+            : { ...el, autoSize: mode, fontSize: report.shrunkFontSize }
+        }
+        if (mode === 'grow' && report.grownHeight !== null) {
+          return { ...el, autoSize: mode, h: report.grownHeight }
+        }
+        return { ...el, autoSize: mode }
+      }),
+  }
+
+  const masterActions: MasterActions = {
+    add: (master) => apply((b) => addMaster(b, master)),
+    remove: (id) => apply((b) => removeMaster(b, id)),
+    rename: (id, name) => apply((b) => updateMaster(b, id, { name }), { coalesceKey: `mname-${id}` }),
+    setToken: (id, key, value) =>
+      apply((b) => setMasterToken(b, id, key, value as never), { coalesceKey: `mtok-${id}-${key}` }),
+    assign: (id) => apply((b) => assignMaster(b, slide!.id, id)),
+    setFurniture: (id, patch) =>
+      apply(
+        (b) => {
+          const m = b.masters?.find((x) => x.id === id)
+          return updateMaster(b, id, { furniture: { ...(m?.furniture ?? {}), ...patch } })
+        },
+        { coalesceKey: `mfurn-${id}` },
+      ),
+  }
+
+  /* ---------- export ---------- */
+
   const exportPdf = async () => {
+    if (!body) return
     flush()
     const { exportPresentationPdf } = await import('@/lib/present/presentPdf')
     downloadBlob(`${slugify(meta.title)}.pdf`, await exportPresentationPdf(meta.title, body))
   }
-
   const exportPptx = async () => {
+    if (!body) return
     flush()
     const { exportPresentationPptx } = await import('@/lib/present/presentPptx')
     downloadBlob(`${slugify(meta.title)}.pptx`, await exportPresentationPptx(body))
-    toast.info(
-      'PPTX exported (basic fidelity)',
-      'Text boxes, shapes and images are covered; themes/animations are not.',
+    toast.info('PPTX exported (basic fidelity)', 'Text, shapes and images are covered; themes/animations are not.')
+  }
+
+  /* ---------- keyboard (stable listener → latest handler) ---------- */
+
+  const kb = useRef<(e: KeyboardEvent) => void>(() => {})
+  kb.current = (e: KeyboardEvent) => {
+    const el = e.target as HTMLElement | null
+    const typing = !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)
+    if (typing) return
+    const mod = e.ctrlKey || e.metaKey
+
+    if (mod && (e.key === 'z' || e.key === 'Z')) {
+      e.preventDefault()
+      e.shiftKey ? redo() : undo()
+      return
+    }
+    if (mod && (e.key === 'y' || e.key === 'Y')) {
+      e.preventDefault()
+      redo()
+      return
+    }
+    if (e.key === 'Escape') {
+      setEditingTextId(null)
+      setSelectedIds(new Set())
+      return
+    }
+    if (mod && (e.key === 'a' || e.key === 'A')) {
+      e.preventDefault()
+      selectAll()
+      return
+    }
+    if (readOnly) return
+    if (mod && (e.key === 'd' || e.key === 'D')) {
+      e.preventDefault()
+      duplicateSelection()
+      return
+    }
+    if (mod && (e.key === 'c' || e.key === 'C')) {
+      copySelection()
+      return
+    }
+    if (mod && (e.key === 'v' || e.key === 'V')) {
+      pasteClipboard()
+      return
+    }
+    if ((e.key === 'Delete' || e.key === 'Backspace') && selectedIds.size) {
+      e.preventDefault()
+      deleteSelection()
+      return
+    }
+    if (e.key === ']') {
+      e.preventDefault()
+      layer(mod ? 'front' : 'forward')
+      return
+    }
+    if (e.key === '[') {
+      e.preventDefault()
+      layer(mod ? 'back' : 'backward')
+      return
+    }
+    if (selectedIds.size && e.key.startsWith('Arrow')) {
+      e.preventDefault()
+      const step = e.shiftKey ? 10 : 1
+      const dx = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0
+      const dy = e.key === 'ArrowUp' ? -step : e.key === 'ArrowDown' ? step : 0
+      if (dx || dy) nudge(dx, dy)
+    }
+  }
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => kb.current(e)
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  if (!body || !slide) {
+    return (
+      <section className="flex h-full min-w-0 flex-1 items-center justify-center bg-panel text-xs text-muted">
+        Loading presentation…
+      </section>
     )
   }
 
+  const zoomPct = Math.round(scale * 100)
+
   return (
     <section className="flex h-full min-w-0 flex-1 flex-col bg-panel">
-      {/* header */}
-      <div className="flex flex-none items-center gap-2 border-b border-bord px-3 py-1.5">
+      {/* ---------- top app bar ---------- */}
+      <div className="flex flex-none items-center gap-1.5 border-b border-bord px-3 py-1.5">
         <input
           className="min-w-0 flex-1 bg-transparent text-[14px] font-bold outline-none"
           value={meta.title}
@@ -232,28 +794,55 @@ export default function PresentationWorkspace({ meta }: { meta: PresentationDocM
           onChange={(e) => updatePresentMeta(meta.id, { title: e.target.value })}
           aria-label="Presentation title"
         />
-        <label className="flex items-center gap-1 text-[11px] text-muted">
-          Theme
-          <select
-            className="field h-6 w-24 cursor-pointer px-1 py-0 text-[11.5px]"
-            value={body.theme}
-            disabled={readOnly}
-            onChange={(e) => apply((b) => ({ ...b, theme: e.target.value as PresentTheme }))}
-          >
-            <option value="plain">Plain</option>
-            <option value="ink">Ink</option>
-            <option value="accent">Deep blue</option>
-          </select>
-        </label>
+
+        {!readOnly && (
+          <>
+            <button
+              className="icon-btn"
+              title="Undo (Ctrl/Cmd+Z)"
+              aria-label="Undo"
+              disabled={!canUndo}
+              onClick={undo}
+            >
+              <IcUndo size={14} />
+            </button>
+            <button
+              className="icon-btn"
+              title="Redo (Ctrl/Cmd+Shift+Z)"
+              aria-label="Redo"
+              disabled={!canRedo}
+              onClick={redo}
+            >
+              <IcRedo size={14} />
+            </button>
+            <ToolbarDivider />
+          </>
+        )}
+
+        <button className="icon-btn" title="Zoom out" aria-label="Zoom out" onClick={() => setZoom(clampZoom(scale / 1.2))}>
+          <IcZoomOut size={14} />
+        </button>
+        <button
+          className="min-w-[3.2rem] rounded-md px-1 text-center text-[11.5px] text-muted hover:text-ink"
+          title="Fit to viewport"
+          onClick={() => setZoom('fit')}
+        >
+          {zoomPct}%
+        </button>
+        <button className="icon-btn" title="Zoom in" aria-label="Zoom in" onClick={() => setZoom(clampZoom(scale * 1.2))}>
+          <IcZoomIn size={14} />
+        </button>
+        <button className="btn !px-2 !py-1 text-[11px]" title="Actual size (100%)" onClick={() => setZoom(1)}>
+          100%
+        </button>
+
+        {/* the theme is a deck property and now lives in the inspector's Deck
+            scope, so this bar stops carrying a control that belongs to a panel */}
         <ToolbarDivider />
         <button className="btn" title="Export as PDF" onClick={() => void exportPdf()}>
           <ActionIcon.Export size={12} /> PDF
         </button>
-        <button
-          className="btn"
-          title="Export as PPTX — basic fidelity (text, shapes, images)"
-          onClick={() => void exportPptx()}
-        >
+        <button className="btn" title="Export as PPTX — basic fidelity" onClick={() => void exportPptx()}>
           <ActionIcon.Export size={12} /> PPTX
         </button>
         <button className="icon-btn" title="Close presentation" aria-label="Close presentation" onClick={closePresent}>
@@ -262,188 +851,172 @@ export default function PresentationWorkspace({ meta }: { meta: PresentationDocM
       </div>
 
       <div className="flex min-h-0 flex-1">
-        {/* slide list */}
-        <aside className="flex w-44 flex-none flex-col border-r border-bord">
-          <div className="min-h-0 flex-1 overflow-y-auto p-2">
-            {body.slides.map((s, i) => (
-              <div
-                key={s.id}
-                className={`group relative mb-2 cursor-pointer overflow-hidden rounded-lg border ${
-                  i === slideIndex ? 'border-accent' : 'border-bord hover:border-muted'
-                }`}
-                onClick={() => {
-                  setSlideIndex(i)
-                  setSelectedId(null)
-                  setEditingTextId(null)
-                }}
-                role="button"
-                aria-label={`Slide ${i + 1}`}
-                aria-current={i === slideIndex}
-              >
-                <SlideView slide={s} theme={body.theme} width={156} />
-                <span className="absolute top-1 left-1 rounded bg-panel/85 px-1 text-[9px] font-bold">
-                  {i + 1}
-                </span>
-                {!readOnly && (
-                  <span className="absolute right-1 bottom-1 hidden gap-0.5 group-hover:flex">
-                    <button
-                      className="icon-btn h-5 w-5 bg-panel/90"
-                      title="Move slide up"
-                      aria-label={`Move slide ${i + 1} up`}
-                      disabled={i === 0}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        apply((b) => {
-                          const slides = [...b.slides]
-                          ;[slides[i - 1], slides[i]] = [slides[i], slides[i - 1]]
-                          return { ...b, slides }
-                        })
-                        setSlideIndex(i - 1)
-                      }}
-                    >
-                      ↑
-                    </button>
-                    <button
-                      className="icon-btn h-5 w-5 bg-panel/90"
-                      title="Move slide down"
-                      aria-label={`Move slide ${i + 1} down`}
-                      disabled={i === body.slides.length - 1}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        apply((b) => {
-                          const slides = [...b.slides]
-                          ;[slides[i + 1], slides[i]] = [slides[i], slides[i + 1]]
-                          return { ...b, slides }
-                        })
-                        setSlideIndex(i + 1)
-                      }}
-                    >
-                      ↓
-                    </button>
-                    <button
-                      className="icon-btn h-5 w-5 bg-panel/90"
-                      title="Duplicate slide"
-                      aria-label={`Duplicate slide ${i + 1}`}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        apply((b) => {
-                          const copy: PresentSlide = JSON.parse(JSON.stringify(b.slides[i]))
-                          copy.id = nid('slide')
-                          copy.elements = copy.elements.map((el) => ({ ...el, id: nid('el') }))
-                          const slides = [...b.slides]
-                          slides.splice(i + 1, 0, copy)
-                          return { ...b, slides }
-                        })
-                      }}
-                    >
-                      <IcCopy size={10} />
-                    </button>
-                    <button
-                      className="icon-btn h-5 w-5 bg-panel/90 text-[#f24822]"
-                      title="Delete slide"
-                      aria-label={`Delete slide ${i + 1}`}
-                      onClick={async (e) => {
-                        e.stopPropagation()
-                        if (body.slides.length <= 1) {
-                          toast.warning('A deck needs at least one slide')
-                          return
-                        }
-                        if (
-                          await confirmDialog({
-                            title: `Delete slide ${i + 1}?`,
-                            confirmLabel: 'Delete slide',
-                            danger: true,
-                          })
-                        ) {
-                          apply((b) => ({ ...b, slides: b.slides.filter((_, j) => j !== i) }))
-                          setSlideIndex((cur) => Math.max(0, cur > i ? cur - 1 : Math.min(cur, body.slides.length - 2)))
-                        }
-                      }}
-                    >
-                      <IcTrash size={10} />
-                    </button>
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
-          {!readOnly && (
-            <button
-              className="btn m-2 flex-none"
-              onClick={() => {
-                apply((b) => {
-                  const slides = [...b.slides]
-                  slides.splice(slideIndex + 1, 0, createSlide())
-                  return { ...b, slides }
-                })
-                setSlideIndex(slideIndex + 1)
-              }}
-            >
-              <IcPlus size={12} /> Add slide
-            </button>
-          )}
-        </aside>
+        <SlideRail
+          body={body}
+          currentIndex={si}
+          readOnly={readOnly}
+          handlers={railHandlers}
+        />
 
-        {/* canvas + notes */}
+        <LayersPanel
+          elements={elements}
+          inherited={furnitureElements(body, slide, si + 1, slideTokens)}
+          selectedIds={selectedIds}
+          collapsed={layersCollapsed}
+          readOnly={readOnly}
+          onToggleCollapsed={() => setLayersCollapsed((v) => !v)}
+          onSelect={(id, additive) =>
+            setSelectedIds((prev) => {
+              if (!additive) return new Set([id])
+              const next = new Set(prev)
+              next.has(id) ? next.delete(id) : next.add(id)
+              return next
+            })
+          }
+          onToggleFlag={(id, flag) =>
+            patchElement(id, (e) => ({ ...e, [flag]: e[flag] ? undefined : true }))
+          }
+        />
+
+        {/* ---------- canvas column ---------- */}
         <div className="flex min-w-0 flex-1 flex-col">
           {!readOnly && (
             <SlideToolbar
-              slideIndex={slideIndex}
+              slideIndex={si}
               slideCount={body.slides.length}
               background={slide.background}
-              themeBackground={theme.bg}
-              onAddText={() => addElement(createTextElement({ z: maxZ + 1 }))}
+              themeBackground={themeColors.bg}
+              selectedCount={selectedEls.length}
+              snapEnabled={snapEnabled}
+              layoutName={layoutById(slide.layoutId)?.name ?? null}
+              onAddText={addText}
               onAddImage={() => imageInput.current?.click()}
               onAddShape={addShape}
               onBackground={(background) =>
-                patchSlide(slideIndex, (s) => ({ ...s, background }))
+                patchSlide((s) => ({ ...s, background }), { coalesceKey: `bg-${slide.id}` })
               }
-              onResetBackground={() =>
-                patchSlide(slideIndex, (s) => ({ ...s, background: null }))
-              }
+              onResetBackground={() => patchSlide((s) => ({ ...s, background: null }))}
+              onToggleSnap={() => setSnapEnabled((v) => !v)}
+              onOpenLayouts={() => setLayoutsOpen((v) => !v)}
+              onInsertChart={() => setChartOpen((v) => !v)}
+              onInsertTable={insertTable}
+              onAlign={align}
+              onDistribute={distribute}
             />
           )}
-          <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto bg-panel2 p-4">
+
+          <div
+            ref={scrollRef}
+            className="relative flex min-h-0 flex-1 items-center justify-center overflow-auto bg-panel2 p-4"
+          >
+            {chartOpen && !readOnly && (
+              <ChartInsertDialog onInsert={insertChart} onClose={() => setChartOpen(false)} />
+            )}
+            {layoutsOpen && !readOnly && (
+              <LayoutPicker
+                body={body}
+                slideIndex={si}
+                onApply={applyLayout}
+                onClose={() => setLayoutsOpen(false)}
+              />
+            )}
             <SlideCanvas
               slide={slide}
-              theme={body.theme}
+              tokens={slideTokens}
+              textStyles={body.textStyles}
+              decor={furnitureElements(body, slide, si + 1, slideTokens)}
               readOnly={readOnly}
-              selectedId={selectedId}
+              scale={scale}
+              snapEnabled={snapEnabled}
+              selectedIds={selectedIds}
               editingTextId={editingTextId}
-              onSelect={setSelectedId}
+              onSelectChange={setSelectedIds}
               onEditText={setEditingTextId}
-              onPatchElement={patchElement}
+              setSlideElements={setSlideElements}
+              onSeal={seal}
             />
           </div>
-          <div className="flex-none border-t border-bord px-3 py-2">
-            <label className="mb-1 block text-[9.5px] font-semibold tracking-widest text-muted uppercase">
-              Speaker notes — slide {slideIndex + 1}
-            </label>
-            <textarea
-              className="field h-14 w-full resize-none text-[12px]"
-              placeholder="Notes only you see while presenting…"
-              value={slide.notes}
-              readOnly={readOnly}
-              onChange={(e) => patchSlide(slideIndex, (s) => ({ ...s, notes: e.target.value }))}
-            />
+
+          {/* notes: a strip until you want them, so the canvas keeps the room */}
+          <div className="flex-none border-t border-bord px-3 py-1.5">
+            <button
+              className="flex w-full items-center gap-1.5 text-left text-[9.5px] font-semibold tracking-widest text-muted uppercase hover:text-ink"
+              aria-expanded={notesOpen}
+              onClick={() => setNotesOpen((v) => !v)}
+            >
+              {notesOpen ? <IcChevronDown size={10} /> : <IcChevronRight size={10} />}
+              Speaker notes — slide {si + 1}
+              {!notesOpen && slide.notes.trim() && (
+                <span className="ml-1 min-w-0 flex-1 truncate normal-case opacity-70">
+                  {slide.notes.trim()}
+                </span>
+              )}
+            </button>
+            {notesOpen && (
+              <textarea
+                className="field mt-1 h-14 w-full resize-none text-[12px]"
+                placeholder="Notes only you see while presenting…"
+                value={slide.notes}
+                readOnly={readOnly}
+                onChange={(e) => {
+                  const v = e.target.value
+                  patchSlide((s) => ({ ...s, notes: v }), { coalesceKey: `notes-${slide.id}` })
+                }}
+                onBlur={seal}
+              />
+            )}
           </div>
+
+          <StatusBar
+            slideIndex={si}
+            slideCount={body.slides.length}
+            presentableCount={presentableSlides(body).length}
+            objectCount={elements.length}
+            selectedCount={selectedEls.length}
+            schemaVersion={body.version}
+            unsaved={unsaved}
+            readOnly={readOnly}
+          />
         </div>
 
-        {/* element inspector */}
-        <ElementInspector
-          selected={selected}
-          readOnly={readOnly}
-          maxZ={maxZ}
-          onPatch={(fn) => selected && patchElement(selected.id, fn)}
-          onDelete={() => {
-            if (!selected) return
-            patchSlide(slideIndex, (s) => ({
-              ...s,
-              elements: s.elements.filter((e) => e.id !== selected.id),
-            }))
-            setSelectedId(null)
-          }}
-        />
+        {/* ---------- contextual inspector ---------- */}
+        {!readOnly && (
+          <Inspector
+            body={body}
+            slide={slide}
+            slideIndex={si}
+            themeColors={themeColors}
+            selectedEls={selectedEls}
+            selected={selected}
+            maxZ={maxZ}
+            readOnly={readOnly}
+            onPatchOne={patchOne}
+            onPatchSlide={patchSlide}
+            onToggleSlideHidden={() => toggleHidden(si)}
+            onSetReviewStatus={(status) => setReviewStatus(si, status)}
+            onSetTheme={(t) => apply((b) => ({ ...b, theme: t }))}
+            slideTokens={slideTokens}
+            masterActions={masterActions}
+            overflow={overflow}
+            textActions={textActions}
+            linkSources={linkSources}
+            linkActions={linkActions}
+            updateAllLinked={() => void updateAllLinked()}
+            openLinkedSource={openLinkedSource}
+            onRevertOverride={(key) => {
+              const ph = placeholderFor(slide.layoutId, selected!)
+              if (ph) patchOne((el) => revertOverride(el, ph, slideTokens, key))
+            }}
+            onDeleteSelection={deleteSelection}
+            onLayer={layer}
+            onToggleFlag={toggleFlag}
+            onReplaceImage={(id) => {
+              replaceTarget.current = id
+              imageInput.current?.click()
+            }}
+            onSeal={seal}
+          />
+        )}
       </div>
 
       <input
@@ -460,408 +1033,845 @@ export default function PresentationWorkspace({ meta }: { meta: PresentationDocM
   )
 }
 
-/* ================= editable canvas ================= */
+/** What the typography panel can do, gathered so the props stay legible. */
+interface TextActions {
+  setStyleRef: (name: TextStyleName | undefined) => void
+  setOverride: <K extends keyof TextStyleSpec>(key: K, value: TextStyleSpec[K] | undefined) => void
+  setBoxProp: (patch: { valign?: 'top' | 'middle' | 'bottom'; padding?: number; autoSize?: AutoSizeMode }) => void
+  applyRemedy: (mode: AutoSizeMode, report: OverflowReport) => void
+  updateStyle: () => void
+}
 
-function SlideCanvas({
-  slide,
-  theme,
+/** What the master panel can do, gathered so the Inspector props stay legible. */
+interface MasterActions {
+  add: (master: PresentMaster) => void
+  remove: (id: string) => void
+  rename: (id: string, name: string) => void
+  setToken: (id: string, key: keyof ThemeTokens, value: string | number | undefined) => void
+  assign: (id: string | undefined) => void
+  setFurniture: (id: string, patch: MasterFurniture) => void
+}
+
+/**
+ * What this element has changed about its placeholder (19E.2).
+ *
+ * An override is not a mistake — a title nudged 20px left is a decision. It
+ * just has to be visible, and undoable one property at a time, so applying a
+ * layout never feels like a trap.
+ */
+function LayoutOverrides({
+  selected,
+  layoutId,
+  tokens,
   readOnly,
-  selectedId,
-  editingTextId,
-  onSelect,
-  onEditText,
-  onPatchElement,
+  onRevert,
 }: {
-  slide: PresentSlide
-  theme: PresentTheme
+  selected: PresentElement
+  layoutId: string | undefined
+  tokens: ThemeTokens
   readOnly: boolean
-  selectedId: string | null
-  editingTextId: string | null
-  onSelect: (id: string | null) => void
-  onEditText: (id: string | null) => void
-  onPatchElement: (id: string, fn: (e: PresentElement) => PresentElement) => void
+  onRevert: (key: OverrideKey) => void
 }) {
-  const t = THEME_COLORS[theme]
-  const wrapRef = useRef<HTMLDivElement>(null)
-  const [scale, setScale] = useState(0.7)
-
-  useEffect(() => {
-    const el = wrapRef.current?.parentElement
-    if (!el) return
-    const compute = () => {
-      const pad = 48
-      setScale(
-        Math.min((el.clientWidth - pad) / SLIDE_W, (el.clientHeight - pad) / SLIDE_H, 1.2),
-      )
-    }
-    compute()
-    const ro = new ResizeObserver(compute)
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [])
-
-  const gesture = useRef<{
-    id: string
-    kind: 'move' | 'resize'
-    startX: number
-    startY: number
-    orig: { x: number; y: number; w: number; h: number }
-  } | null>(null)
-
-  const beginGesture = (
-    e: ReactPointerEvent,
-    el: PresentElement,
-    kind: 'move' | 'resize',
-  ) => {
-    if (readOnly || editingTextId === el.id) return
-    e.stopPropagation()
-    e.preventDefault()
-    onSelect(el.id)
-    gesture.current = {
-      id: el.id,
-      kind,
-      startX: e.clientX,
-      startY: e.clientY,
-      orig: { x: el.x, y: el.y, w: el.w, h: el.h },
-    }
-    const onMove = (ev: PointerEvent) => {
-      const g = gesture.current
-      if (!g) return
-      const dx = (ev.clientX - g.startX) / scale
-      const dy = (ev.clientY - g.startY) / scale
-      onPatchElement(g.id, (cur) =>
-        g.kind === 'move'
-          ? {
-              ...cur,
-              x: Math.round(Math.min(SLIDE_W - 8, Math.max(8 - g.orig.w, g.orig.x + dx))),
-              y: Math.round(Math.min(SLIDE_H - 8, Math.max(8 - g.orig.h, g.orig.y + dy))),
-            }
-          : {
-              ...cur,
-              w: Math.round(Math.max(24, g.orig.w + dx)),
-              h: Math.round(Math.max(16, g.orig.h + dy)),
-            },
-      )
-    }
-    const onUp = () => {
-      gesture.current = null
-      window.removeEventListener('pointermove', onMove)
-      window.removeEventListener('pointerup', onUp)
-    }
-    window.addEventListener('pointermove', onMove)
-    window.addEventListener('pointerup', onUp)
-  }
-
-  const sorted = useMemo(
-    () => [...slide.elements].sort((a, b) => a.z - b.z),
-    [slide.elements],
+  const ph = placeholderFor(layoutId, selected)
+  if (!ph) return null
+  const keys = placeholderOverrides(selected, ph, tokens)
+  return (
+    <>
+      <div className="insp-h">Placeholder · {selected.role}</div>
+      {keys.length === 0 ? (
+        <p className="text-[10.5px] text-muted">Matches the layout exactly.</p>
+      ) : (
+        <>
+          <p className="mb-1 text-[10.5px] text-muted">
+            {keys.length} {keys.length === 1 ? 'property overrides' : 'properties override'} the
+            layout.
+          </p>
+          <div className="flex flex-wrap gap-1">
+            {keys.map((k) => (
+              <button
+                key={k}
+                className="toolbar-control toolbar-control--sm text-[10px]"
+                title={`Revert ${OVERRIDE_LABEL[k]} to the layout`}
+                aria-label={`Revert ${OVERRIDE_LABEL[k]}`}
+                disabled={readOnly}
+                onClick={() => onRevert(k)}
+              >
+                <span aria-hidden>↺ {OVERRIDE_LABEL[k]}</span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </>
   )
+}
 
+/**
+ * The deck status bar (19E.1) — where you are, what is on the slide, and
+ * whether the last edit is actually on disk. "Saved" here is derived from the
+ * persistence queue, not from a timer, so it never claims more than it knows.
+ */
+function StatusBar({
+  slideIndex,
+  slideCount,
+  presentableCount,
+  objectCount,
+  selectedCount,
+  schemaVersion,
+  unsaved,
+  readOnly,
+}: {
+  slideIndex: number
+  slideCount: number
+  presentableCount: number
+  objectCount: number
+  selectedCount: number
+  schemaVersion: number
+  unsaved: boolean
+  readOnly: boolean
+}) {
+  const hidden = slideCount - presentableCount
   return (
     <div
-      ref={wrapRef}
-      style={{ width: SLIDE_W * scale, height: SLIDE_H * scale, position: 'relative' }}
+      className="flex flex-none items-center gap-3 border-t border-bord px-3 py-1 text-[10.5px] text-muted"
+      role="status"
     >
-      <div
-        role="application"
-        aria-label="Slide canvas"
-        style={{
-          width: SLIDE_W,
-          height: SLIDE_H,
-          background: slide.background ?? t.bg,
-          transform: `scale(${scale})`,
-          transformOrigin: 'top left',
-          position: 'absolute',
-          borderRadius: 6,
-          boxShadow: '0 6px 30px rgba(0,0,0,.25)',
-          overflow: 'hidden',
-        }}
-        onPointerDown={() => {
-          onSelect(null)
-          onEditText(null)
-        }}
-      >
-        {sorted.map((el) => {
-          const isSelected = el.id === selectedId
-          const isEditing = el.id === editingTextId
-          return (
-            <div
-              key={el.id}
-              style={{
-                ...elementStyle(el),
-                cursor: readOnly ? 'default' : 'move',
-                outline: isSelected ? '1.5px solid #0d99ff' : 'none',
-                outlineOffset: 2,
-              }}
-              onPointerDown={(e) => beginGesture(e, el, 'move')}
-              onDoubleClick={(e) => {
-                e.stopPropagation()
-                if (!readOnly && el.kind === 'text') onEditText(el.id)
-              }}
-            >
-              {isEditing && el.kind === 'text' ? (
-                <textarea
-                  autoFocus
-                  value={el.text}
-                  aria-label="Edit text"
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    fontSize: el.fontSize,
-                    fontWeight: el.bold ? 700 : 400,
-                    fontStyle: el.italic ? 'italic' : 'normal',
-                    textAlign: el.align,
-                    color: el.color ?? t.text,
-                    lineHeight: 1.25,
-                    background: 'transparent',
-                    border: '1px dashed #0d99ff',
-                    outline: 'none',
-                    resize: 'none',
-                    fontFamily: 'inherit',
-                  }}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  onChange={(e) =>
-                    onPatchElement(el.id, (cur) =>
-                      cur.kind === 'text' ? { ...cur, text: e.target.value } : cur,
-                    )
-                  }
-                  onBlur={() => onEditText(null)}
-                />
-              ) : (
-                <StaticElement el={{ ...el, x: 0, y: 0 } as PresentElement} themeText={t.text} />
-              )}
-              {isSelected && !readOnly && (
-                <span
-                  role="presentation"
-                  style={{
-                    position: 'absolute',
-                    right: -7,
-                    bottom: -7,
-                    width: 13,
-                    height: 13,
-                    borderRadius: 4,
-                    border: '2px solid #0d99ff',
-                    background: '#fff',
-                    cursor: 'nwse-resize',
-                    zIndex: 99,
-                  }}
-                  onPointerDown={(e) => beginGesture(e, el, 'resize')}
-                />
-              )}
-            </div>
-          )
-        })}
-      </div>
+      <span className="tabular-nums">
+        Slide {slideIndex + 1} of {slideCount}
+      </span>
+      {hidden > 0 && (
+        <span className="tabular-nums" title="Hidden slides are left out of every export">
+          {presentableCount} presented
+        </span>
+      )}
+      <span className="tabular-nums">
+        {objectCount} {objectCount === 1 ? 'object' : 'objects'}
+        {selectedCount > 0 && ` · ${selectedCount} selected`}
+      </span>
+      <span className="ml-auto">
+        {readOnly ? 'Read-only' : unsaved ? 'Saving…' : 'Saved'}
+      </span>
+      <span title="Deck schema version">v{schemaVersion}</span>
     </div>
   )
 }
 
-/* ================= element inspector ================= */
+/* ==================== contextual inspector ==================== */
 
-function ElementInspector({
+function Inspector({
+  body,
+  slide,
+  slideIndex,
+  themeColors,
+  selectedEls,
   selected,
-  readOnly,
   maxZ,
-  onPatch,
-  onDelete,
+  readOnly,
+  onPatchOne,
+  onPatchSlide,
+  onDeleteSelection,
+  onLayer,
+  onToggleFlag,
+  onReplaceImage,
+  onSeal,
+  onToggleSlideHidden,
+  onSetReviewStatus,
+  onSetTheme,
+  slideTokens,
+  masterActions,
+  onRevertOverride,
+  overflow,
+  textActions,
+  linkSources,
+  linkActions,
+  updateAllLinked,
+  openLinkedSource,
 }: {
+  body: PresentationBody
+  slide: PresentSlide
+  slideIndex: number
+  themeColors: { bg: string; text: string; accent: string }
+  selectedEls: PresentElement[]
   selected: PresentElement | null
-  readOnly: boolean
   maxZ: number
-  onPatch: (fn: (e: PresentElement) => PresentElement) => void
-  onDelete: () => void
+  readOnly: boolean
+  onPatchOne: (fn: (e: PresentElement) => PresentElement, opts?: { coalesceKey?: string }) => void
+  onPatchSlide: (fn: (s: PresentSlide) => PresentSlide, opts?: { coalesceKey?: string }) => void
+  onDeleteSelection: () => void
+  onLayer: (mode: LayerMode) => void
+  onToggleFlag: (flag: 'locked' | 'hidden') => void
+  onReplaceImage: (id: string) => void
+  onSeal: () => void
+  onToggleSlideHidden: () => void
+  onSetReviewStatus: (status: SlideReviewStatus | undefined) => void
+  onSetTheme: (theme: PresentTheme) => void
+  slideTokens: ThemeTokens
+  masterActions: MasterActions
+  onRevertOverride: (key: OverrideKey) => void
+  overflow: OverflowReport | null
+  textActions: TextActions
+  linkSources: ReadonlyMap<string, SourceState>
+  linkActions: {
+    goTo: (slideIndex: number, elementId: string) => void
+    updateOne: (item: LinkedItem) => Promise<void> | void
+    detach: (item: LinkedItem) => void
+  }
+  updateAllLinked: () => void
+  openLinkedSource: (item: LinkedItem) => void
 }) {
-  if (readOnly) return null
+  const count = selectedEls.length
+  const anyLocked = selectedEls.some((e) => e.locked)
+  const anyHidden = selectedEls.some((e) => e.hidden)
+
+  /**
+   * Three scopes (19E.1). The panel follows the selection — pick an element
+   * and it shows the element — but Deck stays reachable, and a selection
+   * change pulls you back out of it so the panel is never describing
+   * something you are no longer looking at.
+   */
+  const [scope, setScope] = useState<InspectorScope>(count ? 'element' : 'slide')
+  const hasSelection = count > 0
+  useEffect(() => {
+    setScope(hasSelection ? 'element' : 'slide')
+  }, [hasSelection])
+
+  const presentable = presentableSlides(body).length
+  const hiddenCount = body.slides.length - presentable
+
   return (
-    <aside className="w-56 flex-none overflow-y-auto border-l border-bord px-3 pb-4">
-      <div className="insp-h">Element</div>
-      {!selected ? (
-        <p className="text-[11px] leading-relaxed text-muted">
-          Select an element on the slide to edit its geometry, style and layer.
-        </p>
-      ) : (
+    <aside className="flex w-56 flex-none flex-col border-l border-bord" aria-label="Inspector">
+      <div className="flex flex-none border-b border-bord" role="tablist" aria-label="Inspector scope">
+        {(['slide', 'element', 'deck'] as const).map((s) => (
+          <button
+            key={s}
+            role="tab"
+            aria-selected={scope === s}
+            className={`flex-1 border-b-2 px-1 py-1.5 text-[11px] capitalize ${
+              scope === s
+                ? 'border-accent text-ink'
+                : 'border-transparent text-muted hover:text-ink'
+            }`}
+            onClick={() => setScope(s)}
+          >
+            {s}
+          </button>
+        ))}
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
+      {scope === 'slide' && (
         <>
+          <div className="insp-h">Slide {slideIndex + 1}</div>
+          <label className="flex items-center gap-2 text-[11px] text-muted">
+            Background
+            <input
+              type="color"
+              className="h-5 w-8 cursor-pointer border-0 bg-transparent p-0"
+              value={slide.background ?? themeColors.bg}
+              aria-label="Slide background color"
+              disabled={readOnly}
+              onChange={(e) => {
+                const v = e.target.value
+                onPatchSlide((s) => ({ ...s, background: v }), { coalesceKey: `bg-${slide.id}` })
+              }}
+              onBlur={onSeal}
+            />
+            {slide.background && (
+              <button
+                className="toolbar-control toolbar-control--sm text-[9px]"
+                title="Reset to theme background"
+                aria-label="Reset to theme background"
+                onClick={() => onPatchSlide((s) => ({ ...s, background: null }))}
+              >
+                <IcX size={10} />
+              </button>
+            )}
+          </label>
+
+          <div className="insp-h">In the presentation</div>
+          <button
+            className="btn w-full justify-start"
+            aria-pressed={slide.hidden === true}
+            disabled={readOnly}
+            onClick={onToggleSlideHidden}
+          >
+            {slide.hidden ? <IcEyeOff size={12} /> : <IcEye size={12} />}
+            {slide.hidden ? 'Hidden — not exported' : 'Shown'}
+          </button>
+          <p className="mt-1 text-[10.5px] leading-relaxed text-muted">
+            A hidden slide stays in the deck and stays editable. It is left out
+            of PDF and PPTX export.
+          </p>
+
+          <div className="insp-h">Review</div>
+          <select
+            className="field h-6 w-full cursor-pointer px-1 py-0 text-[11.5px]"
+            aria-label="Review status"
+            disabled={readOnly}
+            value={slide.reviewStatus ?? ''}
+            onChange={(e) =>
+              onSetReviewStatus((e.target.value || undefined) as SlideReviewStatus | undefined)
+            }
+          >
+            <option value="">Not set</option>
+            <option value="draft">Draft</option>
+            <option value="review">In review</option>
+            <option value="approved">Approved</option>
+          </select>
+        </>
+      )}
+
+      {scope === 'deck' && (
+        <>
+          <div className="insp-h">Theme</div>
+          <select
+            className="field h-6 w-full cursor-pointer px-1 py-0 text-[11.5px]"
+            aria-label="Deck theme"
+            value={body.theme}
+            disabled={readOnly}
+            onChange={(e) => onSetTheme(e.target.value as PresentTheme)}
+          >
+            <option value="plain">Plain</option>
+            <option value="ink">Ink</option>
+            <option value="accent">Deep blue</option>
+          </select>
+
+          <div className="insp-h">Structure</div>
+          <dl className="flex flex-col gap-1 text-[11px]">
+            <DeckStat label="Slides" value={String(body.slides.length)} />
+            <DeckStat
+              label="In the presentation"
+              value={hiddenCount ? `${presentable} of ${body.slides.length}` : String(presentable)}
+            />
+            <DeckStat label="Sections" value={String(body.sections?.length ?? 0)} />
+            <DeckStat label="Schema" value={`v${body.version}`} />
+          </dl>
+          {hiddenCount > 0 && (
+            <p className="mt-1.5 text-[10.5px] leading-relaxed text-muted">
+              {hiddenCount} hidden {hiddenCount === 1 ? 'slide is' : 'slides are'} kept in the deck
+              and left out of every export.
+            </p>
+          )}
+
+          <LinkedContentPanel
+            body={body}
+            sources={linkSources}
+            readOnly={readOnly}
+            onGoTo={linkActions.goTo}
+            onUpdateOne={(item) => void linkActions.updateOne(item)}
+            onUpdateAll={() => void updateAllLinked()}
+            onDetach={linkActions.detach}
+            onOpenSource={(item) => openLinkedSource(item)}
+          />
+
+          <MasterPanel
+            body={body}
+            slide={slide}
+            readOnly={readOnly}
+            onAddMaster={masterActions.add}
+            onRemoveMaster={masterActions.remove}
+            onRenameMaster={masterActions.rename}
+            onSetToken={masterActions.setToken}
+            onAssignToSlide={masterActions.assign}
+            onSetFurniture={masterActions.setFurniture}
+          />
+        </>
+      )}
+
+      {scope === 'element' && count === 0 && (
+        <p className="mt-3 text-[11px] leading-relaxed text-muted">
+          Nothing is selected. Pick an element on the canvas or in the layers
+          column to edit it.
+        </p>
+      )}
+
+      {scope === 'element' && count >= 2 && (
+        <>
+          <div className="insp-h">{count} elements</div>
+          <p className="mb-2 text-[11px] leading-relaxed text-muted">
+            Use the alignment tools in the toolbar. Move with drag or arrow keys.
+          </p>
+          <div className="flex gap-1">
+            <button className="btn flex-1" title="Lock / unlock" onClick={() => onToggleFlag('locked')}>
+              {anyLocked ? <IcUnlock size={12} /> : <IcLock size={12} />} {anyLocked ? 'Unlock' : 'Lock'}
+            </button>
+            <button className="btn flex-1" title="Hide / show" onClick={() => onToggleFlag('hidden')}>
+              <IcEye size={12} /> {anyHidden ? 'Show' : 'Hide'}
+            </button>
+          </div>
+          <LayerButtons onLayer={onLayer} />
+          <div className="insp-h">Danger</div>
+          <button className="btn w-full text-[#f24822]" onClick={onDeleteSelection}>
+            <IcTrash size={12} /> Delete {count} elements
+          </button>
+        </>
+      )}
+
+      {scope === 'element' && count === 1 && selected && (
+        <>
+          <LayoutOverrides
+            selected={selected}
+            layoutId={slide.layoutId}
+            tokens={slideTokens}
+            readOnly={readOnly}
+            onRevert={onRevertOverride}
+          />
+          <div className="insp-h">
+            {selected.kind === 'text' ? 'Text' : selected.kind === 'image' ? 'Image' : 'Shape'}
+          </div>
           <div className="grid grid-cols-2 gap-1.5">
-            {(
-              [
-                ['x', selected.x],
-                ['y', selected.y],
-                ['w', selected.w],
-                ['h', selected.h],
-              ] as const
-            ).map(([k, v]) => (
+            {(['x', 'y', 'w', 'h'] as const).map((k) => (
               <label key={k} className="text-[10px] text-muted uppercase">
                 {k}
                 <input
                   type="number"
                   className="field mt-0.5 !px-1.5 !py-0.5 text-[11.5px]"
-                  value={Math.round(v)}
+                  value={Math.round(selected[k])}
                   aria-label={`Element ${k}`}
                   onChange={(e) => {
                     const n = Number(e.target.value)
-                    if (Number.isFinite(n)) onPatch((el) => ({ ...el, [k]: n }))
+                    if (!Number.isFinite(n)) return
+                    onPatchOne(
+                      (el) => ({ ...el, [k]: k === 'w' || k === 'h' ? Math.max(1, n) : n }),
+                      { coalesceKey: `geo-${k}-${selected.id}` },
+                    )
                   }}
+                  onBlur={onSeal}
                 />
               </label>
             ))}
           </div>
 
+          <div className="mt-2 grid grid-cols-2 gap-1.5">
+            <label className="text-[10px] text-muted uppercase">
+              Rotation°
+              <input
+                type="number"
+                className="field mt-0.5 !px-1.5 !py-0.5 text-[11.5px]"
+                value={Math.round(selected.rotation ?? 0)}
+                aria-label="Rotation degrees"
+                onChange={(e) => {
+                  const n = Number(e.target.value)
+                  if (!Number.isFinite(n)) return
+                  onPatchOne((el) => ({ ...el, rotation: ((Math.round(n) % 360) + 360) % 360 }), {
+                    coalesceKey: `rot-${selected.id}`,
+                  })
+                }}
+                onBlur={onSeal}
+              />
+            </label>
+            <label className="text-[10px] text-muted uppercase">
+              Opacity %
+              <input
+                type="number"
+                min={0}
+                max={100}
+                className="field mt-0.5 !px-1.5 !py-0.5 text-[11.5px]"
+                value={Math.round((selected.opacity ?? 1) * 100)}
+                aria-label="Opacity percent"
+                onChange={(e) => {
+                  const n = Number(e.target.value)
+                  if (!Number.isFinite(n)) return
+                  onPatchOne((el) => ({ ...el, opacity: Math.max(0, Math.min(1, n / 100)) }), {
+                    coalesceKey: `op-${selected.id}`,
+                  })
+                }}
+                onBlur={onSeal}
+              />
+            </label>
+          </div>
+
           {selected.kind === 'text' && (
             <>
-              <div className="insp-h">Text</div>
-              <label className="text-[10px] text-muted uppercase">
-                Size
-                <input
-                  type="number"
-                  className="field mt-0.5 !px-1.5 !py-0.5 text-[11.5px]"
-                  value={selected.fontSize}
-                  onChange={(e) =>
-                    onPatch((el) =>
-                      el.kind === 'text'
-                        ? { ...el, fontSize: Math.max(8, Math.min(120, Number(e.target.value) || 8)) }
-                        : el,
-                    )
-                  }
-                />
-              </label>
-              {/* Migrated off `.tbtn` onto the toolbar primitive (12.4, closing
-                  #48). These already said `aria-pressed`; what they did not have
-                  was a state anyone could SEE without colour — `--accent` on
-                  `--accent-soft` is 2.38:1 in light, under the 3:1 a state
-                  graphic owes (WCAG 1.4.11) — nor a name behind the glyph, nor
-                  a 24px target. The primitive brings all three. */}
-              <div className="mt-1.5 flex gap-1">
-                <button
-                  className="toolbar-control toolbar-control--sm font-bold"
-                  title="Bold"
-                  aria-label="Bold"
-                  aria-pressed={selected.bold}
-                  onClick={() => onPatch((el) => (el.kind === 'text' ? { ...el, bold: !el.bold } : el))}
-                >
-                  <span aria-hidden>B</span>
-                </button>
-                <button
-                  className="toolbar-control toolbar-control--sm italic"
-                  title="Italic"
-                  aria-label="Italic"
-                  aria-pressed={selected.italic}
-                  onClick={() => onPatch((el) => (el.kind === 'text' ? { ...el, italic: !el.italic } : el))}
-                >
-                  <span aria-hidden>I</span>
-                </button>
-                {(['left', 'center', 'right'] as const).map((a) => (
-                  <button
-                    key={a}
-                    className="toolbar-control toolbar-control--sm"
-                    title={`Align ${a}`}
-                    aria-label={`Align ${a}`}
-                    aria-pressed={selected.align === a}
-                    onClick={() => onPatch((el) => (el.kind === 'text' ? { ...el, align: a } : el))}
-                  >
-                    <span aria-hidden>{a === 'left' ? '⇤' : a === 'center' ? '↔' : '⇥'}</span>
-                  </button>
-                ))}
-              </div>
-              <label className="mt-1.5 flex items-center gap-2 text-[11px] text-muted">
-                Color
-                <input
-                  type="color"
-                  className="h-5 w-8 cursor-pointer border-0 bg-transparent p-0"
-                  value={selected.color ?? '#1f1f24'}
-                  onChange={(e) =>
-                    onPatch((el) => (el.kind === 'text' ? { ...el, color: e.target.value } : el))
-                  }
-                />
-                {selected.color && (
-                  <button
-                    className="toolbar-control toolbar-control--sm text-[9px]"
-                    title="Use theme color"
-                    aria-label="Use theme color"
-                    onClick={() => onPatch((el) => (el.kind === 'text' ? { ...el, color: null } : el))}
-                  >
-                    <span aria-hidden>✕</span>
-                  </button>
-                )}
-              </label>
+              <TextControls selected={selected} onPatchOne={onPatchOne} onSeal={onSeal} />
+              <TypographyPanel
+                el={selected}
+                render={resolveTextRender(selected, slideTokens, body.textStyles)}
+                overflow={overflow}
+                readOnly={readOnly}
+                onSetStyleRef={textActions.setStyleRef}
+                onSetOverride={textActions.setOverride}
+                onSetBoxProp={textActions.setBoxProp}
+                onApplyRemedy={textActions.applyRemedy}
+                onUpdateStyle={textActions.updateStyle}
+              />
             </>
           )}
-
-          {selected.kind === 'shape' && (
-            <>
-              <div className="insp-h">Shape</div>
-              <label className="flex items-center gap-2 text-[11px] text-muted">
-                Fill
-                <input
-                  type="color"
-                  className="h-5 w-8 cursor-pointer border-0 bg-transparent p-0"
-                  value={selected.fill?.slice(0, 7) ?? '#cccccc'}
-                  onChange={(e) =>
-                    onPatch((el) => (el.kind === 'shape' ? { ...el, fill: e.target.value } : el))
-                  }
-                />
-                <button
-                  className="toolbar-control toolbar-control--sm text-[9px]"
-                  title="No fill"
-                  aria-label="No fill"
-                  onClick={() => onPatch((el) => (el.kind === 'shape' ? { ...el, fill: null } : el))}
-                >
-                  <span aria-hidden>✕</span>
-                </button>
-              </label>
-              <label className="mt-1 flex items-center gap-2 text-[11px] text-muted">
-                Stroke
-                <input
-                  type="color"
-                  className="h-5 w-8 cursor-pointer border-0 bg-transparent p-0"
-                  value={selected.stroke ?? '#888888'}
-                  onChange={(e) =>
-                    onPatch((el) => (el.kind === 'shape' ? { ...el, stroke: e.target.value } : el))
-                  }
-                />
-                <input
-                  type="number"
-                  className="field w-14 !px-1.5 !py-0.5 text-[11.5px]"
-                  value={selected.strokeWidth}
-                  min={0}
-                  max={20}
-                  aria-label="Stroke width"
-                  onChange={(e) =>
-                    onPatch((el) =>
-                      el.kind === 'shape'
-                        ? { ...el, strokeWidth: Math.max(0, Number(e.target.value) || 0) }
-                        : el,
-                    )
-                  }
-                />
-              </label>
-            </>
+          {selected.kind === 'image' && (
+            <ImageControls selected={selected} onPatchOne={onPatchOne} onReplace={() => onReplaceImage(selected.id)} />
           )}
+          {selected.kind === 'shape' && <ShapeControls selected={selected} onPatchOne={onPatchOne} onSeal={onSeal} />}
 
-          <div className="insp-h">Layer</div>
+          <div className="insp-h">Arrange</div>
           <div className="flex gap-1">
-            <button
-              className="btn flex-1"
-              title="Bring forward"
-              onClick={() => onPatch((el) => ({ ...el, z: el.z + 1 }))}
-            >
-              ↥ Front
+            <button className="btn flex-1" title="Lock / unlock" onClick={() => onToggleFlag('locked')}>
+              {selected.locked ? <IcLock size={12} /> : <IcUnlock size={12} />}
             </button>
-            <button
-              className="btn flex-1"
-              title="Send backward"
-              onClick={() => onPatch((el) => ({ ...el, z: Math.max(0, el.z - 1) }))}
-            >
-              ↧ Back
+            <button className="btn flex-1" title="Hide / show" onClick={() => onToggleFlag('hidden')}>
+              <IcEye size={12} style={{ opacity: selected.hidden ? 0.4 : 1 }} />
             </button>
           </div>
+          <LayerButtons onLayer={onLayer} />
           <p className="mt-1 text-[10px] text-muted">z {selected.z} of {maxZ}</p>
 
           <div className="insp-h">Danger</div>
-          <button className="btn w-full text-[#f24822]" onClick={onDelete}>
+          <button className="btn w-full text-[#f24822]" onClick={onDeleteSelection}>
             <IcTrash size={12} /> Delete element
           </button>
         </>
       )}
+      </div>
     </aside>
+  )
+}
+
+function DeckStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-2">
+      <dt className="text-muted">{label}</dt>
+      <dd className="font-semibold tabular-nums">{value}</dd>
+    </div>
+  )
+}
+
+function LayerButtons({ onLayer }: { onLayer: (mode: LayerMode) => void }) {
+  return (
+    <div className="mt-1 grid grid-cols-2 gap-1">
+      <button className="btn" title="Bring to front (Ctrl/Cmd+])" onClick={() => onLayer('front')}>
+        ⤒ Front
+      </button>
+      <button className="btn" title="Send to back (Ctrl/Cmd+[)" onClick={() => onLayer('back')}>
+        ⤓ Back
+      </button>
+      <button className="btn" title="Bring forward (])" onClick={() => onLayer('forward')}>
+        ↑ Forward
+      </button>
+      <button className="btn" title="Send backward ([)" onClick={() => onLayer('backward')}>
+        ↓ Backward
+      </button>
+    </div>
+  )
+}
+
+function TextControls({
+  selected,
+  onPatchOne,
+  onSeal,
+}: {
+  selected: PresentElement & { kind: 'text' }
+  onPatchOne: (fn: (e: PresentElement) => PresentElement, opts?: { coalesceKey?: string }) => void
+  onSeal: () => void
+}) {
+  return (
+    <>
+      <label className="mt-2 block text-[10px] text-muted uppercase">
+        Size
+        <input
+          type="number"
+          className="field mt-0.5 !px-1.5 !py-0.5 text-[11.5px]"
+          value={selected.fontSize}
+          onChange={(e) =>
+            onPatchOne(
+              (el) => (el.kind === 'text' ? { ...el, fontSize: Math.max(8, Math.min(200, Number(e.target.value) || 8)) } : el),
+              { coalesceKey: `size-${selected.id}` },
+            )
+          }
+          onBlur={onSeal}
+        />
+      </label>
+      {/* Migrated off `.tbtn` onto the toolbar primitive (12.4, closing #48).
+          These already said `aria-pressed`; what they did not have was a state
+          anyone could SEE without colour — `--accent` on `--accent-soft` is
+          2.38:1 in light, under the 3:1 a state graphic owes (WCAG 1.4.11) —
+          nor a name behind the glyph, nor a 24px target. The primitive brings
+          all three, and `is-active` is not a class this codebase still has. */}
+      <div className="mt-1.5 flex gap-1">
+        <button
+          className="toolbar-control toolbar-control--sm font-bold"
+          title="Bold"
+          aria-label="Bold"
+          aria-pressed={selected.bold}
+          onClick={() => onPatchOne((el) => (el.kind === 'text' ? { ...el, bold: !el.bold } : el))}
+        >
+          <span aria-hidden>B</span>
+        </button>
+        <button
+          className="toolbar-control toolbar-control--sm italic"
+          title="Italic"
+          aria-label="Italic"
+          aria-pressed={selected.italic}
+          onClick={() => onPatchOne((el) => (el.kind === 'text' ? { ...el, italic: !el.italic } : el))}
+        >
+          <span aria-hidden>I</span>
+        </button>
+        {(['left', 'center', 'right'] as const).map((a) => (
+          <button
+            key={a}
+            className="toolbar-control toolbar-control--sm"
+            title={`Align ${a}`}
+            aria-label={`Align ${a}`}
+            aria-pressed={selected.align === a}
+            onClick={() => onPatchOne((el) => (el.kind === 'text' ? { ...el, align: a } : el))}
+          >
+            <span aria-hidden>{a === 'left' ? '⇤' : a === 'center' ? '↔' : '⇥'}</span>
+          </button>
+        ))}
+      </div>
+      <label className="mt-1.5 flex items-center gap-2 text-[11px] text-muted">
+        Color
+        <input
+          type="color"
+          className="h-5 w-8 cursor-pointer border-0 bg-transparent p-0"
+          value={selected.color ?? '#1f1f24'}
+          onChange={(e) =>
+            onPatchOne((el) => (el.kind === 'text' ? { ...el, color: e.target.value } : el), {
+              coalesceKey: `color-${selected.id}`,
+            })
+          }
+          onBlur={onSeal}
+        />
+        {selected.color && (
+          <button
+            className="toolbar-control toolbar-control--sm text-[9px]"
+            title="Use theme color"
+            aria-label="Use theme color"
+            onClick={() => onPatchOne((el) => (el.kind === 'text' ? { ...el, color: null } : el))}
+          >
+            <IcX size={10} />
+          </button>
+        )}
+      </label>
+    </>
+  )
+}
+
+function ImageControls({
+  selected,
+  onPatchOne,
+  onReplace,
+}: {
+  selected: PresentElement & { kind: 'image' }
+  onPatchOne: (fn: (e: PresentElement) => PresentElement, opts?: { coalesceKey?: string }) => void
+  onReplace: () => void
+}) {
+  return (
+    <>
+      <label className="mt-2 block text-[10px] text-muted uppercase">
+        Alt text
+        <input
+          className="field mt-0.5 !px-1.5 !py-0.5 text-[11.5px]"
+          value={selected.alt ?? ''}
+          placeholder="Describe this image"
+          aria-label="Image alt text"
+          onChange={(e) =>
+            onPatchOne((el) => (el.kind === 'image' ? { ...el, alt: e.target.value } : el), {
+              coalesceKey: `alt-${selected.id}`,
+            })
+          }
+        />
+      </label>
+      <div className="insp-h">Frame</div>
+      <div className="grid grid-cols-2 gap-1.5">
+        <label className="text-[10px] text-muted uppercase">
+          Fit
+          <select
+            className="field mt-0.5 h-6 w-full cursor-pointer px-1 py-0 text-[11.5px]"
+            aria-label="Image fit"
+            value={selected.fit ?? 'fill'}
+            onChange={(e) =>
+              onPatchOne((el) => (el.kind === 'image' ? { ...el, fit: e.target.value as ImageFit } : el))
+            }
+          >
+            <option value="fill">Fill</option>
+            <option value="cover">Cover</option>
+            <option value="contain">Contain</option>
+          </select>
+        </label>
+        <label className="text-[10px] text-muted uppercase">
+          Radius
+          <input
+            type="number"
+            min={0}
+            className="field mt-0.5 w-full !px-1.5 !py-0.5 text-[11.5px]"
+            aria-label="Image radius"
+            value={selected.radius ?? 0}
+            onChange={(e) => {
+              const n = Number(e.target.value)
+              if (Number.isFinite(n) && n >= 0) {
+                onPatchOne((el) => (el.kind === 'image' ? { ...el, radius: n } : el), {
+                  coalesceKey: `radius-${selected.id}`,
+                })
+              }
+            }}
+          />
+        </label>
+      </div>
+
+      {/* crop and focal point are a window onto the source, never a rewrite */}
+      <div className="insp-h">Crop</div>
+      <div className="grid grid-cols-2 gap-1.5">
+        {(['x', 'y', 'w', 'h'] as const).map((k) => (
+          <label key={k} className="text-[10px] text-muted uppercase">
+            {k === 'w' ? 'width %' : k === 'h' ? 'height %' : `${k} %`}
+            <input
+              type="number"
+              min={0}
+              max={100}
+              className="field mt-0.5 w-full !px-1.5 !py-0.5 text-[11.5px]"
+              aria-label={`Crop ${k}`}
+              value={Math.round(normalizeCrop(selected.crop)[k] * 100)}
+              onChange={(e) => {
+                const n = Number(e.target.value)
+                if (!Number.isFinite(n)) return
+                onPatchOne(
+                  (el) =>
+                    el.kind === 'image'
+                      ? { ...el, crop: normalizeCrop({ ...normalizeCrop(el.crop), [k]: n / 100 }) }
+                      : el,
+                  { coalesceKey: `crop-${k}-${selected.id}` },
+                )
+              }}
+            />
+          </label>
+        ))}
+      </div>
+      {!isFullCrop(normalizeCrop(selected.crop)) && (
+        <button
+          className="btn mt-1 w-full"
+          onClick={() => onPatchOne((el) => (el.kind === 'image' ? { ...el, crop: undefined } : el))}
+        >
+          Reset crop — the whole picture is still there
+        </button>
+      )}
+
+      <div className="insp-h">Focal point</div>
+      <div className="grid grid-cols-2 gap-1.5">
+        {(['x', 'y'] as const).map((k) => (
+          <label key={k} className="text-[10px] text-muted uppercase">
+            {k} %
+            <input
+              type="number"
+              min={0}
+              max={100}
+              className="field mt-0.5 w-full !px-1.5 !py-0.5 text-[11.5px]"
+              aria-label={`Focal ${k}`}
+              value={Math.round(normalizeFocal(selected.focalPoint)[k] * 100)}
+              onChange={(e) => {
+                const n = Number(e.target.value)
+                if (!Number.isFinite(n)) return
+                onPatchOne(
+                  (el) =>
+                    el.kind === 'image'
+                      ? { ...el, focalPoint: normalizeFocal({ ...normalizeFocal(el.focalPoint), [k]: n / 100 }) }
+                      : el,
+                  { coalesceKey: `focal-${k}-${selected.id}` },
+                )
+              }}
+            />
+          </label>
+        ))}
+      </div>
+
+      <div className="insp-h">Adjustments</div>
+      {(['brightness', 'contrast', 'saturation'] as const).map((k) => (
+        <label key={k} className="mt-1 flex items-center gap-2 text-[10px] text-muted uppercase">
+          <span className="w-16 flex-none">{k}</span>
+          <input
+            type="range"
+            min={-100}
+            max={100}
+            className="min-w-0 flex-1"
+            aria-label={k}
+            value={selected.adjustments?.[k] ?? 0}
+            onChange={(e) =>
+              onPatchOne(
+                (el) =>
+                  el.kind === 'image'
+                    ? { ...el, adjustments: sanitizeAdjustments({ ...(el.adjustments ?? {}), [k]: Number(e.target.value) }) }
+                    : el,
+                { coalesceKey: `adj-${k}-${selected.id}` },
+              )
+            }
+          />
+          <span className="w-8 flex-none text-right tabular-nums">
+            {selected.adjustments?.[k] ?? 0}
+          </span>
+        </label>
+      ))}
+      <p className="mt-1 text-[10.5px] leading-relaxed text-muted">
+        Crop, focal point and adjustments are stored as metadata. The original
+        is untouched and exports at full resolution.
+      </p>
+
+      <button className="btn mt-2 w-full" onClick={onReplace}>
+        <IcImage size={12} /> Replace, keep the frame
+      </button>
+    </>
+  )
+}
+
+function ShapeControls({
+  selected,
+  onPatchOne,
+  onSeal,
+}: {
+  selected: PresentElement & { kind: 'shape' }
+  onPatchOne: (fn: (e: PresentElement) => PresentElement, opts?: { coalesceKey?: string }) => void
+  onSeal: () => void
+}) {
+  return (
+    <>
+      <label className="mt-2 flex items-center gap-2 text-[11px] text-muted">
+        Fill
+        <input
+          type="color"
+          className="h-5 w-8 cursor-pointer border-0 bg-transparent p-0"
+          value={selected.fill?.slice(0, 7) ?? '#cccccc'}
+          onChange={(e) =>
+            onPatchOne((el) => (el.kind === 'shape' ? { ...el, fill: e.target.value } : el), {
+              coalesceKey: `fill-${selected.id}`,
+            })
+          }
+          onBlur={onSeal}
+        />
+        <button
+          className="toolbar-control toolbar-control--sm text-[9px]"
+          title="No fill"
+          aria-label="No fill"
+          onClick={() => onPatchOne((el) => (el.kind === 'shape' ? { ...el, fill: null } : el))}
+        >
+          <IcX size={10} />
+        </button>
+      </label>
+      <label className="mt-1 flex items-center gap-2 text-[11px] text-muted">
+        Stroke
+        <input
+          type="color"
+          className="h-5 w-8 cursor-pointer border-0 bg-transparent p-0"
+          value={selected.stroke ?? '#888888'}
+          onChange={(e) =>
+            onPatchOne((el) => (el.kind === 'shape' ? { ...el, stroke: e.target.value } : el), {
+              coalesceKey: `stroke-${selected.id}`,
+            })
+          }
+          onBlur={onSeal}
+        />
+        <input
+          type="number"
+          className="field w-14 !px-1.5 !py-0.5 text-[11.5px]"
+          value={selected.strokeWidth}
+          min={0}
+          max={40}
+          aria-label="Stroke width"
+          onChange={(e) =>
+            onPatchOne(
+              (el) => (el.kind === 'shape' ? { ...el, strokeWidth: Math.max(0, Number(e.target.value) || 0) } : el),
+              { coalesceKey: `sw-${selected.id}` },
+            )
+          }
+          onBlur={onSeal}
+        />
+      </label>
+    </>
   )
 }

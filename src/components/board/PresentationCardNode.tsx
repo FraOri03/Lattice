@@ -7,6 +7,7 @@ import {
   normalizePresentBody,
   type PresentationBody,
 } from '@/lib/present/presentModel'
+import { furnitureElements, masterTokensFor } from '@/lib/present/masters'
 import { SlideView } from '@/components/present/SlideView'
 import { IcChevronLeft, IcChevronRight, IcPresentation } from '@/components/Icons'
 import { CardChrome } from './CardChrome'
@@ -121,7 +122,13 @@ function ExpandedDeck({ presentId, onOpen }: { presentId: string; onOpen: () => 
     >
       <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-panel2 p-2">
         <div className="max-h-full overflow-hidden rounded shadow-sm ring-1 ring-bord">
-          <SlideView slide={slide} theme={body.theme} width={248} />
+          <SlideView
+            slide={slide}
+            tokens={masterTokensFor(body, slide)}
+            textStyles={body.textStyles}
+            decor={furnitureElements(body, slide, 1, masterTokensFor(body, slide))}
+            width={248}
+          />
         </div>
       </div>
       <div className="flex flex-none items-center justify-between border-t border-bord px-2 py-1">
