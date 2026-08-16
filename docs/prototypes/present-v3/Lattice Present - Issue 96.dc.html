@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics><meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#131316;font-family:Inter,ui-sans-serif,system-ui,sans-serif}
+a{color:#0d99ff}a:hover{color:#4db4ff}
+.dv-turn{padding:40px 44px 32px;border-bottom:1px solid rgba(255,255,255,.07);scroll-margin-top:16px}
+.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 20px}
+.dv-tid{font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#0d99ff;color:#fff;border-radius:4px;text-decoration:none}
+.dv-tname{font:600 13px/1.2 Inter,sans-serif;color:#e8e8ea}
+.dv-opts{display:flex;flex-wrap:wrap;gap:36px;align-items:flex-start}
+.dv-opt{flex:none;display:flex;flex-direction:column;gap:9px;scroll-margin-top:16px}
+.dv-oid{font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:rgba(255,255,255,.09);color:#e8e8ea;border-radius:5px;text-decoration:none}
+.dv-olabel{display:flex;align-items:baseline;gap:8px;font:400 11.5px/1.4 Inter,sans-serif;color:rgba(232,232,234,.55);max-width:900px}
+.dv-card{max-width:100%;background:#1b1b1f;border:1px solid rgba(255,255,255,.1);border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,.45);overflow:hidden}
+.dv-opt:target .dv-oid{background:#0d99ff;color:#fff}
+.dv-next{margin:22px 0 0;font:12px/1.6 Inter,sans-serif;color:rgba(232,232,234,.45)}
+</style></helmet>
+
+<section class="dv-turn" id="t1">
+<div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">Lattice Present — Issue #96 surface mockups</span></div>
+
+<div style="max-width:980px;margin:0 0 26px;font:400 12.5px/1.7 Inter,sans-serif;color:rgba(232,232,234,.6)">
+<p style="margin:0 0 10px"><strong style="color:#e8e8ea">Context read from the repo:</strong> today <code style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#0d99ff">PresentationWorkspace.tsx</code> is a single-selection editor — 44px slide rail with four hover buttons per thumbnail, one fixed 960×540 canvas, a 224px inspector holding x/y/w/h + one font size + fill/stroke, three hard-coded themes in <code style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#0d99ff">THEME_COLORS</code>, images as 4 MB data URLs, and a header row that mixes the deck title with PDF/PPTX export.</p>
+<p style="margin:0 0 10px"><strong style="color:#e8e8ea">Design stance:</strong> keep every token from <code style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#0d99ff">src/styles/index.css</code> (13px Inter, <span style="color:#0d99ff">#0d99ff</span> accent, panel/panel2/bord greys, 6px control radius, 24px minimum target). Per §20 nothing gains a second toolbar row: one contextual bar, one right inspector, layers as a collapsible column, everything else contextual or in the palette. The canvas gets larger, not busier.</p>
+<p style="margin:0"><strong style="color:#e8e8ea">Deck used throughout:</strong> “Phase 19 — Surface upgrades review”, 42 slides, with charts linked to <em>Q3 metrics</em> (Sheet), stills from Photo mode and a diagram from Board — so linked content is visible rather than described.</p>
+</div>
+
+<div class="dv-opts">
+
+<div class="dv-opt" id="1a">
+<div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a>Editor shell — 1440×900. Contextual bar replaces the title/export header; rail gains sections, hidden slides and presence; inspector is slide-level when nothing is selected; notes collapse to a strip.</div>
+<div class="dv-card" style="width:1440px">
+<div style="display:flex;flex-direction:column;height:900px;background:#1b1b1f;color:#e8e8ea;font-size:13px">
+
+<div style="height:44px;flex:none;display:flex;align-items:center;gap:8px;padding:0 12px;background:#232327;border-bottom:1px solid #38383e">
+<div style="display:flex;align-items:center;gap:6px;min-width:0;font-size:12px;color:#97979f"><span aria-hidden="true">◈</span><span>Studio</span><span style="color:#5a5a62">›</span><span aria-hidden="true">▦</span><span>Lattice</span><span style="color:#5a5a62">›</span><span style="font-weight:600;color:#e8e8ea">Phase 19 — Surface upgrades review</span></div>
+<div style="flex:1"></div>
+<div style="display:flex;align-items:center;gap:8px">
+<div style="display:flex;gap:2px;padding:2px;border:1px solid #38383e;background:#2c2c31;border-radius:8px"><span style="display:flex;align-items:center;gap:6px;padding:4px 9px;border-radius:6px;font:500 11.5px Inter;color:#5a5a62">◫ Split</span></div>
+<div style="display:flex;gap:2px;padding:2px;border:1px solid #38383e;background:#2c2c31;border-radius:8px"><span style="display:flex;align-items:center;gap:6px;padding:4px 9px;border-radius:6px;font:500 11.5px Inter;color:#97979f">▤ Board</span><span style="display:flex;align-items:center;gap:6px;padding:4px 9px;border-radius:6px;font:500 11.5px Inter;color:#97979f">⚯ Graph</span></div>
+<div style="display:flex;gap:2px;padding:2px;border:1px solid #38383e;background:#2c2c31;border-radius:8px"><span style="display:flex;align-items:center;gap:6px;padding:4px 9px;border-radius:6px;font:500 11.5px Inter;color:#97979f">▢ Document</span><span style="display:flex;align-items:center;gap:6px;padding:4px 9px;border-radius:6px;font:500 11.5px Inter;color:#97979f">⊞ Sheet</span><span style="display:flex;align-items:center;gap:6px;padding:4px 9px;border-radius:6px;font:500 11.5px Inter;color:#e8e8ea;background:#232327;box-shadow:0 1px 2px rgba(0,0,0,.35)">◧ Presentation</span><span style="display:flex;align-items:center;gap:6px;padding:4px 9px;border-radius:6px;font:500 11.5px Inter;color:#97979f">‹› Code</span><span style="display:flex;align-items:center;gap:6px;padding:4px 9px;border-radius:6px;font:500 11.5px Inter;color:#97979f">◉ Photo</span></div>
+</div>
+<div style="flex:1"></div>
+<div style="display:flex;align-items:center;gap:7px">
+<div style="display:flex"><span style="width:21px;height:21px;border-radius:50%;background:#7c5cff;border:1.5px solid #232327;font:600 9px/18px Inter;text-align:center;color:#fff">FO</span><span style="width:21px;height:21px;border-radius:50%;background:#14ae5c;border:1.5px solid #232327;font:600 9px/18px Inter;text-align:center;color:#fff;margin-left:-6px">MR</span><span style="width:21px;height:21px;border-radius:50%;background:#ffa629;border:1.5px solid #232327;font:600 9px/18px Inter;text-align:center;color:#1b1b1f;margin-left:-6px">AL</span></div>
+<span style="display:flex;align-items:center;gap:5px;height:22px;padding:0 8px;border:1px solid #38383e;background:#2c2c31;border-radius:99px;font:500 10px Inter;color:#14ae5c">● Live</span>
+<span style="width:26px;height:26px;border-radius:6px;color:#97979f;font-size:14px;display:flex;align-items:center;justify-content:center">☎</span>
+<span style="width:26px;height:26px;border-radius:6px;color:#97979f;font-size:14px;display:flex;align-items:center;justify-content:center">◔</span>
+<span style="display:flex;align-items:center;gap:6px;height:26px;padding:0 9px;border:1px solid #38383e;background:#2c2c31;border-radius:6px;font:500 11.5px Inter;color:#e8e8ea">⊕ Share</span>
+<span style="position:relative;width:26px;height:26px;border-radius:6px;color:#97979f;font-size:14px;display:flex;align-items:center;justify-content:center">✎<span style="position:absolute;top:-1px;right:-1px;min-width:14px;height:14px;border-radius:99px;background:#0d99ff;color:#fff;font:700 8.5px/14px Inter;text-align:center">3</span></span>
+<span style="width:26px;height:26px;border-radius:6px;color:#97979f;font-size:14px;display:flex;align-items:center;justify-content:center">↺</span>
+<span style="display:flex;align-items:center;gap:6px;height:26px;padding:0 8px;border:1px solid #38383e;background:#2c2c31;border-radius:6px;font:500 11.5px Inter;color:#e8e8ea">⌘<span style="font:400 10px 'JetBrains Mono',monospace;color:#97979f">Ctrl K</span></span>
+<span style="display:flex;align-items:center;gap:5px;height:22px;padding:0 8px;border:1px solid #38383e;background:#2c2c31;border-radius:99px;font:500 10px Inter;color:#14ae5c">☁ Synced</span>
+<span style="width:26px;height:26px;border-radius:6px;color:#97979f;font-size:14px;display:flex;align-items:center;justify-content:center">☾</span>
+<span style="width:22px;height:22px;border-radius:50%;background:#0d99ff;font:600 9.5px/22px Inter;text-align:center;color:#fff">FO</span>
+</div>
+</div>
+
+<div style="height:31px;flex:none;display:flex;align-items:flex-end;gap:2px;padding:0 10px;background:#1b1b1f;border-bottom:1px solid #38383e">
+<span style="display:flex;align-items:center;gap:7px;padding:5px 10px;border:1px solid #38383e;border-bottom:none;border-radius:8px 8px 0 0;background:#232327;font:500 11.5px Inter;color:#e8e8ea">◧ Phase 19 review <span style="color:#5a5a62">✕</span></span>
+<span style="display:flex;align-items:center;gap:7px;padding:5px 10px;border-radius:8px 8px 0 0;font:500 11.5px Inter;color:#97979f">⊞ Q3 metrics</span>
+<span style="display:flex;align-items:center;gap:7px;padding:5px 10px;border-radius:8px 8px 0 0;font:500 11.5px Inter;color:#97979f">▢ Phase 19 brief</span>
+<span style="display:flex;align-items:center;gap:7px;padding:5px 10px;border-radius:8px 8px 0 0;font:500 11.5px Inter;color:#97979f">◉ Launch stills</span>
+</div>
+
+<div style="height:38px;flex:none;display:flex;align-items:center;gap:6px;padding:0 10px;background:#232327;border-bottom:1px solid #38383e">
+<div style="display:flex;align-items:center;gap:1px">
+<span style="display:flex;align-items:center;justify-content:center;gap:6px;min-width:28px;height:26px;padding:0 7px;border-radius:6px;font:500 12px Inter;background:rgba(13,153,255,.14);color:#e8e8ea">⌖</span>
+<span style="display:flex;align-items:center;justify-content:center;min-width:28px;height:26px;padding:0 7px;border-radius:6px;font:500 12px Inter;color:#97979f">T</span>
+<span style="display:flex;align-items:center;justify-content:center;min-width:28px;height:26px;padding:0 7px;border-radius:6px;font:500 12px Inter;color:#97979f">▭</span>
+<span style="display:flex;align-items:center;justify-content:center;min-width:28px;height:26px;padding:0 7px;border-radius:6px;font:500 12px Inter;color:#97979f">◯</span>
+<span style="display:flex;align-items:center;justify-content:center;min-width:28px;height:26px;padding:0 7px;border-radius:6px;font:500 12px Inter;color:#97979f">↗</span>
+<span style="display:flex;align-items:center;justify-content:center;min-width:28px;height:26px;padding:0 7px;border-radius:6px;font:500 12px Inter;color:#97979f">▣</span>
+<span style="display:flex;align-items:center;justify-content:center;min-width:28px;height:26px;padding:0 7px;border-radius:6px;font:500 12px Inter;color:#97979f">⊞</span>
+<span style="display:flex;align-items:center;justify-content:center;min-width:28px;height:26px;padding:0 7px;border-radius:6px;font:500 12px Inter;color:#97979f">◔</span>
+</div>
+<span style="width:1px;height:20px;background:#38383e;margin:0 3px"></span>
+<span style="display:flex;align-items:center;gap:6px;height:26px;padding:0 9px;border:1px solid #38383e;background:#2c2c31;border-radius:6px;font:500 11.5px Inter;color:#e8e8ea">＋ Slide <span style="color:#5a5a62;font-size:9px">▾</span></span>
+<span style="display:flex;align-items:center;gap:6px;height:26px;padding:0 9px;border-radius:6px;font:500 11.5px Inter;color:#97979f">▦ Layout <span style="color:#5a5a62;font-size:9px">▾</span></span>
+<span style="display:flex;align-items:center;gap:6px;height:26px;padding:0 9px;border-radius:6px;font:500 11.5px Inter;color:#97979f">⧉ Insert from Lattice <span style="color:#5a5a62;font-size:9px">▾</span></span>
+<span style="width:1px;height:20px;background:#38383e;margin:0 3px"></span>
+<span style="display:flex;align-items:center;gap:6px;height:26px;padding:0 9px;border-radius:6px;font:500 11.5px Inter;color:#97979f">Master <span style="color:#e8e8ea">Lattice Dark</span> <span style="color:#5a5a62;font-size:9px">▾</span></span>
+<span style="display:flex;align-items:center;gap:6px;height:26px;padding:0 9px;border-radius:6px;font:500 11.5px Inter;color:#97979f">Transition <span style="color:#e8e8ea">Fade · 300ms</span> <span style="color:#5a5a62;font-size:9px">▾</span></span>
+<div style="flex:1"></div>
+<span style="display:flex;align-items:center;justify-content:center;width:28px;height:26px;border-radius:6px;font-size:12px;color:#97979f" title="Smart guides">⌗</span>
+<span style="display:flex;align-items:center;justify-content:center;width:28px;height:26px;border-radius:6px;font-size:12px;color:#97979f" title="Layers">▤</span>
+<span style="display:flex;align-items:center;gap:6px;height:26px;padding:0 8px;border-radius:6px;font:500 11.5px Inter;color:#97979f">68% <span style="color:#5a5a62;font-size:9px">▾</span></span>
+<span style="width:1px;height:20px;background:#38383e;margin:0 3px"></span>
+<span style="display:flex;align-items:center;gap:6px;height:26px;padding:0 9px;border:1px solid #38383e;background:#2c2c31;border-radius:6px;font:500 11.5px Inter;color:#e8e8ea">⤓ Export <span style="color:#5a5a62;font-size:9px">▾</span></span>
+<span style="display:flex;align-items:center;gap:6px;height:26px;padding:0 11px;border-radius:6px;background:#0d99ff;font:600 11.5px Inter;color:#fff">▶ Present</span>
+</div>
+
+<div style="flex:1;min-height:0;display:flex">
+
+<aside style="width:208px;flex:none;display:flex;flex-direction:column;border-right:1px solid #38383e;background:#1b1b1f">
+<div style="height:30px;flex:none;display:flex;align-items:center;gap:6px;padding:0 8px 0 10px;border-bottom:1px solid #38383e;color:#97979f;font:600 9.5px Inter;letter-spacing:.12em;text-transform:uppercase">Slides <span style="color:#5a5a62;letter-spacing:0;font-weight:500;font-size:10px">42</span><div style="flex:1"></div><span style="font-size:12px;letter-spacing:0">⌕</span><span style="font-size:12px;letter-spacing:0">⋯</span></div>
+<div style="flex:1;min-height:0;overflow:hidden;padding:8px 10px">
+
+<div style="display:flex;align-items:center;gap:5px;margin:0 0 7px;font:600 9.5px Inter;letter-spacing:.1em;text-transform:uppercase;color:#97979f"><span style="font-size:8px">▾</span>Opening<span style="color:#5a5a62;font-weight:500;letter-spacing:0;font-size:10px">3</span></div>
+<div style="display:flex;gap:7px;margin-bottom:7px"><span style="width:11px;flex:none;text-align:right;font:500 9.5px/56px 'JetBrains Mono',monospace;color:#5a5a62">1</span><div style="flex:1;height:0;padding-bottom:56.25%;position:relative;border:1px solid #38383e;border-radius:6px;overflow:hidden;background:#17181c"><div style="position:absolute;inset:0"><div style="position:absolute;left:14%;top:38%;width:62%;height:9%;border-radius:2px;background:#e8e8ea"></div><div style="position:absolute;left:14%;top:53%;width:38%;height:5%;border-radius:2px;background:#5a5a62"></div></div></div></div>
+<div style="display:flex;gap:7px;margin-bottom:7px"><span style="width:11px;flex:none;text-align:right;font:500 9.5px/56px 'JetBrains Mono',monospace;color:#5a5a62">2</span><div style="flex:1;height:0;padding-bottom:56.25%;position:relative;border:1px solid #38383e;border-radius:6px;overflow:hidden;background:#17181c"><div style="position:absolute;left:10%;top:16%;width:34%;height:7%;border-radius:2px;background:#e8e8ea"></div><div style="position:absolute;left:10%;top:34%;width:50%;height:4%;border-radius:2px;background:#4a4a52"></div><div style="position:absolute;left:10%;top:44%;width:44%;height:4%;border-radius:2px;background:#4a4a52"></div><div style="position:absolute;left:10%;top:54%;width:48%;height:4%;border-radius:2px;background:#4a4a52"></div><div style="position:absolute;right:8%;top:16%;width:26%;height:60%;border-radius:3px;background:repeating-linear-gradient(135deg,#2c2c31 0 3px,#232327 3px 6px)"></div></div></div>
+<div style="display:flex;gap:7px;margin-bottom:11px"><span style="width:11px;flex:none;text-align:right;font:500 9.5px/56px 'JetBrains Mono',monospace;color:#5a5a62">3</span><div style="flex:1;height:0;padding-bottom:56.25%;position:relative;border:1px solid #38383e;border-radius:6px;overflow:hidden;background:#0d2b45"><div style="position:absolute;left:12%;top:44%;width:56%;height:11%;border-radius:2px;background:#ffcd29"></div></div></div>
+
+<div style="display:flex;align-items:center;gap:5px;margin:0 0 7px;font:600 9.5px Inter;letter-spacing:.1em;text-transform:uppercase;color:#e8e8ea"><span style="font-size:8px">▾</span>Where we are<span style="color:#5a5a62;font-weight:500;letter-spacing:0;font-size:10px">9</span></div>
+<div style="display:flex;gap:7px;margin-bottom:7px;position:relative"><span style="width:11px;flex:none;text-align:right;font:600 9.5px/56px 'JetBrains Mono',monospace;color:#e8e8ea">4</span><div style="flex:1;height:0;padding-bottom:56.25%;position:relative;border:1.5px solid #0d99ff;border-radius:6px;overflow:hidden;background:#17181c;box-shadow:0 0 0 3px rgba(13,153,255,.14)"><div style="position:absolute;left:9%;top:14%;width:46%;height:8%;border-radius:2px;background:#e8e8ea"></div><div style="position:absolute;left:9%;top:32%;width:34%;height:4%;border-radius:2px;background:#4a4a52"></div><div style="position:absolute;left:9%;top:41%;width:38%;height:4%;border-radius:2px;background:#4a4a52"></div><div style="position:absolute;left:9%;top:50%;width:30%;height:4%;border-radius:2px;background:#4a4a52"></div><div style="position:absolute;right:7%;top:14%;width:33%;height:66%;border-radius:3px;background:repeating-linear-gradient(135deg,#2c2c31 0 3px,#232327 3px 6px)"></div></div><span style="position:absolute;right:5px;top:5px;display:flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:5px;background:rgba(27,27,31,.9);border:1px solid #38383e;font-size:11px;color:#e8e8ea">⋯</span></div>
+<div style="display:flex;gap:7px;margin-bottom:7px"><span style="width:11px;flex:none;text-align:right;font:500 9.5px/56px 'JetBrains Mono',monospace;color:#5a5a62">5</span><div style="flex:1;height:0;padding-bottom:56.25%;position:relative;border:1px solid #38383e;border-radius:6px;overflow:hidden;background:#17181c"><div style="position:absolute;left:9%;top:13%;width:40%;height:7%;border-radius:2px;background:#e8e8ea"></div><div style="position:absolute;left:9%;bottom:14%;width:36%;height:44%;border-radius:2px;background:linear-gradient(to top,#0d99ff 0 42%,#2c2c31 42%)"></div><div style="position:absolute;left:52%;bottom:14%;width:36%;height:56%;border-radius:2px;background:linear-gradient(to top,#0d99ff 0 62%,#2c2c31 62%)"></div><span style="position:absolute;left:4px;bottom:4px;display:flex;align-items:center;gap:2px;height:12px;padding:0 4px;border-radius:3px;background:rgba(13,153,255,.9);font:700 7px/12px Inter;color:#fff">⧉ LINKED</span></div></div>
+<div style="display:flex;gap:7px;margin-bottom:7px;position:relative"><span style="width:11px;flex:none;text-align:right;font:500 9.5px/56px 'JetBrains Mono',monospace;color:#5a5a62">6</span><div style="flex:1;height:0;padding-bottom:56.25%;position:relative;border:1px solid #38383e;border-radius:6px;overflow:hidden;background:#17181c"><div style="position:absolute;inset:0;background:repeating-linear-gradient(135deg,#2c2c31 0 4px,#232327 4px 8px)"></div></div><span style="position:absolute;right:-3px;top:-3px;width:15px;height:15px;border-radius:50%;background:#14ae5c;border:2px solid #1b1b1f;font:700 7px/12px Inter;text-align:center;color:#fff">MR</span></div>
+<div style="display:flex;gap:7px;margin-bottom:7px;opacity:.45"><span style="width:11px;flex:none;text-align:right;font:500 9.5px/56px 'JetBrains Mono',monospace;color:#5a5a62">7</span><div style="flex:1;height:0;padding-bottom:56.25%;position:relative;border:1px dashed #4a4a52;border-radius:6px;overflow:hidden;background:#17181c"><div style="position:absolute;left:9%;top:16%;width:44%;height:7%;border-radius:2px;background:#4a4a52"></div><div style="position:absolute;left:9%;top:32%;width:60%;height:4%;border-radius:2px;background:#38383e"></div><span style="position:absolute;right:4px;bottom:4px;font-size:9px;color:#97979f">⃠ Hidden</span></div></div>
+<div style="display:flex;gap:7px"><span style="width:11px;flex:none;text-align:right;font:500 9.5px/56px 'JetBrains Mono',monospace;color:#5a5a62">8</span><div style="flex:1;height:0;padding-bottom:56.25%;position:relative;border:1px solid #38383e;border-radius:6px;overflow:hidden;background:#17181c"><div style="position:absolute;left:9%;top:16%;width:30%;height:7%;border-radius:2px;background:#e8e8ea"></div><div style="position:absolute;left:9%;top:34%;right:9%;height:44%;border-radius:3px;border:1px solid #2c2c31"></div></div></div>
+
+</div>
+<div style="flex:none;display:flex;align-items:center;gap:5px;padding:7px 10px;border-top:1px solid #38383e;font:500 10px Inter;color:#97979f"><span style="font-size:11px">＋</span>Slide<div style="flex:1"></div><span style="font-size:11px">▦</span><span style="font-size:11px">§</span></div>
+</aside>
+
+<div style="flex:1;min-width:0;display:flex;flex-direction:column">
+<div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;background:#131316;position:relative">
+<div style="width:800px;height:450px;border-radius:4px;background:#17181c;box-shadow:0 10px 44px rgba(0,0,0,.5);position:relative;overflow:hidden">
+<div style="position:absolute;left:64px;top:52px;width:360px;font:700 34px/1.18 Inter;color:#f0f1f4;letter-spacing:-.015em">Where Present stands today</div>
+<div style="position:absolute;left:64px;top:150px;width:340px;display:flex;flex-direction:column;gap:13px">
+<div style="display:flex;gap:10px;font:400 14px/1.5 Inter;color:#b9b9c0"><span style="color:#0d99ff">—</span><span>Single selection, no grouping or layers</span></div>
+<div style="display:flex;gap:10px;font:400 14px/1.5 Inter;color:#b9b9c0"><span style="color:#0d99ff">—</span><span>Themes are three colour presets, not masters</span></div>
+<div style="display:flex;gap:10px;font:400 14px/1.5 Inter;color:#b9b9c0"><span style="color:#0d99ff">—</span><span>PPTX leaves at basic fidelity</span></div>
+<div style="display:flex;gap:10px;font:400 14px/1.5 Inter;color:#b9b9c0"><span style="color:#0d99ff">—</span><span>Images inline as 4 MB data URLs</span></div>
+</div>
+<div style="position:absolute;right:56px;top:52px;width:296px;height:300px;border-radius:6px;background:repeating-linear-gradient(135deg,#2c2c31 0 6px,#26262b 6px 12px);display:flex;align-items:center;justify-content:center"><span style="font:500 10.5px 'JetBrains Mono',monospace;letter-spacing:.08em;color:#8a8a93">EDITOR SCREENSHOT</span></div>
+<div style="position:absolute;left:64px;bottom:26px;display:flex;align-items:center;gap:8px;font:500 10.5px Inter;color:#5a5a62"><span style="width:12px;height:12px;border-radius:3px;background:#0d99ff"></span>Lattice · Phase 19</div>
+<div style="position:absolute;right:56px;bottom:26px;font:500 10.5px 'JetBrains Mono',monospace;color:#5a5a62">04</div>
+</div>
+<span style="position:absolute;left:16px;bottom:14px;display:flex;align-items:center;gap:6px;height:24px;padding:0 9px;border:1px solid #38383e;background:rgba(35,35,39,.92);border-radius:99px;font:500 10.5px Inter;color:#97979f">▦ Title + content · Lattice Dark</span>
+</div>
+<div style="flex:none;border-top:1px solid #38383e;background:#1b1b1f">
+<div style="display:flex;align-items:center;gap:8px;padding:6px 12px"><span style="font:600 9.5px Inter;letter-spacing:.12em;text-transform:uppercase;color:#97979f">Speaker notes</span><span style="font:400 10px Inter;color:#5a5a62">slide 4 · 38 words</span><div style="flex:1"></div><span style="font:500 10px Inter;color:#97979f">✦ Expand with AI</span><span style="font-size:11px;color:#97979f">▾</span></div>
+<div style="padding:0 12px 10px;font:400 12px/1.6 Inter;color:#b9b9c0">Open on the audit, not the roadmap — the four limitations above are all in <span style="color:#0d99ff">Issue&nbsp;#96</span>. Hold the maturity score until slide 9.</div>
+</div>
+<div style="height:26px;flex:none;display:flex;align-items:center;gap:10px;padding:0 12px;border-top:1px solid #38383e;background:#232327;font:400 10.5px Inter;color:#97979f"><span>Slide 4 of 42</span><span style="color:#38383e">|</span><span>12 objects</span><span style="color:#38383e">|</span><span>Autosaved 2s ago</span><div style="flex:1"></div><span>Deck schema v2</span><span style="color:#38383e">|</span><span>3 linked objects · 1 update available</span></div>
+</div>
+
+<aside style="width:272px;flex:none;display:flex;flex-direction:column;border-left:1px solid #38383e;background:#1b1b1f">
+<div style="height:30px;flex:none;display:flex;align-items:center;gap:2px;padding:0 8px;border-bottom:1px solid #38383e">
+<span style="padding:4px 8px;border-radius:6px;font:600 11px Inter;color:#e8e8ea;background:#2c2c31">Slide</span>
+<span style="padding:4px 8px;border-radius:6px;font:500 11px Inter;color:#5a5a62">Element</span>
+<span style="padding:4px 8px;border-radius:6px;font:500 11px Inter;color:#97979f">Deck</span>
+<div style="flex:1"></div><span style="font-size:12px;color:#97979f">⌄</span>
+</div>
+<div style="flex:1;min-height:0;padding:0 12px 14px">
+<div style="margin:14px 0 7px;font:600 10px Inter;letter-spacing:.14em;text-transform:uppercase;color:#97979f">Layout</div>
+<div style="display:flex;align-items:center;gap:8px;height:28px;padding:0 8px;border:1px solid #38383e;background:#2c2c31;border-radius:6px;font:500 11.5px Inter;color:#e8e8ea"><span style="width:20px;height:12px;border-radius:2px;border:1px solid #5a5a62;display:block"></span>Title + content<div style="flex:1"></div><span style="color:#5a5a62;font-size:9px">▾</span></div>
+<div style="margin-top:6px;display:flex;gap:6px"><span style="flex:1;display:flex;align-items:center;justify-content:center;height:26px;border:1px solid #38383e;background:#2c2c31;border-radius:6px;font:500 11px Inter;color:#e8e8ea">Reset to layout</span><span style="display:flex;align-items:center;justify-content:center;width:28px;height:26px;border:1px solid #38383e;background:#2c2c31;border-radius:6px;font-size:11px;color:#97979f">⋯</span></div>
+<div style="margin-top:7px;display:flex;gap:7px;padding:7px 8px;border-radius:6px;background:rgba(255,166,41,.1);border:1px solid rgba(255,166,41,.28)"><span style="color:#ffa629;font-size:11px">⚠</span><span style="font:400 10.5px/1.5 Inter;color:#c9c9d0">2 properties override the master — <span style="color:#ffa629">title colour, body size</span></span></div>
+
+<div style="margin:16px 0 7px;font:600 10px Inter;letter-spacing:.14em;text-transform:uppercase;color:#97979f">Background</div>
+<div style="display:flex;gap:6px"><span style="flex:1;display:flex;align-items:center;justify-content:center;height:26px;border-radius:6px;font:500 11px Inter;color:#e8e8ea;background:rgba(13,153,255,.14);border:1px solid rgba(13,153,255,.4)">Master</span><span style="flex:1;display:flex;align-items:center;justify-content:center;height:26px;border-radius:6px;font:500 11px Inter;color:#97979f;border:1px solid #38383e;background:#2c2c31">Colour</span><span style="flex:1;display:flex;align-items:center;justify-content:center;height:26px;border-radius:6px;font:500 11px Inter;color:#97979f;border:1px solid #38383e;background:#2c2c31">Image</span></div>
+
+<div style="margin:16px 0 7px;font:600 10px Inter;letter-spacing:.14em;text-transform:uppercase;color:#97979f">Transition</div>
+<div style="display:flex;gap:6px"><span style="flex:1;display:flex;align-items:center;gap:6px;height:26px;padding:0 8px;border:1px solid #38383e;background:#2c2c31;border-radius:6px;font:500 11.5px Inter;color:#e8e8ea">Fade<div style="flex:1"></div><span style="color:#5a5a62;font-size:9px">▾</span></span><span style="width:66px;display:flex;align-items:center;height:26px;padding:0 8px;border:1px solid #38383e;background:#2c2c31;border-radius:6px;font:500 11.5px 'JetBrains Mono',monospace;color:#e8e8ea">300ms</span></div>
+<div style="margin-top:6px;font:400 10.5px Inter;color:#5a5a62">Easing <span style="color:#97979f">standard</span> · applies on enter</div>
+
+<div style="margin:16px 0 7px;display:flex;align-items:center;font:600 10px Inter;letter-spacing:.14em;text-transform:uppercase;color:#97979f">Sequence<div style="flex:1"></div><span style="letter-spacing:0;font-weight:500;font-size:10px;text-transform:none;color:#0d99ff">Edit</span></div>
+<div style="display:flex;flex-direction:column;gap:4px">
+<div style="display:flex;align-items:center;gap:8px;height:26px;padding:0 8px;border:1px solid #38383e;border-radius:6px;background:#232327"><span style="font:600 9.5px 'JetBrains Mono',monospace;color:#0d99ff">1</span><span style="font:400 11px Inter;color:#e8e8ea">Title</span><div style="flex:1"></div><span style="font:400 10px Inter;color:#5a5a62">fade · on click</span></div>
+<div style="display:flex;align-items:center;gap:8px;height:26px;padding:0 8px;border:1px solid #38383e;border-radius:6px;background:#232327"><span style="font:600 9.5px 'JetBrains Mono',monospace;color:#0d99ff">2</span><span style="font:400 11px Inter;color:#e8e8ea">Bullets</span><div style="flex:1"></div><span style="font:400 10px Inter;color:#5a5a62">wipe · after prev</span></div>
+</div>
+
+<div style="margin:16px 0 7px;display:flex;align-items:center;font:600 10px Inter;letter-spacing:.14em;text-transform:uppercase;color:#97979f">Section<div style="flex:1"></div><span style="letter-spacing:0;font-weight:500;font-size:10px;text-transform:none;color:#97979f">Where we are</span></div>
+<div style="display:flex;flex-wrap:wrap;gap:5px"><span style="display:flex;align-items:center;gap:5px;height:22px;padding:0 8px;border-radius:99px;border:1px solid #38383e;background:#2c2c31;font:500 10.5px Inter;color:#97979f">⃠ Hide slide</span><span style="display:flex;align-items:center;gap:5px;height:22px;padding:0 8px;border-radius:99px;border:1px solid #38383e;background:#2c2c31;font:500 10.5px Inter;color:#97979f">✎ Review: draft</span></div>
+</div>
+<div style="flex:none;display:flex;align-items:center;gap:6px;padding:9px 12px;border-top:1px solid #38383e"><span style="width:16px;height:16px;border-radius:50%;background:#7c5cff;font:600 7.5px/16px Inter;text-align:center;color:#fff">FO</span><span style="font:400 10.5px Inter;color:#97979f">Last edited by you · 2s ago</span></div>
+</aside>
+
+</div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="1b">
+<div class="dv-olabel"><a class="dv-oid" href="#1b">1b</a>Multi-select, smart guides, layers. Three objects selected by marquee: equal-spacing guides, a centre guide, one floating align/distribute cluster, and the layers column open beside the rail.</div>
+<div class="dv-card" style="width:1240px">
+<div style="display:flex;flex-direction:column;height:760px;background:#1b1b1f;color:#e8e8ea;font-size:13px">
+
+<div style="height:38px;flex:none;display:flex;align-items:center;gap:6px;padding:0 10px;background:#232327;border-bottom:1px solid #38383e">
+<span style="display:flex;align-items:center;gap:6px;height:24px;padding:0 8px;border-radius:99px;background:rgba(13,153,255,.14);font:600 11px Inter;color:#e8e8ea">⌖ 3 objects selected</span>
+<span style="width:1px;height:20px;background:#38383e;margin:0 3px"></span>
+<div style="display:flex;align-items:center;gap:1px">
+<span style="width:28px;height:26px;border-radius:6px;font-size:12px;color:#97979f;display:flex;align-items:center;justify-content:center">⇤</span>
+<span style="width:28px;height:26px;border-radius:6px;font-size:12px;color:#97979f;display:flex;align-items:center;justify-content:center">⇔</span>
+<span style="width:28px;height:26px;border-radius:6px;font-size:12px;color:#97979f;display:flex;align-items:center;justify-content:center">⇥</span>
+<span style="width:1px;height:16px;background:#38383e;margin:0 4px"></span>
+<span style="width:28px;height:26px;border-radius:6px;font-size:12px;color:#e8e8ea;background:rgba(13,153,255,.14);display:flex;align-items:center;justify-content:center">⇞</span>
+<span style="width:28px;height:26px;border-radius:6px;font-size:12px;color:#97979f;display:flex;align-items:center;justify-content:center">⇕</span>
+<span style="width:28px;height:26px;border-radius:6px;font-size:12px;color:#97979f;display:flex;align-items:center;justify-content:center">⇟</span>
+<span style="width:1px;height:16px;background:#38383e;margin:0 4px"></span>
+<span style="width:28px;height:26px;border-radius:6px;font-size:12px;color:#97979f;display:flex;align-items:center;justify-content:center">⇹</span>
+<span style="width:28px;height:26px;border-radius:6px;font-size:12px;color:#97979f;display:flex;align-items:center;justify-content:center">⇳</span>
+</div>
+<span style="width:1px;height:20px;background:#38383e;margin:0 3px"></span>
+<span style="display:flex;align-items:center;gap:6px;height:26px;padding:0 9px;border:1px solid #38383e;background:#2c2c31;border-radius:6px;font:500 11.5px Inter;color:#e8e8ea">⧉ Group <span style="font:400 10px 'JetBrains Mono',monospace;color:#5a5a62">⌘G</span></span>
+<span style="display:flex;align-items:center;gap:6px;height:26px;padding:0 9px;border-radius:6px;font:500 11.5px Inter;color:#97979f">🔒 Lock</span>
+<span style="display:flex;align-items:center;gap:6px;height:26px;padding:0 9px;border-radius:6px;font:500 11.5px Inter;color:#97979f">⧅ Copy style</span>
+<div style="flex:1"></div>
+<span style="display:flex;align-items:center;justify-content:center;width:28px;height:26px;border-radius:6px;font-size:12px;color:#e8e8ea;background:rgba(13,153,255,.14)">⌗</span>
+<span style="display:flex;align-items:center;justify-content:center;width:28px;height:26px;border-radius:6px;font-size:12px;color:#e8e8ea;background:rgba(13,153,255,.14)">▤</span>
+<span style="display:flex;align-items:center;gap:6px;height:26px;padding:0 8px;border-radius:6px;font:500 11.5px Inter;color:#97979f">75% <span style="color:#5a5a62;font-size:9px">▾</span></span>
+<span style="width:1px;height:20px;background:#38383e;margin:0 3px"></span>
+<span style="display:flex;align-items:center;gap:6px;height:26px;padding:0 11px;border-radius:6px;background:#0d99ff;font:600 11.5px Inter;color:#fff">▶ Present</span>
+</div>
+
+<div style="flex:1;min-height:0;display:flex">
+
+<aside style="width:64px;flex:none;border-right:1px solid #38383e;padding:8px 6px;display:flex;flex-direction:column;gap:6px;background:#1b1b1f">
+<div style="height:0;padding-bottom:56.25%;position:relative;border:1px solid #38383e;border-radius:5px;background:#17181c"></div>
+<div style="height:0;padding-bottom:56.25%;position:relative;border:1.5px solid #0d99ff;border-radius:5px;background:#17181c;box-shadow:0 0 0 2px rgba(13,153,255,.14)"></div>
+<div style="height:0;padding-bottom:56.25%;position:relative;border:1px solid #38383e;border-radius:5px;background:#17181c"></div>
+<div style="height:0;padding-bottom:56.25%;position:relative;border:1px solid #38383e;border-radius:5px;background:#17181c"></div>
+<div style="flex:1"></div>
+<span style="font:500 9px Inter;text-align:center;color:#5a5a62">42</span>
+</aside>
+
+<aside style="width:214px;flex:none;display:flex;flex-direction:column;border-right:1px solid #38383e;background:#1b1b1f">
+<div style="height:30px;flex:none;display:flex;align-items:center;gap:6px;padding:0 8px 0 10px;border-bottom:1px solid #38383e;font:600 9.5px Inter;letter-spacing:.12em;text-transform:uppercase;color:#97979f">Layers<div style="flex:1"></div><span style="font-size:11px;letter-spacing:0">⌕</span><span style="font-size:11px;letter-spacing:0">✕</span></div>
+<div style="flex:1;min-height:0;padding:6px 6px">
+
+<div style="display:flex;align-items:center;gap:7px;height:26px;padding:0 6px;border-radius:6px;font:500 11px Inter;color:#e8e8ea;background:rgba(13,153,255,.14)"><span style="font-size:9px;color:#5a5a62">▾</span><span style="font-size:11px;color:#97979f">⧉</span><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Metric cards</span><span style="font-size:10px;color:#97979f">◉</span><span style="font-size:10px;color:#5a5a62">🔓</span></div>
+<div style="padding-left:14px">
+<div style="display:flex;align-items:center;gap:7px;height:26px;padding:0 6px;border-radius:6px;font:400 11px Inter;color:#e8e8ea;background:rgba(13,153,255,.09)"><span style="font-size:11px;color:#97979f">▭</span><span style="flex:1">Card — Editing</span><span style="font-size:10px;color:#97979f">◉</span><span style="font-size:10px;color:#5a5a62">🔓</span></div>
+<div style="display:flex;align-items:center;gap:7px;height:26px;padding:0 6px;border-radius:6px;font:400 11px Inter;color:#e8e8ea;background:rgba(13,153,255,.09)"><span style="font-size:11px;color:#97979f">▭</span><span style="flex:1;display:flex"><span style="flex:1;height:18px;border:1px solid #0d99ff;border-radius:4px;background:#1b1b1f;display:flex;align-items:center;padding:0 4px;font:400 11px Inter;color:#e8e8ea">Card — Layout<span style="width:1px;height:12px;background:#0d99ff;margin-left:1px"></span></span></span></div>
+<div style="display:flex;align-items:center;gap:7px;height:26px;padding:0 6px;border-radius:6px;font:400 11px Inter;color:#e8e8ea;background:rgba(13,153,255,.09)"><span style="font-size:11px;color:#97979f">▭</span><span style="flex:1">Card — Typography</span><span style="font-size:10px;color:#97979f">◉</span><span style="font-size:10px;color:#5a5a62">🔓</span></div>
+</div>
+<div style="height:2px;margin:2px 6px;border-radius:2px;background:#0d99ff"></div>
+<div style="display:flex;align-items:center;gap:7px;height:26px;padding:0 6px;border-radius:6px;font:400 11px Inter;color:#c9c9d0"><span style="font-size:11px;color:#97979f">◔</span><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Maturity chart</span><span style="display:flex;align-items:center;height:14px;padding:0 4px;border-radius:3px;background:rgba(13,153,255,.18);font:700 7.5px Inter;color:#4db4ff">⧉</span><span style="font-size:10px;color:#97979f">◉</span><span style="font-size:10px;color:#5a5a62">🔓</span></div>
+<div style="display:flex;align-items:center;gap:7px;height:26px;padding:0 6px;border-radius:6px;font:400 11px Inter;color:#c9c9d0"><span style="font-size:11px;color:#97979f">T</span><span style="flex:1">Slide title</span><span style="font-size:10px;color:#97979f">◉</span><span style="font-size:10px;color:#5a5a62">🔓</span></div>
+<div style="display:flex;align-items:center;gap:7px;height:26px;padding:0 6px;border-radius:6px;font:400 11px Inter;color:#5a5a62"><span style="font-size:11px">▣</span><span style="flex:1">Backdrop still</span><span style="font-size:10px">◎</span><span style="font-size:10px">🔒</span></div>
+<div style="margin:8px 6px 5px;font:600 9px Inter;letter-spacing:.12em;text-transform:uppercase;color:#5a5a62">From master · Content</div>
+<div style="display:flex;align-items:center;gap:7px;height:24px;padding:0 6px;border-radius:6px;font:400 11px Inter;color:#5a5a62"><span style="font-size:11px">▤</span><span style="flex:1">Footer rule</span><span style="font-size:10px">🔒</span></div>
+<div style="display:flex;align-items:center;gap:7px;height:24px;padding:0 6px;border-radius:6px;font:400 11px Inter;color:#5a5a62"><span style="font-size:11px">§</span><span style="flex:1">Slide number</span><span style="font-size:10px">🔒</span></div>
+</div>
+</aside>
+
+<div style="flex:1;min-width:0;display:flex;flex-direction:column">
+<div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;background:#131316;position:relative">
+<div style="width:720px;height:405px;border-radius:4px;background:#17181c;box-shadow:0 10px 44px rgba(0,0,0,.5);position:relative;overflow:hidden">
+
+<div style="position:absolute;left:52px;top:34px;width:300px;font:700 24px/1.2 Inter;color:#f0f1f4;letter-spacing:-.01em">Maturity, by surface</div>
+
+<div style="position:absolute;left:0;right:0;top:150px;height:1px;background:#f24822"></div>
+<div style="position:absolute;left:360px;top:0;bottom:0;width:1px;background:#f24822"></div>
+
+<div style="position:absolute;left:52px;top:150px;width:180px;height:112px;border-radius:6px;background:#232327;border:1px solid #2c2c31;padding:12px;box-sizing:border-box"><div style="font:600 9px Inter;letter-spacing:.12em;text-transform:uppercase;color:#8a8a93">Editing</div><div style="margin-top:8px;font:700 30px Inter;color:#f0f1f4">7.5</div><div style="margin-top:4px;font:400 10px Inter;color:#8a8a93">was 5.0</div></div>
+<div style="position:absolute;left:262px;top:150px;width:180px;height:112px;border-radius:6px;background:#232327;border:1px solid #2c2c31;padding:12px;box-sizing:border-box"><div style="font:600 9px Inter;letter-spacing:.12em;text-transform:uppercase;color:#8a8a93">Layout</div><div style="margin-top:8px;font:700 30px Inter;color:#f0f1f4">8.5</div><div style="margin-top:4px;font:400 10px Inter;color:#8a8a93">was 3.0</div></div>
+<div style="position:absolute;left:472px;top:150px;width:180px;height:112px;border-radius:6px;background:#232327;border:1px solid #2c2c31;padding:12px;box-sizing:border-box"><div style="font:600 9px Inter;letter-spacing:.12em;text-transform:uppercase;color:#8a8a93">Typography</div><div style="margin-top:8px;font:700 30px Inter;color:#f0f1f4">8.0</div><div style="margin-top:4px;font:400 10px Inter;color:#8a8a93">was 4.0</div></div>
+
+<div style="position:absolute;left:48px;top:146px;width:608px;height:120px;border:1.5px solid #0d99ff;pointer-events:none"></div>
+<span style="position:absolute;left:44px;top:142px;width:7px;height:7px;background:#fff;border:1.5px solid #0d99ff;border-radius:1px"></span>
+<span style="position:absolute;left:652px;top:142px;width:7px;height:7px;background:#fff;border:1.5px solid #0d99ff;border-radius:1px"></span>
+<span style="position:absolute;left:44px;top:262px;width:7px;height:7px;background:#fff;border:1.5px solid #0d99ff;border-radius:1px"></span>
+<span style="position:absolute;left:652px;top:262px;width:7px;height:7px;background:#fff;border:1.5px solid #0d99ff;border-radius:1px"></span>
+<span style="position:absolute;left:348px;top:138px;width:7px;height:7px;background:#fff;border:1.5px solid #0d99ff;border-radius:1px"></span>
+
+<div style="position:absolute;left:232px;top:200px;width:30px;height:1px;background:#f24822"></div>
+<span style="position:absolute;left:236px;top:186px;height:14px;padding:0 4px;border-radius:3px;background:#f24822;font:700 8.5px/14px 'JetBrains Mono',monospace;color:#fff">30</span>
+<div style="position:absolute;left:442px;top:200px;width:30px;height:1px;background:#f24822"></div>
+<span style="position:absolute;left:446px;top:186px;height:14px;padding:0 4px;border-radius:3px;background:#f24822;font:700 8.5px/14px 'JetBrains Mono',monospace;color:#fff">30</span>
+
+<div style="position:absolute;left:34px;top:288px;width:640px;height:74px;border:1px dashed rgba(13,153,255,.85);background:rgba(13,153,255,.07);border-radius:2px"></div>
+
+<div style="position:absolute;left:52px;bottom:16px;display:flex;align-items:center;gap:7px;font:500 9px Inter;color:#4a4a52"><span style="width:10px;height:10px;border-radius:2px;background:#0d99ff"></span>Lattice · Phase 19</div>
+<div style="position:absolute;right:44px;bottom:16px;font:500 9px 'JetBrains Mono',monospace;color:#4a4a52">09</div>
+</div>
+
+<div style="position:absolute;left:50%;top:96px;transform:translateX(-50%);display:flex;align-items:center;gap:2px;padding:3px;border:1px solid #38383e;background:#232327;border-radius:9px;box-shadow:0 8px 26px rgba(0,0,0,.5)">
+<span style="display:flex;align-items:center;justify-content:center;width:26px;height:24px;border-radius:6px;font-size:11px;color:#97979f">⇤</span>
+<span style="display:flex;align-items:center;justify-content:center;width:26px;height:24px;border-radius:6px;font-size:11px;color:#97979f">⇔</span>
+<span style="display:flex;align-items:center;justify-content:center;width:26px;height:24px;border-radius:6px;font-size:11px;color:#97979f">⇥</span>
+<span style="width:1px;height:16px;background:#38383e;margin:0 3px"></span>
+<span style="display:flex;align-items:center;justify-content:center;width:26px;height:24px;border-radius:6px;font-size:11px;color:#e8e8ea;background:rgba(13,153,255,.14)">⇹</span>
+<span style="display:flex;align-items:center;justify-content:center;width:26px;height:24px;border-radius:6px;font-size:11px;color:#97979f">⇳</span>
+<span style="width:1px;height:16px;background:#38383e;margin:0 3px"></span>
+<span style="display:flex;align-items:center;gap:5px;height:24px;padding:0 8px;border-radius:6px;font:500 11px Inter;color:#e8e8ea">⧉ Group</span>
+<span style="display:flex;align-items:center;justify-content:center;width:26px;height:24px;border-radius:6px;font-size:11px;color:#97979f">⋯</span>
+</div>
+
+<span style="position:absolute;left:16px;bottom:14px;display:flex;align-items:center;gap:8px;height:24px;padding:0 9px;border:1px solid #38383e;background:rgba(35,35,39,.92);border-radius:99px;font:500 10.5px Inter;color:#97979f">⌗ Snap 8px · equal spacing 30</span>
+</div>
+<div style="height:26px;flex:none;display:flex;align-items:center;gap:10px;padding:0 12px;border-top:1px solid #38383e;background:#232327;font:400 10.5px Inter;color:#97979f"><span>Slide 9 of 42</span><span style="color:#38383e">|</span><span>3 of 9 objects selected</span><span style="color:#38383e">|</span><span>⌥drag to duplicate · ⇧arrow nudges 10px</span><div style="flex:1"></div><span>Undo stack 24</span></div>
+</div>
+
+<aside style="width:272px;flex:none;display:flex;flex-direction:column;border-left:1px solid #38383e;background:#1b1b1f">
+<div style="height:30px;flex:none;display:flex;align-items:center;gap:2px;padding:0 8px;border-bottom:1px solid #38383e"><span style="padding:4px 8px;border-radius:6px;font:500 11px Inter;color:#97979f">Slide</span><span style="padding:4px 8px;border-radius:6px;font:600 11px Inter;color:#e8e8ea;background:#2c2c31">Element</span><span style="padding:4px 8px;border-radius:6px;font:500 11px Inter;color:#97979f">Deck</span></div>
+<div style="flex:1;min-height:0;padding:0 12px 14px">
+<div style="margin:13px 0 7px;display:flex;align-items:center;font:600 10px Inter;letter-spacing:.14em;text-transform:uppercase;color:#97979f">Selection<div style="flex:1"></div><span style="letter-spacing:0;text-transform:none;font-weight:500;font-size:10px;color:#5a5a62">3 rectangles</span></div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+<label style="display:block;font:500 9.5px Inter;letter-spacing:.1em;text-transform:uppercase;color:#5a5a62">X<div style="margin-top:3px;display:flex;align-items:center;height:26px;padding:0 7px;border:1px solid #38383e;background:#2c2c31;border-radius:6px;font:400 11.5px 'JetBrains Mono',monospace;color:#e8e8ea">64</div></label>
+<label style="display:block;font:500 9.5px Inter;letter-spacing:.1em;text-transform:uppercase;color:#5a5a62">Y<div style="margin-top:3px;display:flex;align-items:center;height:26px;padding:0 7px;border:1px solid #38383e;background:#2c2c31;border-radius:6px;font:400 11.5px 'JetBrains Mono',monospace;color:#e8e8ea">195</div></label>
+<label style="display:block;font:500 9.5px Inter;letter-spacing:.1em;text-transform:uppercase;color:#5a5a62">W<div style="margin-top:3px;display:flex;align-items:center;height:26px;padding:0 7px;border:1px solid #38383e;background:#2c2c31;border-radius:6px;font:400 11.5px 'JetBrains Mono',monospace;color:#e8e8ea">240</div></label>
+<label style="display:block;font:500 9.5px Inter;letter-spacing:.1em;text-transform:uppercase;color:#5a5a62">H<div style="margin-top:3px;display:flex;align-items:center;height:26px;padding:0 7px;border:1px solid #38383e;background:#2c2c31;border-radius:6px;font:400 11.5px 'JetBrains Mono',monospace;color:#e8e8ea">150</div></label>
+</div>
+<div style="margin-top:6px;display:flex;align-items:center;gap:8px">
+<span style="display:flex;align-items:center;gap:5px;height:24px;padding:0 8px;border-radius:6px;border:1px solid rgba(13,153,255,.4);background:rgba(13,153,255,.14);font:500 10.5px Inter;color:#e8e8ea">⛓ Lock ratio</span>
+<label style="display:flex;align-items:center;gap:5px;font:500 9.5px Inter;letter-spacing:.1em;text-transform:uppercase;color:#5a5a62">Rot<span style="display:flex;align-items:center;height:24px;padding:0 7px;border:1px solid #38383e;background:#2c2c31;border-radius:6px;font:400 11.5px 'JetBrains Mono',monospace;color:#e8e8ea;letter-spacing:0">0°</span></label>
+<span style="display:flex;align-items:center;justify-content:center;width:26px;height:24px;border-radius:6px;border:1px solid #38383e;background:#2c2c31;font-size:11px;color:#97979f">⇋</span>
+<span style="display:flex;align-items:center;justify-content:center;width:26px;height:24px;border-radius:6px;border:1px solid #38383e;background:#2c2c31;font-size:11px;color:#97979f">⇵</span>
+</div>
+<div style="margin-top:5px;font:400 10px Inter;color:#5a5a62">Y and H are shared; X differs across the selection.</div>
+
+<div style="margin:15px 0 7px;font:600 10px Inter;letter-spacing:.14em;text-transform:uppercase;color:#97979f">Align &amp; distribute</div>
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px">
+<span style="display:flex;align-items:center;justify-content:center;height:26px;border:1px solid #38383e;background:#2c2c31;border-radius:6px;font-size:11px;color:#97979f">⇤</span>
+<span style="display:flex;align-items:center;justify-content:center;height:26px;border:1px solid #38383e;background:#2c2c31;border-radius:6px;font-size:11px;color:#97979f">⇔</span>
+<span style="display:flex;align-items:center;justify-content:center;height:26px;border:1px solid #38383e;background:#2c2c31;border-radius:6px;font-size:11px;color:#97979f">⇥</span>
+<span style="display:flex;align-items:center;justify-content:center;height:26px;border:1px solid rgba(13,153,255,.4);background:rgba(13,153,255,.14);border-radius:6px;font-size:11px;color:#e8e8ea">⇹</span>
+<span style="display:flex;align-items:center;justify-content:center;height:26px;border:1px solid #38383e;background:#2c2c31;border-radius:6px;font-size:11px;color:#97979f">⇞</span>
+<span style="display:flex;align-items:center;justify-content:center;height:26px;border:1px solid #38383e;background:#2c2c31;border-radius:6px;font-size:11px;color:#97979f">⇕</span>
+<span style="display:flex;align-items:center;justify-content:center;height:26px;border:1px solid #38383e;background:#2c2c31;border-radius:6px;font-size:11px;color:#97979f">⇟</span>
+<span style="display:flex;align-items:center;justify-content:center;height:26px;border:1px solid #38383e;background:#2c2c31;border-radius:6px;font-size:11px;color:#97979f">⇳</span>
+</div>
+<div style="margin-top:5px;display:flex;align-items:center;gap:6px;font:400 10px Inter;color:#5a5a62">Relative to<span style="display:flex;align-items:center;gap:5px;height:22px;padding:0 7px;border:1px solid #38383e;background:#2c2c31;border-radius:6px;font:500 10.5px Inter;color:#e8e8ea">Selection <span style="font-size:8px;color:#5a5a62">▾</span></span></div>
+
+<div style="margin:15px 0 7px;font:600 10px Inter;letter-spacing:.14em;text-transform:uppercase;color:#97979f">Arrange</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">
+<span style="display:flex;align-items:center;gap:6px;height:26px;padding:0 8px;border:1px solid #38383e;background:#2c2c31;border-radius:6px;font:500 10.5px Inter;color:#e8e8ea">⤒ To front</span>
+<span style="display:flex;align-items:center;gap:6px;height:26px;padding:0 8px;border:1px solid #38383e;background:#2c2c31;border-radius:6px;font:500 10.5px Inter;color:#e8e8ea">↑ Forward</span>
+<span style="display:flex;align-items:center;gap:6px;height:26px;padding:0 8px;border:1px solid #38383e;background:#2c2c31;border-radius:6px;font:500 10.5px Inter;color:#e8e8ea">⤓ To back</span>
+<span style="display:flex;align-items:center;gap:6px;height:26px;padding:0 8px;border:1px solid #38383e;background:#2c2c31;border-radius:6px;font:500 10.5px Inter;color:#e8e8ea">↓ Backward</span>
+</div>
+
+<div style="margin:15px 0 7px;font:600 10px Inter;letter-spacing:.14em;text-transform:uppercase;color:#97979f">Appearance</div>
+<div style="display:flex;align-items:center;gap:8px"><span style="font:400 10.5px Inter;color:#97979f">Opacity</span><span style="flex:1;height:3px;border-radius:2px;background:#38383e;position:relative"><span style="position:absolute;left:0;top:0;bottom:0;width:100%;background:#0d99ff;border-radius:2px"></span><span style="position:absolute;right:-5px;top:-4px;width:11px;height:11px;border-radius:50%;background:#e8e8ea;border:2px solid #0d99ff"></span></span><span style="font:400 11px 'JetBrains Mono',monospace;color:#e8e8ea">100</span></div>
+<div style="margin-top:7px;display:flex;align-items:center;gap:6px"><span style="font:400 10.5px Inter;color:#97979f">Fill</span><span style="width:18px;height:18px;border-radius:4px;background:#232327;border:1px solid #4a4a52"></span><span style="font:400 11px 'JetBrains Mono',monospace;color:#e8e8ea">#232327</span><div style="flex:1"></div><span style="font:400 10.5px Inter;color:#97979f">Stroke</span><span style="width:18px;height:18px;border-radius:4px;background:#2c2c31;border:1px solid #4a4a52"></span></div>
+
+<div style="margin:15px 0 7px;font:600 10px Inter;letter-spacing:.14em;text-transform:uppercase;color:#97979f">Grid &amp; guides</div>
+<div style="display:flex;flex-wrap:wrap;gap:5px"><span style="display:flex;align-items:center;gap:5px;height:22px;padding:0 8px;border-radius:99px;border:1px solid rgba(13,153,255,.4);background:rgba(13,153,255,.14);font:500 10.5px Inter;color:#e8e8ea">Smart guides</span><span style="display:flex;align-items:center;gap:5px;height:22px;padding:0 8px;border-radius:99px;border:1px solid #38383e;background:#2c2c31;font:500 10.5px Inter;color:#97979f">Grid 8px</span><span style="display:flex;align-items:center;gap:5px;height:22px;padding:0 8px;border-radius:99px;border:1px solid #38383e;background:#2c2c31;font:500 10.5px Inter;color:#97979f">Margins</span></div>
+</div>
+</aside>
+
+</div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="1c">
+<div class="dv-olabel"><a class="dv-oid" href="#1c">1c</a>Layouts &amp; masters. Themes stop being three colour presets: a master owns typography, placeholders and persistent furniture; layouts are semantic placeholder sets; overrides are visible and reversible.</div>
+<div class="dv-card" style="width:1240px">
+<div style="display:flex;flex-direction:column;height:720px;background:#1b1b1f;color:#e8e8ea">
+<div style="height:44px;flex:none;display:flex;align-items:center;gap:10px;padding:0 14px;border-bottom:1px solid #38383e;background:#232327">
+<span style="font:600 13px Inter;color:#e8e8ea">Layouts &amp; masters</span>
+<span style="display:flex;align-items:center;gap:6px;font:400 11px Inter;color:#5a5a62">Theme <span style="color:#97979f">Lattice Dark</span><span>→</span>Master <span style="color:#97979f">Content</span><span>→</span>Layout <span style="color:#e8e8ea">Two column</span></span>
+<div style="flex:1"></div>
+<span style="display:flex;align-items:center;gap:6px;height:26px;padding:0 9px;border:1px solid #38383e;background:#2c2c31;border-radius:6px;font:500 11.5px Inter;color:#e8e8ea">✦ Generate from Brand</span>
+<span style="display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:6px;font-size:13px;color:#97979f">✕</span>
+</div>
+
+<div style="flex:1;min-height:0;display:flex">
+<aside style="width:240px;flex:none;border-right:1px solid #38383e;padding:12px;display:flex;flex-direction:column;gap:6px">
+<div style="font:600 10px Inter;letter-spacing:.14em;text-transform:uppercase;color:#97979f">Masters</div>
+<div style="display:flex;gap:9px;padding:8px;border:1px solid #38383e;border-radius:8px;background:#232327">
+<div style="width:56px;height:32px;flex:none;border-radius:3px;background:#0d2b45;position:relative;overflow:hidden"><div style="position:absolute;left:14%;top:42%;width:60%;height:12%;background:#ffcd29;border-radius:1px"></div></div>
+<div style="min-width:0"><div style="font:600 11.5px Inter;color:#e8e8ea">Title</div><div style="font:400 10px Inter;color:#5a5a62">3 slides · 2 layouts</div></div>
+</div>
+<div style="display:flex;gap:9px;padding:8px;border:1.5px solid #0d99ff;border-radius:8px;background:rgba(13,153,255,.1)">
+<div style="width:56px;height:32px;flex:none;border-radius:3px;background:#17181c;position:relative;overflow:hidden"><div style="position:absolute;left:10%;top:16%;width:44%;height:10%;background:#e8e8ea;border-radius:1px"></div><div style="position:absolute;left:10%;top:36%;width:36%;height:6%;background:#4a4a52;border-radius:1px"></div><div style="position:absolute;left:10%;bottom:14%;width:20%;height:5%;background:#0d99ff;border-radius:1px"></div></div>
+<div style="min-width:0"><div style="font:600 11.5px Inter;color:#e8e8ea">Content</div><div style="font:400 10px Inter;color:#4db4ff">34 slides · 6 layouts</div></div>
+</div>
+<div style="display:flex;gap:9px;padding:8px;border:1px solid #38383e;border-radius:8px;background:#232327">
+<div style="width:56px;height:32px;flex:none;border-radius:3px;background:#ffffff;position:relative;overflow:hidden"><div style="position:absolute;left:10%;top:18%;width:40%;height:9%;background:#1f1f24;border-radius:1px"></div><div style="position:absolute;left:10%;bottom:18%;right:10%;height:44%;background:#e6eef6;border-radius:1px"></div></div>
+<div style="min-width:0"><div style="font:600 11.5px Inter;color:#e8e8ea">Data — light</div><div style="font:400 10px Inter;color:#5a5a62">5 slides · 3 layouts</div></div>
+</div>
+<div style="display:flex;align-items:center;justify-content:center;gap:6px;height:28px;border:1px dashed #4a4a52;border-radius:8px;font:500 11px Inter;color:#97979f">＋ New master</div>
+
+<div style="margin-top:8px;font:600 10px Inter;letter-spacing:.14em;text-transform:uppercase;color:#97979f">Master owns</div>
+<div style="display:flex;flex-direction:column;gap:3px;font:400 11px/1.6 Inter;color:#c9c9d0">
+<div style="display:flex;gap:8px"><span style="color:#5a5a62;width:76px">Background</span><span>#17181C</span></div>
+<div style="display:flex;gap:8px"><span style="color:#5a5a62;width:76px">Title</span><span>Inter 700 · 34/1.18</span></div>
+<div style="display:flex;gap:8px"><span style="color:#5a5a62;width:76px">Body</span><span>Inter 400 · 14/1.5</span></div>
+<div style="display:flex;gap:8px"><span style="color:#5a5a62;width:76px">Caption</span><span>Inter 500 · 10.5</span></div>
+<div style="display:flex;gap:8px"><span style="color:#5a5a62;width:76px">Radius</span><span>6px</span></div>
+<div style="display:flex;gap:8px"><span style="color:#5a5a62;width:76px">Furniture</span><span>Logo, rule, number</span></div>
+<div style="display:flex;gap:8px"><span style="color:#5a5a62;width:76px">Palette</span><span style="display:flex;gap:3px"><span style="width:13px;height:13px;border-radius:3px;background:#0d99ff"></span><span style="width:13px;height:13px;border-radius:3px;background:#ffcd29"></span><span style="width:13px;height:13px;border-radius:3px;background:#14ae5c"></span><span style="width:13px;height:13px;border-radius:3px;background:#f24822"></span><span style="width:13px;height:13px;border-radius:3px;background:#e8e8ea"></span></span></div>
+</div>
+</aside>
+
+<div style="flex:1;min-width:0;display:flex;flex-direction:column">
+<div style="flex:1;min-height:0;padding:14px 16px">
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:11px"><span style="font:600 10px Inter;letter-spacing:.14em;text-transform:uppercase;color:#97979f">Layouts in Content</span><div style="flex:1"></div><span style="display:flex;align-items:center;gap:6px;font:400 10px Inter;color:#5a5a62">Placeholders<span style="display:flex;align-items:center;gap:4px"><span style="width:9px;height:9px;border-radius:2px;background:rgba(13,153,255,.55)"></span>title</span><span style="display:flex;align-items:center;gap:4px"><span style="width:9px;height:9px;border-radius:2px;background:rgba(124,92,255,.55)"></span>body</span><span style="display:flex;align-items:center;gap:4px"><span style="width:9px;height:9px;border-radius:2px;background:rgba(20,174,92,.55)"></span>media</span><span style="display:flex;align-items:center;gap:4px"><span style="width:9px;height:9px;border-radius:2px;background:rgba(255,205,41,.55)"></span>chart</span></span></div>
+
+<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px">
+
+<div><div style="height:0;padding-bottom:56.25%;position:relative;border:1px solid #38383e;border-radius:7px;background:#17181c;overflow:hidden"><span style="position:absolute;left:12%;top:40%;width:64%;height:13%;border-radius:2px;background:rgba(13,153,255,.55)"></span><span style="position:absolute;left:12%;top:60%;width:40%;height:7%;border-radius:2px;background:rgba(124,92,255,.45)"></span></div><div style="margin-top:6px;font:500 11px Inter;color:#e8e8ea">Title slide</div><div style="font:400 9.5px Inter;color:#5a5a62">title · subtitle</div></div>
+
+<div><div style="height:0;padding-bottom:56.25%;position:relative;border:1.5px solid #0d99ff;border-radius:7px;background:#17181c;overflow:hidden;box-shadow:0 0 0 3px rgba(13,153,255,.14)"><span style="position:absolute;left:9%;top:13%;width:52%;height:11%;border-radius:2px;background:rgba(13,153,255,.55)"></span><span style="position:absolute;left:9%;top:33%;width:38%;height:48%;border-radius:2px;background:rgba(124,92,255,.4)"></span><span style="position:absolute;right:9%;top:33%;width:38%;height:48%;border-radius:2px;background:rgba(124,92,255,.4)"></span></div><div style="margin-top:6px;font:500 11px Inter;color:#e8e8ea">Two column</div><div style="font:400 9.5px Inter;color:#4db4ff">title · body ×2</div></div>
+
+<div><div style="height:0;padding-bottom:56.25%;position:relative;border:1px solid #38383e;border-radius:7px;background:#17181c;overflow:hidden"><span style="position:absolute;left:9%;top:13%;width:48%;height:11%;border-radius:2px;background:rgba(13,153,255,.55)"></span><span style="position:absolute;left:9%;top:33%;width:44%;height:48%;border-radius:2px;background:rgba(124,92,255,.4)"></span><span style="position:absolute;right:9%;top:20%;width:34%;height:61%;border-radius:2px;background:rgba(20,174,92,.4)"></span></div><div style="margin-top:6px;font:500 11px Inter;color:#e8e8ea">Title + content</div><div style="font:400 9.5px Inter;color:#5a5a62">title · body · media</div></div>
+
+<div><div style="height:0;padding-bottom:56.25%;position:relative;border:1px solid #38383e;border-radius:7px;background:#0d2b45;overflow:hidden"><span style="position:absolute;left:12%;top:44%;width:56%;height:14%;border-radius:2px;background:rgba(255,205,41,.7)"></span></div><div style="margin-top:6px;font:500 11px Inter;color:#e8e8ea">Section</div><div style="font:400 9.5px Inter;color:#5a5a62">title only</div></div>
+
+<div><div style="height:0;padding-bottom:56.25%;position:relative;border:1px solid #38383e;border-radius:7px;background:#17181c;overflow:hidden"><span style="position:absolute;left:9%;top:13%;width:36%;height:11%;border-radius:2px;background:rgba(13,153,255,.55)"></span><span style="position:absolute;left:9%;top:32%;width:38%;height:50%;border-radius:2px;background:rgba(124,92,255,.4)"></span><span style="position:absolute;left:50%;top:32%;width:1.5%;height:50%;background:#38383e"></span><span style="position:absolute;right:9%;top:32%;width:38%;height:50%;border-radius:2px;background:rgba(124,92,255,.4)"></span></div><div style="margin-top:6px;font:500 11px Inter;color:#e8e8ea">Comparison</div><div style="font:400 9.5px Inter;color:#5a5a62">title · body ×2 · rule</div></div>
+
+<div><div style="height:0;padding-bottom:56.25%;position:relative;border:1px solid #38383e;border-radius:7px;background:#17181c;overflow:hidden"><span style="position:absolute;inset:0;background:rgba(20,174,92,.34)"></span><span style="position:absolute;left:9%;bottom:16%;width:56%;height:12%;border-radius:2px;background:rgba(13,153,255,.6)"></span></div><div style="margin-top:6px;font:500 11px Inter;color:#e8e8ea">Image full bleed</div><div style="font:400 9.5px Inter;color:#5a5a62">media · title overlay</div></div>
+
+<div><div style="height:0;padding-bottom:56.25%;position:relative;border:1px solid #38383e;border-radius:7px;background:#17181c;overflow:hidden"><span style="position:absolute;left:0;top:0;bottom:0;width:46%;background:rgba(20,174,92,.34)"></span><span style="position:absolute;right:9%;top:24%;width:38%;height:12%;border-radius:2px;background:rgba(13,153,255,.55)"></span><span style="position:absolute;right:9%;top:44%;width:38%;height:32%;border-radius:2px;background:rgba(124,92,255,.4)"></span></div><div style="margin-top:6px;font:500 11px Inter;color:#e8e8ea">Image + text</div><div style="font:400 9.5px Inter;color:#5a5a62">media · title · body</div></div>
+
+<div><div style="height:0;padding-bottom:56.25%;position:relative;border:1px solid #38383e;border-radius:7px;background:#17181c;overflow:hidden"><span style="position:absolute;left:14%;top:34%;width:64%;height:9%;border-radius:2px;background:rgba(124,92,255,.5)"></span><span style="position:absolute;left:14%;top:47%;width:52%;height:9%;border-radius:2px;background:rgba(124,92,255,.5)"></span><span style="position:absolute;left:14%;top:66%;width:24%;height:6%;border-radius:2px;background:rgba(13,153,255,.45)"></span></div><div style="margin-top:6px;font:500 11px Inter;color:#e8e8ea">Quote</div><div style="font:400 9.5px Inter;color:#5a5a62">body · attribution</div></div>
+
+<div><div style="height:0;padding-bottom:56.25%;position:relative;border:1px solid #38383e;border-radius:7px;background:#17181c;overflow:hidden"><span style="position:absolute;left:9%;top:13%;width:40%;height:11%;border-radius:2px;background:rgba(13,153,255,.55)"></span><span style="position:absolute;left:9%;top:33%;right:9%;height:50%;border-radius:2px;background:rgba(255,205,41,.36)"></span></div><div style="margin-top:6px;font:500 11px Inter;color:#e8e8ea">Data</div><div style="font:400 9.5px Inter;color:#5a5a62">title · chart or table</div></div>
+
+<div><div style="height:0;padding-bottom:56.25%;position:relative;border:1px dashed #4a4a52;border-radius:7px;background:#17181c;overflow:hidden;display:flex;align-items:center;justify-content:center"><span style="font:500 9.5px 'JetBrains Mono',monospace;color:#5a5a62">EMPTY</span></div><div style="margin-top:6px;font:500 11px Inter;color:#e8e8ea">Blank</div><div style="font:400 9.5px Inter;color:#5a5a62">furniture only</div></div>
+
+</div>
+
+<div style="margin-top:16px;padding-top:14px;border-top:1px solid #2c2c31;display:flex;gap:16px">
+<div style="width:300px;flex:none">
+<div style="font:600 10px Inter;letter-spacing:.14em;text-transform:uppercase;color:#97979f">Two column · placeholders</div>
+<div style="margin-top:8px;display:flex;flex-direction:column;gap:4px">
+<div style="display:flex;align-items:center;gap:8px;height:26px;padding:0 8px;border:1px solid #38383e;border-radius:6px;background:#232327;font:400 11px Inter;color:#e8e8ea"><span style="width:9px;height:9px;border-radius:2px;background:rgba(13,153,255,.8)"></span>title<div style="flex:1"></div><span style="font:400 10px 'JetBrains Mono',monospace;color:#5a5a62">64,52 · 620×70</span></div>
+<div style="display:flex;align-items:center;gap:8px;height:26px;padding:0 8px;border:1px solid #38383e;border-radius:6px;background:#232327;font:400 11px Inter;color:#e8e8ea"><span style="width:9px;height:9px;border-radius:2px;background:rgba(124,92,255,.8)"></span>body.left<div style="flex:1"></div><span style="font:400 10px 'JetBrains Mono',monospace;color:#5a5a62">64,150 · 380×250</span></div>
+<div style="display:flex;align-items:center;gap:8px;height:26px;padding:0 8px;border:1px solid #38383e;border-radius:6px;background:#232327;font:400 11px Inter;color:#e8e8ea"><span style="width:9px;height:9px;border-radius:2px;background:rgba(124,92,255,.8)"></span>body.right<div style="flex:1"></div><span style="font:400 10px 'JetBrains Mono',monospace;color:#5a5a62">516,150 · 380×250</span></div>
+<div style="display:flex;align-items:center;gap:8px;height:26px;padding:0 8px;border:1px dashed #38383e;border-radius:6px;font:400 11px Inter;color:#5a5a62"><span style="width:9px;height:9px;border-radius:2px;background:#4a4a52"></span>footer · slideNumber<div style="flex:1"></div><span style="font:400 10px Inter">inherited</span></div>
+</div>
+</div>
+<div style="flex:1;min-width:0">
+<div style="font:600 10px Inter;letter-spacing:.14em;text-transform:uppercase;color:#97979f">Applying this layout</div>
+<div style="margin-top:8px;display:flex;flex-direction:column;gap:6px;font:400 11.5px/1.6 Inter;color:#c9c9d0">
+<div style="display:flex;gap:8px"><span style="color:#14ae5c">✓</span>Existing content maps by placeholder role — title stays title, body splits across the two columns.</div>
+<div style="display:flex;gap:8px"><span style="color:#ffa629">⚠</span>2 objects sit outside every placeholder. They keep their absolute geometry and are listed as <em>free objects</em>.</div>
+<div style="display:flex;gap:8px"><span style="color:#0d99ff">↺</span>Overrides survive the change and stay revertible per property — nothing is flattened into the slide.</div>
+</div>
+<div style="margin-top:12px;display:flex;align-items:center;gap:8px">
+<span style="display:flex;align-items:center;gap:6px;height:28px;padding:0 12px;border-radius:6px;background:#0d99ff;font:600 11.5px Inter;color:#fff">Apply to slide 9</span>
+<span style="display:flex;align-items:center;gap:6px;height:28px;padding:0 12px;border:1px solid #38383e;background:#2c2c31;border-radius:6px;font:500 11.5px Inter;color:#e8e8ea">Apply to section · 9 slides</span>
+<span style="display:flex;align-items:center;gap:6px;height:28px;padding:0 12px;border-radius:6px;font:500 11.5px Inter;color:#97979f">Duplicate as linked layout</span>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="1d">
+<div class="dv-olabel"><a class="dv-oid" href="#1d">1d</a>Typography. Structured rich text — mixed formatting inside one object, named text styles with visible overrides, and an honest overflow state with autofit as a choice rather than a surprise.</div>
+<div class="dv-card" style="width:1000px">
+<div style="display:flex;height:700px;background:#1b1b1f;color:#e8e8ea">
+
+<div style="flex:1;min-width:0;display:flex;flex-direction:column">
+<div style="height:34px;flex:none;display:flex;align-items:center;gap:4px;padding:0 10px;border-bottom:1px solid #38383e;background:#232327">
+<span style="display:flex;align-items:center;gap:5px;height:24px;padding:0 8px;border-radius:6px;background:rgba(13,153,255,.14);font:600 11px Inter;color:#e8e8ea">T Text · body.left</span>
+<span style="width:1px;height:18px;background:#38383e;margin:0 3px"></span>
+<span style="display:flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;font:700 11px Inter;color:#e8e8ea;background:rgba(13,153,255,.14)">B</span>
+<span style="display:flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;font:400 11px Inter;font-style:italic;color:#97979f">I</span>
+<span style="display:flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;font:400 11px Inter;text-decoration:underline;color:#97979f">U</span>
+<span style="display:flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;font:400 11px Inter;color:#97979f">⧉</span>
+<span style="width:1px;height:18px;background:#38383e;margin:0 3px"></span>
+<span style="display:flex;align-items:center;gap:5px;height:24px;padding:0 7px;border-radius:6px;font:500 11px Inter;color:#97979f">• List</span>
+<span style="display:flex;align-items:center;gap:5px;height:24px;padding:0 7px;border-radius:6px;font:500 11px Inter;color:#97979f">↳ Indent</span>
+<span style="display:flex;align-items:center;gap:5px;height:24px;padding:0 7px;border-radius:6px;font:500 11px Inter;color:#0d99ff">🔗 Link</span>
+<div style="flex:1"></div>
+<span style="display:flex;align-items:center;gap:5px;height:22px;padding:0 8px;border-radius:99px;border:1px solid rgba(255,166,41,.35);background:rgba(255,166,41,.12);font:600 10px Inter;color:#ffa629">⚠ Overflows by 2 lines</span>
+</div>
+
+<div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;background:#131316;padding:20px">
+<div style="width:600px;height:338px;border-radius:4px;background:#17181c;box-shadow:0 10px 40px rgba(0,0,0,.5);position:relative;overflow:hidden">
+<div style="position:absolute;left:40px;top:28px;width:400px;font:700 25px/1.18 Inter;color:#f0f1f4;letter-spacing:-.012em">A credible type system</div>
+
+<div style="position:absolute;left:40px;top:96px;width:330px;height:186px;border:1.5px solid #0d99ff;border-radius:2px;padding:2px">
+<div style="font:400 11.5px/1.62 Inter;color:#b9b9c0">
+Rich text is stored as a <span style="font-weight:700;color:#f0f1f4">structured document</span>, not an HTML blob — so <span style="font-style:italic">runs of mixed formatting</span>, <span style="color:#0d99ff;text-decoration:underline;text-decoration-style:dotted">links to other Lattice entities</span> and list nesting all survive undo, persistence and CRDT merges.
+<div style="margin-top:7px;display:flex;flex-direction:column;gap:3px">
+<div style="display:flex;gap:7px"><span style="color:#0d99ff">•</span><span>Variable weight, tracking and line height per style</span></div>
+<div style="display:flex;gap:7px"><span style="color:#0d99ff">•</span><span>Vertical alignment inside the placeholder box</span></div>
+<div style="display:flex;gap:7px;opacity:.4"><span style="color:#0d99ff">•</span><span>Paragraph spacing rather than empty lines</span></div>
+</div>
+</div>
+<div style="position:absolute;left:-2px;right:-2px;bottom:-30px;height:28px;border-top:1px dashed rgba(255,166,41,.75);background:linear-gradient(rgba(255,166,41,.1),transparent)"></div>
+<span style="position:absolute;right:0;bottom:-27px;display:flex;align-items:center;gap:4px;height:16px;padding:0 5px;border-radius:3px;background:#ffa629;font:700 8.5px/16px Inter;color:#1b1b1f">2 LINES BEYOND BOX</span>
+<span style="position:absolute;left:-4px;top:-4px;width:6px;height:6px;background:#fff;border:1.5px solid #0d99ff;border-radius:1px"></span>
+<span style="position:absolute;right:-4px;top:-4px;width:6px;height:6px;background:#fff;border:1.5px solid #0d99ff;border-radius:1px"></span>
+<span style="position:absolute;left:-4px;bottom:-4px;width:6px;height:6px;background:#fff;border:1.5px solid #0d99ff;border-radius:1px"></span>
+<span style="position:absolute;right:-4px;bottom:-4px;width:6px;height:6px;background:#fff;border:1.5px solid #0d99ff;border-radius:1px"></span>
+</div>
+
+<div style="position:absolute;right:34px;top:96px;width:186px;height:186px;border-radius:5px;background:repeating-linear-gradient(135deg,#2c2c31 0 6px,#26262b 6px 12px);display:flex;align-items:center;justify-content:center"><span style="font:500 9px 'JetBrains Mono',monospace;letter-spacing:.08em;color:#8a8a93">TYPE SPECIMEN</span></div>
+<div style="position:absolute;left:40px;bottom:14px;display:flex;align-items:center;gap:6px;font:500 8.5px Inter;color:#4a4a52"><span style="width:9px;height:9px;border-radius:2px;background:#0d99ff"></span>Lattice · Phase 19</div>
+<div style="position:absolute;right:34px;bottom:14px;font:500 8.5px 'JetBrains Mono',monospace;color:#4a4a52">14</div>
+</div>
+</div>
+</div>
+
+<aside style="width:292px;flex:none;display:flex;flex-direction:column;border-left:1px solid #38383e;background:#1b1b1f;overflow:hidden">
+<div style="height:30px;flex:none;display:flex;align-items:center;gap:2px;padding:0 8px;border-bottom:1px solid #38383e"><span style="padding:4px 8px;border-radius:6px;font:500 11px Inter;color:#97979f">Slide</span><span style="padding:4px 8px;border-radius:6px;font:600 11px Inter;color:#e8e8ea;background:#2c2c31">Element</span><span style="padding:4px 8px;border-radius:6px;font:500 11px Inter;color:#97979f">Deck</span></div>
+<div style="flex:1;min-height:0;padding:0 12px 14px">
+
+<div style="margin:13px 0 7px;display:flex;align-items:center;font:600 10px Inter;letter-spacing:.14em;text-transform:uppercase;color:#97979f">Text style<div style="flex:1"></div><span style="letter-spacing:0;text-transform:none;font-weight:500;font-size:10px;color:#0d99ff">Update style</span></div>
+<div style="display:flex;align-items:center;gap:8px;height:28px;padding:0 8px;border:1px solid #38383e;background:#2c2c31;border-radius:6px;font:500 11.5px Inter;color:#e8e8ea">Body<span style="display:flex;align-items:center;height:16px;padding:0 5px;border-radius:3px;background:rgba(255,166,41,.16);font:700 8.5px Inter;color:#ffa629">2 OVERRIDES</span><div style="flex:1"></div><span style="color:#5a5a62;font-size:9px">▾</span></div>
+<div style="margin-top:5px;display:flex;gap:5px"><span style="display:flex;align-items:center;height:22px;padding:0 8px;border-radius:99px;border:1px solid #38383e;background:#2c2c31;font:500 10px Inter;color:#97979f">Title</span><span style="display:flex;align-items:center;height:22px;padding:0 8px;border-radius:99px;border:1px solid #38383e;background:#2c2c31;font:500 10px Inter;color:#97979f">Heading</span><span style="display:flex;align-items:center;height:22px;padding:0 8px;border-radius:99px;border:1px solid rgba(13,153,255,.4);background:rgba(13,153,255,.14);font:500 10px Inter;color:#e8e8ea">Body</span><span style="display:flex;align-items:center;height:22px;padding:0 8px;border-radius:99px;border:1px solid #38383e;background:#2c2c31;font:500 10px Inter;color:#97979f">Caption</span></div>
+
+<div style="margin:15px 0 7px;font:600 10px Inter;letter-spacing:.14em;text-transform:uppercase;color:#97979f">Font</div>
+<div style="display:flex;align-items:center;gap:8px;height:28px;padding:0 8px;border:1px solid #38383e;background:#2c2c31;border-radius:6px;font:500 11.5px Inter;color:#e8e8ea">Inter<div style="flex:1"></div><span style="font:400 9.5px Inter;color:#5a5a62">variable</span><span style="color:#5a5a62;font-size:9px">▾</span></div>
+<div style="margin-top:6px;display:flex;align-items:center;gap:8px"><span style="font:500 9.5px Inter;letter-spacing:.1em;text-transform:uppercase;color:#5a5a62">Weight</span><span style="flex:1;height:3px;border-radius:2px;background:#38383e;position:relative"><span style="position:absolute;left:0;top:0;bottom:0;width:34%;background:#0d99ff;border-radius:2px"></span><span style="position:absolute;left:34%;top:-4px;width:11px;height:11px;margin-left:-5px;border-radius:50%;background:#e8e8ea;border:2px solid #0d99ff"></span></span><span style="width:30px;text-align:right;font:400 11px 'JetBrains Mono',monospace;color:#e8e8ea">400</span></div>
+<div style="margin-top:6px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px">
+<label style="display:block;font:500 9.5px Inter;letter-spacing:.1em;text-transform:uppercase;color:#5a5a62">Size<div style="margin-top:3px;display:flex;align-items:center;height:26px;padding:0 7px;border:1px solid #38383e;background:#2c2c31;border-radius:6px;font:400 11.5px 'JetBrains Mono',monospace;color:#e8e8ea">14</div></label>
+<label style="display:block;font:500 9.5px Inter;letter-spacing:.1em;text-transform:uppercase;color:#5a5a62">Line<div style="margin-top:3px;display:flex;align-items:center;height:26px;padding:0 7px;border:1px solid #38383e;background:#2c2c31;border-radius:6px;font:400 11.5px 'JetBrains Mono',monospace;color:#e8e8ea">1.5</div></label>
+<label style="display:block;font:500 9.5px Inter;letter-spacing:.1em;text-transform:uppercase;color:#5a5a62">Track<div style="margin-top:3px;display:flex;align-items:center;height:26px;padding:0 7px;border:1px solid rgba(255,166,41,.4);background:#2c2c31;border-radius:6px;font:400 11.5px 'JetBrains Mono',monospace;color:#e8e8ea">-.01</div></label>
+</div>
+<div style="margin-top:6px;display:flex;align-items:center;gap:8px"><span style="font:400 10.5px Inter;color:#97979f">Colour</span><span style="width:18px;height:18px;border-radius:4px;background:#b9b9c0;border:1px solid #4a4a52"></span><span style="font:400 11px 'JetBrains Mono',monospace;color:#e8e8ea">body.muted</span><div style="flex:1"></div><span style="font:500 10px Inter;color:#0d99ff">Reset</span></div>
+
+<div style="margin:15px 0 7px;font:600 10px Inter;letter-spacing:.14em;text-transform:uppercase;color:#97979f">Alignment</div>
+<div style="display:flex;gap:5px">
+<div style="display:flex;gap:2px;padding:2px;border:1px solid #38383e;background:#2c2c31;border-radius:7px"><span style="display:flex;align-items:center;justify-content:center;width:26px;height:22px;border-radius:5px;font-size:11px;color:#e8e8ea;background:#1b1b1f">⇤</span><span style="display:flex;align-items:center;justify-content:center;width:26px;height:22px;border-radius:5px;font-size:11px;color:#97979f">⇔</span><span style="display:flex;align-items:center;justify-content:center;width:26px;height:22px;border-radius:5px;font-size:11px;color:#97979f">⇥</span><span style="display:flex;align-items:center;justify-content:center;width:26px;height:22px;border-radius:5px;font-size:11px;color:#97979f">≡</span></div>
+<div style="display:flex;gap:2px;padding:2px;border:1px solid #38383e;background:#2c2c31;border-radius:7px"><span style="display:flex;align-items:center;justify-content:center;width:26px;height:22px;border-radius:5px;font-size:11px;color:#e8e8ea;background:#1b1b1f">⇞</span><span style="display:flex;align-items:center;justify-content:center;width:26px;height:22px;border-radius:5px;font-size:11px;color:#97979f">⇕</span><span style="display:flex;align-items:center;justify-content:center;width:26px;height:22px;border-radius:5px;font-size:11px;color:#97979f">⇟</span></div>
+</div>
+<div style="margin-top:6px;display:grid;grid-template-columns:1fr 1fr;gap:5px">
+<label style="display:block;font:500 9.5px Inter;letter-spacing:.1em;text-transform:uppercase;color:#5a5a62">Space before<div style="margin-top:3px;display:flex;align-items:center;height:26px;padding:0 7px;border:1px solid #38383e;background:#2c2c31;border-radius:6px;font:400 11.5px 'JetBrains Mono',monospace;color:#e8e8ea">0</div></label>
+<label style="display:block;font:500 9.5px Inter;letter-spacing:.1em;text-transform:uppercase;color:#5a5a62">Space after<div style="margin-top:3px;display:flex;align-items:center;height:26px;padding:0 7px;border:1px solid #38383e;background:#2c2c31;border-radius:6px;font:400 11.5px 'JetBrains Mono',monospace;color:#e8e8ea">8</div></label>
+</div>
+
+<div style="margin:15px 0 7px;font:600 10px Inter;letter-spacing:.14em;text-transform:uppercase;color:#97979f">Overflow</div>
+<div style="display:flex;flex-direction:column;gap:4px">
+<div style="display:flex;align-items:center;gap:8px;height:26px;padding:0 8px;border-radius:6px;border:1px solid rgba(255,166,41,.4);background:rgba(255,166,41,.1);font:500 11px Inter;color:#e8e8ea"><span style="width:11px;height:11px;border-radius:50%;border:3px solid #ffa629;background:#1b1b1f"></span>Show overflow<div style="flex:1"></div><span style="font:400 10px Inter;color:#ffa629">current</span></div>
+<div style="display:flex;align-items:center;gap:8px;height:26px;padding:0 8px;border-radius:6px;border:1px solid #38383e;background:#2c2c31;font:500 11px Inter;color:#c9c9d0"><span style="width:11px;height:11px;border-radius:50%;border:1.5px solid #5a5a62"></span>Shrink to fit<div style="flex:1"></div><span style="font:400 10px 'JetBrains Mono',monospace;color:#5a5a62">→ 12.4px</span></div>
+<div style="display:flex;align-items:center;gap:8px;height:26px;padding:0 8px;border-radius:6px;border:1px solid #38383e;background:#2c2c31;font:500 11px Inter;color:#c9c9d0"><span style="width:11px;height:11px;border-radius:50%;border:1.5px solid #5a5a62"></span>Grow box<div style="flex:1"></div><span style="font:400 10px 'JetBrains Mono',monospace;color:#5a5a62">h 186→232</span></div>
+<div style="display:flex;align-items:center;gap:8px;height:26px;padding:0 8px;border-radius:6px;border:1px solid #38383e;background:#2c2c31;font:500 11px Inter;color:#c9c9d0"><span style="width:11px;height:11px;border-radius:50%;border:1.5px solid #5a5a62"></span>Clip</div>
+</div>
+<div style="margin-top:8px;display:flex;gap:7px;padding:7px 8px;border-radius:6px;background:#232327;border:1px solid #38383e"><span style="color:#0d99ff;font-size:11px">✦</span><span style="font:400 10.5px/1.5 Inter;color:#c9c9d0">3 other slides overflow. <span style="color:#0d99ff">Review all</span></span></div>
+</div>
+</aside>
+
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="1e">
+<div class="dv-olabel"><a class="dv-oid" href="#1e">1e</a>Media. Non-destructive crop with a focal point, adjustments that never touch the stored asset, replace-in-place that keeps geometry — and the asset held by reference instead of a 4 MB data URL.</div>
+<div class="dv-card" style="width:1000px">
+<div style="display:flex;height:700px;background:#1b1b1f;color:#e8e8ea">
+
+<div style="flex:1;min-width:0;display:flex;flex-direction:column">
+<div style="height:34px;flex:none;display:flex;align-items:center;gap:5px;padding:0 10px;border-bottom:1px solid #38383e;background:#232327">
+<span style="display:flex;align-items:center;gap:5px;height:24px;padding:0 8px;border-radius:6px;background:rgba(13,153,255,.14);font:600 11px Inter;color:#e8e8ea">▣ Image · media</span>
+<span style="width:1px;height:18px;background:#38383e;margin:0 3px"></span>
+<span style="display:flex;align-items:center;gap:5px;height:24px;padding:0 8px;border-radius:6px;background:rgba(13,153,255,.14);font:500 11px Inter;color:#e8e8ea">⛶ Crop</span>
+<span style="display:flex;align-items:center;gap:5px;height:24px;padding:0 8px;border-radius:6px;font:500 11px Inter;color:#97979f">⊕ Focal point</span>
+<span style="display:flex;align-items:center;gap:5px;height:24px;padding:0 8px;border-radius:6px;font:500 11px Inter;color:#97979f">◫ Mask</span>
+<span style="display:flex;align-items:center;gap:5px;height:24px;padding:0 8px;border-radius:6px;font:500 11px Inter;color:#97979f">⇄ Replace</span>
+<div style="flex:1"></div>
+<span style="display:flex;align-items:center;gap:5px;height:22px;padding:0 8px;border-radius:99px;border:1px solid #38383e;background:#2c2c31;font:500 10px Inter;color:#97979f">Esc cancels · Enter applies</span>
+</div>
+
+<div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;background:#131316;padding:20px">
+<div style="width:600px;height:338px;border-radius:4px;background:#17181c;box-shadow:0 10px 40px rgba(0,0,0,.5);position:relative;overflow:hidden">
+<div style="position:absolute;left:40px;top:26px;width:340px;font:700 22px/1.2 Inter;color:#f0f1f4;letter-spacing:-.01em">Launch stills</div>
+
+<div style="position:absolute;left:40px;top:82px;width:250px;height:200px;opacity:.28;background:repeating-linear-gradient(135deg,#3a3a42 0 7px,#33333a 7px 14px);border-radius:3px"></div>
+<div style="position:absolute;left:74px;top:104px;width:216px;height:158px;overflow:hidden;border-radius:3px;background:repeating-linear-gradient(135deg,#4a4a52 0 7px,#41414a 7px 14px);display:flex;align-items:center;justify-content:center"><span style="font:500 9px 'JetBrains Mono',monospace;letter-spacing:.08em;color:#c9c9d0">PHOTO ASSET · 4032×3024</span></div>
+<div style="position:absolute;left:74px;top:104px;width:216px;height:158px;border:1.5px solid #0d99ff;box-sizing:border-box"></div>
+<span style="position:absolute;left:70px;top:100px;width:14px;height:3px;background:#0d99ff"></span><span style="position:absolute;left:70px;top:100px;width:3px;height:14px;background:#0d99ff"></span>
+<span style="position:absolute;left:276px;top:100px;width:14px;height:3px;background:#0d99ff"></span><span style="position:absolute;left:287px;top:100px;width:3px;height:14px;background:#0d99ff"></span>
+<span style="position:absolute;left:70px;top:259px;width:14px;height:3px;background:#0d99ff"></span><span style="position:absolute;left:70px;top:248px;width:3px;height:14px;background:#0d99ff"></span>
+<span style="position:absolute;left:276px;top:259px;width:14px;height:3px;background:#0d99ff"></span><span style="position:absolute;left:287px;top:248px;width:3px;height:14px;background:#0d99ff"></span>
+<div style="position:absolute;left:74px;top:157px;width:216px;height:1px;background:rgba(255,255,255,.16)"></div>
+<div style="position:absolute;left:74px;top:210px;width:216px;height:1px;background:rgba(255,255,255,.16)"></div>
+<div style="position:absolute;left:146px;top:104px;width:1px;height:158px;background:rgba(255,255,255,.16)"></div>
+<div style="position:absolute;left:218px;top:104px;width:1px;height:158px;background:rgba(255,255,255,.16)"></div>
+<span style="position:absolute;left:186px;top:150px;width:16px;height:16px;border-radius:50%;border:2px solid #ffcd29;background:rgba(255,205,41,.22)"></span>
+<span style="position:absolute;left:193px;top:143px;width:2px;height:30px;background:rgba(255,205,41,.55)"></span>
+<span style="position:absolute;left:179px;top:157px;width:30px;height:2px;background:rgba(255,205,41,.55)"></span>
+<span style="position:absolute;left:74px;top:268px;display:flex;align-items:center;gap:5px;height:16px;padding:0 6px;border-radius:3px;background:rgba(27,27,31,.92);border:1px solid #38383e;font:500 8.5px/16px 'JetBrains Mono',monospace;color:#c9c9d0">CROP 216×158 · FOCAL 52% 30%</span>
+
+<div style="position:absolute;right:34px;top:82px;width:206px;height:96px;border-radius:5px;background:repeating-linear-gradient(135deg,#2c2c31 0 6px,#26262b 6px 12px)"></div>
+<div style="position:absolute;right:34px;top:186px;width:206px;height:96px;border-radius:5px;background:repeating-linear-gradient(135deg,#2c2c31 0 6px,#26262b 6px 12px)"></div>
+<div style="position:absolute;left:40px;bottom:14px;display:flex;align-items:center;gap:6px;font:500 8.5px Inter;color:#4a4a52"><span style="width:9px;height:9px;border-radius:2px;background:#0d99ff"></span>Lattice · Phase 19</div>
+<div style="position:absolute;right:34px;bottom:14px;font:500 8.5px 'JetBrains Mono',monospace;color:#4a4a52">21</div>
+</div>
+</div>
+</div>
+
+<aside style="width:292px;flex:none;display:flex;flex-direction:column;border-left:1px solid #38383e;background:#1b1b1f;overflow:hidden">
+<div style="height:30px;flex:none;display:flex;align-items:center;gap:2px;padding:0 8px;border-bottom:1px solid #38383e"><span style="padding:4px 8px;border-radius:6px;font:500 11px Inter;color:#97979f">Slide</span><span style="padding:4px 8px;border-radius:6px;font:600 11px Inter;color:#e8e8ea;background:#2c2c31">Element</span><span style="padding:4px 8px;border-radius:6px;font:500 11px Inter;color:#97979f">Deck</span></div>
+<div style="flex:1;min-height:0;padding:0 12px 14px">
+
+<div style="margin:13px 0 7px;font:600 10px Inter;letter-spacing:.14em;text-transform:uppercase;color:#97979f">Source</div>
+<div style="display:flex;gap:9px;padding:8px;border:1px solid #38383e;border-radius:8px;background:#232327">
+<div style="width:44px;height:32px;flex:none;border-radius:4px;background:repeating-linear-gradient(135deg,#4a4a52 0 5px,#41414a 5px 10px)"></div>
+<div style="min-width:0;flex:1"><div style="font:600 11px Inter;color:#e8e8ea;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">set-03-wide.jpg</div><div style="font:400 9.5px Inter;color:#5a5a62">Photo · Launch stills · 2.4 MB · by reference</div></div>
+</div>
+<div style="margin-top:5px;display:flex;gap:5px"><span style="display:flex;align-items:center;gap:5px;height:22px;padding:0 8px;border-radius:99px;border:1px solid rgba(13,153,255,.4);background:rgba(13,153,255,.14);font:500 10px Inter;color:#e8e8ea">⧉ Linked to source</span><span style="display:flex;align-items:center;height:22px;padding:0 8px;border-radius:99px;border:1px solid #38383e;background:#2c2c31;font:500 10px Inter;color:#97979f">Open in Photo</span></div>
+<div style="margin-top:6px;display:flex;gap:5px"><span style="flex:1;display:flex;align-items:center;justify-content:center;gap:5px;height:26px;border:1px solid #38383e;background:#2c2c31;border-radius:6px;font:500 10.5px Inter;color:#e8e8ea">⇄ Replace, keep frame</span><span style="display:flex;align-items:center;justify-content:center;width:28px;height:26px;border:1px solid #38383e;background:#2c2c31;border-radius:6px;font-size:11px;color:#97979f">⤓</span></div>
+
+<div style="margin:15px 0 7px;font:600 10px Inter;letter-spacing:.14em;text-transform:uppercase;color:#97979f">Fit</div>
+<div style="display:flex;gap:2px;padding:2px;border:1px solid #38383e;background:#2c2c31;border-radius:7px"><span style="flex:1;display:flex;align-items:center;justify-content:center;height:23px;border-radius:5px;font:500 10.5px Inter;color:#e8e8ea;background:#1b1b1f">Cover</span><span style="flex:1;display:flex;align-items:center;justify-content:center;height:23px;border-radius:5px;font:500 10.5px Inter;color:#97979f">Contain</span><span style="flex:1;display:flex;align-items:center;justify-content:center;height:23px;border-radius:5px;font:500 10.5px Inter;color:#97979f">Fill</span></div>
+<div style="margin-top:6px;display:grid;grid-template-columns:1fr 1fr;gap:5px">
+<label style="display:block;font:500 9.5px Inter;letter-spacing:.1em;text-transform:uppercase;color:#5a5a62">Radius<div style="margin-top:3px;display:flex;align-items:center;height:26px;padding:0 7px;border:1px solid #38383e;background:#2c2c31;border-radius:6px;font:400 11.5px 'JetBrains Mono',monospace;color:#e8e8ea">6</div></label>
+<label style="display:block;font:500 9.5px Inter;letter-spacing:.1em;text-transform:uppercase;color:#5a5a62">Border<div style="margin-top:3px;display:flex;align-items:center;gap:6px;height:26px;padding:0 7px;border:1px solid #38383e;background:#2c2c31;border-radius:6px;font:400 11.5px 'JetBrains Mono',monospace;color:#e8e8ea"><span style="width:12px;height:12px;border-radius:3px;background:#38383e"></span>0</div></label>
+</div>
+<div style="margin-top:6px;display:flex;align-items:center;gap:8px"><span style="font:400 10.5px Inter;color:#97979f;width:52px">Opacity</span><span style="flex:1;height:3px;border-radius:2px;background:#38383e;position:relative"><span style="position:absolute;left:0;top:0;bottom:0;width:100%;background:#0d99ff;border-radius:2px"></span><span style="position:absolute;right:-5px;top:-4px;width:11px;height:11px;border-radius:50%;background:#e8e8ea;border:2px solid #0d99ff"></span></span><span style="width:26px;text-align:right;font:400 11px 'JetBrains Mono',monospace;color:#e8e8ea">100</span></div>
+<div style="margin-top:7px;display:flex;align-items:center;gap:8px"><span style="font:400 10.5px Inter;color:#97979f;width:52px">Shadow</span><span style="display:flex;align-items:center;gap:5px;height:22px;padding:0 8px;border-radius:99px;border:1px solid #38383e;background:#2c2c31;font:500 10px Inter;color:#97979f">Soft · 24 · 20%</span></div>
+
+<div style="margin:15px 0 7px;display:flex;align-items:center;font:600 10px Inter;letter-spacing:.14em;text-transform:uppercase;color:#97979f">Adjustments<div style="flex:1"></div><span style="letter-spacing:0;text-transform:none;font-weight:500;font-size:10px;color:#0d99ff">Reset</span></div>
+<div style="display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;align-items:center;gap:8px"><span style="font:400 10.5px Inter;color:#97979f;width:64px">Brightness</span><span style="flex:1;height:3px;border-radius:2px;background:#38383e;position:relative"><span style="position:absolute;left:50%;top:0;bottom:0;width:8%;background:#0d99ff;border-radius:2px"></span><span style="position:absolute;left:58%;top:-4px;width:11px;height:11px;margin-left:-5px;border-radius:50%;background:#e8e8ea;border:2px solid #0d99ff"></span></span><span style="width:26px;text-align:right;font:400 11px 'JetBrains Mono',monospace;color:#e8e8ea">+8</span></div>
+<div style="display:flex;align-items:center;gap:8px"><span style="font:400 10.5px Inter;color:#97979f;width:64px">Contrast</span><span style="flex:1;height:3px;border-radius:2px;background:#38383e;position:relative"><span style="position:absolute;left:50%;top:0;bottom:0;width:4%;background:#0d99ff;border-radius:2px"></span><span style="position:absolute;left:54%;top:-4px;width:11px;height:11px;margin-left:-5px;border-radius:50%;background:#e8e8ea;border:2px solid #0d99ff"></span></span><span style="width:26px;text-align:right;font:400 11px 'JetBrains Mono',monospace;color:#e8e8ea">+4</span></div>
+<div style="display:flex;align-items:center;gap:8px"><span style="font:400 10.5px Inter;color:#97979f;width:64px">Saturation</span><span style="flex:1;height:3px;border-radius:2px;background:#38383e;position:relative"><span style="position:absolute;left:38%;top:0;bottom:0;width:12%;background:#0d99ff;border-radius:2px"></span><span style="position:absolute;left:38%;top:-4px;width:11px;height:11px;margin-left:-5px;border-radius:50%;background:#e8e8ea;border:2px solid #0d99ff"></span></span><span style="width:26px;text-align:right;font:400 11px 'JetBrains Mono',monospace;color:#e8e8ea">-12</span></div>
+</div>
+<div style="margin-top:9px;display:flex;gap:7px;padding:7px 8px;border-radius:6px;background:#232327;border:1px solid #38383e"><span style="color:#14ae5c;font-size:11px">✓</span><span style="font:400 10.5px/1.5 Inter;color:#c9c9d0">Crop, focal point and adjustments are stored as metadata. The original stays untouched and exports at full resolution.</span></div>
+
+<div style="margin:15px 0 7px;font:600 10px Inter;letter-spacing:.14em;text-transform:uppercase;color:#97979f">Alt text</div>
+<div style="padding:7px 8px;border:1px solid #38383e;background:#2c2c31;border-radius:6px;font:400 11px/1.5 Inter;color:#c9c9d0">Wide shot of the studio set, softbox left of frame.<div style="margin-top:6px;display:flex;align-items:center;gap:6px"><span style="display:flex;align-items:center;gap:4px;height:20px;padding:0 7px;border-radius:99px;background:rgba(13,153,255,.14);font:500 9.5px Inter;color:#4db4ff">✦ Generated</span><span style="font:400 9.5px Inter;color:#5a5a62">edited by you</span></div></div>
+</div>
+</aside>
+
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="1f">
+<div class="dv-olabel"><a class="dv-oid" href="#1f">1f</a>Tables &amp; a Sheet-linked chart. The chart stays a chart: it holds a range reference, reports that the source moved ahead, and the update is an explicit act — never something that happens while you present.</div>
+<div class="dv-card" style="width:1000px">
+<div style="display:flex;height:700px;background:#1b1b1f;color:#e8e8ea">
+
+<div style="flex:1;min-width:0;display:flex;flex-direction:column">
+<div style="height:34px;flex:none;display:flex;align-items:center;gap:5px;padding:0 10px;border-bottom:1px solid #38383e;background:#232327">
+<span style="display:flex;align-items:center;gap:5px;height:24px;padding:0 8px;border-radius:6px;background:rgba(13,153,255,.14);font:600 11px Inter;color:#e8e8ea">◔ Chart · Bar</span>
+<span style="width:1px;height:18px;background:#38383e;margin:0 3px"></span>
+<span style="display:flex;align-items:center;gap:5px;height:24px;padding:0 8px;border-radius:6px;font:500 11px Inter;color:#97979f">⊞ Edit data</span>
+<span style="display:flex;align-items:center;gap:5px;height:24px;padding:0 8px;border-radius:6px;font:500 11px Inter;color:#97979f">◫ Legend</span>
+<span style="display:flex;align-items:center;gap:5px;height:24px;padding:0 8px;border-radius:6px;font:500 11px Inter;color:#97979f"># Labels</span>
+<div style="flex:1"></div>
+<span style="display:flex;align-items:center;gap:5px;height:22px;padding:0 8px;border-radius:99px;border:1px solid rgba(255,166,41,.35);background:rgba(255,166,41,.12);font:600 10px Inter;color:#ffa629">⧉ Source moved ahead · rev 41 → 47</span>
+</div>
+
+<div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;background:#131316;padding:20px">
+<div style="width:600px;height:338px;border-radius:4px;background:#17181c;box-shadow:0 10px 40px rgba(0,0,0,.5);position:relative;overflow:hidden">
+<div style="position:absolute;left:36px;top:22px;width:400px;font:700 20px/1.2 Inter;color:#f0f1f4;letter-spacing:-.01em">Q3 — adoption by section</div>
+
+<div style="position:absolute;left:36px;top:66px;width:262px">
+<div style="display:flex;border-bottom:1px solid #2c2c31"><span style="flex:1;padding:5px 6px;font:600 8.5px Inter;letter-spacing:.08em;text-transform:uppercase;color:#8a8a93">Section</span><span style="width:56px;padding:5px 6px;text-align:right;font:600 8.5px Inter;letter-spacing:.08em;text-transform:uppercase;color:#8a8a93">Q2</span><span style="width:56px;padding:5px 6px;text-align:right;font:600 8.5px Inter;letter-spacing:.08em;text-transform:uppercase;color:#8a8a93">Q3</span></div>
+<div style="display:flex;border-bottom:1px solid #232327"><span style="flex:1;padding:5px 6px;font:400 10.5px Inter;color:#c9c9d0">Board</span><span style="width:56px;padding:5px 6px;text-align:right;font:400 10.5px 'JetBrains Mono',monospace;color:#c9c9d0">2 410</span><span style="width:56px;padding:5px 6px;text-align:right;font:500 10.5px 'JetBrains Mono',monospace;color:#f0f1f4">3 120</span></div>
+<div style="display:flex;border-bottom:1px solid #232327;background:rgba(13,153,255,.06)"><span style="flex:1;padding:5px 6px;font:400 10.5px Inter;color:#c9c9d0">Present</span><span style="width:56px;padding:5px 6px;text-align:right;font:400 10.5px 'JetBrains Mono',monospace;color:#c9c9d0">640</span><span style="width:56px;padding:5px 6px;text-align:right;font:500 10.5px 'JetBrains Mono',monospace;color:#4db4ff">1 480</span></div>
+<div style="display:flex;border-bottom:1px solid #232327"><span style="flex:1;padding:5px 6px;font:400 10.5px Inter;color:#c9c9d0">Sheet</span><span style="width:56px;padding:5px 6px;text-align:right;font:400 10.5px 'JetBrains Mono',monospace;color:#c9c9d0">1 890</span><span style="width:56px;padding:5px 6px;text-align:right;font:500 10.5px 'JetBrains Mono',monospace;color:#f0f1f4">2 050</span></div>
+<div style="display:flex"><span style="flex:1;padding:5px 6px;font:400 10.5px Inter;color:#c9c9d0">Photo</span><span style="width:56px;padding:5px 6px;text-align:right;font:400 10.5px 'JetBrains Mono',monospace;color:#c9c9d0">310</span><span style="width:56px;padding:5px 6px;text-align:right;font:500 10.5px 'JetBrains Mono',monospace;color:#f0f1f4">520</span></div>
+</div>
+
+<div style="position:absolute;right:30px;top:60px;width:246px;height:206px;border-radius:5px;border:1.5px solid #0d99ff;background:#1b1b1f;padding:10px;box-sizing:border-box">
+<div style="display:flex;align-items:baseline;gap:6px"><span style="font:600 9px Inter;letter-spacing:.1em;text-transform:uppercase;color:#8a8a93">Weekly active</span><span style="font:400 8.5px 'JetBrains Mono',monospace;color:#5a5a62">Q3</span></div>
+<div style="margin-top:12px;height:132px;display:flex;align-items:flex-end;gap:14px">
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px"><span style="width:100%;height:110px;border-radius:2px 2px 0 0;background:#0d99ff"></span><span style="font:500 8px Inter;color:#8a8a93">Board</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px"><span style="width:100%;height:52px;border-radius:2px 2px 0 0;background:#4db4ff"></span><span style="font:500 8px Inter;color:#8a8a93">Present</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px"><span style="width:100%;height:72px;border-radius:2px 2px 0 0;background:#0d99ff"></span><span style="font:500 8px Inter;color:#8a8a93">Sheet</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px"><span style="width:100%;height:18px;border-radius:2px 2px 0 0;background:#0d99ff"></span><span style="font:500 8px Inter;color:#8a8a93">Photo</span></div>
+</div>
+<span style="position:absolute;left:8px;bottom:6px;display:flex;align-items:center;gap:4px;height:15px;padding:0 5px;border-radius:3px;background:rgba(255,166,41,.16);font:700 8px/15px Inter;color:#ffa629">⧉ Q3 metrics · Revenue!B2:E8</span>
+</div>
+<span style="position:absolute;right:26px;top:52px;width:7px;height:7px;background:#fff;border:1.5px solid #0d99ff;border-radius:1px"></span>
+<div style="position:absolute;left:36px;bottom:14px;display:flex;align-items:center;gap:6px;font:500 8.5px Inter;color:#4a4a52"><span style="width:9px;height:9px;border-radius:2px;background:#0d99ff"></span>Lattice · Phase 19</div>
+<div style="position:absolute;right:30px;bottom:14px;font:500 8.5px 'JetBrains Mono',monospace;color:#4a4a52">27</div>
+</div>
+</div>
+</div>
+
+<aside style="width:292px;flex:none;display:flex;flex-direction:column;border-left:1px solid #38383e;background:#1b1b1f;overflow:hidden">
+<div style="height:30px;flex:none;display:flex;align-items:center;gap:2px;padding:0 8px;border-bottom:1px solid #38383e"><span style="padding:4px 8px;border-radius:6px;font:500 11px Inter;color:#97979f">Slide</span><span style="padding:4px 8px;border-radius:6px;font:600 11px Inter;color:#e8e8ea;background:#2c2c31">Element</span><span style="padding:4px 8px;border-radius:6px;font:500 11px Inter;color:#97979f">Deck</span></div>
+<div style="flex:1;min-height:0;padding:0 12px 14px">
+
+<div style="margin:13px 0 7px;font:600 10px Inter;letter-spacing:.14em;text-transform:uppercase;color:#97979f">Linked data</div>
+<div style="padding:9px;border:1px solid rgba(255,166,41,.35);border-radius:8px;background:rgba(255,166,41,.08)">
+<div style="display:flex;align-items:center;gap:7px"><span style="font-size:11px;color:#ffa629">⧉</span><span style="font:600 11px Inter;color:#e8e8ea">Update available</span></div>
+<div style="margin-top:6px;font:400 10.5px/1.55 Inter;color:#c9c9d0">Q3 metrics · <span style="font-family:'JetBrains Mono',monospace">Revenue!B2:E8</span><br><span style="color:#8a8a93">This deck holds rev 41 · source is at rev 47</span></div>
+<div style="margin-top:7px;display:flex;flex-direction:column;gap:3px;font:400 10px/1.5 'JetBrains Mono',monospace;color:#8a8a93">
+<div><span style="color:#14ae5c">+</span> Present 640 → 1 480</div>
+<div><span style="color:#14ae5c">+</span> Photo 410 → 520</div>
+<div><span style="color:#ffa629">~</span> 1 new row outside the range</div>
+</div>
+<div style="margin-top:9px;display:flex;gap:5px"><span style="display:flex;align-items:center;gap:5px;height:26px;padding:0 10px;border-radius:6px;background:#0d99ff;font:600 11px Inter;color:#fff">Update</span><span style="display:flex;align-items:center;gap:5px;height:26px;padding:0 9px;border:1px solid #38383e;background:#2c2c31;border-radius:6px;font:500 11px Inter;color:#e8e8ea">Open source</span><span style="display:flex;align-items:center;justify-content:center;width:28px;height:26px;border:1px solid #38383e;background:#2c2c31;border-radius:6px;font-size:11px;color:#97979f">⋯</span></div>
+</div>
+<div style="margin-top:6px;display:flex;gap:5px"><span style="flex:1;display:flex;align-items:center;justify-content:center;height:24px;border-radius:6px;border:1px solid #38383e;background:#2c2c31;font:500 10.5px Inter;color:#97979f">Relink range</span><span style="flex:1;display:flex;align-items:center;justify-content:center;height:24px;border-radius:6px;border:1px solid #38383e;background:#2c2c31;font:500 10.5px Inter;color:#97979f">Detach to static</span></div>
+<div style="margin-top:7px;display:flex;align-items:center;gap:7px;padding:7px 8px;border-radius:6px;background:#232327;border:1px solid #38383e"><span style="width:26px;height:14px;border-radius:99px;background:#38383e;position:relative;flex:none"><span style="position:absolute;left:2px;top:2px;width:10px;height:10px;border-radius:50%;background:#8a8a93"></span></span><span style="font:400 10px/1.45 Inter;color:#c9c9d0">Auto-update on open — off. Presenting never changes a slide underneath you.</span></div>
+
+<div style="margin:15px 0 7px;font:600 10px Inter;letter-spacing:.14em;text-transform:uppercase;color:#97979f">Chart</div>
+<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px">
+<span style="display:flex;align-items:center;justify-content:center;height:28px;border-radius:6px;border:1px solid rgba(13,153,255,.4);background:rgba(13,153,255,.14);font-size:12px;color:#e8e8ea">▊</span>
+<span style="display:flex;align-items:center;justify-content:center;height:28px;border-radius:6px;border:1px solid #38383e;background:#2c2c31;font-size:12px;color:#97979f">╱</span>
+<span style="display:flex;align-items:center;justify-content:center;height:28px;border-radius:6px;border:1px solid #38383e;background:#2c2c31;font-size:12px;color:#97979f">◣</span>
+<span style="display:flex;align-items:center;justify-content:center;height:28px;border-radius:6px;border:1px solid #38383e;background:#2c2c31;font-size:12px;color:#97979f">◕</span>
+<span style="display:flex;align-items:center;justify-content:center;height:28px;border-radius:6px;border:1px solid #38383e;background:#2c2c31;font-size:12px;color:#97979f">⁘</span>
+</div>
+<div style="margin-top:7px;display:flex;flex-direction:column;gap:4px">
+<div style="display:flex;align-items:center;gap:8px;height:26px;padding:0 8px;border:1px solid #38383e;border-radius:6px;background:#232327;font:400 11px Inter;color:#e8e8ea"><span style="font:500 9.5px Inter;color:#5a5a62;width:52px">Categories</span><span style="font-family:'JetBrains Mono',monospace;font-size:10.5px">B2:B8</span></div>
+<div style="display:flex;align-items:center;gap:8px;height:26px;padding:0 8px;border:1px solid #38383e;border-radius:6px;background:#232327;font:400 11px Inter;color:#e8e8ea"><span style="font:500 9.5px Inter;color:#5a5a62;width:52px">Series 1</span><span style="width:11px;height:11px;border-radius:3px;background:#0d99ff"></span><span style="font-family:'JetBrains Mono',monospace;font-size:10.5px">E2:E8</span><div style="flex:1"></div><span style="font:400 10px Inter;color:#5a5a62">Q3</span></div>
+<div style="display:flex;align-items:center;gap:8px;height:26px;padding:0 8px;border:1px dashed #38383e;border-radius:6px;font:400 11px Inter;color:#5a5a62">＋ Add series</div>
+</div>
+<div style="margin-top:7px;display:flex;flex-wrap:wrap;gap:5px"><span style="display:flex;align-items:center;height:22px;padding:0 8px;border-radius:99px;border:1px solid rgba(13,153,255,.4);background:rgba(13,153,255,.14);font:500 10px Inter;color:#e8e8ea">Theme palette</span><span style="display:flex;align-items:center;height:22px;padding:0 8px;border-radius:99px;border:1px solid #38383e;background:#2c2c31;font:500 10px Inter;color:#97979f">Value labels</span><span style="display:flex;align-items:center;height:22px;padding:0 8px;border-radius:99px;border:1px solid #38383e;background:#2c2c31;font:500 10px Inter;color:#97979f">Gridlines</span><span style="display:flex;align-items:center;height:22px;padding:0 8px;border-radius:99px;border:1px solid #38383e;background:#2c2c31;font:500 10px Inter;color:#97979f">Animate on reveal</span></div>
+
+<div style="margin:15px 0 7px;font:600 10px Inter;letter-spacing:.14em;text-transform:uppercase;color:#97979f">Table on this slide</div>
+<div style="display:flex;flex-direction:column;gap:4px;font:400 10.5px Inter;color:#c9c9d0">
+<div style="display:flex;align-items:center;gap:8px;height:26px;padding:0 8px;border:1px solid #38383e;border-radius:6px;background:#232327"><span style="color:#5a5a62">Grid</span>5 × 3<div style="flex:1"></div><span style="color:#5a5a62">⊞ Merge · borders · fills</span></div>
+<div style="display:flex;align-items:center;gap:8px;height:26px;padding:0 8px;border:1px solid #38383e;border-radius:6px;background:#232327"><span style="color:#5a5a62">Data</span>Pasted values<div style="flex:1"></div><span style="color:#0d99ff">Link to a range</span></div>
+</div>
+<div style="margin-top:9px;font:400 10px/1.5 Inter;color:#5a5a62">PPTX export writes this as a native chart with its cached data table, so the file opens editable in PowerPoint — not as a picture.</div>
+</div>
+</aside>
+
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="1g">
+<div class="dv-olabel"><a class="dv-oid" href="#1g">1g</a>Linked content. One generic model — copy, embed or link — shown as a per-element chip on the canvas and a deck-wide panel. Sync state is per element, and “Update all” tells you exactly what it will touch.</div>
+<div class="dv-card" style="width:1060px">
+<div style="display:flex;height:680px;background:#1b1b1f;color:#e8e8ea">
+
+<div style="flex:1;min-width:0;display:flex;flex-direction:column">
+<div style="height:34px;flex:none;display:flex;align-items:center;gap:6px;padding:0 10px;border-bottom:1px solid #38383e;background:#232327"><span style="font:600 11px Inter;color:#e8e8ea">Slide 31 · Board diagram</span><div style="flex:1"></div><span style="display:flex;align-items:center;gap:5px;height:22px;padding:0 8px;border-radius:99px;border:1px solid #38383e;background:#2c2c31;font:500 10px Inter;color:#97979f">⧉ 3 linked objects in deck</span></div>
+<div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;background:#131316;padding:20px;position:relative">
+<div style="width:560px;height:315px;border-radius:4px;background:#17181c;box-shadow:0 10px 40px rgba(0,0,0,.5);position:relative;overflow:hidden">
+<div style="position:absolute;left:34px;top:22px;font:700 19px/1.2 Inter;color:#f0f1f4">Where linked content comes from</div>
+<div style="position:absolute;left:34px;top:64px;right:34px;height:196px;border:1.5px solid #0d99ff;border-radius:4px;background:#1b1b1f;overflow:hidden">
+<div style="position:absolute;left:24px;top:30px;width:104px;height:40px;border-radius:5px;border:1px solid #38383e;background:#232327;font:500 9.5px/40px Inter;text-align:center;color:#c9c9d0">RichDoc</div>
+<div style="position:absolute;left:24px;top:88px;width:104px;height:40px;border-radius:5px;border:1px solid #38383e;background:#232327;font:500 9.5px/40px Inter;text-align:center;color:#c9c9d0">Sheet range</div>
+<div style="position:absolute;left:24px;top:146px;width:104px;height:34px;border-radius:5px;border:1px solid #38383e;background:#232327;font:500 9.5px/34px Inter;text-align:center;color:#c9c9d0">Photo asset</div>
+<div style="position:absolute;left:196px;top:66px;width:112px;height:56px;border-radius:5px;border:1.5px solid #0d99ff;background:rgba(13,153,255,.12);font:600 9.5px/56px Inter;text-align:center;color:#e8e8ea">Linked object</div>
+<div style="position:absolute;left:352px;top:60px;width:112px;height:34px;border-radius:5px;border:1px solid #38383e;background:#232327;font:500 9.5px/34px Inter;text-align:center;color:#c9c9d0">Copy</div>
+<div style="position:absolute;left:352px;top:104px;width:112px;height:34px;border-radius:5px;border:1px solid #38383e;background:#232327;font:500 9.5px/34px Inter;text-align:center;color:#c9c9d0">Embed</div>
+<div style="position:absolute;left:352px;top:148px;width:112px;height:34px;border-radius:5px;border:1px solid #38383e;background:#232327;font:500 9.5px/34px Inter;text-align:center;color:#c9c9d0">Link</div>
+<div style="position:absolute;left:128px;top:50px;width:68px;height:1px;background:#4a4a52"></div>
+<div style="position:absolute;left:128px;top:108px;width:68px;height:1px;background:#4a4a52"></div>
+<div style="position:absolute;left:128px;top:163px;width:68px;height:1px;background:#4a4a52"></div>
+<div style="position:absolute;left:308px;top:77px;width:44px;height:1px;background:#4a4a52"></div>
+<div style="position:absolute;left:308px;top:121px;width:44px;height:1px;background:#4a4a52"></div>
+<div style="position:absolute;left:308px;top:165px;width:44px;height:1px;background:#4a4a52"></div>
+</div>
+<span style="position:absolute;left:30px;top:60px;width:7px;height:7px;background:#fff;border:1.5px solid #0d99ff;border-radius:1px"></span>
+<div style="position:absolute;left:34px;bottom:12px;display:flex;align-items:center;gap:6px;font:500 8px Inter;color:#4a4a52"><span style="width:8px;height:8px;border-radius:2px;background:#0d99ff"></span>Lattice · Phase 19</div>
+<div style="position:absolute;right:34px;bottom:12px;font:500 8px 'JetBrains Mono',monospace;color:#4a4a52">31</div>
+</div>
+
+<div style="position:absolute;left:50%;bottom:60px;transform:translateX(-50%);width:330px;padding:11px;border:1px solid #38383e;border-radius:10px;background:#232327;box-shadow:0 14px 40px rgba(0,0,0,.55)">
+<div style="display:flex;align-items:center;gap:7px"><span style="font-size:11px;color:#4db4ff">⧉</span><span style="font:600 11.5px Inter;color:#e8e8ea">Linked to Board · Present architecture</span></div>
+<div style="margin-top:6px;display:flex;flex-direction:column;gap:2px;font:400 10.5px/1.55 Inter;color:#8a8a93">
+<div>Entity <span style="color:#c9c9d0">section “Linked content”</span></div>
+<div>Deck holds <span style="color:#c9c9d0">rev 12</span> · source at <span style="color:#14ae5c">rev 12</span></div>
+</div>
+<div style="margin-top:7px;display:flex;align-items:center;gap:5px;height:22px;padding:0 8px;border-radius:99px;background:rgba(20,174,92,.14);font:600 10px Inter;color:#14ae5c;width:fit-content">✓ In sync</div>
+<div style="margin-top:9px;display:flex;gap:5px">
+<span style="display:flex;align-items:center;gap:5px;height:26px;padding:0 9px;border:1px solid #38383e;background:#2c2c31;border-radius:6px;font:500 11px Inter;color:#e8e8ea">Open in Board</span>
+<span style="display:flex;align-items:center;gap:5px;height:26px;padding:0 9px;border:1px solid #38383e;background:#2c2c31;border-radius:6px;font:500 11px Inter;color:#e8e8ea">Relink</span>
+<span style="display:flex;align-items:center;gap:5px;height:26px;padding:0 9px;border-radius:6px;font:500 11px Inter;color:#97979f">Detach</span>
+</div>
+</div>
+</div>
+</div>
+
+<aside style="width:368px;flex:none;display:flex;flex-direction:column;border-left:1px solid #38383e;background:#1b1b1f">
+<div style="height:34px;flex:none;display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid #38383e"><span style="font:600 11.5px Inter;color:#e8e8ea">Linked content</span><span style="font:400 10.5px Inter;color:#5a5a62">7 objects · 4 sources</span><div style="flex:1"></div><span style="font-size:12px;color:#97979f">⌕</span><span style="font-size:12px;color:#97979f">✕</span></div>
+
+<div style="flex:none;padding:10px 12px;border-bottom:1px solid #2c2c31;display:flex;align-items:center;gap:8px;background:rgba(255,166,41,.06)">
+<span style="font:400 11px/1.5 Inter;color:#c9c9d0;flex:1">2 objects have newer sources. Updating rewrites 2 slides.</span>
+<span style="display:flex;align-items:center;gap:5px;height:26px;padding:0 10px;border-radius:6px;background:#0d99ff;font:600 11px Inter;color:#fff">Update all</span>
+</div>
+
+<div style="flex:1;min-height:0;padding:10px 12px">
+
+<div style="display:flex;align-items:center;gap:7px;margin-bottom:7px"><span style="font-size:11px;color:#97979f">⊞</span><span style="font:600 11px Inter;color:#e8e8ea">Q3 metrics</span><span style="font:400 10px Inter;color:#5a5a62">Sheet</span><div style="flex:1"></div><span style="font:400 10px Inter;color:#5a5a62">rev 47</span></div>
+<div style="display:flex;flex-direction:column;gap:5px;margin-bottom:14px">
+<div style="display:flex;gap:9px;padding:8px;border:1px solid rgba(255,166,41,.3);border-radius:8px;background:rgba(255,166,41,.07)">
+<div style="width:46px;height:26px;flex:none;border-radius:3px;background:#17181c;position:relative;overflow:hidden"><span style="position:absolute;left:12%;bottom:14%;width:20%;height:56%;background:#0d99ff"></span><span style="position:absolute;left:40%;bottom:14%;width:20%;height:34%;background:#0d99ff"></span><span style="position:absolute;left:68%;bottom:14%;width:20%;height:70%;background:#0d99ff"></span></div>
+<div style="flex:1;min-width:0">
+<div style="display:flex;align-items:center;gap:6px"><span style="font:500 11px Inter;color:#e8e8ea">Adoption chart</span><span style="font:400 9.5px 'JetBrains Mono',monospace;color:#5a5a62">slide 27</span></div>
+<div style="margin-top:2px;font:400 10px Inter;color:#ffa629">Update available · rev 41 → 47</div>
+<div style="margin-top:6px;display:flex;gap:5px"><span style="display:flex;align-items:center;height:22px;padding:0 8px;border-radius:6px;background:#0d99ff;font:600 10px Inter;color:#fff">Update</span><span style="display:flex;align-items:center;height:22px;padding:0 8px;border-radius:6px;border:1px solid #38383e;background:#2c2c31;font:500 10px Inter;color:#c9c9d0">Open</span><span style="display:flex;align-items:center;height:22px;padding:0 8px;border-radius:6px;font:500 10px Inter;color:#97979f">Detach</span></div>
+</div>
+</div>
+<div style="display:flex;gap:9px;padding:8px;border:1px solid #38383e;border-radius:8px;background:#232327">
+<div style="width:46px;height:26px;flex:none;border-radius:3px;background:#17181c;border:1px solid #2c2c31"></div>
+<div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:6px"><span style="font:500 11px Inter;color:#e8e8ea">Revenue table</span><span style="font:400 9.5px 'JetBrains Mono',monospace;color:#5a5a62">slide 27</span></div><div style="margin-top:2px;font:400 10px Inter;color:#ffa629">Update available · 1 row added</div></div>
+</div>
+</div>
+
+<div style="display:flex;align-items:center;gap:7px;margin-bottom:7px"><span style="font-size:11px;color:#97979f">▤</span><span style="font:600 11px Inter;color:#e8e8ea">Present architecture</span><span style="font:400 10px Inter;color:#5a5a62">Board</span><div style="flex:1"></div><span style="font:400 10px Inter;color:#14ae5c">rev 12</span></div>
+<div style="display:flex;gap:9px;padding:8px;border:1.5px solid #0d99ff;border-radius:8px;background:rgba(13,153,255,.08);margin-bottom:14px">
+<div style="width:46px;height:26px;flex:none;border-radius:3px;background:#1b1b1f;border:1px solid #38383e"></div>
+<div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:6px"><span style="font:500 11px Inter;color:#e8e8ea">Section diagram</span><span style="font:400 9.5px 'JetBrains Mono',monospace;color:#5a5a62">slide 31</span></div><div style="margin-top:2px;font:400 10px Inter;color:#14ae5c">✓ In sync · linked</div></div>
+</div>
+
+<div style="display:flex;align-items:center;gap:7px;margin-bottom:7px"><span style="font-size:11px;color:#97979f">◉</span><span style="font:600 11px Inter;color:#e8e8ea">Launch stills</span><span style="font:400 10px Inter;color:#5a5a62">Photo</span><div style="flex:1"></div><span style="font:400 10px Inter;color:#14ae5c">rev 4</span></div>
+<div style="display:flex;flex-direction:column;gap:5px;margin-bottom:14px">
+<div style="display:flex;gap:9px;padding:8px;border:1px solid #38383e;border-radius:8px;background:#232327">
+<div style="width:46px;height:26px;flex:none;border-radius:3px;background:repeating-linear-gradient(135deg,#4a4a52 0 5px,#41414a 5px 10px)"></div>
+<div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:6px"><span style="font:500 11px Inter;color:#e8e8ea">set-03-wide</span><span style="font:400 9.5px 'JetBrains Mono',monospace;color:#5a5a62">slide 21</span></div><div style="margin-top:2px;font:400 10px Inter;color:#14ae5c">✓ In sync · by reference</div></div>
+</div>
+<div style="display:flex;gap:9px;padding:8px;border:1px solid #38383e;border-radius:8px;background:#232327">
+<div style="width:46px;height:26px;flex:none;border-radius:3px;background:repeating-linear-gradient(135deg,#4a4a52 0 5px,#41414a 5px 10px)"></div>
+<div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:6px"><span style="font:500 11px Inter;color:#e8e8ea">set-07-detail</span><span style="font:400 9.5px 'JetBrains Mono',monospace;color:#5a5a62">slide 22</span></div><div style="margin-top:2px;font:400 10px Inter;color:#14ae5c">✓ In sync · by reference</div></div>
+</div>
+</div>
+
+<div style="display:flex;align-items:center;gap:7px;margin-bottom:7px"><span style="font-size:11px;color:#97979f">▢</span><span style="font:600 11px Inter;color:#e8e8ea">Phase 19 brief</span><span style="font:400 10px Inter;color:#5a5a62">RichDoc</span><div style="flex:1"></div><span style="font:400 10px Inter;color:#f24822">missing</span></div>
+<div style="display:flex;gap:9px;padding:8px;border:1px solid rgba(242,72,34,.35);border-radius:8px;background:rgba(242,72,34,.07)">
+<div style="width:46px;height:26px;flex:none;border-radius:3px;background:#17181c;border:1px dashed #4a4a52"></div>
+<div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:6px"><span style="font:500 11px Inter;color:#e8e8ea">Scope excerpt</span><span style="font:400 9.5px 'JetBrains Mono',monospace;color:#5a5a62">slide 3</span></div><div style="margin-top:2px;font:400 10px Inter;color:#f24822">Source heading was removed</div><div style="margin-top:6px;display:flex;gap:5px"><span style="display:flex;align-items:center;height:22px;padding:0 8px;border-radius:6px;border:1px solid #38383e;background:#2c2c31;font:500 10px Inter;color:#e8e8ea">Relink…</span><span style="display:flex;align-items:center;height:22px;padding:0 8px;border-radius:6px;font:500 10px Inter;color:#97979f">Keep as copy</span></div></div>
+</div>
+
+<div style="margin-top:14px;padding-top:11px;border-top:1px solid #2c2c31;font:400 10px/1.55 Inter;color:#5a5a62">The same model backs Board, RichDoc and future modes — Present is the first consumer, not a special case.</div>
+</div>
+</aside>
+
+</div>
+</div>
+</div>
+
+<!--APPEND-->
+</div>
+
+<p class="dv-next">Try next: “open the layers panel by default in <a class="dv-oid" href="#1a">1a</a>” · “make the linked-content badge quieter” · “show the narrow tier with the inspector as a drawer”</p>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{}"></script>
+</body>
+</html>
