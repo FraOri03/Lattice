@@ -96,6 +96,14 @@ import {
   IcEyeOff,
   IcImage,
   IcLock,
+  IcObjectAlignBottom,
+  IcObjectAlignCenter,
+  IcObjectAlignLeft,
+  IcObjectAlignMiddle,
+  IcObjectAlignRight,
+  IcObjectAlignTop,
+  IcObjectDistributeH,
+  IcObjectDistributeV,
   IcRedo,
   IcTrash,
   IcUndo,
@@ -1051,6 +1059,8 @@ export default function PresentationWorkspace({ meta }: { meta: PresentationDocM
               if (ph) patchOne((el) => revertOverride(el, ph, slideTokens, key))
             }}
             onDeleteSelection={deleteSelection}
+            onAlign={align}
+            onDistribute={distribute}
             onLayer={layer}
             onToggleFlag={toggleFlag}
             onReplaceImage={(id) => {
@@ -1084,6 +1094,25 @@ export default function PresentationWorkspace({ meta }: { meta: PresentationDocM
     </section>
   )
 }
+
+/**
+ * The alignment controls, declared once. The toolbar and the inspector offer
+ * the same eight actions, so they read from the same list rather than drifting
+ * apart one label at a time.
+ */
+const ALIGN_ACTIONS: { edge: AlignEdge; label: string; Icon: typeof IcObjectAlignLeft }[] = [
+  { edge: 'left', label: 'Align left', Icon: IcObjectAlignLeft },
+  { edge: 'hcenter', label: 'Align horizontal centres', Icon: IcObjectAlignCenter },
+  { edge: 'right', label: 'Align right', Icon: IcObjectAlignRight },
+  { edge: 'top', label: 'Align top', Icon: IcObjectAlignTop },
+  { edge: 'vcenter', label: 'Align vertical centres', Icon: IcObjectAlignMiddle },
+  { edge: 'bottom', label: 'Align bottom', Icon: IcObjectAlignBottom },
+]
+
+const DISTRIBUTE_ACTIONS: { axis: DistributeAxis; label: string; Icon: typeof IcObjectAlignLeft }[] = [
+  { axis: 'h', label: 'Distribute horizontally', Icon: IcObjectDistributeH },
+  { axis: 'v', label: 'Distribute vertically', Icon: IcObjectDistributeV },
+]
 
 /** What the typography panel can do, gathered so the props stay legible. */
 interface TextActions {
@@ -1222,6 +1251,8 @@ function Inspector({
   onPatchOne,
   onPatchSlide,
   onDeleteSelection,
+  onAlign,
+  onDistribute,
   onLayer,
   onToggleFlag,
   onReplaceImage,
@@ -1254,6 +1285,8 @@ function Inspector({
   onPatchOne: (fn: (e: PresentElement) => PresentElement, opts?: { coalesceKey?: string }) => void
   onPatchSlide: (fn: (s: PresentSlide) => PresentSlide, opts?: { coalesceKey?: string }) => void
   onDeleteSelection: () => void
+  onAlign: (edge: AlignEdge) => void
+  onDistribute: (axis: DistributeAxis) => void
   onLayer: (mode: LayerMode) => void
   onToggleFlag: (flag: 'locked' | 'hidden') => void
   onReplaceImage: (id: string) => void
@@ -1498,8 +1531,37 @@ function Inspector({
       {scope === 'element' && count >= 2 && (
         <>
           <div className="insp-h">{count} elements</div>
-          <p className="mb-2 text-[11px] leading-relaxed text-muted">
-            Use the alignment tools in the toolbar. Move with drag or arrow keys.
+
+          {/* The panel used to point at the toolbar. With several things
+              selected this is where you are looking, so the alignment lives
+              here too — same actions, same icons, one fewer redirection. */}
+          <div className="grid grid-cols-4 gap-1">
+            {ALIGN_ACTIONS.map(({ edge, label, Icon }) => (
+              <button
+                key={edge}
+                className="toolbar-control toolbar-control--sm"
+                title={label}
+                aria-label={label}
+                onClick={() => onAlign(edge)}
+              >
+                <Icon size={14} />
+              </button>
+            ))}
+            {DISTRIBUTE_ACTIONS.map(({ axis, label, Icon }) => (
+              <button
+                key={axis}
+                className="toolbar-control toolbar-control--sm"
+                title={count < 3 ? 'Select at least three elements' : label}
+                aria-label={label}
+                disabled={count < 3}
+                onClick={() => onDistribute(axis)}
+              >
+                <Icon size={14} />
+              </button>
+            ))}
+          </div>
+          <p className="mt-1.5 mb-2 text-[11px] leading-relaxed text-muted">
+            Move with drag or arrow keys.
           </p>
           <div className="flex gap-1">
             <button className="btn flex-1" title="Lock / unlock" onClick={() => onToggleFlag('locked')}>

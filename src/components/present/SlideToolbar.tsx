@@ -1,18 +1,18 @@
 import { useI18n } from '@/lib/i18n'
 import {
-  IcAlignBottom,
-  IcAlignCenter,
-  IcAlignLeft,
-  IcAlignMiddle,
-  IcAlignRight,
-  IcAlignTop,
-  IcDistributeH,
-  IcDistributeV,
   IcChart,
   IcImage,
   IcLayout,
   IcMagnet,
   IcPlay,
+  IcObjectAlignBottom,
+  IcObjectAlignCenter,
+  IcObjectAlignLeft,
+  IcObjectAlignMiddle,
+  IcObjectAlignRight,
+  IcObjectAlignTop,
+  IcObjectDistributeH,
+  IcObjectDistributeV,
   IcTable,
 } from '@/components/Icons'
 import {
@@ -187,21 +187,21 @@ export function SlideToolbar({
           <>
             <ToolbarSeparator />
             <ToolbarGroup label={t.groups.arrange}>
-              <ToolbarAction icon={<IcAlignLeft size={13} />} label={t.alignLeft} onRun={() => onAlign('left')} />
-              <ToolbarAction icon={<IcAlignCenter size={13} />} label={t.alignCenter} onRun={() => onAlign('hcenter')} />
-              <ToolbarAction icon={<IcAlignRight size={13} />} label={t.alignRight} onRun={() => onAlign('right')} />
-              <ToolbarAction icon={<IcAlignTop size={13} />} label={t.alignTop} onRun={() => onAlign('top')} />
-              <ToolbarAction icon={<IcAlignMiddle size={13} />} label={t.alignMiddle} onRun={() => onAlign('vcenter')} />
-              <ToolbarAction icon={<IcAlignBottom size={13} />} label={t.alignBottom} onRun={() => onAlign('bottom')} />
+              <ToolbarAction icon={<IcObjectAlignLeft size={13} />} label={t.alignLeft} onRun={() => onAlign('left')} />
+              <ToolbarAction icon={<IcObjectAlignCenter size={13} />} label={t.alignCenter} onRun={() => onAlign('hcenter')} />
+              <ToolbarAction icon={<IcObjectAlignRight size={13} />} label={t.alignRight} onRun={() => onAlign('right')} />
+              <ToolbarAction icon={<IcObjectAlignTop size={13} />} label={t.alignTop} onRun={() => onAlign('top')} />
+              <ToolbarAction icon={<IcObjectAlignMiddle size={13} />} label={t.alignMiddle} onRun={() => onAlign('vcenter')} />
+              <ToolbarAction icon={<IcObjectAlignBottom size={13} />} label={t.alignBottom} onRun={() => onAlign('bottom')} />
               <ToolbarAction
-                icon={<IcDistributeH size={13} />}
+                icon={<IcObjectDistributeH size={13} />}
                 label={t.distributeH}
                 disabled={selectedCount < 3}
                 disabledReason={t.needsThree}
                 onRun={() => onDistribute('h')}
               />
               <ToolbarAction
-                icon={<IcDistributeV size={13} />}
+                icon={<IcObjectDistributeV size={13} />}
                 label={t.distributeV}
                 disabled={selectedCount < 3}
                 disabledReason={t.needsThree}
