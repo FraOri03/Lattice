@@ -22,8 +22,7 @@ the live frame.
 
 ## What it specified, and what was built
 
-The work is in review in [#251](https://github.com/FraOri03/Lattice/pull/251);
-it is not on `main` at the time this prototype was committed.
+The work landed in [#251](https://github.com/FraOri03/Lattice/pull/251).
 
 | Frame | What it drew | Built |
 | --- | --- | --- |
