@@ -21,6 +21,7 @@ const handlers = {
   onOpenLayouts: vi.fn(),
   onInsertChart: vi.fn(),
   onInsertTable: vi.fn(),
+  onPresent: vi.fn(),
   onAlign: vi.fn(),
   onDistribute: vi.fn(),
 }
@@ -206,6 +207,21 @@ describe('SlideToolbar — status', () => {
     renderBar({ selectedCount: 3, slideIndex: 1, slideCount: 4 })
     expect(screen.getByText(/3 selected/)).toBeInTheDocument()
     expect(screen.queryByText(/Slide 2\/4/)).toBeNull()
+  })
+})
+
+describe('SlideToolbar — presenting (#244)', () => {
+  it('offers Present, and says what it does', () => {
+    renderBar()
+    const present = screen.getByRole('button', { name: 'Present' })
+    expect(present).toHaveAttribute('title', expect.stringContaining('full screen'))
+  })
+
+  it('asks to present without touching the deck', () => {
+    renderBar()
+    fireEvent.click(screen.getByRole('button', { name: 'Present' }))
+    expect(handlers.onPresent).toHaveBeenCalledOnce()
+    expect(handlers.onAddText).not.toHaveBeenCalled()
   })
 })
 

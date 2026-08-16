@@ -6,6 +6,7 @@ import type { JSONContent } from '@tiptap/core'
 import { sanitizeAdjustments, type Crop, type FocalPoint, type ImageAdjustments, type ImageFit } from './media'
 import { sanitizeLinkRef, type LinkRef } from './linked'
 import type { ChartData } from './sheetRange'
+import { TRANSITIONS, type SlideTransition } from './presenter'
 import type { AutoSizeMode } from './overflow'
 import {
   sanitizeTextStyles,
@@ -37,10 +38,10 @@ export const SLIDE_H = 540
  * element `role`. v4 → v5 (19E.3): structured text (`doc`), named text styles
  * and box typography. v5 → v6 (19E.4): media metadata and assets by
  * reference, table and chart elements, and a link record any element may
- * carry. Every addition is optional, so a body of any version loads unchanged
- * and renders exactly as it did.
+ * carry. v6 → v7 (#244): a per-slide transition. Every addition is optional,
+ * so a body of any version loads unchanged and renders exactly as it did.
  */
-export const PRESENT_BODY_VERSION = 6
+export const PRESENT_BODY_VERSION = 7
 
 export type PresentTheme = 'plain' | 'ink' | 'accent'
 
@@ -197,6 +198,10 @@ export interface PresentSlide {
   masterId?: string
   /** the layout this slide was last arranged with (19E.2) */
   layoutId?: string
+  /** how this slide arrives when presenting (#244); absent means none */
+  transition?: SlideTransition
+  /** transition duration in ms; clamped on use */
+  transitionMs?: number
 }
 
 export interface PresentationBody {
@@ -370,6 +375,13 @@ function migrateSlide(raw: unknown): PresentSlide {
     elements,
     sectionId: typeof s.sectionId === 'string' && s.sectionId ? (s.sectionId as string) : undefined,
     masterId: typeof s.masterId === 'string' && s.masterId ? (s.masterId as string) : undefined,
+    transition: TRANSITIONS.includes(s.transition as SlideTransition)
+      ? (s.transition as SlideTransition)
+      : undefined,
+    transitionMs:
+      typeof s.transitionMs === 'number' && Number.isFinite(s.transitionMs)
+        ? s.transitionMs
+        : undefined,
     // Kept as written rather than validated against the layout catalogue:
     // `layouts.ts` reads SLIDE_W from this module, so importing it back here
     // would be a load-time cycle. An id that matches no layout resolves to

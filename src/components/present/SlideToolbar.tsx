@@ -12,6 +12,7 @@ import {
   IcImage,
   IcLayout,
   IcMagnet,
+  IcPlay,
   IcTable,
 } from '@/components/Icons'
 import {
@@ -59,6 +60,7 @@ export function SlideToolbar({
   onOpenLayouts,
   onInsertChart,
   onInsertTable,
+  onPresent,
   onAlign,
   onDistribute,
 }: {
@@ -80,6 +82,7 @@ export function SlideToolbar({
   onOpenLayouts: () => void
   onInsertChart: () => void
   onInsertTable: () => void
+  onPresent: () => void
   onAlign: (edge: AlignEdge) => void
   onDistribute: (axis: DistributeAxis) => void
 }) {
@@ -207,10 +210,25 @@ export function SlideToolbar({
             </ToolbarGroup>
           </>
         )}
+
+        <ToolbarSeparator />
+
+        {/* Present sits last and to the right — inside the same root, because
+            a second ToolbarRoot would be a second tab stop and this bar is
+            deliberately one. */}
+        <ToolbarGroup label={t.present} className="ml-auto">
+          <ToolbarAction
+            icon={<IcPlay size={12} />}
+            content="icon-text"
+            label={t.present}
+            description={t.presentDescription}
+            onRun={onPresent}
+          />
+        </ToolbarGroup>
       </ToolbarRoot>
 
       {/* status, not a control */}
-      <span className="ml-auto text-[10.5px] text-muted">
+      <span className="ml-2 text-[10.5px] text-muted">
         {selectedCount > 0 ? t.selection(selectedCount) : t.status(slideIndex + 1, slideCount)}
       </span>
     </div>
