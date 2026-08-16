@@ -1,5 +1,6 @@
 import type { GraphEntityKind, GraphRelationshipKind, GraphViewSettings } from '@/lib/graph/graphTypes'
-import { GraphNodeIcon, graphNodeColor } from './graphVisuals'
+import { useState } from 'react'
+import { GraphNodeIcon, edgeStyle, graphNodeColor } from './graphVisuals'
 import { kindMeta } from '@/lib/graph/graphKindMeta'
 import {
   ENTITY_LABEL,
@@ -64,20 +65,24 @@ function Check({
 
 /** Collapsible left panel: scope, layout, node & relationship visibility. */
 export function GraphFilters({ settings, update, onClose }: GraphFiltersProps) {
+  const [advancedOpen, setAdvancedOpen] = useState(false)
   return (
     <aside
-      className="flex h-full w-60 flex-none flex-col border-r border-bord bg-panel"
+      className="side-panel-drawer absolute top-2 left-2 z-20 flex max-h-[calc(100%-1rem)] w-[19.125rem] flex-col rounded-xl border border-bord bg-panel shadow-xl"
       aria-label="Graph filters"
+      role="dialog"
     >
       <div className="flex items-center gap-2 border-b border-bord px-3 py-2">
-        <span className="flex-1 text-[12px] font-semibold">Filters &amp; layout</span>
+        <span className="flex-1 text-[12px] font-semibold">Adjust</span>
         <button className="icon-btn" aria-label="Close filters" onClick={onClose}>
           <IcX size={14} />
         </button>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
-        <div className="insp-h !mt-3">Scope</div>
+        {/* 19B frame D: Quick holds the four controls people actually reach
+            for; everything else is a level down, not a level away. */}
+        <div className="insp-h !mt-3">Quick</div>
         <div className="flex rounded-lg border border-bord bg-panel2 p-0.5" role="tablist">
           {(['project', 'local'] as const).map((scope) => (
             <button
@@ -167,6 +172,17 @@ export function GraphFilters({ settings, update, onClose }: GraphFiltersProps) {
           Show board card instances
         </Check>
 
+        <details className="mt-3 border-t border-bord pt-2" open={advancedOpen}>
+          <summary
+            className="cursor-pointer list-none text-[11px] font-semibold text-muted hover:text-ink"
+            onClick={(e) => {
+              e.preventDefault()
+              setAdvancedOpen((v) => !v)
+            }}
+          >
+            {advancedOpen ? '▾' : '▸'} Advanced — every power control
+          </summary>
+
         <div className="insp-h">Entity types</div>
         {FILTERABLE_ENTITY_KINDS.map(({ group, kinds }) => (
           <div key={group} className="mb-1.5">
@@ -204,9 +220,33 @@ export function GraphFilters({ settings, update, onClose }: GraphFiltersProps) {
               })
             }
           >
+            {/* 19B: the row draws the dash the canvas actually uses, so the
+                filter and the picture cannot describe different things */}
+            <svg width="18" height="8" aria-hidden className="flex-none">
+              <line
+                x1="0"
+                y1="4"
+                x2="18"
+                y2="4"
+                stroke="var(--muted)"
+                strokeWidth="1.6"
+                strokeDasharray={edgeStyle(kind).dash.join(' ')}
+              />
+            </svg>
             {RELATIONSHIP_LABEL[kind]}
           </Check>
         ))}
+        </details>
+
+        <button
+          className="btn mt-3 w-full"
+          onClick={() => update({ pinnedPositions: {} })}
+          disabled={Object.keys(settings.pinnedPositions).length === 0}
+          title="Let the layout place every node again"
+        >
+          Clear {Object.keys(settings.pinnedPositions).length || ''} pinned{' '}
+          {Object.keys(settings.pinnedPositions).length === 1 ? 'position' : 'positions'}
+        </button>
       </div>
     </aside>
   )

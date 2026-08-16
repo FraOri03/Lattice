@@ -45,11 +45,18 @@ fully blocked.
 - **Never colour-only.** Node type is encoded by **icon + shape + label**
   redundantly — boards are larger outlined nodes, tags are accent pills, and the
   legend pairs every colour with an icon and a name.
-- **Reduced motion.** The canvas uses a static, precomputed layout with **no
-  continuous physics and no intro/reveal animation** — nodes appear at their
-  settled positions immediately and only redraw on interaction. There is no
-  motion to reduce, so `prefers-reduced-motion` is inherently respected. (The
-  base app also neutralizes CSS transitions under this query.)
+- **Reduced motion.** The layout is still static and precomputed: **no
+  continuous physics, no intro or reveal animation**, and nodes appear at their
+  settled positions rather than flying into them.
+
+  19B added one deliberate movement — picking a search result or focusing a
+  node flies the camera there over ~220ms instead of teleporting, so you keep
+  your bearings. That means `prefers-reduced-motion` is **no longer respected
+  by having nothing to animate**: `GraphCanvas.centerOn` checks the query and,
+  when motion is reduced, moves the camera to its destination in a single
+  frame. Any future animation in this view owes the same check — the guarantee
+  is now maintained, not inherent. (The base app also neutralizes CSS
+  transitions under this query.)
 - **Fixed-size mode.** *Fixed node size* removes degree-based sizing so nodes are
   uniform and predictable.
 - **Visible focus.** The focused node draws an accent halo; all interactive

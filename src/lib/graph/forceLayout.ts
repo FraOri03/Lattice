@@ -91,22 +91,34 @@ function gridByType(nodes: LatticeGraphNode[], k: number): LayoutPositions {
   return centre(positions)
 }
 
+/**
+ * BFS rings around a focus node, with each ring **grouped under the node it
+ * came from** (19B).
+ *
+ * Placing a ring by index alone scatters siblings around the circle, so a
+ * local graph reads as a cloud at a distance rather than as branches. Giving
+ * every parent an angular sector proportional to how many descendants it has
+ * is what makes a branch look like a branch.
+ */
 function radial(input: LayoutInput, k: number): LayoutPositions {
   const { nodes, edges, focusId } = input
   const focus = focusId && nodes.some((n) => n.id === focusId) ? focusId : nodes[0]?.id
   const positions: LayoutPositions = {}
   if (!focus) return positions
   const adj = buildAdjacency(nodes, edges)
+
   const rings: string[][] = [[focus]]
   const placed = new Set<string>([focus])
+  /** who each node was first reached from — the branch it belongs to */
+  const parent = new Map<string, string>()
   let depth = 1
   while (placed.size < nodes.length && depth < 40) {
-    const prev = rings[depth - 1]
-    const ring = neighborhood(adj, prev, 1, 'both')
     const next: string[] = []
-    for (const id of ring) {
-      if (!placed.has(id)) {
+    for (const from of rings[depth - 1]) {
+      for (const id of neighborhood(adj, [from], 1, 'both')) {
+        if (placed.has(id)) continue
         placed.add(id)
+        parent.set(id, from)
         next.push(id)
       }
     }
@@ -114,17 +126,41 @@ function radial(input: LayoutInput, k: number): LayoutPositions {
     rings.push(next)
     depth++
   }
-  // anything unreachable goes on an outer ring
+  // anything unreachable goes on an outer ring, parented to nothing
   const rest = nodes.filter((n) => !placed.has(n.id)).map((n) => n.id)
   if (rest.length) rings.push(rest)
+
   positions[focus] = { x: 0, y: 0 }
+  /** the angular slice each placed node owns, so its children sit under it */
+  const sector = new Map<string, { start: number; end: number }>([
+    [focus, { start: 0, end: Math.PI * 2 }],
+  ])
+
   rings.forEach((ring, r) => {
     if (r === 0) return
     const radius = r * k * 2.2
-    ring.forEach((id, i) => {
-      const angle = (i / ring.length) * Math.PI * 2
-      positions[id] = { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius }
-    })
+    // group this ring by the branch each node belongs to
+    // keyed by the parent, or by `undefined` for the unreachable ring — a
+    // Map takes that key directly, so no sentinel string is needed
+    const byParent = new Map<string | undefined, string[]>()
+    for (const id of ring) {
+      const key = parent.get(id)
+      const list = byParent.get(key)
+      if (list) list.push(id)
+      else byParent.set(key, [id])
+    }
+    for (const [key, children] of byParent) {
+      const own = (key && sector.get(key)) || { start: 0, end: Math.PI * 2 }
+      const span = own.end - own.start
+      children.forEach((id, i) => {
+        // each child takes the middle of its own slice of the parent's sector
+        const start = own.start + (span * i) / children.length
+        const end = own.start + (span * (i + 1)) / children.length
+        const angle = (start + end) / 2
+        positions[id] = { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius }
+        sector.set(id, { start, end })
+      })
+    }
   })
   return positions
 }

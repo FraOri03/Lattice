@@ -148,3 +148,34 @@ export function inducedSubgraph(
     edges: data.edges.filter((e) => keep.has(e.source) && keep.has(e.target)),
   }
 }
+
+/**
+ * Which connected component each node belongs to (19B).
+ *
+ * `countComponents` already walks the graph to count them; the search results
+ * need to *name* one, so this returns the mapping rather than the total. Ids
+ * are assigned in node order, which keeps them stable for a given graph.
+ */
+export function componentIds(
+  nodes: LatticeGraphNode[],
+  edges: LatticeGraphEdge[],
+): Map<string, number> {
+  const adj = buildAdjacency(nodes, edges)
+  const out = new Map<string, number>()
+  let current = 0
+  for (const node of nodes) {
+    if (out.has(node.id)) continue
+    const queue = [node.id]
+    out.set(node.id, current)
+    while (queue.length) {
+      const id = queue.pop()!
+      for (const next of adj.undirected.get(id) ?? []) {
+        if (out.has(next)) continue
+        out.set(next, current)
+        queue.push(next)
+      }
+    }
+    current++
+  }
+  return out
+}
