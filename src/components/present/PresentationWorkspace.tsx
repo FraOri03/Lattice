@@ -50,6 +50,14 @@ import {
   type SourceState,
 } from '@/lib/present/linked'
 import { TypographyPanel } from './TypographyPanel'
+import { PresenterView } from './PresenterView'
+import {
+  DEFAULT_TRANSITION_MS,
+  TRANSITIONS,
+  TRANSITION_LABEL,
+  startIndex,
+  type SlideTransition,
+} from '@/lib/present/presenter'
 import { MasterPanel } from './MasterPanel'
 import { THEME_PRESETS, type ThemeTokens } from '@/lib/present/theme'
 import {
@@ -151,6 +159,12 @@ export default function PresentationWorkspace({ meta }: { meta: PresentationDocM
   const [notesOpen, setNotesOpen] = useState(false)
   const [layoutsOpen, setLayoutsOpen] = useState(false)
   const [chartOpen, setChartOpen] = useState(false)
+  const [presenting, setPresenting] = useState(false)
+  /** bumping this replays the current slide's transition on the canvas */
+  const [previewNonce, setPreviewNonce] = useState(0)
+  const reducedMotion =
+    typeof window !== 'undefined' &&
+    window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true
   const [overflow, setOverflow] = useState<OverflowReport | null>(null)
 
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -698,7 +712,10 @@ export default function PresentationWorkspace({ meta }: { meta: PresentationDocM
     flush()
     const { exportPresentationPptx } = await import('@/lib/present/presentPptx')
     downloadBlob(`${slugify(meta.title)}.pptx`, await exportPresentationPptx(body))
-    toast.info('PPTX exported (basic fidelity)', 'Text, shapes and images are covered; themes/animations are not.')
+    toast.info(
+      'PPTX exported (basic fidelity)',
+      'Text runs, lists, tables, charts and images are covered. Slide transitions are not written — they play when presenting.',
+    )
   }
 
   /* ---------- keyboard (stable listener → latest handler) ---------- */
@@ -900,6 +917,12 @@ export default function PresentationWorkspace({ meta }: { meta: PresentationDocM
               onOpenLayouts={() => setLayoutsOpen((v) => !v)}
               onInsertChart={() => setChartOpen((v) => !v)}
               onInsertTable={insertTable}
+              onPresent={() => {
+                // a deck is read while it runs: flush first so what is on the
+                // screen is what is on disk, then never write again
+                flush()
+                setPresenting(true)
+              }}
               onAlign={align}
               onDistribute={distribute}
             />
@@ -920,6 +943,17 @@ export default function PresentationWorkspace({ meta }: { meta: PresentationDocM
                 onClose={() => setLayoutsOpen(false)}
               />
             )}
+            <div
+              key={`preview-${previewNonce}`}
+              className="contents"
+              style={
+                previewNonce && !reducedMotion && slide.transition && slide.transition !== 'none'
+                  ? {
+                      animation: `present-${slide.transition} ${slide.transitionMs ?? DEFAULT_TRANSITION_MS}ms ease-out both`,
+                    }
+                  : undefined
+              }
+            >
             <SlideCanvas
               slide={slide}
               tokens={slideTokens}
@@ -935,6 +969,7 @@ export default function PresentationWorkspace({ meta }: { meta: PresentationDocM
               setSlideElements={setSlideElements}
               onSeal={seal}
             />
+            </div>
           </div>
 
           {/* notes: a strip until you want them, so the canvas keeps the room */}
@@ -995,6 +1030,14 @@ export default function PresentationWorkspace({ meta }: { meta: PresentationDocM
             onToggleSlideHidden={() => toggleHidden(si)}
             onSetReviewStatus={(status) => setReviewStatus(si, status)}
             onSetTheme={(t) => apply((b) => ({ ...b, theme: t }))}
+            onSetTransition={(t) =>
+              patchSlide((sl) => ({ ...sl, transition: t === 'none' ? undefined : t }))
+            }
+            onSetTransitionMs={(ms) =>
+              patchSlide((sl) => ({ ...sl, transitionMs: ms }), { coalesceKey: `trans-${slide.id}` })
+            }
+            onPreviewTransition={() => setPreviewNonce((n) => n + 1)}
+            reducedMotion={reducedMotion}
             slideTokens={slideTokens}
             masterActions={masterActions}
             overflow={overflow}
@@ -1018,6 +1061,15 @@ export default function PresentationWorkspace({ meta }: { meta: PresentationDocM
           />
         )}
       </div>
+
+      {presenting && body && (
+        <PresenterView
+          body={body}
+          title={meta.title}
+          startAt={startIndex(body, si)}
+          onExit={() => setPresenting(false)}
+        />
+      )}
 
       <input
         ref={imageInput}
@@ -1177,6 +1229,10 @@ function Inspector({
   onToggleSlideHidden,
   onSetReviewStatus,
   onSetTheme,
+  onSetTransition,
+  onSetTransitionMs,
+  onPreviewTransition,
+  reducedMotion,
   slideTokens,
   masterActions,
   onRevertOverride,
@@ -1205,6 +1261,10 @@ function Inspector({
   onToggleSlideHidden: () => void
   onSetReviewStatus: (status: SlideReviewStatus | undefined) => void
   onSetTheme: (theme: PresentTheme) => void
+  onSetTransition: (t: SlideTransition) => void
+  onSetTransitionMs: (ms: number) => void
+  onPreviewTransition: () => void
+  reducedMotion: boolean
   slideTokens: ThemeTokens
   masterActions: MasterActions
   onRevertOverride: (key: OverrideKey) => void
@@ -1301,6 +1361,56 @@ function Inspector({
           <p className="mt-1 text-[10.5px] leading-relaxed text-muted">
             A hidden slide stays in the deck and stays editable. It is left out
             of PDF and PPTX export.
+          </p>
+
+          <div className="insp-h">Transition</div>
+          <select
+            className="field h-6 w-full cursor-pointer px-1 py-0 text-[11.5px]"
+            aria-label="Slide transition"
+            disabled={readOnly}
+            value={slide.transition ?? 'none'}
+            onChange={(e) => onSetTransition(e.target.value as SlideTransition)}
+          >
+            {TRANSITIONS.map((t) => (
+              <option key={t} value={t}>
+                {TRANSITION_LABEL[t]}
+              </option>
+            ))}
+          </select>
+          {slide.transition && slide.transition !== 'none' && (
+            <>
+              <label className="mt-1 flex items-center gap-2 text-[10px] text-muted uppercase">
+                <span className="w-14 flex-none">Duration</span>
+                <input
+                  type="range"
+                  min={60}
+                  max={1200}
+                  step={20}
+                  className="min-w-0 flex-1"
+                  aria-label="Transition duration"
+                  disabled={readOnly}
+                  value={slide.transitionMs ?? DEFAULT_TRANSITION_MS}
+                  onChange={(e) => onSetTransitionMs(Number(e.target.value))}
+                />
+                <span className="w-10 flex-none text-right tabular-nums">
+                  {slide.transitionMs ?? DEFAULT_TRANSITION_MS}
+                </span>
+              </label>
+              <button className="btn mt-1 w-full" onClick={onPreviewTransition}>
+                Preview on this slide
+              </button>
+              {reducedMotion && (
+                <p className="mt-1 text-[10.5px] leading-relaxed text-muted">
+                  Your system asks for reduced motion, so this transition will
+                  not run for you — it is still stored, and will run for someone
+                  who has not asked for that.
+                </p>
+              )}
+            </>
+          )}
+          <p className="mt-1 text-[10.5px] leading-relaxed text-muted">
+            Transitions play when presenting. PDF has no concept of one, and the
+            PPTX writer does not emit them — the export reports that.
           </p>
 
           <div className="insp-h">Review</div>
