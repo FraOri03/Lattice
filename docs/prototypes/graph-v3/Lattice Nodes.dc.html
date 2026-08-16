@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <meta name="design_doc_mode" content="canvas" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    body { margin: 0; background: #141417; color: #e8e8ea; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+    a { color: #6cc0ff; text-decoration: none; }
+    a:hover { color: #8fd0ff; text-decoration: underline; }
+    @keyframes dcspin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+    }
+  </style>
+</helmet>
+
+<section style="display:flex;flex-direction:column;gap:26px;padding:56px 60px 90px;background:#141417">
+
+  <div style="display:flex;flex-direction:column;gap:14px;max-width:1440px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="display:inline-flex;align-items:center;height:20px;padding:0 8px;border:1px solid #3a3a42;border-radius:5px;background:#1d1d21;color:#8a8a93;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase">Turn 1</span>
+      <span style="font-size:11px;color:#8f8f98">Lattice · Nodes (Graph) mode · redesign of the existing dark system</span>
+    </div>
+    <h1 style="margin:0;font-size:30px;font-weight:600;letter-spacing:-.02em;line-height:1.15">A spatial map of the project, with the chrome kept quiet</h1>
+    <p style="margin:0;max-width:860px;font-size:13.5px;line-height:1.65;color:#a8a8b0;text-wrap:pretty">Same tokens as today — <code style="padding:1px 5px;border:1px solid #33333a;border-radius:4px;background:#1d1d21;font-size:11.5px;color:#c8c8ce">#1b1b1f</code> canvas, <code style="padding:1px 5px;border:1px solid #33333a;border-radius:4px;background:#1d1d21;font-size:11.5px;color:#c8c8ce">#232327</code> panels, <code style="padding:1px 5px;border:1px solid #33333a;border-radius:4px;background:#1d1d21;font-size:11.5px;color:#c8c8ce">#0d99ff</code> accent, the CardColor palette on nodes, the existing dash families on edges. What changes is the hierarchy: the two side panels stop being permanent walls, filters get two levels, labels get a budget and a collision pass, and every state change is written as a camera move rather than a jump cut. Every frame below is live — hover nodes, click them, search, zoom, toggle filters.</p>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:2px">
+      <span style="display:inline-flex;align-items:center;height:23px;padding:0 9px;border:1px solid #33333a;border-radius:6px;background:#1d1d21;font-size:10.5px;color:#a8a8b0">52 nodes · 93 links · 5 themed clusters</span>
+      <span style="display:inline-flex;align-items:center;height:23px;padding:0 9px;border:1px solid #33333a;border-radius:6px;background:#1d1d21;font-size:10.5px;color:#a8a8b0">Shape + colour + icon + label — never colour alone</span>
+      <span style="display:inline-flex;align-items:center;height:23px;padding:0 9px;border:1px solid #33333a;border-radius:6px;background:#1d1d21;font-size:10.5px;color:#a8a8b0">Deterministic layout · no perpetual physics</span>
+    </div>
+  </div>
+
+  <div id="1a" style="display:flex;flex-direction:column;gap:11px">
+    <div style="display:flex;align-items:baseline;gap:10px">
+      <span style="font-size:11px;font-weight:700;letter-spacing:.12em;color:#0d99ff">01</span>
+      <span style="font-size:15px;font-weight:600">Project Graph — one node selected</span>
+      <span style="font-size:11px;color:#8f8f98">1440 × 900 · primary state</span>
+    </div>
+    <p style="margin:0;max-width:1100px;font-size:12px;line-height:1.6;color:#8a8a93;text-wrap:pretty">The canvas owns the screen: 40px app bar, 40px graph strip, one docked 316px Inspector, everything else floats. <b style="color:#c2c2c9;font-weight:600">API Architecture</b> is selected — accent ring plus a soft halo, its six relationships lit in accent, the rest of the graph dimmed to 28% so the map stays legible instead of disappearing. Labels are budgeted: selection, neighbours and high-degree hubs first, then a greedy collision pass drops anything that would overlap.</p>
+    <dc-import name="LatticeGraphFrame" mode="primary" dim-level="{{ dimLevel }}" label-density="{{ labelDensity }}" node-sizing="{{ nodeSizing }}" show-minimap="{{ showMinimap }}" style="width:1440px;height:900px;border:1px solid #33333a;border-radius:12px;overflow:hidden;box-shadow:0 30px 70px -30px rgba(0,0,0,.9)" hint-size="1440px,900px"></dc-import>
+  </div>
+
+  <div id="1b" style="display:flex;flex-direction:column;gap:11px;margin-top:14px">
+    <div style="display:flex;align-items:baseline;gap:10px">
+      <span style="font-size:11px;font-weight:700;letter-spacing:.12em;color:#0d99ff">A</span>
+      <span style="font-size:15px;font-weight:600">Hover — neighbourhood highlighting</span>
+      <span style="font-size:11px;color:#8f8f98">120ms opacity transition</span>
+    </div>
+    <p style="margin:0;max-width:1100px;font-size:12px;line-height:1.6;color:#8a8a93;text-wrap:pretty">Hover beats selection for highlighting, exactly as the current renderer does. <b style="color:#c2c2c9;font-weight:600">Design System</b> grows ~13%, takes a light ring, and its eleven links become accent while the selected node keeps its blue ring — so you can survey a neighbour without losing your place. The tooltip is drawn in graph space so it travels with the node.</p>
+    <dc-import name="LatticeGraphFrame" mode="hover" dim-level="{{ dimLevel }}" label-density="{{ labelDensity }}" node-sizing="{{ nodeSizing }}" show-minimap="{{ showMinimap }}" style="width:1440px;height:900px;border:1px solid #33333a;border-radius:12px;overflow:hidden;box-shadow:0 30px 70px -30px rgba(0,0,0,.9)" hint-size="1440px,900px"></dc-import>
+  </div>
+
+  <div id="1c" style="display:flex;flex-direction:column;gap:11px;margin-top:14px">
+    <div style="display:flex;align-items:baseline;gap:10px">
+      <span style="font-size:11px;font-weight:700;letter-spacing:.12em;color:#0d99ff">B</span>
+      <span style="font-size:15px;font-weight:600">Search — matches promoted, structure preserved</span>
+      <span style="font-size:11px;color:#8f8f98">⏎ flies the camera in ~220ms</span>
+    </div>
+    <p style="margin:0;max-width:1100px;font-size:12px;line-height:1.6;color:#8a8a93;text-wrap:pretty">Matches take a yellow ring and keep their labels; non-matches drop to 20% but the shape of the project is still readable behind them. The result list shows the matched substring, the entity icon and a type · cluster subtitle, with the first row pre-selected for <span style="color:#c2c2c9">↑↓ ⏎</span>. Picking a result centres the camera rather than teleporting — try it, then use the minimap to jump elsewhere.</p>
+    <dc-import name="LatticeGraphFrame" mode="search" dim-level="{{ dimLevel }}" label-density="{{ labelDensity }}" node-sizing="{{ nodeSizing }}" show-minimap="{{ showMinimap }}" style="width:1440px;height:900px;border:1px solid #33333a;border-radius:12px;overflow:hidden;box-shadow:0 30px 70px -30px rgba(0,0,0,.9)" hint-size="1440px,900px"></dc-import>
+  </div>
+
+  <div id="1d" style="display:flex;flex-direction:column;gap:11px;margin-top:14px">
+    <div style="display:flex;align-items:baseline;gap:10px">
+      <span style="font-size:11px;font-weight:700;letter-spacing:.12em;color:#0d99ff">C</span>
+      <span style="font-size:15px;font-weight:600">Local Graph — a neighbourhood, not a filter</span>
+      <span style="font-size:11px;color:#8f8f98">nodes morph to new positions in ~320ms</span>
+    </div>
+    <p style="margin:0;max-width:1100px;font-size:12px;line-height:1.6;color:#8a8a93;text-wrap:pretty">One 30px bar carries the whole context: the way back, the root, a depth stepper and how much of the project you are looking at. No banner, no modal. The layout is radial from the root with second-hop nodes grouped under the first-hop node they came from, so the branches read as branches. Step the depth up and down to see the neighbourhood grow.</p>
+    <dc-import name="LatticeGraphFrame" mode="local" dim-level="{{ dimLevel }}" label-density="{{ labelDensity }}" node-sizing="{{ nodeSizing }}" show-minimap="{{ showMinimap }}" style="width:1440px;height:900px;border:1px solid #33333a;border-radius:12px;overflow:hidden;box-shadow:0 30px 70px -30px rgba(0,0,0,.9)" hint-size="1440px,900px"></dc-import>
+  </div>
+
+  <div id="1e" style="display:flex;flex-direction:column;gap:11px;margin-top:14px">
+    <div style="display:flex;align-items:baseline;gap:10px">
+      <span style="font-size:11px;font-weight:700;letter-spacing:.12em;color:#0d99ff">D</span>
+      <span style="font-size:15px;font-weight:600">Adjust — quick controls first, power controls below</span>
+      <span style="font-size:11px;color:#8f8f98">popover, not a third column</span>
+    </div>
+    <p style="margin:0;max-width:1100px;font-size:12px;line-height:1.6;color:#8a8a93;text-wrap:pretty">The old left panel becomes a 306px popover that never takes canvas width. <b style="color:#c2c2c9;font-weight:600">Quick</b> holds the four controls people actually reach for; <b style="color:#c2c2c9;font-weight:600">Advanced</b> keeps every power control that exists today, with the relationship rows showing their real dash pattern. The filters are live — untick Spreadsheets and the graph, the stats and the Adjust badge all change. Meanwhile the canvas keeps the old positions and says so, instead of blanking while it recalculates.</p>
+    <dc-import name="LatticeGraphFrame" mode="filters" dim-level="{{ dimLevel }}" label-density="{{ labelDensity }}" node-sizing="{{ nodeSizing }}" show-minimap="{{ showMinimap }}" style="width:1440px;height:900px;border:1px solid #33333a;border-radius:12px;overflow:hidden;box-shadow:0 30px 70px -30px rgba(0,0,0,.9)" hint-size="1440px,900px"></dc-import>
+  </div>
+
+  <div id="1f" style="display:flex;flex-direction:column;gap:11px;margin-top:14px">
+    <div style="display:flex;align-items:baseline;gap:10px">
+      <span style="font-size:11px;font-weight:700;letter-spacing:.12em;color:#0d99ff">E</span>
+      <span style="font-size:15px;font-weight:600">1280 × 800 — Inspector as an overlay</span>
+      <span style="font-size:11px;color:#8f8f98">canvas keeps its width</span>
+    </div>
+    <p style="margin:0;max-width:1100px;font-size:12px;line-height:1.6;color:#8a8a93;text-wrap:pretty">Below the docked tier the Inspector undocks into a 300px floating drawer with the shell's existing drawer elevation, so selecting a node no longer squeezes the graph and reflows every position. The secondary statistics (clusters) drop out of the bottom readout before anything else shrinks.</p>
+    <dc-import name="LatticeGraphFrame" mode="compact" compact="{{ true }}" dim-level="{{ dimLevel }}" label-density="{{ labelDensity }}" node-sizing="{{ nodeSizing }}" show-minimap="{{ showMinimap }}" style="width:1280px;height:800px;border:1px solid #33333a;border-radius:12px;overflow:hidden;box-shadow:0 30px 70px -30px rgba(0,0,0,.9)" hint-size="1280px,800px"></dc-import>
+  </div>
+
+  <div id="1g" style="display:flex;flex-direction:column;gap:11px;margin-top:14px">
+    <div style="display:flex;align-items:baseline;gap:10px">
+      <span style="font-size:11px;font-weight:700;letter-spacing:.12em;color:#0d99ff">F</span>
+      <span style="font-size:15px;font-weight:600">Filtered-empty — explain, then offer the way back</span>
+      <span style="font-size:11px;color:#8f8f98">state coverage</span>
+    </div>
+    <p style="margin:0;max-width:1100px;font-size:12px;line-height:1.6;color:#8a8a93;text-wrap:pretty">An empty canvas always says why it is empty and what to do next; the graph never invents links, so "nothing here" is a filter problem, not a data mystery. Reset filters brings the whole project back in one click.</p>
+    <dc-import name="LatticeGraphFrame" mode="empty" dim-level="{{ dimLevel }}" label-density="{{ labelDensity }}" node-sizing="{{ nodeSizing }}" show-minimap="{{ showMinimap }}" style="width:1440px;height:760px;border:1px solid #33333a;border-radius:12px;overflow:hidden;box-shadow:0 30px 70px -30px rgba(0,0,0,.9)" hint-size="1440px,760px"></dc-import>
+  </div>
+
+</section>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;dimLevel&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;min&quot;:0.1,&quot;max&quot;:0.5,&quot;step&quot;:0.02,&quot;default&quot;:0.28,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Graph legibility&quot;},&quot;labelDensity&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;sparse&quot;,&quot;smart&quot;,&quot;all&quot;],&quot;default&quot;:&quot;smart&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Graph legibility&quot;},&quot;nodeSizing&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;degree&quot;,&quot;fixed&quot;],&quot;default&quot;:&quot;degree&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Graph legibility&quot;},&quot;showMinimap&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Graph legibility&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      dimLevel: this.props.dimLevel === undefined ? 0.28 : this.props.dimLevel,
+      labelDensity: this.props.labelDensity || 'smart',
+      nodeSizing: this.props.nodeSizing || 'degree',
+      showMinimap: this.props.showMinimap === undefined ? true : this.props.showMinimap,
+    };
+  }
+}
+
+</script>
+</body>
+</html>
