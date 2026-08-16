@@ -5,6 +5,8 @@ import { GraphNodeIcon } from './graphVisuals'
 import { IcSearch, IcX } from '@/components/Icons'
 
 interface GraphSearchProps {
+  /** node id → connected-component index, for the result subtitle (19B) */
+  clusterOf?: ReadonlyMap<string, number>
   nodes: LatticeGraphNode[]
   onMatches: (ids: Set<string> | null) => void
   onPick: (node: LatticeGraphNode) => void
@@ -14,7 +16,21 @@ interface GraphSearchProps {
  * Node search. Highlights matches (via onMatches), dims the rest, Enter
  * focuses the first result, Escape clears, selecting a result centres it.
  */
-export function GraphSearch({ nodes, onMatches, onPick }: GraphSearchProps) {
+/** The matched run of the label, marked rather than merely present. */
+function Highlighted({ text, query }: { text: string; query: string }) {
+  const at = text.toLowerCase().indexOf(query.trim().toLowerCase())
+  if (at < 0 || !query.trim()) return <>{text}</>
+  const end = at + query.trim().length
+  return (
+    <>
+      {text.slice(0, at)}
+      <mark className="rounded-[2px] bg-accent-soft text-ink">{text.slice(at, end)}</mark>
+      {text.slice(end)}
+    </>
+  )
+}
+
+export function GraphSearch({ nodes, clusterOf, onMatches, onPick }: GraphSearchProps) {
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -75,8 +91,17 @@ export function GraphSearch({ nodes, onMatches, onPick }: GraphSearchProps) {
               }}
             >
               <GraphNodeIcon icon={m.node.icon} size={12} />
-              <span className="min-w-0 flex-1 truncate">{m.node.label}</span>
-              <span className="text-[9.5px] text-muted">{m.node.subtitle}</span>
+              <span className="min-w-0 flex-1">
+                {/* 19B: show the substring that matched, so a result explains
+                    itself instead of leaving you to find the word */}
+                <span className="block truncate">
+                  <Highlighted text={m.node.label} query={query} />
+                </span>
+                <span className="block truncate text-[9.5px] text-muted">
+                  {m.node.kind}
+                  {clusterOf?.get(m.node.id) !== undefined && ` · cluster ${clusterOf.get(m.node.id)! + 1}`}
+                </span>
+              </span>
             </button>
           ))}
         </div>

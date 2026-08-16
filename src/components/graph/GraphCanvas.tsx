@@ -3,6 +3,21 @@ import { CARD_COLORS, type CardColor } from '@/types/model'
 import type { GraphViewSettings, LatticeGraphEdge, LatticeGraphNode } from '@/lib/graph/graphTypes'
 import type { LayoutPositions } from '@/lib/graph/forceLayout'
 import { edgeStyle } from './graphVisuals'
+import { edgeAt, placeLabels, tweenCamera } from '@/lib/graph/graphGeometry'
+
+/** How far a dimmed element recedes (19B: the mockup's 28%). */
+const DIMMED_ALPHA = 0.28
+/** How much a hovered node grows (19B: ~13%). */
+const HOVER_GROWTH = 1.13
+const LABEL_LINE_HEIGHT = 13
+/** How close a click must be to an edge, in screen px. */
+const EDGE_HIT_PX = 6
+/** A camera flight, in ms; skipped entirely under reduced motion. */
+const FLIGHT_MS = 220
+
+const prefersReducedMotion = (): boolean =>
+  typeof window !== 'undefined' &&
+  window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true
 
 export interface GraphCameraApi {
   fit: () => void
@@ -26,6 +41,9 @@ interface GraphCanvasProps {
   hoveredId: string | null
   searchMatchIds: Set<string> | null
   onSelect: (id: string | null) => void
+  /** the selected relationship, if the selection is an edge rather than a node */
+  selectedEdgeId?: string | null
+  onSelectEdge: (id: string | null) => void
   onOpen: (node: LatticeGraphNode, opts: { split: boolean }) => void
   onHover: (id: string | null, screen?: Pt) => void
   onPinNode: (id: string, pos: Pt) => void
@@ -71,10 +89,12 @@ export function GraphCanvas(props: GraphCanvasProps) {
     positions,
     settings,
     selectedId,
+    selectedEdgeId,
     focusId,
     hoveredId,
     searchMatchIds,
     onSelect,
+    onSelectEdge,
     onOpen,
     onHover,
     onPinNode,
@@ -92,6 +112,7 @@ export function GraphCanvas(props: GraphCanvasProps) {
     | { kind: 'node'; id: string; moved: boolean; pos: Pt }
     | null
   >(null)
+  const flightRef = useRef(0)
   const [kbdFocusId, setKbdFocusId] = useState<string | null>(null)
   const [announce, setAnnounce] = useState('')
 
@@ -185,8 +206,10 @@ export function GraphCanvas(props: GraphCanvasProps) {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     ctx.clearRect(0, 0, w, h)
 
+    // 19B: the mockup's 28% — dimmed enough to recede, bright enough that the
+    // shape of the project is still readable behind the highlight
     const dim = (base: string, on: boolean) => {
-      ctx.globalAlpha = on ? 1 : 0.18
+      ctx.globalAlpha = on ? 1 : DIMMED_ALPHA
       return base
     }
 
@@ -210,8 +233,14 @@ export function GraphCanvas(props: GraphCanvasProps) {
         continue
       const lit =
         !highlightSet || (highlightSet.has(e.source) && highlightSet.has(e.target))
-      ctx.strokeStyle = dim(lit && highlightSet ? t.accent : t.bord, !highlightSet || lit)
-      ctx.lineWidth = (lit && highlightSet ? 1.4 : 1) * Math.min(1.6, Math.max(0.5, zoom))
+      const isSelectedEdge = e.id === selectedEdgeId
+      ctx.strokeStyle = isSelectedEdge
+        ? t.accent
+        : dim(lit && highlightSet ? t.accent : t.bord, !highlightSet || lit)
+      if (isSelectedEdge) ctx.globalAlpha = 1
+      ctx.lineWidth =
+        (isSelectedEdge ? 2.6 : lit && highlightSet ? 1.4 : 1) *
+        Math.min(1.6, Math.max(0.5, zoom))
       const dash = edgeStyle(e.kind).dash
       ctx.setLineDash(dash.map((d) => d * Math.max(0.6, Math.min(2, zoom))))
       ctx.beginPath()
@@ -228,7 +257,10 @@ export function GraphCanvas(props: GraphCanvasProps) {
       const p = posById.get(node.id)
       if (!p) continue
       const s = worldToScreen(p.x, p.y)
-      const r = Math.max(2.5, nodeRadius(node) * Math.min(1.8, Math.max(0.35, zoom)))
+      // 19B: a hovered node grows, so surveying a neighbour is visible without
+      // taking the selection away from where you were
+      const hoverScale = node.id === hoveredId ? HOVER_GROWTH : 1
+      const r = Math.max(2.5, nodeRadius(node) * Math.min(1.8, Math.max(0.35, zoom)) * hoverScale)
       if (s.x < -r || s.x > w + r || s.y < -r || s.y > h + r) continue
       const on = !highlightSet || highlightSet.has(node.id)
       const isSel = node.id === selectedId
@@ -237,7 +269,7 @@ export function GraphCanvas(props: GraphCanvasProps) {
       const isMatch = searchMatchIds?.has(node.id) ?? false
       const color = colorForNode(node, t.accent, t.muted)
 
-      ctx.globalAlpha = on ? 1 : 0.2
+      ctx.globalAlpha = on ? 1 : DIMMED_ALPHA
 
       // focus halo
       if (isFocus || isKbd) {
@@ -246,7 +278,7 @@ export function GraphCanvas(props: GraphCanvasProps) {
         ctx.fillStyle = t.accent
         ctx.globalAlpha = 0.16
         ctx.fill()
-        ctx.globalAlpha = on ? 1 : 0.2
+        ctx.globalAlpha = on ? 1 : DIMMED_ALPHA
       }
 
       ctx.beginPath()
@@ -310,28 +342,43 @@ export function GraphCanvas(props: GraphCanvasProps) {
           : zoomedEnough
             ? LABEL_CAP
             : 26
-      let shown = 0
       ctx.font = '11px Inter, system-ui, sans-serif'
       ctx.textAlign = 'center'
       ctx.textBaseline = 'top'
-      for (const c of prioritized) {
-        if (shown >= cap) break
-        const relevant =
-          c.node.id === selectedId ||
-          c.node.id === activeId ||
-          (searchMatchIds?.has(c.node.id) ?? false) ||
-          (highlightSet?.has(c.node.id) ?? false)
-        if (showSelected && !relevant) continue
-        const label = c.node.label.length > 26 ? c.node.label.slice(0, 25) + '…' : c.node.label
-        const ty = c.s.y + c.r + 2
+
+      // 19B: measure first, then keep the labels that do not collide. Priority
+      // order is already relevance, so a dropped label is always the less
+      // important of the pair.
+      const measured = prioritized
+        .filter((c) => {
+          if (!showSelected) return true
+          return (
+            c.node.id === selectedId ||
+            c.node.id === activeId ||
+            (searchMatchIds?.has(c.node.id) ?? false) ||
+            (highlightSet?.has(c.node.id) ?? false)
+          )
+        })
+        .map((c) => {
+          const label = c.node.label.length > 26 ? c.node.label.slice(0, 25) + '…' : c.node.label
+          const width = ctx.measureText(label).width
+          const ty = c.s.y + c.r + 2
+          return {
+            ...c,
+            label,
+            ty,
+            box: { x: c.s.x - width / 2 - 2, y: ty - 1, w: width + 4, h: LABEL_LINE_HEIGHT },
+          }
+        })
+
+      for (const c of placeLabels(measured, cap)) {
         ctx.globalAlpha = 1
         ctx.fillStyle = t.bg
         ctx.lineWidth = 3
         ctx.strokeStyle = t.bg
-        ctx.strokeText(label, c.s.x, ty)
+        ctx.strokeText(c.label, c.s.x, c.ty)
         ctx.fillStyle = highlightSet && !highlightSet.has(c.node.id) ? t.muted : t.ink
-        ctx.fillText(label, c.s.x, ty)
-        shown++
+        ctx.fillText(c.label, c.s.x, c.ty)
       }
     }
     ctx.globalAlpha = 1
@@ -344,6 +391,8 @@ export function GraphCanvas(props: GraphCanvasProps) {
     focusId,
     kbdFocusId,
     searchMatchIds,
+    selectedEdgeId,
+    hoveredId,
     settings.showLabels,
     activeId,
     nodeRadius,
@@ -404,11 +453,29 @@ export function GraphCanvas(props: GraphCanvasProps) {
       },
       centerOn: (id) => {
         const p = posById.get(id)
-        if (p) {
-          cameraRef.current.x = p.x
-          cameraRef.current.y = p.y
+        if (!p) return
+        const from = { x: cameraRef.current.x, y: cameraRef.current.y }
+        const to = { x: p.x, y: p.y }
+        // 19B: the camera flies rather than teleporting, so you keep your
+        // bearings — unless the reader asked for no motion, in which case it
+        // simply arrives.
+        if (prefersReducedMotion()) {
+          cameraRef.current.x = to.x
+          cameraRef.current.y = to.y
           draw()
+          return
         }
+        cancelAnimationFrame(flightRef.current)
+        const start = performance.now()
+        const step = () => {
+          const progress = (performance.now() - start) / FLIGHT_MS
+          const at = tweenCamera(from, to, progress)
+          cameraRef.current.x = at.x
+          cameraRef.current.y = at.y
+          draw()
+          if (progress < 1) flightRef.current = requestAnimationFrame(step)
+        }
+        flightRef.current = requestAnimationFrame(step)
       },
     }
     apiRef(api)
@@ -436,6 +503,27 @@ export function GraphCanvas(props: GraphCanvasProps) {
       return best
     },
     [nodes, posById, nodeRadius, screenToWorld],
+  )
+
+  /**
+   * The edge nearest a point (19B). Nodes are tested first by every caller, so
+   * this only ever runs on the space between them — which is exactly where an
+   * edge is the thing you meant to click.
+   */
+  const edgeAtPoint = useCallback(
+    (sx: number, sy: number) =>
+      edgeAt(
+        { x: sx, y: sy },
+        {
+          edges,
+          screenOf: (id) => {
+            const p = posById.get(id)
+            return p ? worldToScreen(p.x, p.y) : undefined
+          },
+          threshold: EDGE_HIT_PX,
+        },
+      ),
+    [edges, posById, worldToScreen],
   )
 
   /* ---------------- pointer interaction ---------------- */
@@ -468,7 +556,10 @@ export function GraphCanvas(props: GraphCanvasProps) {
     if (!drag) {
       const hit = nodeAt(sx, sy)
       onHover(hit?.id ?? null, hit ? { x: e.clientX, y: e.clientY } : undefined)
-      if (canvasRef.current) canvasRef.current.style.cursor = hit ? 'pointer' : 'grab'
+      if (canvasRef.current) {
+        const overEdge = !hit && !!edgeAtPoint(sx, sy)
+        canvasRef.current.style.cursor = hit || overEdge ? 'pointer' : 'grab'
+      }
       return
     }
     if (drag.kind === 'pan') {
@@ -497,13 +588,20 @@ export function GraphCanvas(props: GraphCanvasProps) {
         if (node) {
           setKbdFocusId(drag.id)
           onSelect(drag.id)
+          onSelectEdge(null)
         }
       }
     } else if (drag.kind === 'pan') {
       const rect = canvasRef.current!.getBoundingClientRect()
       const movedX = Math.abs(e.clientX - rect.left - drag.startX)
       const movedY = Math.abs(e.clientY - rect.top - drag.startY)
-      if (movedX < 3 && movedY < 3) onSelect(null) // click empty clears
+      if (movedX < 3 && movedY < 3) {
+        // an edge is only reachable where no node is: node → edge → nothing
+        const rect = canvasRef.current?.getBoundingClientRect()
+        const hitEdge = rect ? edgeAtPoint(e.clientX - rect.left, e.clientY - rect.top) : null
+        if (hitEdge) onSelectEdge(hitEdge.id)
+        else onSelect(null)
+      }
     }
   }
 

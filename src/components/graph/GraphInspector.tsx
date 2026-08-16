@@ -8,7 +8,7 @@ import {
 } from '@/lib/graph/GraphQueryService'
 import { RELATIONSHIP_LABEL } from './graphLabels'
 import { GraphNodeIcon } from './graphVisuals'
-import { IcExternal, IcEye, IcGraph, IcSplit, IcTag, IcX, IcCopy } from '@/components/Icons'
+import { IcExternal, IcEye, IcGraph, IcPin, IcSplit, IcTag, IcX, IcCopy } from '@/components/Icons'
 
 interface GraphInspectorProps {
   node: LatticeGraphNode
@@ -19,6 +19,12 @@ interface GraphInspectorProps {
   onSelectNode: (id: string) => void
   onClose: () => void
   onCopyLink: (node: LatticeGraphNode) => void
+  /** whether this node's position is currently pinned (19B) */
+  /** the shell decides docked or floating; the panel just wears it (19B) */
+  className: string
+  pinned: boolean
+  onTogglePin: () => void
+  onSelectNeighbourhood: () => void
 }
 
 /**
@@ -35,16 +41,17 @@ export function GraphInspector({
   onSelectNode,
   onClose,
   onCopyLink,
+  className,
+  pinned,
+  onTogglePin,
+  onSelectNeighbourhood,
 }: GraphInspectorProps) {
   const groups = useMemo(() => groupedNeighbors(data, node.id), [data, node.id])
   const incoming = useMemo(() => incomingEdges(data, node.id).length, [data, node.id])
   const outgoing = useMemo(() => outgoingEdges(data, node.id).length, [data, node.id])
 
   return (
-    <aside
-      className="flex h-full w-72 flex-none flex-col border-l border-bord bg-panel"
-      aria-label="Graph inspector"
-    >
+    <aside className={className} aria-label="Graph inspector">
       <div className="flex items-start gap-2 border-b border-bord p-3">
         <span className="mt-0.5 flex h-7 w-7 flex-none items-center justify-center rounded-lg border border-bord bg-panel2">
           <GraphNodeIcon icon={node.icon} size={14} />
@@ -102,6 +109,19 @@ export function GraphInspector({
           </button>
           <button className="btn justify-start" onClick={() => onFocusLocal(node)}>
             <IcGraph size={13} /> Focus local graph
+          </button>
+          <button className="btn justify-start" onClick={onSelectNeighbourhood}>
+            <IcGraph size={13} /> Select neighbourhood
+          </button>
+          {/* 19B: a dragged node pins where it was dropped, and until now
+              nothing could release it — the position outlived the intent. */}
+          <button
+            className="btn justify-start"
+            aria-pressed={pinned}
+            title={pinned ? 'Let the layout place this node again' : 'Keep this node where it is'}
+            onClick={onTogglePin}
+          >
+            <IcPin size={13} /> {pinned ? 'Unpin position' : 'Pin position'}
           </button>
           <div className="flex gap-1.5">
             <button className="btn flex-1 justify-start" onClick={() => onCopyLink(node)}>
