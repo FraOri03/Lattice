@@ -1,4 +1,5 @@
 import { nid } from '@/lib/id'
+import { vaultKey } from '@/lib/storage/vaultScope'
 
 /**
  * Who this browser is, read from local storage and nothing else.
@@ -18,7 +19,13 @@ export interface CollabIdentity {
   avatarUrl: string
 }
 
-const GUEST_KEY = 'lattice-guest-id'
+/**
+ * Scoped like every other local store (#257). Unscoped, one anonymous id
+ * was shared by every person who ever used this browser without signing in,
+ * so two of them appeared to presence and comments as the same author — and
+ * the id outlived the vault it had signed things in.
+ */
+const GUEST_KEY = vaultKey('lattice-guest-id')
 
 /** Stable identity for presence/comments: the signed-in account, else a per-browser guest. */
 export function currentIdentity(): CollabIdentity {

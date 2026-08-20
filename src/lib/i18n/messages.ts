@@ -109,6 +109,8 @@ export const en = {
     signIn: 'Sign in',
     signInTitle: 'Sign in',
     signOut: 'Sign out',
+    exitGuest: 'Exit guest mode',
+    exitGuestTitle: 'Leave guest mode and go back to the login screen',
     accountTitle: (name: string) => `${name} — account`,
     localOnlyAccount: 'local-only account',
     connectedServices: 'Connected services',
@@ -1091,6 +1093,20 @@ export const en = {
         'Files mirrored to Drive are protected by your Google account, with whatever second factor it already enforces.',
       protectionServer:
         'When realtime is configured, the server verifies your Google token and mints the role itself: the browser’s claim about who it is is never trusted.',
+      guestTitle: 'Guest session',
+      guestBody:
+        'This browser is being used without an account. Everything you make stays in a guest vault on this device, and signing in takes it with you. Leaving guest mode brings the login screen back — it keeps the vault, it does not delete it.',
+      exitGuest: 'Exit guest mode',
+      forgetTitle: 'Forget this device',
+      forgetBody:
+        'Deletes this vault from this browser: the projects, the document bodies and asset binaries in IndexedDB, the collaboration records, the Drive bookkeeping, and the GitHub and Gemini keys stored here. Anything mirrored to Drive stays in Drive. Nothing else on this machine is touched — another account’s vault is not this session’s to delete.',
+      forget: 'Forget this device',
+      forgetConfirmTitle: 'Delete this vault from this browser?',
+      forgetConfirmBody:
+        'This cannot be undone from here. Whatever has not reached Drive is gone with it.',
+      forgetConfirm: 'Delete it',
+      forgetBlocked: (n: number) =>
+        `${n} database${n === 1 ? ' is' : 's are'} still open in another tab. Close the other tabs and run this again.`,
     },
     notifications: {
       intro:
@@ -1263,6 +1279,8 @@ export const it: Catalog = {
     signIn: 'Accedi',
     signInTitle: 'Accedi',
     signOut: 'Esci',
+    exitGuest: 'Esci dalla modalità ospite',
+    exitGuestTitle: 'Lascia la modalità ospite e torna alla schermata di accesso',
     accountTitle: (name) => `${name} — account`,
     localOnlyAccount: 'account solo locale',
     connectedServices: 'Servizi collegati',
@@ -2141,6 +2159,22 @@ export const it: Catalog = {
         'I file replicati su Drive sono protetti dal tuo account Google, con il secondo fattore che già impone.',
       protectionServer:
         'Quando il realtime è configurato, è il server a verificare il tuo token Google e a emettere il ruolo: quello che il browser dichiara di essere non viene mai creduto.',
+      guestTitle: 'Sessione ospite',
+      guestBody:
+        'Questo browser sta lavorando senza account. Tutto quello che crei resta in un vault ospite su questo dispositivo, e accedendo se lo porta con sé. Uscire dalla modalità ospite fa tornare la schermata di accesso: il vault resta, non viene cancellato.',
+      exitGuest: 'Esci dalla modalità ospite',
+      forgetTitle: 'Dimentica questo dispositivo',
+      forgetBody:
+        'Cancella questo vault da questo browser: i progetti, i corpi dei documenti e i binari degli asset in IndexedDB, i record di collaborazione, la contabilità di Drive e le chiavi GitHub e Gemini salvate qui. Quello che è già su Drive resta su Drive. Nient’altro su questa macchina viene toccato: il vault di un altro account non è di questa sessione da cancellare.',
+      forget: 'Dimentica questo dispositivo',
+      forgetConfirmTitle: 'Cancellare questo vault da questo browser?',
+      forgetConfirmBody:
+        'Da qui non si torna indietro. Quello che non è arrivato su Drive se ne va con lui.',
+      // "Elimina" and not "Cancella": the dialog's other button reads "Cancel",
+      // and in Italian the two look like the same word and mean the opposite
+      forgetConfirm: 'Elimina',
+      forgetBlocked: (n) =>
+        `${n} database ${n === 1 ? 'è ancora aperto' : 'sono ancora aperti'} in un’altra scheda. Chiudi le altre schede e riprova.`,
     },
     notifications: {
       intro:

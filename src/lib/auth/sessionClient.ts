@@ -213,6 +213,25 @@ class SessionClient {
   }
 
   /**
+   * End a session no one in this browser is signed in to (#257).
+   *
+   * The cookie is HttpOnly, so the only local evidence of a session is the
+   * stored account — and the two can come apart. {@link revoke} swallows
+   * every network failure, so a sign-out performed offline clears the account
+   * and leaves the session alive; clearing site data by hand does the same.
+   * What is left is a browser that shows the login screen while `/api/shared`
+   * and `/api/invitations` still answer for the departed user: their shared
+   * projects, the addresses their invitations were sent to, and the ability
+   * to accept those invitations on their behalf.
+   *
+   * Nothing in Lattice restores an account FROM the cookie, so a session with
+   * no account is unusable as well as unsafe. It is ended, not adopted.
+   */
+  async discardOrphanSession(): Promise<void> {
+    await this.revoke('logout')
+  }
+
+  /**
    * Sign out everywhere. Returns how many sessions ended, so the UI can
    * report what happened instead of guessing.
    */

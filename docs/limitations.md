@@ -209,6 +209,18 @@ _Honesty gap tracked in [#9](https://github.com/FraOri03/Lattice/issues/9)._
 
 - Vault **metadata lives in localStorage** (~5 MB budget); binaries and document bodies
   live in IndexedDB.
+- **One vault per account, and signing out does not delete it.** Every storage name is
+  namespaced by the account signed in when the page loaded (`lib/storage/vaultScope`), so
+  the next person to use the browser cannot open the last one's projects through the app —
+  but the bytes stay on the machine, and devtools do not go through the app.
+  **Settings → Security → Forget this device** is the delete: it removes the CURRENT
+  vault's localStorage keys and IndexedDB databases and nothing else. Another account's
+  vault on the same browser is deliberately out of its reach — a session cannot reach into
+  its neighbour's storage even to destroy it — so a shared machine needs one pass per
+  account, each signed in. Anything already mirrored to Drive stays in Drive.
+- **A guest vault outlives the guest.** "Continue without an account" writes to a vault of
+  its own, kept so that signing in can adopt the work rather than drop it. Leaving guest
+  mode brings the login screen back but does not erase it; "Forget this device" does.
 - **GitHub sync is text-only** (code documents); binary assets are out of scope by design.
 - **No responsive / mobile story** — fixed-width panels starve the canvas below ~1100 px;
   Monaco/Sheet/Presentation are unusable on a phone. Explicit device tiers are roadmap work

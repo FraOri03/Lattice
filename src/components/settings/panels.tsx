@@ -17,6 +17,9 @@ import { NOTIFICATION_EVENTS } from '@/lib/collab/notificationPrefs'
 import { useStore } from '@/store/useStore'
 import { useUiStore } from '@/store/useUiStore'
 import { useI18n, useLocale, useTimeAgo } from '@/lib/i18n'
+import { forgetThisDevice } from '@/lib/storage/forgetDevice'
+import { confirmDialog } from '@/components/ui/ConfirmDialog'
+import { toast } from '@/components/ui/Toaster'
 import { setThemeAnimated } from '@/lib/theme/animateTheme'
 import { resolveTheme } from '@/lib/theme/appearance'
 import type {
@@ -45,6 +48,7 @@ import {
   IcLogOut,
   IcMic,
   IcRefresh,
+  IcTrash,
   IcUpload,
   IcUser,
   IcUsers,
@@ -619,9 +623,57 @@ function ConnectionsPanel() {
 function SecurityPanel() {
   const t = useI18n()
   const sec = t.settings.security
-  const { account, authKind, signOut } = useAccount()
+  const { account, authKind, loginSkipped, signOut, exitGuest } = useAccount()
   const sync = useSyncStore()
+  const [forgetting, setForgetting] = useState(false)
   const driveConnected = authKind === 'google' && sync.provider === 'google-drive'
+
+  /**
+   * The delete that had never existed (#257): scoping stopped one account
+   * READING another's vault and left every byte of it on the machine.
+   *
+   * Signing out first is not politeness. The wipe closes the IndexedDB
+   * connections it is about to delete, and a sync engine still running would
+   * reopen them — and then push an empty vault at a Drive that is not empty.
+   */
+  const forget = async () => {
+    const ok = await confirmDialog({
+      title: sec.forgetConfirmTitle,
+      body: sec.forgetConfirmBody,
+      confirmLabel: sec.forgetConfirm,
+      danger: true,
+    })
+    if (!ok) return
+    setForgetting(true)
+    try {
+      syncEngine.stop()
+      const result = await forgetThisDevice()
+      if (result.blocked.length) {
+        // the only outcome with a reader still on the page to tell
+        toast.warning(sec.forgetTitle, sec.forgetBlocked(result.blocked.length))
+        setForgetting(false)
+        return
+      }
+      /**
+       * End the session as well, whichever kind it is. Forgetting the device
+       * means the machine stops remembering this person, and a signed-in shell
+       * over a vault that no longer exists is neither state.
+       *
+       * No success toast: everything in memory belongs to the deleted vault and
+       * the scope resolves once per page load (`vaultScope`), so this reloads —
+       * which would take the message with it. The login screen is the evidence.
+       */
+      if (account) {
+        await authService.signOut()
+        window.location.reload()
+      } else {
+        exitGuest() // clears the guest flag, then reloads for the same reason
+      }
+    } catch (err) {
+      setForgetting(false)
+      toast.error(sec.forgetTitle, err instanceof Error ? err.message : String(err))
+    }
+  }
 
   return (
     <>
@@ -642,6 +694,16 @@ function SecurityPanel() {
         </div>
       </Card>
 
+      {/* guest mode used to have no exit at all: one click of "Continue
+          without an account" and the login screen never came back (#257) */}
+      {!account && loginSkipped && (
+        <Card title={sec.guestTitle} body={sec.guestBody}>
+          <button className="btn" onClick={exitGuest}>
+            <IcLogOut size={12} /> {sec.exitGuest}
+          </button>
+        </Card>
+      )}
+
       {/* the one revocation this build can really perform */}
       <Card title={sec.revokeTitle} body={sec.revokeBody}>
         <button
@@ -651,6 +713,12 @@ function SecurityPanel() {
           onClick={() => void authService.disconnectDrive()}
         >
           <IcLock size={12} /> {sec.revoke}
+        </button>
+      </Card>
+
+      <Card title={sec.forgetTitle} body={sec.forgetBody}>
+        <button className="btn" disabled={forgetting} onClick={() => void forget()}>
+          <IcTrash size={12} /> {sec.forget}
         </button>
       </Card>
 

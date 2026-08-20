@@ -71,6 +71,13 @@ const v4 = {
 let store: typeof import('./useStore')
 
 beforeAll(async () => {
+  /**
+   * Signed in, because that is who owns a pre-11.3 vault: since #257 the
+   * unsuffixed keys are claimed by an ACCOUNT scope, and an anonymous one is
+   * given an empty namespace instead — a browser that had signed out before
+   * upgrading must not inherit the vault of whoever used it last.
+   */
+  localStorage.setItem('lattice-account', JSON.stringify({ id: 'usr_upgrader' }))
   localStorage.setItem('lattice-vault-v1', JSON.stringify(v4))
   // imported AFTER the seed: persist rehydrates when the store is created
   store = await import('./useStore')

@@ -103,7 +103,31 @@ sound while the token was persisted, and wrong the moment it was not.
 Without a replacement, every reload would have announced an expired Drive
 session and demanded a reconnect. `lattice-drive-consent` is that
 replacement: a boolean fact about this browser, which grants whoever reads
-it nothing.
+it nothing — scoped per account since #257, because consent is something one
+person granted over one Drive, and unscoped it told the next account here
+that it already held permission nobody had asked it for.
+
+## A session with nobody signed in to it
+
+The cookie is HttpOnly, so the only local evidence that a session exists is
+the stored account — and the two can come apart. `SessionClient.revoke`
+swallows every network failure on purpose (a sign-out must not leave a UI
+that believes it is still signed in), so a sign-out performed offline clears
+the account and leaves the session alive on the server. Clearing site data by
+hand does the same, from the other end.
+
+What is left is a browser that shows the login screen while `/api/shared` and
+`/api/invitations` still answer for whoever left: their shared projects, the
+addresses their invitations were sent to, and a button that accepts one
+(#257).
+
+Two things close that. `AccountProvider` calls
+`sessionClient.discardOrphanSession()` on any boot with no stored account —
+nothing in Lattice restores an account FROM the cookie, so a session with no
+account is unusable as well as unsafe, and it is ended rather than adopted.
+And `sharedIndex` refuses to ask at all without a stored account, so the
+window before the revocation lands is not a window in which the answer is
+rendered.
 
 ## Honest limits
 

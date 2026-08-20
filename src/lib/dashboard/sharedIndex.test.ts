@@ -26,8 +26,12 @@ vi.mock('@/lib/auth/sessionClient', () => ({
   },
 }))
 
+/** Whether this browser has an account of its own, per test. */
+let storedAccount: { id: string } | null = { id: 'usr_ada' }
+
 vi.mock('@/lib/auth/AuthService', () => ({
   authService: { getAccessToken: async () => 'tok' },
+  loadStoredAccount: () => storedAccount,
 }))
 
 const { sharedIndex } = await import('./sharedIndex')
@@ -54,6 +58,7 @@ function deferredPost(): void {
 
 describe('sharedIndex', () => {
   beforeEach(() => {
+    storedAccount = { id: 'usr_ada' }
     post = vi.fn<PostFn>(async () => replyWith(index()))
     sharedIndex.reset()
   })
@@ -129,5 +134,41 @@ describe('sharedIndex', () => {
     await sharedIndex.load()
     expect(sharedIndex.current().unavailable).toBe(true)
     expect(warn).not.toHaveBeenCalled()
+  })
+
+  /**
+   * #257 — the credential this travels on is an HttpOnly cookie, so a browser
+   * whose sign-out never reached the network is locally signed out and still
+   * server-authenticated. Asking at all was the leak: the reply would have
+   * been the departed user's projects and the addresses their invitations
+   * were sent to, rendered under a login screen.
+   */
+  describe('with no account in this browser', () => {
+    it('does not ask the server who it is', async () => {
+      storedAccount = null
+      await sharedIndex.load()
+      expect(post).not.toHaveBeenCalled()
+      expect(sharedIndex.current()).toMatchObject({ loaded: true, unavailable: true })
+      expect(sharedIndex.current().index.projects).toEqual([])
+    })
+
+    it('refuses to answer an invitation', async () => {
+      storedAccount = null
+      const outcome = await sharedIndex.accept('inv_1')
+      expect(outcome.ok).toBe(false)
+      expect(post).not.toHaveBeenCalled()
+    })
+
+    it('asks again once somebody signs in', async () => {
+      storedAccount = null
+      await sharedIndex.load()
+      expect(post).not.toHaveBeenCalled()
+
+      storedAccount = { id: 'usr_ada' }
+      sharedIndex.reset()
+      await sharedIndex.load()
+      expect(post).toHaveBeenCalledTimes(1)
+      expect(sharedIndex.current().index.addresses).toEqual(['ada@example.com'])
+    })
   })
 })

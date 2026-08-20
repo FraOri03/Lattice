@@ -16,7 +16,7 @@ import { IcCloud, IcLogOut, IcSettings, IcUser } from '@/components/Icons'
  * them, so there is exactly one place to change each of them.
  */
 export function ProfileMenu() {
-  const { account, authKind, signIn, signOut } = useAccount()
+  const { account, authKind, loginSkipped, signIn, signOut, exitGuest } = useAccount()
   const sync = useSyncStore()
   const t = useI18n()
   const timeAgo = useTimeAgo()
@@ -27,9 +27,25 @@ export function ProfileMenu() {
 
   if (!account) {
     return (
-      <button className="btn" onClick={() => void signIn()} title={t.profile.signInTitle}>
-        <IcUser size={13} /> {t.profile.signIn}
-      </button>
+      <div className="flex flex-none items-center gap-1">
+        <button className="btn" onClick={() => void signIn()} title={t.profile.signInTitle}>
+          <IcUser size={13} /> {t.profile.signIn}
+        </button>
+        {/* the way out of "continue without an account" (#257). Until this
+            existed the only control here was "Sign in", so a browser that had
+            once skipped the login screen never showed it again — and every
+            later visitor landed in the same guest vault. */}
+        {loginSkipped && (
+          <button
+            className="icon-btn"
+            onClick={exitGuest}
+            title={t.profile.exitGuestTitle}
+            aria-label={t.profile.exitGuest}
+          >
+            <IcLogOut size={13} />
+          </button>
+        )}
+      </div>
     )
   }
 
