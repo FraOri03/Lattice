@@ -26,6 +26,13 @@ import {
  * becoming a third surface. That is what lets closing it put you back exactly
  * where you were — the rest of the URL never went anywhere.
  *
+ * Ids ride SHORT: `nid()` stamps a type prefix on every id it mints
+ * (`proj_`, `board_`, `pres_`…) and inside the URL that prefix is dead weight,
+ * because the param name already carries the type. The serializer drops it and
+ * `resolveNav` puts it back, which takes ~16 characters off a full
+ * project·board·entity link without renaming a single stored id. Both forms
+ * are accepted on the way in, so every link written before this keeps working.
+ *
  * Navigable identity inside a project is deliberately coarse: transient things
  * (card selection, drag positions, scroll, panel toggles) are NOT part of it,
  * so Back/Forward move between meaningful places instead of every
@@ -107,6 +114,54 @@ export function isEntityKind(x: string | undefined | null): x is NavEntityKind {
   return !!x && (ENTITY_KINDS as readonly string[]).includes(x)
 }
 
+/** Everything the URL carries an id for. */
+type PrefixedId = NavEntityKind | 'project' | 'board'
+
+/**
+ * The type prefix `nid()` stamps onto each kind of id.
+ *
+ * Note `present` → `pres_`: the URL's kind token and the id's prefix are
+ * genuinely different strings, which is why this is a map rather than a
+ * `${kind}_` template.
+ */
+const ID_PREFIX: Record<PrefixedId, string> = {
+  project: 'proj_',
+  board: 'board_',
+  note: 'note_',
+  doc: 'doc_',
+  code: 'code_',
+  sheet: 'sheet_',
+  present: 'pres_',
+  asset: 'asset_',
+}
+
+/**
+ * The id as the URL writes it: without its type prefix. An id that never had
+ * one (the seeded `b_welcome`, `n_welcome`) passes through untouched, and so
+ * does a prefix with nothing after it.
+ */
+function shortId(thing: PrefixedId, id: string): string {
+  const prefix = ID_PREFIX[thing]
+  return id.startsWith(prefix) && id.length > prefix.length
+    ? id.slice(prefix.length)
+    : id
+}
+
+/**
+ * What a URL token can mean, in resolution order: the token exactly as
+ * written, then the token with its prefix restored.
+ *
+ * Bare-first is what lets the two forms coexist. A seeded id like `b_welcome`
+ * means itself, not `board_b_welcome`; a pre-shortening link still says
+ * `p=proj_a` and resolves on the first try. They cannot collide: `nid()` mints
+ * `<prefix>_<base36>`, so a shortened id is never also somebody else's whole
+ * id.
+ */
+function idCandidates(thing: PrefixedId, token: string): string[] {
+  const prefix = ID_PREFIX[thing]
+  return token.startsWith(prefix) ? [token] : [token, prefix + token]
+}
+
 /** Raw, unvalidated params straight off the URL. */
 export interface RawNav {
   projectId?: string
@@ -159,12 +214,14 @@ export function serializeNav(nav: ResolvedNavigation | null): string {
     if (d) q.set('d', d)
   }
   if (nav.surface === 'project' && nav.projectId) {
-    q.set('p', nav.projectId)
+    q.set('p', shortId('project', nav.projectId))
     // split is a layout, serialized as the legacy `m=split` token so
     // pre-refactor links keep resolving; otherwise the section is the mode
     q.set('m', nav.split ? SPLIT_TOKEN : nav.mode)
-    if (nav.boardId) q.set('b', nav.boardId)
-    if (nav.entity) q.set('e', `${nav.entity.kind}.${nav.entity.id}`)
+    if (nav.boardId) q.set('b', shortId('board', nav.boardId))
+    if (nav.entity) {
+      q.set('e', `${nav.entity.kind}.${shortId(nav.entity.kind, nav.entity.id)}`)
+    }
   }
   // settings rides over either surface, so it survives a dashboard URL that is
   // otherwise empty — `?s=appearance` is a real, shareable address
@@ -220,13 +277,19 @@ export interface NavSnapshot {
  *   board outside the project          → that project's first board
  *   missing entity                     → dropped (its mode still opens, empty)
  *   unknown settings section           → dropped (settings simply stays shut)
+ *
+ * Every id is looked up in both its short and its prefixed form, so `p=a` and
+ * `p=proj_a` are the same address.
  */
 export function resolveNav(raw: RawNav, snap: NavSnapshot): ResolvedNavigation {
   // settings is validated on its own: it rides over whichever surface the rest
   // of the params resolve to, and an unknown section is simply dropped rather
   // than opening the screen somewhere arbitrary
   const settings = isSettingsSection(raw.settings) ? raw.settings : undefined
-  if (!raw.projectId || !snap.hasProject(raw.projectId)) {
+  const projectId = raw.projectId
+    ? idCandidates('project', raw.projectId).find((id) => snap.hasProject(id))
+    : undefined
+  if (!projectId) {
     // the dashboard is where `d` means anything; an unknown value degrades to
     // Home rather than leaving the surface addressed by a token nobody owns
     const destination = resolveDestination(raw.destination)
@@ -235,18 +298,19 @@ export function resolveNav(raw: RawNav, snap: NavSnapshot): ResolvedNavigation {
       ? { surface: 'dashboard', destination, settings }
       : { surface: 'dashboard', destination }
   }
-  const projectId = raw.projectId
   const boardId =
-    raw.boardId && snap.boardBelongsTo(raw.boardId, projectId)
-      ? raw.boardId
-      : snap.firstBoardOf(projectId)
+    (raw.boardId
+      ? idCandidates('board', raw.boardId).find((id) =>
+          snap.boardBelongsTo(id, projectId),
+        )
+      : undefined) ?? snap.firstBoardOf(projectId)
   let entity: NavState['entity']
-  if (
-    isEntityKind(raw.entityKind) &&
-    raw.entityId &&
-    snap.entityExists(raw.entityKind, raw.entityId, projectId)
-  ) {
-    entity = { kind: raw.entityKind, id: raw.entityId }
+  if (isEntityKind(raw.entityKind) && raw.entityId) {
+    const kind = raw.entityKind
+    const id = idCandidates(kind, raw.entityId).find((c) =>
+      snap.entityExists(kind, c, projectId),
+    )
+    if (id) entity = { kind, id }
   }
   // `m=split` is the layout, not a section: turn it into the split flag and
   // derive the underlying section from the open entity (or the Board).

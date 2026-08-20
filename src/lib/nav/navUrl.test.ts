@@ -19,10 +19,14 @@ import {
 
 const snapshot = (): NavSnapshot => ({
   hasProject: (id) => id === 'proj_a' || id === 'proj_b',
-  boardBelongsTo: (bid, pid) => bid === 'board_a1' && pid === 'proj_a',
+  // `b_welcome` is the shape of a SEEDED id: real, and with no `board_` prefix
+  // to drop. It is here so the short-id rules are tested against both shapes.
+  boardBelongsTo: (bid, pid) =>
+    (bid === 'board_a1' || bid === 'b_welcome') && pid === 'proj_a',
   firstBoardOf: (pid) => (pid === 'proj_a' ? 'board_a1' : 'board_b1'),
   entityExists: (kind, id, pid) =>
-    pid === 'proj_a' && kind === 'doc' && id === 'doc_1',
+    pid === 'proj_a' &&
+    ((kind === 'doc' && id === 'doc_1') || (kind === 'note' && id === 'n_welcome')),
 })
 
 /** Narrow a resolved navigation to the project surface (fails if it isn't). */
@@ -47,17 +51,18 @@ describe('serialize / parse round-trip', () => {
       entity: { kind: 'doc', id: 'doc_1' },
     })
     const search = serializeNav(nav)
-    expect(search).toContain('p=proj_a')
-    expect(search).toContain('m=doc')
-    expect(search).toContain('e=doc.doc_1')
+    // ids ride without their `nid()` type prefix — the param name is the type
+    expect(search).toBe('?p=a&m=doc&b=a1&e=doc.1')
     const raw = parseNav(search)
     expect(raw).toEqual({
-      projectId: 'proj_a',
+      projectId: 'a',
       mode: 'doc',
-      boardId: 'board_a1',
+      boardId: 'a1',
       entityKind: 'doc',
-      entityId: 'doc_1',
+      entityId: '1',
     })
+    // …and the ids come back whole, because resolve is what restores them
+    expect(resolveNav(raw, snapshot())).toEqual(nav)
   })
 
   it('serializes empty state to an empty string', () => {
@@ -103,7 +108,7 @@ describe('settings rides over the surface', () => {
       ...projectNav({ projectId: 'proj_a', mode: 'doc', boardId: 'board_a1' }),
       settings: 'storage',
     })
-    expect(search).toContain('p=proj_a')
+    expect(search).toContain('p=a')
     expect(search).toContain('s=storage')
     const nav = resolveNav(parseNav(search), snapshot())
     expect(project(nav).projectId).toBe('proj_a')
@@ -334,5 +339,63 @@ describe('the dashboard destinations ride as d=', () => {
     expect(key('home')).toBe('dashboard')
     expect(key('trash')).toBe('dashboard|trash')
     expect(new Set([key('home'), key('trash'), key('starred')]).size).toBe(3)
+  })
+})
+
+/**
+ * Short ids (the URL half of the id, without `nid()`'s type prefix).
+ *
+ * Two rules carry the whole feature: the serializer writes the short form, and
+ * `resolveNav` accepts BOTH — so every link ever written keeps resolving, and
+ * ids that never had a prefix are never given one.
+ */
+describe('ids ride short', () => {
+  const full = projectNav({
+    projectId: 'proj_a',
+    mode: 'doc',
+    boardId: 'board_a1',
+    entity: { kind: 'doc', id: 'doc_1' },
+  })
+
+  it('drops the type prefix, because the param name already carries it', () => {
+    expect(serializeNav(full)).toBe('?p=a&m=doc&b=a1&e=doc.1')
+  })
+
+  it('still resolves a link written in the long form', () => {
+    const legacy = resolveNav(parseNav('?p=proj_a&m=doc&b=board_a1&e=doc.doc_1'), snapshot())
+    expect(legacy).toEqual(full)
+    // the two spellings are the same place, so Back does not stop at both
+    expect(navKey(legacy)).toBe(navKey(resolveNav(parseNav(serializeNav(full)), snapshot())))
+  })
+
+  it('re-serializes a long link short, so opening one upgrades it', () => {
+    const nav = resolveNav(parseNav('?p=proj_a&m=doc&b=board_a1&e=doc.doc_1'), snapshot())
+    expect(serializeNav(nav)).toBe('?p=a&m=doc&b=a1&e=doc.1')
+  })
+
+  it('leaves a prefix-less id alone instead of inventing one for it', () => {
+    // `b_welcome` does not start with `board_`, so there is nothing to drop —
+    // and nothing to put back. The naive "always re-add the prefix" rule would
+    // look for `board_b_welcome` here and fall back to the first board.
+    const nav = projectNav({
+      projectId: 'proj_a',
+      mode: 'board',
+      boardId: 'b_welcome',
+      entity: { kind: 'note', id: 'n_welcome' },
+    })
+    const search = serializeNav(nav)
+    expect(search).toBe('?p=a&m=board&b=b_welcome&e=note.n_welcome')
+    expect(resolveNav(parseNav(search), snapshot())).toEqual(nav)
+  })
+
+  it('degrades a short id that matches nothing, same as any unknown id', () => {
+    expect(resolveNav(parseNav('?p=ghost'), snapshot())).toEqual(DASHBOARD_NAV)
+    const nav = project(resolveNav(parseNav('?p=a&m=board&b=ghost'), snapshot()))
+    expect(nav.boardId).toBe('board_a1')
+  })
+
+  it('is shorter — which is the entire point', () => {
+    const long = '?p=proj_a&m=doc&b=board_a1&e=doc.doc_1'
+    expect(serializeNav(full).length).toBeLessThan(long.length)
   })
 })
