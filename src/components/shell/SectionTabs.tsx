@@ -4,15 +4,28 @@ import { useWorkspaceLayoutStore } from '@/store/workspaceLayoutStore'
 import { splitAvailable } from '@/lib/layout/tiers'
 import { useViewportTier } from '@/lib/layout/useViewportTier'
 import type { ViewMode } from '@/types/model'
-import { SECTION_METAS, type WorkspaceSection } from '@/types/workspace'
+import {
+  SWITCHER_CLUSTERS,
+  sectionMeta,
+  type PlannedMeta,
+  type PlannedSurface,
+  type SwitcherItem,
+  type WorkspaceSection,
+} from '@/types/workspace'
 import { useI18n } from '@/lib/i18n'
 import {
+  IcBezier,
   IcBoard,
   IcCamera,
   IcCode,
+  IcComfyUI,
   IcDoc,
+  IcFilm,
   IcGraph,
+  IcPages,
+  IcPalette,
   IcPresentation,
+  IcSparkles,
   IcSplit,
   IcTable,
 } from '@/components/Icons'
@@ -26,18 +39,34 @@ const SECTION_ICONS: Record<WorkspaceSection, React.ReactNode> = {
   photo: <IcCamera size={13} />,
 }
 
+const PLANNED_ICONS: Record<PlannedSurface, React.ReactNode> = {
+  comfyui: <IcComfyUI size={13} />,
+  aiDashboard: <IcSparkles size={13} />,
+  trace: <IcBezier size={13} />,
+  forge: <IcPalette size={13} />,
+  folio: <IcPages size={13} />,
+  flux: <IcFilm size={13} />,
+}
+
 /**
- * The top navigation: three segmented clusters —
- * [Split] · [Board · Graph] · [Document · Sheet · Presentation · Code · Photo].
+ * The top navigation: five segmented clusters —
+ * [Split] · [Board · Graph] · [Document · Sheet · Presentation · Code] ·
+ * [ComfyUI · AI dashboard] · [Trace · Forge · Photo · Folio · Flux].
  *
  * Split leads on its own because it is the odd one out: a LAYOUT that applies
  * on top of whatever else is selected, rather than a thing you select.
  *
- * Presentation only. Underneath, the three concepts stay separated (see
- * src/types/workspace.ts): the sections drive `viewMode`, Graph is a content
- * VIEW, and Split is a LAYOUT owned by `workspaceLayoutStore` — which is why
- * Split and a section can be active at the same time, and why Graph can occupy
- * the second pane while an editor holds the first.
+ * Underneath, the three concepts stay separated (see src/types/workspace.ts):
+ * the sections drive `viewMode`, Graph is a content VIEW, and Split is a
+ * LAYOUT owned by `workspaceLayoutStore` — which is why Split and a section can
+ * be active at the same time, and why Graph can occupy the second pane while an
+ * editor holds the first.
+ *
+ * The last two clusters are the AI and Creative suites, disabled: the space
+ * they will take is spent now rather than six times over as each ships. They
+ * are also the first thing to leave a narrow bar — a placeholder you cannot
+ * click is the cheapest thing to drop — which is why they hide on a container
+ * query rather than being unconditionally mounted.
  */
 export function SectionTabs() {
   const viewMode = useStore((s) => s.viewMode)
@@ -88,9 +117,6 @@ export function SectionTabs() {
     }
   }
 
-  const board = SECTION_METAS[0]
-  const rest = SECTION_METAS.slice(1)
-
   return (
     <div
       className="flex items-center gap-2"
@@ -118,7 +144,7 @@ export function SectionTabs() {
       </Cluster>
 
       <Cluster>
-        <SectionTab meta={board} active={viewMode === board.mode} onSelect={setViewMode} />
+        <SectionTab section="board" active={viewMode === 'board'} onSelect={setViewMode} />
         <Tab
           icon={<IcGraph size={13} />}
           label={t.modes.graph}
@@ -137,42 +163,59 @@ export function SectionTabs() {
         />
       </Cluster>
 
-      <Cluster>
-        {rest.map((meta) => (
-          <SectionTab
-            key={meta.section}
-            meta={meta}
-            active={viewMode === meta.mode}
-            onSelect={setViewMode}
-          />
-        ))}
-      </Cluster>
+      {SWITCHER_CLUSTERS.map((items, i) => (
+        // a cluster with nothing clickable in it goes away whole at the same
+        // width its members would have gone one by one
+        <Cluster key={i} planned={items.every(isPlanned)}>
+          {items.map((item) =>
+            item.kind === 'section' ? (
+              <SectionTab
+                key={item.section}
+                section={item.section}
+                active={viewMode === sectionMeta(item.section).mode}
+                onSelect={setViewMode}
+              />
+            ) : (
+              <PlannedTab key={item.planned.id} meta={item.planned} />
+            ),
+          )}
+        </Cluster>
+      ))}
     </div>
   )
 }
 
-function Cluster({ children }: { children: React.ReactNode }) {
+const isPlanned = (item: SwitcherItem) => item.kind === 'planned'
+
+function Cluster({ children, planned }: { children: React.ReactNode; planned?: boolean }) {
   return (
-    <div className="flex rounded-lg border border-bord bg-panel2 p-0.5">{children}</div>
+    <div
+      className={`rounded-lg border border-bord bg-panel2 p-0.5 ${
+        planned ? 'hidden @min-[64rem]:flex' : 'flex'
+      }`}
+    >
+      {children}
+    </div>
   )
 }
 
 function SectionTab({
-  meta,
+  section,
   active,
   onSelect,
 }: {
-  meta: (typeof SECTION_METAS)[number]
+  section: WorkspaceSection
   active: boolean
   onSelect: (mode: ViewMode) => void
 }) {
   const t = useI18n()
+  const meta = sectionMeta(section)
   // SECTION_METAS.label stays the untranslated source of truth (and keeps the
   // list testable without a DOM); the visible label is localised here.
   const label = t.modes[meta.mode]
   return (
     <Tab
-      icon={SECTION_ICONS[meta.section]}
+      icon={SECTION_ICONS[section]}
       label={label}
       active={active}
       onClick={() => onSelect(meta.mode)}
@@ -182,9 +225,37 @@ function SectionTab({
   )
 }
 
+/**
+ * A tab for an environment that does not exist yet. It is disabled, never
+ * pressed, and its tooltip names the phase that builds it instead of the
+ * "coming soon" that would be true of anything.
+ *
+ * It stays icon-only at every width: six more words would cost ~300px the bar
+ * does not have, and the words belong to features nobody can reach.
+ */
+function PlannedTab({ meta }: { meta: PlannedMeta }) {
+  const t = useI18n()
+  const label = t.modes[meta.id]
+  return (
+    <Tab
+      icon={PLANNED_ICONS[meta.id]}
+      label={label}
+      labelled={false}
+      hideWhenTight
+      active={false}
+      disabled
+      onClick={() => {}}
+      ariaLabel={t.topbar.plannedAria(label)}
+      title={t.topbar.plannedTitle(label, t.topbar.plannedDomain[meta.id], meta.phase)}
+    />
+  )
+}
+
 function Tab({
   icon,
   label,
+  labelled = true,
+  hideWhenTight,
   active,
   disabled,
   onClick,
@@ -193,6 +264,10 @@ function Tab({
 }: {
   icon: React.ReactNode
   label: string
+  /** false pins the tab to its icon — see PlannedTab */
+  labelled?: boolean
+  /** leaves the bar below 64rem, where every pixel belongs to a live surface */
+  hideWhenTight?: boolean
   active: boolean
   disabled?: boolean
   onClick: () => void
@@ -207,17 +282,19 @@ function Tab({
       aria-pressed={active}
       aria-label={ariaLabel}
       title={title}
-      className={`flex cursor-pointer items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40 ${
-        active ? 'bg-panel text-ink shadow-sm' : 'text-muted hover:text-ink'
-      }`}
+      className={`flex-none cursor-pointer items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium whitespace-nowrap focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40 ${
+        hideWhenTight ? 'hidden @min-[64rem]:flex' : 'flex'
+      } ${active ? 'bg-panel text-ink shadow-sm' : 'text-muted hover:text-ink'}`}
     >
       {icon}
-      {/* The eight labels cost ~360px, which is the difference between a bar
-          that fits and one that does not. 87.5rem is the width the bar needs
-          to hold everything WITH them (12.0 measured 1400px of content), and
-          it asks the bar — not the window, which is what `lg:` did while the
-          bar lived in a box 240px narrower (F4). */}
-      <span className="hidden @min-[87.5rem]:inline">{label}</span>
+      {/* The eight words take the switcher from 520px to 899px, and that is
+          the difference between a bar that fits and one that does not: with
+          them the bar asks for 1996px. 127rem is measured from that, unlike
+          the 87.5rem it replaces — which was set when the switcher had eight
+          tabs, and was already producing a bar that overflowed at 1920. The
+          query asks the BAR how wide it is, not the window (audit F4). See
+          lib/layout/topBarFit for the rest of the budget. */}
+      {labelled && <span className="hidden @min-[127rem]:inline">{label}</span>}
     </button>
   )
 }

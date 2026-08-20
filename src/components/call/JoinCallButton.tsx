@@ -1,4 +1,5 @@
 import { useCall } from './CallProvider'
+import { useI18n } from '@/lib/i18n'
 import { IcMic, IcRefresh } from '@/components/Icons'
 
 /**
@@ -10,19 +11,24 @@ import { IcMic, IcRefresh } from '@/components/Icons'
  *
  * When calls are not configured (or you are signed out) the control is
  * disabled and explains why — it never pretends a call is available.
+ *
+ * `labelled` is decided by the bar (see lib/layout/topBarFit): the button also
+ * lives inside the "···" panel, which is portalled out of the header, so a
+ * container query cannot answer "is there room for the word" for both places.
  */
-export function JoinCallButton() {
+export function JoinCallButton({ labelled = true }: { labelled?: boolean }) {
   const { status, unavailable, unavailableMessage, join, error } = useCall()
+  const t = useI18n()
 
   // while connected the CallIsland owns the controls; keep the topbar quiet
   if (status === 'connected') {
     return (
       <span
-        className="hidden items-center gap-1.5 rounded-full border border-[#14ae5c]/40 bg-panel2 px-2 py-1 text-[10px] font-medium text-[#14ae5c] lg:flex"
-        title="You are in the project call — controls are in the call island, bottom right"
+        className="flex items-center gap-1.5 rounded-full border border-[#14ae5c]/40 bg-panel2 px-2 py-1 text-[10px] font-medium whitespace-nowrap text-[#14ae5c]"
+        title={t.call.inCallTitle}
       >
-        <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-[#14ae5c]" />
-        In call
+        <span aria-hidden className="h-1.5 w-1.5 flex-none rounded-full bg-[#14ae5c]" />
+        {labelled && t.call.inCall}
       </span>
     )
   }
@@ -32,23 +38,19 @@ export function JoinCallButton() {
   const title = unavailable
     ? unavailableMessage
     : error
-      ? `${error} — click to try again`
-      : 'Join the project call — your microphone and camera stay off until you turn them on'
+      ? t.call.retryTitle(error)
+      : t.call.joinTitle
 
   return (
     <button
       className="btn"
       onClick={() => void join()}
       disabled={disabled}
-      aria-label={
-        unavailable
-          ? `Join call unavailable: ${unavailableMessage}`
-          : 'Join the project call'
-      }
+      aria-label={unavailable ? t.call.unavailableAria(unavailableMessage) : t.call.joinAria}
       title={title}
     >
       {connecting ? <IcRefresh size={13} className="animate-spin" /> : <IcMic size={13} />}
-      <span className="hidden lg:inline">{connecting ? 'Joining…' : 'Join call'}</span>
+      {labelled && <span>{connecting ? t.call.joining : t.call.join}</span>}
     </button>
   )
 }

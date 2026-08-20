@@ -13,9 +13,12 @@ import type { ViewMode } from '@/types/model'
  * The thresholds are widths at which something specific stops fitting, not
  * device sizes:
  *
- * - **1440** — below this the top bar cannot hold its content. It asks for
- *   1400 px in Italian and the box it lives in is the viewport minus the
- *   240 px sidebar, so the page starts scrolling sideways at ~1640.
+ * - **1440** — the width at which two panes are still worth having. It was
+ *   originally derived from the top bar as well, and the top bar has since
+ *   stopped using it: a window threshold cannot decide for a box that is the
+ *   window minus the sidebar, minus more again when a pane is split, so the
+ *   bar measures itself (see [`topBarFit`](./topBarFit.ts)) and this number
+ *   answers only for `splitAvailable`.
  * - **1100** — below this the Board is left under 600 px of canvas with the
  *   sidebar and inspector both docked (240 + 280 of permanent chrome).
  * - **768** — below this a docked panel and a usable editor cannot coexist at

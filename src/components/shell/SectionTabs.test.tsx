@@ -20,7 +20,7 @@ describe('SectionTabs', () => {
     })
   })
 
-  it('renders the two clusters: [Board · Graph] and [Split · sections]', () => {
+  it('renders every live surface: Split, Board · Graph, the editors and Photo', () => {
     render(<SectionTabs />)
     for (const name of [
       /board section/i,
@@ -34,6 +34,61 @@ describe('SectionTabs', () => {
     ]) {
       expect(tab(name)).toBeInTheDocument()
     }
+  })
+
+  /**
+   * The switcher's order is the product decision this branch made, so it is
+   * asserted rather than left to whoever next edits the JSX: five clusters,
+   * with Photo inside the creative one — between Forge and Folio — and not
+   * beside the editors it was built next to.
+   */
+  it('lays the five clusters out in order, with Photo inside the creative one', () => {
+    render(<SectionTabs />)
+    expect(
+      screen
+        .getAllByRole('button')
+        .map((b) => b.getAttribute('aria-label')),
+    ).toEqual([
+      'Split view',
+      'Board section',
+      'Graph view',
+      'Document section',
+      'Sheet section',
+      'Presentation section',
+      'Code section',
+      'ComfyUI — planned, not available yet',
+      'AI dashboard — planned, not available yet',
+      'Trace — planned, not available yet',
+      'Forge — planned, not available yet',
+      'Photo section',
+      'Folio — planned, not available yet',
+      'Flux — planned, not available yet',
+    ])
+  })
+
+  it('leaves the planned environments disabled, and says which phase builds each', () => {
+    render(<SectionTabs />)
+    for (const [name, phase] of [
+      [/comfyui/i, 21],
+      [/ai dashboard/i, 21],
+      [/trace/i, 23],
+      [/forge/i, 24],
+      [/folio/i, 25],
+      [/flux/i, 26],
+    ] as const) {
+      const planned = tab(name)
+      expect(planned).toBeDisabled()
+      // never "coming soon" — the tooltip names the phase that builds it
+      expect(planned).toHaveAttribute('title', expect.stringContaining(`phase ${phase}`))
+    }
+  })
+
+  it('does not pin a planned tab to a word it cannot afford', () => {
+    render(<SectionTabs />)
+    // the six placeholders are icon-only at every width, so the switcher can
+    // still show the eight live labels when the bar is wide enough for them
+    expect(tab(/trace/i)).toHaveTextContent('')
+    expect(tab(/document section/i)).toHaveTextContent('Document')
   })
 
   it('marks the active section with aria-pressed', () => {

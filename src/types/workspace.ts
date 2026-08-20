@@ -108,3 +108,81 @@ export const SECTION_METAS: SectionMeta[] = [
   { section: 'code', mode: 'code', label: 'Code' },
   { section: 'photo', mode: 'photo', label: 'Photo' },
 ]
+
+/**
+ * Environments that are on the roadmap and have no engine yet: the AI suite
+ * (phase 21 — RunPod serverless + in-house ComfyUI) and the Creative suite
+ * (phases 23–26, on the phase-22 Creative Core).
+ *
+ * They are in the switcher, disabled, on purpose. The alternative — adding
+ * them the day each one ships — is how a toolbar gets re-laid-out six times
+ * and how the bar's width budget becomes a surprise six times. Here the space
+ * they will occupy is spent now, and every tooltip says which phase builds it
+ * rather than pretending the tab is one click from working.
+ */
+export type PlannedSurface =
+  | 'comfyui'
+  | 'aiDashboard'
+  | 'trace'
+  | 'forge'
+  | 'folio'
+  | 'flux'
+
+export interface PlannedMeta {
+  id: PlannedSurface
+  /** the roadmap phase that builds it — quoted in the tooltip */
+  phase: number
+}
+
+/**
+ * One tab of the section switcher. Split and Graph are deliberately NOT here:
+ * a layout and a content view are not sections (see the header of this file),
+ * and both carry behaviour no list can express — SectionTabs codes them.
+ */
+export type SwitcherItem =
+  | { kind: 'section'; section: WorkspaceSection }
+  | { kind: 'planned'; planned: PlannedMeta }
+
+const asSection = (section: WorkspaceSection): SwitcherItem => ({ kind: 'section', section })
+const asPlanned = (id: PlannedSurface, phase: number): SwitcherItem => ({
+  kind: 'planned',
+  planned: { id, phase },
+})
+
+/**
+ * The switcher's clusters after [Split] and [Board · Graph], in bar order.
+ * Single source of truth so the grouping — and the fact that Photo sits inside
+ * the creative cluster rather than beside the editors — is assertable without
+ * a DOM.
+ *
+ * Photo is the odd member: a real, working section between placeholders. It is
+ * a set-and-lighting planner, not a document, and it is the surface Forge and
+ * Flux will eventually sit next to; grouping it with Sheet and Code only ever
+ * described where it was built, not what it is.
+ */
+export const SWITCHER_CLUSTERS: SwitcherItem[][] = [
+  // documents — the four editors that produce a file you read
+  [
+    asSection('document'),
+    asSection('spreadsheet'),
+    asSection('presentation'),
+    asSection('code'),
+  ],
+  // AI — phase 21
+  [asPlanned('comfyui', 21), asPlanned('aiDashboard', 21)],
+  // creative — phases 23–26, with Photo already live in the middle of them
+  [
+    asPlanned('trace', 23),
+    asPlanned('forge', 24),
+    asSection('photo'),
+    asPlanned('folio', 25),
+    asPlanned('flux', 26),
+  ],
+]
+
+/** The meta for a section, by name. */
+export function sectionMeta(section: WorkspaceSection): SectionMeta {
+  const meta = SECTION_METAS.find((m) => m.section === section)
+  if (!meta) throw new Error(`unknown workspace section: ${section}`)
+  return meta
+}
