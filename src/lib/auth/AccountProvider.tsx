@@ -9,6 +9,7 @@ import {
 } from 'react'
 import type { Account } from '@/types/model'
 import { authService, updateStoredAccount } from './AuthService'
+import { sessionClient } from './sessionClient'
 import { signInWithEmailCode } from './emailSignIn'
 import type { ProfilePatch } from './profile'
 import { hasGoogleAuth } from '@/lib/env'
@@ -40,6 +41,12 @@ export interface AccountContextValue {
   signInWithCode: (email: string, code: string) => Promise<void>
   signOut: () => Promise<void>
   skipLogin: () => void
+  /**
+   * Leave "continue without an account" and go back to the login screen
+   * (#257). The guest vault is kept, not deleted: the work in it belongs to
+   * whoever did it, and signing in is still allowed to adopt it.
+   */
+  exitGuest: () => void
   /**
    * Edit the profile (14.2). Writes the stored account, so the new name and
    * avatar reach presence, comments and invitations through the same record
@@ -95,7 +102,15 @@ export function AccountProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (account && authService.kind === 'google') {
       void syncEngine.start()
+      return
     }
+    /**
+     * Nobody is signed in here — so nothing may be signed in on the server
+     * either. The cookie is HttpOnly and outlives a sign-out that could not
+     * reach the network, which leaves a browser showing the login screen
+     * while the API still answers for the person who left (#257).
+     */
+    if (!account) void sessionClient.discardOrphanSession()
     // run once for the restored session; sign-in path calls start() itself
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -170,6 +185,26 @@ export function AccountProvider({ children }: { children: ReactNode }) {
     setLoginSkipped(true)
   }, [])
 
+  /**
+   * The way out of guest mode, which did not exist (#257).
+   *
+   * `SKIP_KEY` was written once and cleared only by a successful sign-in, and
+   * the signed-out profile menu offered a single button: "Sign in". So one
+   * click of "Continue without an account" put a browser into a guest session
+   * that nobody could leave — the login screen never came back, and everyone
+   * who opened Lattice on that machine afterwards landed in the same vault.
+   *
+   * Reloading for the same reason `signOut` does: the guest vault is hydrated
+   * into stores and singletons that a state change does not unwind, and a
+   * login screen with the previous session live behind it is the shape of the
+   * bug being fixed, not the fix.
+   */
+  const exitGuest = useCallback(() => {
+    localStorage.removeItem(SKIP_KEY)
+    setLoginSkipped(false)
+    window.location.reload()
+  }, [])
+
   const updateProfile = useCallback((patch: ProfilePatch) => {
     const next = updateStoredAccount(patch)
     if (next) setAccount(next)
@@ -186,6 +221,7 @@ export function AccountProvider({ children }: { children: ReactNode }) {
       signInWithCode,
       signOut,
       skipLogin,
+      exitGuest,
       updateProfile,
     }),
     [
@@ -197,6 +233,7 @@ export function AccountProvider({ children }: { children: ReactNode }) {
       signInWithCode,
       signOut,
       skipLogin,
+      exitGuest,
       updateProfile,
     ],
   )

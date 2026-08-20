@@ -4,6 +4,7 @@ import { applyProfilePatch, mergeProviderProfile, type ProfilePatch } from './pr
 import { MOCK_SUBJECT, providerIdsOf } from './identity'
 import { identityStore } from './identityStore'
 import { sessionClient } from './sessionClient'
+import { vaultKey } from '@/lib/storage/vaultScope'
 
 /**
  * AuthService — personal account sign-in.
@@ -83,8 +84,13 @@ const TOKEN_KEY = 'lattice-google-token'
  * every reload would have declared the Drive session expired and demanded
  * a reconnect — a token-shaped hole where a boolean belongs. This flag is
  * what survives instead, and it grants nothing to whoever reads it.
+ *
+ * Scoped per account (#257): consent is something ONE person granted over
+ * ONE Drive. Unscoped, it told the next account to sign in on this browser
+ * that permission it had never been asked for was already in hand, and sent
+ * it into a silent refresh instead of the consent screen.
  */
-const DRIVE_CONSENT_KEY = 'lattice-drive-consent'
+const DRIVE_CONSENT_KEY = vaultKey('lattice-drive-consent')
 
 function hasDriveConsent(): boolean {
   try {

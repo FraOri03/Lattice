@@ -1,5 +1,5 @@
 import { useEffect, useSyncExternalStore } from 'react'
-import { authService } from '@/lib/auth/AuthService'
+import { authService, loadStoredAccount } from '@/lib/auth/AuthService'
 import { NotAuthenticatedError, sessionClient } from '@/lib/auth/sessionClient'
 import { EMPTY_SHARED_INDEX, type SharedIndex } from '@/types/shared'
 
@@ -86,12 +86,35 @@ class SharedIndexService {
     return this.inflight
   }
 
+  /** The state of a question this browser has no standing to ask. */
+  private static readonly UNANSWERABLE: Partial<IndexState> = {
+    loading: false,
+    loaded: true,
+    unavailable: true,
+    index: EMPTY_SHARED_INDEX,
+  }
+
   private async fetch(): Promise<void> {
     const started = this.generation
     /** Drop an answer that belongs to whoever was signed in when it was asked. */
     const settle = (patch: Partial<IndexState>) => {
       if (this.generation !== started) return
       this.set(patch)
+    }
+    /**
+     * No account here, no question to ask (#257).
+     *
+     * This used to load on mount with no gate at all, and the credential it
+     * travels on is an HttpOnly cookie the client cannot see. A browser whose
+     * sign-out never reached the network is locally signed out and still
+     * server-authenticated, so "Shared with me" and "Invites" answered for the
+     * person who left — their projects, the addresses their invitations went
+     * to, and a button that accepts one. `AccountProvider` revokes such a
+     * session on boot; this refuses to read it in the meantime.
+     */
+    if (!loadStoredAccount()) {
+      settle(SharedIndexService.UNANSWERABLE)
+      return
     }
     try {
       const res = await sessionClient.post(SHARED_URL, { action: 'index' }, () =>
@@ -100,12 +123,7 @@ class SharedIndexService {
       if (!res.ok) {
         // 501 (no database) and 401 (no session) are the same fact to a
         // reader: this deployment cannot answer for you
-        settle({
-          loading: false,
-          loaded: true,
-          unavailable: true,
-          index: EMPTY_SHARED_INDEX,
-        })
+        settle(SharedIndexService.UNANSWERABLE)
         return
       }
       const index = (await res.json()) as SharedIndex
@@ -114,12 +132,7 @@ class SharedIndexService {
       if (!(err instanceof NotAuthenticatedError)) {
         console.warn('[dashboard/shared] index failed:', err)
       }
-      settle({
-        loading: false,
-        loaded: true,
-        unavailable: true,
-        index: EMPTY_SHARED_INDEX,
-      })
+      settle(SharedIndexService.UNANSWERABLE)
     }
   }
 
@@ -141,6 +154,11 @@ class SharedIndexService {
   }
 
   private async act(body: Record<string, unknown>): Promise<InviteAction> {
+    // an invitation is answered by its recipient, and this browser cannot
+    // name one — see `fetch` for the session that would otherwise answer
+    if (!loadStoredAccount()) {
+      return { ok: false, error: 'Sign in to answer this invitation.' }
+    }
     try {
       const res = await sessionClient.post(INVITATIONS_URL, body, () =>
         authService.getAccessToken(),

@@ -25,6 +25,24 @@ export interface StorageProvider {
 }
 
 /**
+ * The local half of the contract: a store backed by a handle this browser
+ * holds open. Drive implements {@link StorageProvider} and not this — there
+ * is no connection on the other end to let go of.
+ */
+export interface LocalStorageProvider extends StorageProvider {
+  /**
+   * Drop the connection to the database.
+   *
+   * Only "forget this device" needs it: `indexedDB.deleteDatabase` fires
+   * `blocked` and waits while any connection is still open, so a wipe that
+   * did not close this one would report success over a vault that is still
+   * there. Every method reopens lazily, so calling it early is merely
+   * wasteful rather than wrong.
+   */
+  close(): void
+}
+
+/**
  * One database per account, not per browser (see `vaultScope`). Document
  * bodies and asset binaries are the heaviest thing Lattice holds, and until
  * this was scoped the next person to sign in on this machine inherited all
@@ -42,7 +60,7 @@ function asPromise<T>(req: IDBRequest<T>): Promise<T> {
   })
 }
 
-class IndexedDbStorageProvider implements StorageProvider {
+class IndexedDbStorageProvider implements LocalStorageProvider {
   private dbPromise?: Promise<IDBDatabase>
 
   private open(): Promise<IDBDatabase> {
@@ -95,6 +113,13 @@ class IndexedDbStorageProvider implements StorageProvider {
     await asPromise((await this.store(BLOBS, 'readwrite')).clear())
     await asPromise((await this.store(DOCS, 'readwrite')).clear())
   }
+
+  close(): void {
+    const pending = this.dbPromise
+    this.dbPromise = undefined
+    // the handle may still be opening: close it when it lands, not before
+    void pending?.then((db) => db.close()).catch(() => {})
+  }
 }
 
-export const storage: StorageProvider = new IndexedDbStorageProvider()
+export const storage: LocalStorageProvider = new IndexedDbStorageProvider()
