@@ -159,12 +159,31 @@ describe('SlideToolbar — precision (19E.0)', () => {
 })
 
 describe('SlideToolbar — align and distribute (19E.0)', () => {
-  it('stays hidden until there is something to align against', () => {
-    const { unmount } = renderBar({ selectedCount: 1 })
+  it('stays hidden until something is selected', () => {
+    const { unmount } = renderBar({ selectedCount: 0 })
     expect(screen.queryByRole('button', { name: 'Align left' })).toBeNull()
     unmount()
     renderBar({ selectedCount: 2 })
     expect(screen.getByRole('button', { name: 'Align left' })).toBeInTheDocument()
+  })
+
+  /**
+   * One element has something to align against — the slide — so the group is
+   * offered, and the tooltip says what the reference is rather than leaving
+   * you to infer it from whether the box moved.
+   */
+  it('offers alignment for a single element, against the slide', () => {
+    renderBar({ selectedCount: 1 })
+    const left = screen.getByRole('button', { name: 'Align left' })
+    expect(left).toBeInTheDocument()
+    expect(left.getAttribute('title')).toContain('Relative to the slide')
+  })
+
+  it('drops the slide-relative wording once several are selected', () => {
+    renderBar({ selectedCount: 3 })
+    expect(
+      screen.getByRole('button', { name: 'Align left' }).getAttribute('title'),
+    ).not.toContain('Relative to the slide')
   })
 
   it('reports each edge it was asked for', () => {

@@ -35,11 +35,12 @@ export type SlideShape = 'rect' | 'ellipse' | 'line'
  * 900-line workspace.
  *
  * 19E.0 adds the precision controls the Phase 1 canvas needs: a snapping
- * toggle, and an align/distribute group that appears only once more than one
- * element is selected — a bar that offered them against a single element would
- * be offering nothing. They are built from the same primitives as the rest of
- * the bar rather than the hand-rolled `.tbtn` buttons the original branch used,
- * because that class was retired in 12.4.
+ * toggle, and an align/distribute group. The group appears as soon as anything
+ * is selected, because with one element the thing to align against is the
+ * slide — centring a single box is the commonest alignment there is.
+ * Distribution still needs three, and says so. They are built from the same
+ * primitives as the rest of the bar rather than the hand-rolled `.tbtn`
+ * buttons the original branch used, because that class was retired in 12.4.
  *
  * Hidden entirely for a viewer by its caller, as before.
  */
@@ -181,18 +182,33 @@ export function SlideToolbar({
           />
         </ToolbarGroup>
 
-        {/* Alignment needs something to align against: below two elements the
-            group would be a row of controls that cannot do anything. */}
-        {selectedCount > 1 && (
+        {/* Alignment needs something to align against, and with one element
+            that something is the slide — so the group appears as soon as
+            anything is selected. Distribution still needs three. */}
+        {selectedCount > 0 && (
           <>
             <ToolbarSeparator />
             <ToolbarGroup label={t.groups.arrange}>
-              <ToolbarAction icon={<IcObjectAlignLeft size={13} />} label={t.alignLeft} onRun={() => onAlign('left')} />
-              <ToolbarAction icon={<IcObjectAlignCenter size={13} />} label={t.alignCenter} onRun={() => onAlign('hcenter')} />
-              <ToolbarAction icon={<IcObjectAlignRight size={13} />} label={t.alignRight} onRun={() => onAlign('right')} />
-              <ToolbarAction icon={<IcObjectAlignTop size={13} />} label={t.alignTop} onRun={() => onAlign('top')} />
-              <ToolbarAction icon={<IcObjectAlignMiddle size={13} />} label={t.alignMiddle} onRun={() => onAlign('vcenter')} />
-              <ToolbarAction icon={<IcObjectAlignBottom size={13} />} label={t.alignBottom} onRun={() => onAlign('bottom')} />
+              {/* mapped rather than repeated, so the reference wording cannot
+                  end up on some of the six and not the others */}
+              {(
+                [
+                  ['left', t.alignLeft, IcObjectAlignLeft],
+                  ['hcenter', t.alignCenter, IcObjectAlignCenter],
+                  ['right', t.alignRight, IcObjectAlignRight],
+                  ['top', t.alignTop, IcObjectAlignTop],
+                  ['vcenter', t.alignMiddle, IcObjectAlignMiddle],
+                  ['bottom', t.alignBottom, IcObjectAlignBottom],
+                ] as const
+              ).map(([edge, label, Icon]) => (
+                <ToolbarAction
+                  key={edge}
+                  icon={<Icon size={13} />}
+                  label={label}
+                  description={selectedCount === 1 ? t.alignToSlide : undefined}
+                  onRun={() => onAlign(edge)}
+                />
+              ))}
               <ToolbarAction
                 icon={<IcObjectDistributeH size={13} />}
                 label={t.distributeH}
