@@ -1,10 +1,16 @@
 /**
  * Alignment & distribution (Phase 1) — pure, unit-testable.
  *
- * Operate on a selection of ≥2 (align) / ≥3 (distribute) elements and return a
- * map of id → new {x, y}. Only the moved axis changes; the other is preserved,
- * so alignment never has surprising side effects. Callers apply the result
- * through the history layer as one undo step.
+ * Return a map of id → new {x, y}. Only the moved axis changes; the other is
+ * preserved, so alignment never has surprising side effects. Callers apply the
+ * result through the history layer as one undo step.
+ *
+ * **What alignment is measured against** is the interesting decision. With
+ * several elements selected it is their shared bounds — "line these up with
+ * each other". With one, that would be a no-op, so the reference is the frame
+ * the element lives on: centring a single box on the slide is the commonest
+ * alignment there is, and refusing to do it because only one thing is selected
+ * would be a rule serving the implementation rather than the person.
  */
 import type { Rect } from './geometry'
 import { unionBounds } from './geometry'
@@ -19,10 +25,15 @@ export interface AlignItem extends Rect {
 export function alignElements(
   items: AlignItem[],
   edge: AlignEdge,
+  /** align to this frame instead of the selection's own bounds */
+  frame?: Rect,
 ): Map<string, { x: number; y: number }> {
   const out = new Map<string, { x: number; y: number }>()
-  if (items.length < 2) return out
-  const b = unionBounds(items)
+  if (!items.length) return out
+  // without a frame, two elements are the least that can be aligned to
+  // each other; with one, there is nothing to line up against
+  if (!frame && items.length < 2) return out
+  const b = frame ?? unionBounds(items)
   for (const it of items) {
     let { x, y } = it
     switch (edge) {

@@ -5,6 +5,8 @@ import { downloadBlob, slugify } from '@/lib/download'
 import { presenceService } from '@/lib/collab/PresenceService'
 import { nid } from '@/lib/id'
 import {
+  SLIDE_H,
+  SLIDE_W,
   THEME_COLORS,
   createSlide,
   createTextElement,
@@ -408,9 +410,15 @@ export default function PresentationWorkspace({ meta }: { meta: PresentationDocM
     setSlideElements(reorderZ(elements, selectedIds, mode))
   }
 
+  /**
+   * One element aligns to the slide; several align to each other. That is what
+   * every design tool does, and it is the difference between "centre this on
+   * the slide" being one click and being impossible.
+   */
   const align = (edge: AlignEdge) => {
-    if (selectedEls.length < 2) return
-    const map = alignElements(selectedEls.map((e) => ({ id: e.id, ...rectOf(e) })), edge)
+    if (!selectedEls.length) return
+    const frame = selectedEls.length === 1 ? { x: 0, y: 0, w: SLIDE_W, h: SLIDE_H } : undefined
+    const map = alignElements(selectedEls.map((e) => ({ id: e.id, ...rectOf(e) })), edge, frame)
     setSlideElements(elements.map((e) => (map.has(e.id) ? { ...e, ...map.get(e.id)! } : e)))
   }
 
@@ -1114,6 +1122,50 @@ const DISTRIBUTE_ACTIONS: { axis: DistributeAxis; label: string; Icon: typeof Ic
   { axis: 'v', label: 'Distribute vertically', Icon: IcObjectDistributeV },
 ]
 
+/**
+ * The eight alignment controls. One component, two homes — a single element
+ * (aligned to the slide) and a multi-selection (aligned to each other) — so
+ * the two can never offer different actions.
+ */
+function AlignCluster({
+  count,
+  onAlign,
+  onDistribute,
+}: {
+  count: number
+  onAlign: (edge: AlignEdge) => void
+  onDistribute: (axis: DistributeAxis) => void
+}) {
+  const relativeTo = count === 1 ? 'the slide' : 'the selection'
+  return (
+    <div className="grid grid-cols-4 gap-1">
+      {ALIGN_ACTIONS.map(({ edge, label, Icon }) => (
+        <button
+          key={edge}
+          className="toolbar-control toolbar-control--sm"
+          title={`${label} — relative to ${relativeTo}`}
+          aria-label={label}
+          onClick={() => onAlign(edge)}
+        >
+          <Icon size={14} />
+        </button>
+      ))}
+      {DISTRIBUTE_ACTIONS.map(({ axis, label, Icon }) => (
+        <button
+          key={axis}
+          className="toolbar-control toolbar-control--sm"
+          title={count < 3 ? 'Select at least three elements' : label}
+          aria-label={label}
+          disabled={count < 3}
+          onClick={() => onDistribute(axis)}
+        >
+          <Icon size={14} />
+        </button>
+      ))}
+    </div>
+  )
+}
+
 /** What the typography panel can do, gathered so the props stay legible. */
 interface TextActions {
   setStyleRef: (name: TextStyleName | undefined) => void
@@ -1535,31 +1587,7 @@ function Inspector({
           {/* The panel used to point at the toolbar. With several things
               selected this is where you are looking, so the alignment lives
               here too — same actions, same icons, one fewer redirection. */}
-          <div className="grid grid-cols-4 gap-1">
-            {ALIGN_ACTIONS.map(({ edge, label, Icon }) => (
-              <button
-                key={edge}
-                className="toolbar-control toolbar-control--sm"
-                title={label}
-                aria-label={label}
-                onClick={() => onAlign(edge)}
-              >
-                <Icon size={14} />
-              </button>
-            ))}
-            {DISTRIBUTE_ACTIONS.map(({ axis, label, Icon }) => (
-              <button
-                key={axis}
-                className="toolbar-control toolbar-control--sm"
-                title={count < 3 ? 'Select at least three elements' : label}
-                aria-label={label}
-                disabled={count < 3}
-                onClick={() => onDistribute(axis)}
-              >
-                <Icon size={14} />
-              </button>
-            ))}
-          </div>
+          <AlignCluster count={count} onAlign={onAlign} onDistribute={onDistribute} />
           <p className="mt-1.5 mb-2 text-[11px] leading-relaxed text-muted">
             Move with drag or arrow keys.
           </p>
@@ -1581,6 +1609,9 @@ function Inspector({
 
       {scope === 'element' && count === 1 && selected && (
         <>
+          <div className="insp-h">Align to slide</div>
+          <AlignCluster count={count} onAlign={onAlign} onDistribute={onDistribute} />
+
           <LayoutOverrides
             selected={selected}
             layoutId={slide.layoutId}
