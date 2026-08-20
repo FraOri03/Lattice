@@ -56,6 +56,21 @@ All notable changes to Lattice are recorded here. The format follows
 
 ### Changed
 
+- **URLs are shorter: an id no longer repeats in the address bar what the parameter
+  already says.** Every id Lattice mints carries a type prefix — `proj_`, `board_`,
+  `pres_` — which is useful in a log and dead weight in a URL, where `p=` already means
+  project, `b=` means board and `e=present.` already names the kind. The prefix is now
+  dropped on the way out and restored on the way in, so
+  `?p=proj_default&m=presentation&b=board_mt2609ax7dezr&e=present.pres_mt260183i3ovw`
+  became `?p=default&m=presentation&b=mt2609ax7dezr&e=present.mt260183i3ovw` — 16
+  characters shorter on a full project·board·entity link. **Nothing was renamed**: the
+  stored ids are untouched, which matters because a project id is also a Liveblocks room
+  id, a Drive folder property and a primary key in `project_memberships`. Both spellings
+  resolve, so every link written before this — bookmarked, pasted in a chat, sitting in
+  someone's history — keeps working and is quietly rewritten to the short form when
+  opened. Ids that never had a prefix (the seeded `b_welcome`, `n_welcome`) are left
+  exactly as they are rather than being given one.
+
 - **A project membership now belongs to a person, not to an e-mail address.** Access was
   granted to an address, so whoever held that address held the project — and when a company
   reassigns a departed colleague's mailbox, the new employee silently inherited everything

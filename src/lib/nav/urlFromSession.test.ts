@@ -13,6 +13,9 @@ import { serializeNav } from './navUrl'
  * point of the phase.
  */
 
+/** The id as the URL writes it: `nid()`'s type prefix is dropped there. */
+const short = (id: string) => id.slice(id.indexOf('_') + 1)
+
 beforeEach(() => useStore.setState({ tabSessions: {}, navSurface: 'project' }))
 
 describe('the URL follows the tab session', () => {
@@ -23,7 +26,7 @@ describe('the URL follows the tab session', () => {
 
     const nav = currentNav()
     expect(nav).toMatchObject({ surface: 'project', entity: { kind: 'note', id } })
-    expect(serializeNav(nav)).toContain(`e=note.${id}`)
+    expect(serializeNav(nav)).toContain(`e=note.${short(id)}`)
   })
 
   it('carries no entity when nothing is focused, and keeps the tabs', () => {
@@ -50,7 +53,7 @@ describe('the URL follows the tab session', () => {
     // and it follows the focus, without the other tab ever appearing in it
     useStore.getState().activateEntityTab({ kind: 'note', id: note })
     expect(currentNav()).toMatchObject({ entity: { kind: 'note', id: note } })
-    expect(serializeNav(currentNav())).not.toContain(doc)
+    expect(serializeNav(currentNav())).not.toContain(short(doc))
   })
 
   it('says nothing about a project when the dashboard is showing', () => {
