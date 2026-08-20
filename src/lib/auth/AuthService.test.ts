@@ -72,11 +72,19 @@ function installGis(): void {
  * the credential.
  */
 function seedExpiredSession(): void {
+  seedAccount()
+  // unsuffixed because this browser resolves to the legacy slot: `beforeEach`
+  // seeds the account before the import, so the scope is the account's and it
+  // claims the pre-namespacing keys (see `lib/storage/vaultScope`)
+  localStorage.setItem('lattice-drive-consent', '1')
+}
+
+/** The stored account, as any reload with a live session finds it. */
+function seedAccount(): void {
   localStorage.setItem(
     'lattice-account',
     JSON.stringify({ id: 'acc_1', name: 'Tester', email: 't@example.com' }),
   )
-  localStorage.setItem('lattice-drive-consent', '1')
 }
 
 /**
@@ -124,6 +132,13 @@ const realRemoveEventListener = window.removeEventListener as (
 
 beforeEach(async () => {
   localStorage.clear()
+  /**
+   * Before the import, not after. Since #257 the Drive consent flag is scoped
+   * per account, and `vaultScope` resolves that scope ONCE — when the module
+   * graph is first imported. An account seeded afterwards would leave every
+   * key in this file resolved against a guest slot nothing writes to.
+   */
+  seedAccount()
   installGis()
   window.addEventListener = ((
     type: string,
@@ -204,11 +219,8 @@ describe('background token refresh', () => {
   })
 
   it('does ask for a reconnect when consent was never granted here', async () => {
-    localStorage.setItem(
-      'lattice-account',
-      JSON.stringify({ id: 'acc_1', name: 'Tester', email: 't@example.com' }),
-    )
-    // no consent flag: this browser has never completed the Drive grant
+    // the account is already seeded; no consent flag, so this browser has
+    // never completed the Drive grant
     expect(await authService.getAccessToken()).toBeNull()
     expect(authService.needsReauth()).toBe(true)
   })
@@ -290,10 +302,7 @@ describe('background token refresh', () => {
   })
 
   it('reports the session as unrecoverable when consent was never granted', async () => {
-    localStorage.setItem(
-      'lattice-account',
-      JSON.stringify({ id: 'acc_1', name: 'Tester', email: 't@example.com' }),
-    )
+    // signed in, but this browser holds no consent flag
     window.dispatchEvent(new Event('pointerdown'))
 
     expect(await authService.getAccessToken()).toBeNull()

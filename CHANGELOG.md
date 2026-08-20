@@ -14,6 +14,28 @@ All notable changes to Lattice are recorded here. The format follows
 
 ### Fixed
 
+- **Signing out, or continuing without an account, no longer shows the last user's
+  projects** ([#257](https://github.com/FraOri03/Lattice/issues/257)). Namespacing the
+  storage keys (below) gave every account its own vault and then handed two of them the
+  same name. A slot was derived from the scope that owned it, so the anonymous scope's slot
+  was the literal string `guest` — and adopting a guest vault at sign-in handed that same
+  name to an account. Nothing checked whether a name was already spoken for, so the second
+  account on any browser stored its vault in slot `guest`, and the next signed-out page load
+  derived `guest` again and read it: the dashboard listed the departing account's projects,
+  the account after that adopted the whole vault, and the sync engine pushed it to *their*
+  Drive — the exact failure the namespace was built to stop, one step further along. The
+  GitHub token and the Gemini API key were in that slot too. Slots are now minted rather
+  than derived, a name is never handed out twice, and a map already written by the broken
+  build is repaired on the next load: the account keeps its vault and the anonymous scope
+  is evicted from it. The unsuffixed pre-namespacing keys also stopped going to whoever
+  asked first — on a browser whose owner had signed out before updating, that was the
+  anonymous scope, which took the lot. Alongside it: guest mode has a way out (it had
+  none — one click of "Continue without an account" and the login screen never came back
+  for anybody), a server session with no account in this browser is revoked on boot instead
+  of answering for whoever left, the Drive consent flag and the anonymous collaboration id
+  are scoped like everything else, and **Settings → Security → Forget this device** deletes
+  the current vault from the machine, which nothing could do before.
+
 - **Signing in with a second account no longer shows the first account's work.** Everything
   Lattice keeps on the machine — the vault, the document bodies and asset binaries in
   IndexedDB, the Drive push bookkeeping, the collaboration records, the connected GitHub

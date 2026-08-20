@@ -104,6 +104,20 @@ class YjsManager {
     // rooms stay cached: destroying them would drop unsaved editor bindings
   }
 
+  /**
+   * Tear the rooms down for real, IndexedDB connections included.
+   *
+   * {@link stop} deliberately does not: a room outlives a trip to the
+   * dashboard so an editor binding is not dropped under the user. "Forget
+   * this device" is the one caller that needs the opposite — an open
+   * connection makes `deleteDatabase` hang on `blocked`, so the vault would
+   * survive the thing that promised to delete it.
+   */
+  destroyRooms(): void {
+    for (const room of this.rooms.values()) room.destroy()
+    this.rooms.clear()
+  }
+
   /** Provider hook: deliver incoming realtime CollabMessages to the hub. */
   setMessageHandler(handler: ((msg: CollabMessage) => void) | null): void {
     this.messageHandler = handler
