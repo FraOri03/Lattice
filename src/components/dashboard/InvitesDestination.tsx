@@ -5,6 +5,7 @@ import { inviteService } from '@/lib/collab/InviteService'
 import { useI18n, useTimeAgo } from '@/lib/i18n'
 import { collectSentInvites } from '@/lib/dashboard/honestSections'
 import { sharedIndex, useSharedIndex } from '@/lib/dashboard/sharedIndex'
+import { displayAddress } from '@/lib/auth/addressAlias'
 import { ROLE_LABEL } from '@/types/collab'
 import { toast } from '@/components/ui/Toaster'
 import { SectionStateBlock } from './SectionStateBlock'
@@ -93,7 +94,7 @@ function ReceivedTab() {
                 {t.honest.invites.invitedBy(invite.invitedByName, ROLE_LABEL[invite.role])}
               </span>
               <span className="block truncate text-[10.5px] text-muted">
-                {invite.email} · {t.honest.invites.expires(timeAgo(invite.expiresAt))}
+                {displayAddress(invite.email)} · {t.honest.invites.expires(timeAgo(invite.expiresAt))}
               </span>
             </span>
             <button
@@ -184,7 +185,7 @@ export function InvitesDestination() {
                   >
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[12.5px] font-medium">
-                        {t.honest.invites.invitedTo(invite.email, projectName)}
+                        {t.honest.invites.invitedTo(displayAddress(invite.email), projectName)}
                       </span>
                       <span className="block truncate text-[10.5px] text-muted">
                         {ROLE_LABEL[invite.role]} · {timeAgo(invite.createdAt)}

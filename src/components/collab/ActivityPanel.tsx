@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useStore } from '@/store/useStore'
 import { useCollabStore } from '@/lib/collab/collabStore'
 import { colorForUser } from '@/lib/collab/CollaborationProvider'
+import { maskAddresses } from '@/lib/auth/addressAlias'
 import type { ActivityEvent, ActivityType } from '@/types/collab'
 import {
   IcActivity,
@@ -111,7 +112,7 @@ export function ActivityPanel() {
                 <div className="min-w-0 flex-1">
                   <p className="text-[11.5px] leading-snug break-words">
                     <span className="font-semibold">{e.actorName}</span>{' '}
-                    <span className="text-muted">·</span> {e.message}
+                    <span className="text-muted">·</span> {maskAddresses(e.message)}
                   </p>
                   <span className="text-[10px] text-muted">
                     {new Date(e.at).toLocaleTimeString(undefined, {

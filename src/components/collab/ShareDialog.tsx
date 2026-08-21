@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useStore } from '@/store/useStore'
 import { useUiStore } from '@/store/useUiStore'
 import { useCollabStore } from '@/lib/collab/collabStore'
@@ -8,8 +8,11 @@ import { collabHub } from '@/lib/collab/hub'
 import { useMyRole } from '@/lib/collab/useCollab'
 import { useCollabMode } from '@/lib/collab/collabPresentation'
 import { assignableRoles, can, canManageRole } from '@/lib/collab/permissions'
+import { aclSlots } from '@/lib/collab/acl'
+import { serverAcl, type ServerMembers } from '@/lib/collab/ServerAclService'
 import { isLive } from '@/lib/collab/invitations'
 import { currentIdentity, colorForUser } from '@/lib/collab/CollaborationProvider'
+import { displayAddress, maskAddresses } from '@/lib/auth/addressAlias'
 import { useI18n, useTimeAgo } from '@/lib/i18n'
 import { type CollabRole, type ProjectInvite, type ProjectMember } from '@/types/collab'
 import { toast } from '@/components/ui/Toaster'
@@ -18,6 +21,7 @@ import {
   IcCopy,
   IcEye,
   IcInfo,
+  IcLock,
   IcMail,
   IcRefresh,
   IcTrash,
@@ -40,7 +44,7 @@ function MemberAvatar({ member }: { member: ProjectMember }) {
       {member.avatarUrl ? (
         <img src={member.avatarUrl} alt="" className="h-full w-full object-cover" />
       ) : (
-        (member.name || member.email).slice(0, 1).toUpperCase()
+        (member.name || displayAddress(member.email)).slice(0, 1).toUpperCase()
       )}
     </span>
   )
@@ -53,7 +57,7 @@ function MemberRow({ member, projectId }: { member: ProjectMember; projectId: st
   const timeAgo = useTimeAgo()
   const isSelf = member.userId === identity.userId
   const manageable = !isSelf && canManageRole(myRole, member.role)
-  const displayName = member.name || member.email
+  const displayName = member.name || displayAddress(member.email)
 
   return (
     <div className="flex items-center gap-2.5 rounded-lg px-2 py-2 hover:bg-panel2/50">
@@ -64,7 +68,7 @@ function MemberRow({ member, projectId }: { member: ProjectMember; projectId: st
           {isSelf && <span className="text-[10px] text-muted">{t.share.you}</span>}
         </div>
         <div className="truncate text-[11px] text-muted">
-          {member.email}
+          {displayAddress(member.email)}
           {member.lastActiveAt ? ` · ${t.share.activeAgo(timeAgo(member.lastActiveAt))}` : ''}
         </div>
       </div>
@@ -156,7 +160,7 @@ function InviteRow({ invite, projectId }: { invite: ProjectInvite; projectId: st
         <IcMail size={13} />
       </span>
       <div className="min-w-0 flex-1">
-        <div className="truncate text-[12.5px] font-medium">{invite.email}</div>
+        <div className="truncate text-[12.5px] font-medium">{displayAddress(invite.email)}</div>
         <div className="text-[11px] text-muted">
           {t.share.invitedLine(
             t.roles[invite.role],
@@ -198,6 +202,150 @@ function InviteRow({ invite, projectId }: { invite: ProjectInvite; projectId: st
       >
         <IcX size={12} />
       </button>
+    </div>
+  )
+}
+
+/**
+ * The ACL the endpoints enforce, beside the member list this device keeps.
+ *
+ * They are two different records in two different places, merged by two
+ * different rules, and until now only one of them was visible. The
+ * consequence was a silent class of failure: a member the local list is sure
+ * about, whom the server has never heard of, gets the full editing UI here —
+ * `useMyRole` defaults an unknown project to `owner` — and a red "No access"
+ * lock on the realtime chip, with their edits piling up unsent. Nothing in
+ * the app could show them why. This can.
+ */
+function ServerAccess({
+  projectId,
+  localMembers,
+}: {
+  projectId: string
+  localMembers: ProjectMember[]
+}) {
+  const t = useI18n()
+  const myRole = useMyRole()
+  const [state, setState] = useState<ServerMembers | null>(null)
+  const [busy, setBusy] = useState('')
+
+  const load = useCallback(() => {
+    void serverAcl.members(projectId).then(setState)
+  }, [projectId])
+  useEffect(load, [load])
+
+  // a build with no realtime backend has no server ACL to disagree with, and
+  // a section that says so on every project is noise
+  if (!state || state.state === 'unconfigured') return null
+
+  const slots = state.state === 'ok' ? aclSlots(state.acl) : []
+  const onServer = new Set(slots.map((s) => s.email.toLowerCase()))
+  const localAddresses = new Set(
+    localMembers.map((m) => m.email.toLowerCase()).filter(Boolean),
+  )
+  // the ones the top-bar lock is about: this device grants them, the server does not
+  const missing =
+    state.state === 'ok'
+      ? localMembers.filter((m) => m.email && !onServer.has(m.email.toLowerCase()))
+      : []
+  const mayManage = can(myRole, 'members.manage')
+
+  const reserve = async (email: string, role: CollabRole) => {
+    setBusy(email)
+    const result = await serverAcl.setRole(projectId, email, role)
+    setBusy('')
+    if (result.ok) {
+      toast.success(t.share.serverReserved(displayAddress(email)))
+      load()
+    } else {
+      toast.error(t.share.serverReserveFailed, maskAddresses(result.error))
+    }
+  }
+
+  return (
+    <div className="mt-3 rounded-lg border border-bord bg-panel2/40 p-3">
+      <div className="flex items-center gap-2">
+        <IcLock size={12} className="flex-none text-muted" />
+        <span className="flex-1 text-[11.5px] font-semibold">{t.share.serverTitle}</span>
+        <button
+          className="icon-btn h-6 w-6"
+          title={t.share.serverRefresh}
+          aria-label={t.share.serverRefresh}
+          onClick={load}
+        >
+          <IcRefresh size={11} />
+        </button>
+      </div>
+      <p className="mt-1 text-[10.5px] leading-relaxed text-muted">{t.share.serverBody}</p>
+
+      {state.state === 'no-rooms' && (
+        <p className="mt-2 text-[11px] leading-relaxed text-muted">{t.share.serverNoRooms}</p>
+      )}
+      {(state.state === 'denied' || state.state === 'error') && (
+        <p className="mt-2 text-[11px] leading-relaxed text-[#f24822]">
+          {state.state === 'denied' ? `${t.share.serverDeniedTitle} — ` : ''}
+          {maskAddresses(state.error)}
+        </p>
+      )}
+
+      {state.state === 'ok' && (
+        <ul className="mt-2 flex flex-col gap-1">
+          {slots.length === 0 && (
+            <li className="text-[11px] text-muted">{t.share.serverEmpty}</li>
+          )}
+          {slots.map((slot) => (
+            <li key={`${slot.role}:${slot.email}`} className="flex items-center gap-2 text-[11.5px]">
+              <span className="min-w-0 flex-1 truncate">{displayAddress(slot.email)}</span>
+              {!localAddresses.has(slot.email.toLowerCase()) && (
+                <span className="flex-none rounded-full bg-[#ffa629]/15 px-1.5 text-[9.5px] font-medium text-[#ffa629]">
+                  {t.share.serverOnly}
+                </span>
+              )}
+              <span
+                className="flex-none text-[9.5px] text-muted"
+                title={slot.claimed ? t.share.serverBoundWhy : t.share.serverUnboundWhy}
+              >
+                {slot.claimed ? t.share.serverBound : t.share.serverUnbound}
+              </span>
+              <span className="w-20 flex-none text-right text-[10.5px] text-muted">
+                {t.roles[slot.role]}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {missing.length > 0 && (
+        <div className="mt-3 border-t border-bord pt-2">
+          <div className="text-[11px] font-semibold text-[#f24822]">
+            {t.share.serverMissingTitle}
+          </div>
+          <p className="mt-0.5 text-[10.5px] leading-relaxed text-muted">
+            {t.share.serverMissingBody}
+          </p>
+          <ul className="mt-1.5 flex flex-col gap-1">
+            {missing.map((member) => (
+              <li key={member.userId} className="flex items-center gap-2 text-[11.5px]">
+                <span className="min-w-0 flex-1 truncate">
+                  {displayAddress(member.email)}
+                </span>
+                <span className="flex-none text-[10.5px] text-muted">
+                  {t.roles[member.role]}
+                </span>
+                {mayManage && member.role !== 'owner' && (
+                  <button
+                    className="btn h-6 flex-none px-2 text-[10.5px]"
+                    disabled={busy === member.email}
+                    onClick={() => void reserve(member.email, member.role)}
+                  >
+                    {t.share.serverReserve}
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   )
 }
@@ -320,7 +468,7 @@ export function ShareDialog() {
       setEmail('')
       const link = inviteService.linkFor(result.invite)
       if (link) void navigator.clipboard.writeText(link)
-      const address = result.invite.email
+      const address = displayAddress(result.invite.email)
       /**
        * Three different things happened and the toast says which (18.2).
        * "Sent" and "there is no mail backend" used to be the same sentence,
@@ -342,6 +490,18 @@ export function ShareDialog() {
         toast.success(
           t.share.inviteCreated(address),
           link ? t.share.inviteCreatedBody : t.share.noLinkBody,
+        )
+      }
+      /**
+       * A second fact, and a different fix: the message may well have gone
+       * out while the ACL reservation did not. Saying it here is the whole
+       * point — the sender is the only person who can open the project once
+       * and give the realtime rooms something to write into.
+       */
+      if (result.reservationError) {
+        toast.warning(
+          t.share.inviteNotReserved,
+          t.share.inviteNotReservedBody(maskAddresses(result.reservationError)),
         )
       }
     })
@@ -462,6 +622,8 @@ export function ShareDialog() {
                 <InviteRow key={i.id} invite={i} projectId={projectId} />
               ))}
             </div>
+
+            <ServerAccess projectId={projectId} localMembers={activeMembers} />
 
             <div className="mt-2 flex items-start gap-2 rounded-lg bg-panel2 px-3 py-2 text-[10.5px] leading-relaxed text-muted">
               <IcEye size={12} className="mt-0.5 flex-none" />

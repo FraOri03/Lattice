@@ -116,6 +116,27 @@ export function roleOf(acl: RoomAcl, principal: Principal): CollabRole | null {
 }
 
 /**
+ * Every slot the ACL holds, highest rank first — the whole grant, flattened.
+ *
+ * For readers rather than for checks: an admin looking at "who can actually
+ * reach this project" needs the list the server enforces, and the five role
+ * arrays are an awkward shape to render. `claimed` is whether the slot has
+ * been bound to a userId, which is the difference between a person who has
+ * arrived and an address that is merely reserved for one.
+ */
+export function aclSlots(
+  acl: RoomAcl,
+): { email: string; role: CollabRole; claimed: boolean }[] {
+  const slots: { email: string; role: CollabRole; claimed: boolean }[] = []
+  for (const role of SLOTS) {
+    for (const email of slotList(acl, role)) {
+      slots.push({ email, role, claimed: !!acl.bindings[email] })
+    }
+  }
+  return slots
+}
+
+/**
  * The role a slot currently carries, addressed by the e-mail it was opened
  * with and independent of who may claim it.
  *

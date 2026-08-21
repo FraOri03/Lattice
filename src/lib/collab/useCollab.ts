@@ -4,6 +4,7 @@ import type { CollabRole, PresencePeer } from '@/types/collab'
 import { useCollabStore } from './collabStore'
 import { SESSION_ID, currentIdentity } from './CollaborationProvider'
 import { can, isReadOnly, type Capability } from './permissions'
+import { roleInProject } from './memberRole'
 
 /**
  * React hooks over the collaboration layer. Components use these instead
@@ -17,11 +18,7 @@ export function useMyRole(): CollabRole {
   const members = useCollabStore((s) => s.members[projectId])
   const viewAsRole = useCollabStore((s) => s.viewAsRole)
   return useMemo(() => {
-    const identity = currentIdentity()
-    const me = members?.find(
-      (m) => m.userId === identity.userId && m.status === 'active',
-    )
-    const actual = me?.role ?? 'owner'
+    const actual = roleInProject(members, currentIdentity())
     if (viewAsRole && actual === 'owner') return viewAsRole
     return actual
   }, [members, viewAsRole])

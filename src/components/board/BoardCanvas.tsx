@@ -148,9 +148,21 @@ function Canvas() {
   const commentMode = useCollabStore((s) => s.commentMode)
   const setFocusedThread = useCollabStore((s) => s.setFocusedThread)
   const readOnly = useReadOnly()
+  /**
+   * The tier is read on its own line, and that is not a style preference:
+   * inlining the call into the `&&` below made it a CONDITIONAL hook. A
+   * read-only board short-circuits on `!readOnly`, so `useViewportTier` was
+   * never reached, every hook after it shifted up one, and React tore the
+   * whole canvas down with "change in the order of Hooks" — a blank screen.
+   *
+   * It survived because nothing reached it: `useMyRole` used to answer
+   * `owner` for any project it did not recognise, so `readOnly` was
+   * effectively never true here.
+   */
+  const tier = useViewportTier()
   // pan, zoom, open a card and comment survive every tier; dragging cards
   // around and drawing connections do not below 768px
-  const canLayOut = !readOnly && capabilityAt('board', useViewportTier()) === 'edit'
+  const canLayOut = !readOnly && capabilityAt('board', tier) === 'edit'
   const { screenToFlowPosition, fitBounds } = useReactFlow()
   const peers = usePeers()
 

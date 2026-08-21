@@ -188,6 +188,9 @@ export const en = {
     inviteEmailedBody: 'The link is on your clipboard too, if you would rather send it yourself.',
     inviteMailFailed: 'The invitation exists, but the e-mail was not sent',
     inviteMailFailedBody: 'The link is copied — send it yourself, or try resending later.',
+    inviteNotReserved: 'The invitation exists, but the server did not reserve their access',
+    inviteNotReservedBody: (error: string) =>
+      `${error} Until it does, they will open the project and the realtime backend will refuse them.`,
     // member row
     you: '(you)',
     activeAgo: (ago: string) => `active ${ago}`,
@@ -217,6 +220,27 @@ export const en = {
     resendTitle: 'Resend (mints a new link; the previous one stops working)',
     resendAria: 'Resend invite',
     revoke: 'Revoke invite',
+    // what the server enforces, as opposed to what this device believes
+    serverTitle: 'What the server enforces',
+    serverBody:
+      'The list above is this device’s. The realtime token is minted from this one, so where they disagree, this is what actually decides.',
+    serverRefresh: 'Re-read from the server',
+    serverNoRooms:
+      'This project has no realtime rooms yet. Its owner creates them by opening the project once with realtime connected; until then nobody is enforced and nobody is refused.',
+    serverDeniedTitle: 'The server does not recognise you here',
+    serverEmpty: 'The server lists nobody for this project.',
+    serverBound: 'claimed',
+    serverBoundWhy:
+      'This address has been proved by whoever signed in with it, and the slot now answers only to them.',
+    serverUnbound: 'reserved',
+    serverUnboundWhy: 'Reserved for this address; nobody has signed in and claimed it yet.',
+    serverOnly: 'not in your list',
+    serverMissingTitle: 'In your list, not on the server',
+    serverMissingBody:
+      'These people see the project and can edit it on their own device, and every realtime write they make is refused. Reserving the address is what makes the grant real.',
+    serverReserve: 'Reserve on the server',
+    serverReserved: (email: string) => `${email} now has access on the server too.`,
+    serverReserveFailed: 'The server refused the reservation',
     // members footer note
     footerNote:
       'An invitation can only be accepted by the address it was sent to. To see the app as another role without a second person, use “Preview as role” in Settings.',
@@ -1086,6 +1110,26 @@ export const en = {
         'Drops the Google token and asks Google to revoke it. Lattice loses access to the folder immediately; the files that are already there stay in your Drive, and the local vault is untouched.',
       revoke: 'Revoke access',
       revokeUnavailable: 'There is no Drive token to revoke.',
+      sharingTitle: 'Access other people hold',
+      sharingBody:
+        'Every membership and every open invitation in this vault that is not yours, across every project — including the records of projects the vault no longer holds. Revoking keeps your own address and removes the rest: here, and on the server wherever it is the one enforcing them.',
+      sharingKept: (email: string) => `Keeping ${email} — the account signed in here.`,
+      sharingNone: 'Nothing to revoke: every membership and every open invitation is yours.',
+      sharingFound: (people: number, projects: number) =>
+        `${people} other ${people === 1 ? 'address' : 'addresses'}, in ${projects} ${projects === 1 ? 'project' : 'projects'}.`,
+      sharingRevoke: 'Revoke all other access',
+      sharingUnavailable:
+        'Sign in with the account whose access should survive — a sweep keeps the address it can prove.',
+      sharingConfirmTitle: 'Revoke everyone else?',
+      sharingConfirmBody: (addresses: string) =>
+        `These lose access: ${addresses}. Whatever already reached their devices stays there — this closes the door, it does not reach through it.`,
+      sharingConfirm: 'Revoke them',
+      sharingDone: (members: number, invites: number, projects: number) =>
+        `${members} membership${members === 1 ? '' : 's'} and ${invites} invitation${invites === 1 ? '' : 's'}, in ${projects} ${projects === 1 ? 'project' : 'projects'}.`,
+      sharingReclaimed: (n: number) =>
+        `${n} ${n === 1 ? 'project' : 'projects'} had an owner who was not you; you own ${n === 1 ? 'it' : 'them'} here now.`,
+      sharingRefused: (n: number) =>
+        `${n} the server would not drop — it still records somebody else as owner there.`,
       protectionTitle: 'What protects your work',
       protectionVault:
         'The vault lives in this browser profile. Lattice adds no encryption of its own, so anyone who can open this browser can open the vault — encryption at rest is designed and not built.',
@@ -1352,6 +1396,9 @@ export const it: Catalog = {
     invalidEmail: 'Indirizzo email non valido',
     inviteEmailed: (email) => `Invito inviato per e-mail a ${email}`,
     inviteEmailedBody: 'Il link è anche negli appunti, se preferisci mandarlo tu.',
+    inviteNotReserved: 'L’invito esiste, ma il server non ha prenotato il suo accesso',
+    inviteNotReservedBody: (error) =>
+      `${error} Finché non lo fa, aprirà il progetto e il backend realtime lo rifiuterà.`,
     inviteMailFailed: 'L’invito esiste, ma l’e-mail non è partita',
     inviteMailFailedBody:
       'Il link è copiato: mandalo tu, oppure riprova a reinviare più tardi.',
@@ -1386,6 +1433,27 @@ export const it: Catalog = {
     resendTitle: 'Reinvia (genera un link nuovo; il precedente smette di funzionare)',
     resendAria: 'Reinvia invito',
     revoke: 'Revoca invito',
+    serverTitle: 'Cosa fa valere il server',
+    serverBody:
+      'La lista qui sopra è di questo dispositivo. Il token realtime nasce da questa, quindi dove le due non concordano è questa a decidere davvero.',
+    serverRefresh: 'Rileggi dal server',
+    serverNoRooms:
+      'Questo progetto non ha ancora stanze realtime. Le crea il proprietario aprendo il progetto una volta col realtime collegato; fino ad allora nessuno è imposto e nessuno è rifiutato.',
+    serverDeniedTitle: 'Il server non ti riconosce qui',
+    serverEmpty: 'Il server non elenca nessuno per questo progetto.',
+    serverBound: 'confermato',
+    serverBoundWhy:
+      'L’indirizzo è stato dimostrato da chi ci ha fatto accesso, e lo slot ora risponde solo a lui.',
+    serverUnbound: 'prenotato',
+    serverUnboundWhy:
+      'Prenotato per questo indirizzo; nessuno ha ancora fatto accesso e lo ha reclamato.',
+    serverOnly: 'non nella tua lista',
+    serverMissingTitle: 'Nella tua lista, non sul server',
+    serverMissingBody:
+      'Queste persone vedono il progetto e sul loro dispositivo possono modificarlo, e ogni scrittura realtime che fanno viene rifiutata. È la prenotazione dell’indirizzo a rendere vero il permesso.',
+    serverReserve: 'Prenota sul server',
+    serverReserved: (email) => `${email} ora ha accesso anche sul server.`,
+    serverReserveFailed: 'Il server ha rifiutato la prenotazione',
     footerNote:
       'Un invito può essere accettato solo dall’indirizzo a cui è stato mandato. Per vedere l’app con un altro ruolo senza una seconda persona, usa “Anteprima come ruolo” nelle Impostazioni.',
     previewAsRole: 'Anteprima come ruolo',
@@ -2152,6 +2220,27 @@ export const it: Catalog = {
         'Elimina il token Google e ne chiede la revoca a Google. Lattice perde subito l’accesso alla cartella; i file già lì restano nel tuo Drive, e il vault locale non viene toccato.',
       revoke: 'Revoca l’accesso',
       revokeUnavailable: 'Non c’è nessun token Drive da revocare.',
+      sharingTitle: 'Accessi in mano ad altri',
+      sharingBody:
+        'Ogni appartenenza e ogni invito aperto in questo vault che non sia tuo, in tutti i progetti — compresi i record di progetti che il vault non ha più. La revoca tiene il tuo indirizzo e toglie il resto: qui, e sul server dove è lui a farli valere.',
+      sharingKept: (email) => `Resta ${email} — l’account collegato qui.`,
+      sharingNone:
+        'Niente da revocare: ogni appartenenza e ogni invito aperto sono tuoi.',
+      sharingFound: (people, projects) =>
+        `${people} ${people === 1 ? 'altro indirizzo' : 'altri indirizzi'}, in ${projects} ${projects === 1 ? 'progetto' : 'progetti'}.`,
+      sharingRevoke: 'Revoca tutti gli altri accessi',
+      sharingUnavailable:
+        'Accedi con l’account il cui accesso deve sopravvivere: la pulizia tiene l’indirizzo che riesce a dimostrare.',
+      sharingConfirmTitle: 'Revocare a tutti gli altri?',
+      sharingConfirmBody: (addresses) =>
+        `Perdono l’accesso: ${addresses}. Quello che è già arrivato sui loro dispositivi resta lì — questo chiude la porta, non ci passa attraverso.`,
+      sharingConfirm: 'Revoca',
+      sharingDone: (members, invites, projects) =>
+        `${members} ${members === 1 ? 'appartenenza' : 'appartenenze'} e ${invites} ${invites === 1 ? 'invito' : 'inviti'}, in ${projects} ${projects === 1 ? 'progetto' : 'progetti'}.`,
+      sharingReclaimed: (n) =>
+        `${n} ${n === 1 ? 'progetto aveva' : 'progetti avevano'} un proprietario che non eri tu; ora qui ${n === 1 ? 'è tuo' : 'sono tuoi'}.`,
+      sharingRefused: (n) =>
+        `${n} il server non li ha tolti: là risulta ancora proprietario qualcun altro.`,
       protectionTitle: 'Cosa protegge il tuo lavoro',
       protectionVault:
         'Il vault vive in questo profilo del browser. Lattice non aggiunge cifratura propria: chi può aprire questo browser può aprire il vault — la cifratura a riposo è progettata, non realizzata.',

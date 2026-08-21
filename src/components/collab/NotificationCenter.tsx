@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from 'react'
 import { useStore } from '@/store/useStore'
 import { useCollabStore } from '@/lib/collab/collabStore'
 import { AnchoredPopover } from '@/components/ui/AnchoredPopover'
+import { maskAddresses } from '@/lib/auth/addressAlias'
 import { focusAreaOnBoard } from './CommentAreas'
 import type { AppNotification, NotificationType } from '@/types/collab'
 import {
@@ -156,8 +157,12 @@ export function NotificationCenter() {
             >
               <span className="mt-0.5 flex-none text-muted">{TYPE_ICON[n.type]}</span>
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-[12px] font-semibold">{n.title}</span>
-                <span className="block truncate text-[11px] text-muted">{n.body}</span>
+                <span className="block truncate text-[12px] font-semibold">
+                  {maskAddresses(n.title)}
+                </span>
+                <span className="block truncate text-[11px] text-muted">
+                  {maskAddresses(n.body)}
+                </span>
               </span>
               <span className="flex-none text-[9.5px] text-muted">{timeAgo(n.createdAt)}</span>
             </button>
