@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { usePhotoStore } from '@/store/photoStore'
 import { generateSetLayout, getPhotoAiKey, setPhotoAiKey } from '@/lib/photo/ai'
+import { AiJobError, aiFailureMessage } from '@/lib/ai'
+import { useI18n } from '@/lib/i18n'
 import { IcAlert, IcCheckCircle, IcSend, IcSparkles, IcX } from '@/components/Icons'
 
 const FIELD =
@@ -39,8 +41,10 @@ const LOADING_STEPS = [
 
 /** Right-side AI panel: prompt → generated set layout for the active shot. */
 export function PhotoAI() {
+  const t = useI18n()
   const loadRawElements = usePhotoStore((s) => s.loadRawElements)
   const setAiPanelOpen = usePhotoStore((s) => s.setAiPanelOpen)
+  const projectId = usePhotoStore((s) => s.projectId)
 
   const [prompt, setPrompt] = useState('')
   const [apiKey, setApiKey] = useState(getPhotoAiKey())
@@ -67,7 +71,7 @@ export function PhotoAI() {
       })()
       const [, result] = await Promise.all([
         stepPromise,
-        generateSetLayout(selectedPrompt, { forceOffline }),
+        generateSetLayout(selectedPrompt, { forceOffline, projectId: projectId ?? '' }),
       ])
 
       loadRawElements(result.elements)
@@ -78,7 +82,16 @@ export function PhotoAI() {
         `${result.source === 'gemini' ? 'Gemini' : 'Offline template'} placed ${cameras} camera${cameras === 1 ? '' : 's'}, ${lights} light${lights === 1 ? '' : 's'} and ${others} scene element${others === 1 ? '' : 's'} in the active shot.`,
       )
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error — check the API key.')
+      // The seam answers with a reason as well as a sentence, so the panel
+      // can say what happened AND whether retrying is worth it — in the
+      // reader's language rather than the vendor's.
+      setError(
+        err instanceof AiJobError
+          ? aiFailureMessage(t, err.failure)
+          : err instanceof Error
+            ? err.message
+            : 'Unknown error — check the API key.',
+      )
     } finally {
       setIsLoading(false)
     }

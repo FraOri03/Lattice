@@ -356,7 +356,7 @@ describe('what the provider refuses without calling the server', () => {
 describe('failures the server reports', () => {
   it.each([
     ['no-credit', 402, 'no'],
-    ['no-worker', 503, 'later'],
+    ['no-capacity', 503, 'later'],
     ['model-missing', 500, 'no'],
     ['not-configured', 501, 'no'],
   ] as const)('maps %s and states whether retrying helps', async (reason, status, retry) => {

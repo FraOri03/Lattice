@@ -118,6 +118,23 @@ export const hasConversionBackend = env.conversionApiUrl.length > 0
 export const hasMediaCalls = env.livekitUrl.length > 0 && hasRealtimeBackend
 
 /**
+ * True when this build offers an AI backend of any kind.
+ *
+ * The predicate the settings panel reads. It says only that a backend was
+ * *selected* at build time — whether the server behind it has a key, an
+ * endpoint and credit is a runtime question the seam asks
+ * (`/api/ai/capabilities`), because a deployment has to be able to withdraw
+ * AI without a redeploy.
+ *
+ * Note what it deliberately does not cover: Photo mode's set designer runs
+ * on templates with nothing configured at all, and on a third-party model
+ * as soon as the user pastes their own key. Neither is a *deployment*
+ * backend, so neither turns this on — the connections panel is about what
+ * this build talks to, not about what a user has connected for themselves.
+ */
+export const hasAiBackend = env.aiBackend.length > 0
+
+/**
  * True when this build was compiled with the hosted AI backend selected.
  *
  * A *build-time* answer, and only the first half of the question: whether

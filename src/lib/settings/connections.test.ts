@@ -9,6 +9,7 @@ const inputs = (patch: Partial<ConnectionInputs> = {}): ConnectionInputs => ({
   hasRealtimeBackend: false,
   hasMediaCalls: false,
   hasConversionBackend: false,
+  hasAiBackend: false,
   ...patch,
 })
 
@@ -17,7 +18,7 @@ const of = (id: ServiceId, patch: Partial<ConnectionInputs> = {}) =>
 
 describe('the unconfigured build', () => {
   it('says a service was left out rather than pretending it is off by choice', () => {
-    for (const id of ['drive', 'realtime', 'livekit', 'conversion'] as ServiceId[]) {
+    for (const id of ['drive', 'realtime', 'livekit', 'conversion', 'ai'] as ServiceId[]) {
       const service = of(id)
       expect([id, service.state]).toEqual([id, 'unconfigured'])
       expect(service.action).toBe('none')
@@ -78,5 +79,30 @@ describe('identity is not storage is not sync', () => {
       'unconfigured',
     )
     expect(of('conversion', { hasConversionBackend: true }).state).toBe('connected')
+  })
+})
+
+describe('AI', () => {
+  /**
+   * The panel is about what this BUILD talks to. Photo mode's set designer
+   * runs on templates with nothing configured, and on a third-party model
+   * as soon as the user pastes their own key — neither is a deployment
+   * backend, and claiming "connected" for either would take credit for
+   * something this deployment neither runs nor pays for.
+   */
+  it('reports unconfigured on a build with no AI backend', () => {
+    expect(of('ai')).toMatchObject({
+      state: 'unconfigured',
+      action: 'none',
+      configuredBy: 'VITE_AI_BACKEND',
+    })
+  })
+
+  it('reports connected once a backend was selected at build time', () => {
+    expect(of('ai', { hasAiBackend: true }).state).toBe('connected')
+  })
+
+  it('offers nothing to click either way', () => {
+    expect(of('ai', { hasAiBackend: true }).action).toBe('none')
   })
 })

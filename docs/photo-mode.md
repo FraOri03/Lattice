@@ -14,10 +14,16 @@ shot list is a **sequence**: shots can be reordered from the timeline, and their
 numbers are positional, so they always read 1..n in the order shown. Elements are
 drawn with the **Photoicons** top-down artwork.
 
-An **AI set designer** (`src/lib/photo/ai.ts`) can propose a setup from a prompt — it
-is **BYOK** (bring your own key) and degrades to an offline heuristic when no key is
-present, so the mode is fully usable without any network call. Scenes import/export
-as JSON.
+An **AI set designer** can propose a setup from a prompt — it is **BYOK** (bring your
+own key) and degrades to offline templates when no key is present, so the mode is
+fully usable without any network call. Scenes import/export as JSON.
+
+Since Phase 21.0 it runs on the shared AI provider seam rather than on its own
+private path: `design-set` is an action in the catalogue, the vendor call and the
+templates are two providers, and `src/lib/photo/ai.ts` is the adapter between them
+and Photo mode's vocabulary. The key is still the user's, still stored per account,
+and still sent only to Google. What the move bought — and what it cost the seam — is
+in [architecture/ai.md](architecture/ai.md).
 
 ## Board integration
 

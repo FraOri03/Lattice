@@ -170,8 +170,8 @@ describe('HTTP failures from RunPod', () => {
     [403, 'not-configured'],
     [404, 'not-configured'],
     [402, 'no-credit'],
-    [429, 'no-worker'],
-    [503, 'no-worker'],
+    [429, 'no-capacity'],
+    [503, 'no-capacity'],
     [500, 'upstream-error'],
   ] as const)('maps %i to %s', (status, reason) => {
     expect(upstreamFailure(status, '').reason).toBe(reason)

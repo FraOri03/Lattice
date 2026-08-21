@@ -1,4 +1,4 @@
-import type { AiActionId } from './actions.js'
+import type { AiActionId, AiAssetKind } from './actions.js'
 
 /**
  * The AI job lifecycle and the failure taxonomy.
@@ -91,8 +91,16 @@ export type AiFailureReason =
   | 'invalid-parameters'
   /** The RunPod account is out of credit. */
   | 'no-credit'
-  /** RunPod has no worker to give — capacity, not a fault. */
-  | 'no-worker'
+  /**
+   * The backend has nothing free to run this on — capacity, not a fault.
+   *
+   * Named for the shortage rather than for a GPU worker: the same state is
+   * a queued serverless endpoint, a rate-limited vendor API, and a local
+   * ComfyUI already busy with another job. The first version of this list
+   * called it `no-worker`, which was a RunPod word in a file that is
+   * supposed to outlive RunPod.
+   */
+  | 'no-capacity'
   /** The endpoint is running a container without the model this action needs. */
   | 'model-missing'
   /** Anything the upstream reported that is none of the above. */
@@ -138,7 +146,7 @@ export const AI_FAILURES: Readonly<Record<AiFailureReason, AiFailureShape>> = {
   'input-too-large': { retry: 'after-change', billed: false },
   'invalid-parameters': { retry: 'after-change', billed: false },
   'no-credit': { retry: 'no', billed: false },
-  'no-worker': { retry: 'later', billed: false },
+  'no-capacity': { retry: 'later', billed: false },
   'model-missing': { retry: 'no', billed: false },
   // The upstream already had the job when it broke, so some of it may have
   // run. Retrying is the user's call, never the client's.
@@ -196,10 +204,27 @@ export interface AiJobSnapshot {
   readonly failure?: AiFailure
 }
 
+/**
+ * One thing a job produced.
+ *
+ * Two shapes, because the catalogue holds two kinds of work. A GPU worker
+ * writes bytes somewhere and hands back a `url`; a language model answering
+ * with a structured layout has no bytes to write, and its answer IS the
+ * result — so it comes back in `value`.
+ *
+ * `value` is `unknown` on purpose, and it is the one deliberately untyped
+ * field in the seam. The alternative is the catalogue importing the model
+ * types of every consumer that might ever receive an output, which is the
+ * coupling this file exists to prevent — pointing the other way. The
+ * action's declared `output` kind is what tells a caller how to narrow it,
+ * and the adapter that asked for the action is the only code that should.
+ */
 export interface AiJobOutput {
+  readonly kind: AiAssetKind
   /** Where the result can be fetched. 21.5 decides where it then lives. */
-  readonly url: string
-  readonly kind: 'image'
+  readonly url?: string
+  /** The result itself, for an output that is structure rather than bytes. */
+  readonly value?: unknown
   readonly bytes?: number
 }
 

@@ -37,6 +37,7 @@ import type {
 } from '@/lib/theme/appearance'
 import {
   env,
+  hasAiBackend,
   hasConversionBackend,
   hasGoogleAuth,
   hasMediaCalls,
@@ -54,6 +55,7 @@ import {
   IcLogOut,
   IcMic,
   IcRefresh,
+  IcSparkles,
   IcTrash,
   IcUpload,
   IcUser,
@@ -470,6 +472,7 @@ const SERVICE_ICON: Record<ServiceId, typeof IcDrive> = {
   realtime: IcUsers,
   livekit: IcMic,
   conversion: IcRefresh,
+  ai: IcSparkles,
 }
 
 /**
@@ -554,6 +557,7 @@ function ConnectionsPanel() {
     hasRealtimeBackend,
     hasMediaCalls,
     hasConversionBackend,
+    hasAiBackend,
   })
 
   const act = (id: ServiceId, action: ServiceAction) => {

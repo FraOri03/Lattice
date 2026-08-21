@@ -61,12 +61,20 @@ export function endpointFor(gpuClass: GpuClass): string {
   )
 }
 
-/** Actions this deployment can actually run right now. */
+/**
+ * Actions this deployment can actually run right now.
+ *
+ * An action with no GPU class is not a RunPod action at all — the catalogue
+ * holds more than GPU work, and Photo mode's set designer is answered by a
+ * language model in the browser. Filtering on the class rather than
+ * defaulting it keeps this endpoint from claiming work it cannot do.
+ */
 export function availableActions(): AiActionId[] {
   if (!runpodKey()) return []
-  return (Object.keys(AI_ACTIONS) as AiActionId[]).filter(
-    (id) => endpointFor(AI_ACTIONS[id].gpuClass).length > 0,
-  )
+  return (Object.keys(AI_ACTIONS) as AiActionId[]).filter((id) => {
+    const gpuClass = AI_ACTIONS[id].gpuClass
+    return gpuClass !== undefined && endpointFor(gpuClass).length > 0
+  })
 }
 
 export function aiConfigured(): boolean {
@@ -297,7 +305,7 @@ export function upstreamFailure(status: number, body: string): UpstreamError {
     )
   }
   if (status === 429 || status === 503) {
-    return new UpstreamError('no-worker', 'RunPod has no worker available right now.')
+    return new UpstreamError('no-capacity', 'RunPod has no worker available right now.')
   }
   return new UpstreamError('upstream-error', `RunPod answered ${status}: ${detail}`)
 }

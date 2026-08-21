@@ -1174,6 +1174,7 @@ export const en = {
         realtime: 'Realtime backend',
         livekit: 'LiveKit calls',
         conversion: 'Conversion worker',
+        ai: 'AI backend',
       },
       gets: {
         drive:
@@ -1186,6 +1187,8 @@ export const en = {
           'Audio, camera and screen while a call is running. The media goes to LiveKit, never into the vault.',
         conversion:
           'Only the file you ask it to convert, for as long as the conversion takes.',
+        ai:
+          'The prompt and any image you hand an AI action, for as long as the job runs. Photo mode’s set designer is separate: it works from templates on this device, and uses a model only if you add your own key.',
       },
       configuredBy: (variable: string) =>
         `Decided when this build was made (${variable}), so there is nothing to switch here.`,
@@ -1336,7 +1339,7 @@ export const en = {
       'input-too-large': 'That image is too large to send. Try one under 3 MB.',
       'invalid-parameters': 'Some settings are outside the range this action accepts.',
       'no-credit': 'The GPU account behind this deployment is out of credit.',
-      'no-worker': 'No GPU is free right now.',
+      'no-capacity': 'No GPU is free right now.',
       'model-missing': 'The worker does not have the model this action needs.',
       'upstream-error': 'The GPU backend failed while running this job.',
       cancelled: 'You cancelled this generation.',
@@ -2421,6 +2424,7 @@ export const it: Catalog = {
         realtime: 'Backend realtime',
         livekit: 'Chiamate LiveKit',
         conversion: 'Worker di conversione',
+        ai: 'Backend AI',
       },
       gets: {
         drive:
@@ -2433,6 +2437,8 @@ export const it: Catalog = {
           'Audio, videocamera e schermo mentre una chiamata è in corso. I flussi vanno a LiveKit, mai dentro il vault.',
         conversion:
           'Solo il file che chiedi di convertire, per il tempo della conversione.',
+        ai:
+          'Il prompt e le eventuali immagini che passi a un’azione AI, per la durata del lavoro. Il set designer di Photo mode è un’altra cosa: lavora da template su questo dispositivo e usa un modello solo se aggiungi la tua chiave.',
       },
       configuredBy: (variable) =>
         `Deciso quando è stata compilata questa build (${variable}): qui non c’è niente da attivare.`,
@@ -2581,7 +2587,7 @@ export const it: Catalog = {
       'input-too-large': 'Immagine troppo grande per l’invio. Provane una sotto i 3 MB.',
       'invalid-parameters': 'Alcuni valori sono fuori dall’intervallo accettato da questa azione.',
       'no-credit': 'L’account GPU dietro questo deploy ha esaurito il credito.',
-      'no-worker': 'Nessuna GPU libera in questo momento.',
+      'no-capacity': 'Nessuna GPU libera in questo momento.',
       'model-missing': 'Il worker non ha il modello richiesto da questa azione.',
       'upstream-error': 'Il backend GPU si è interrotto durante il lavoro.',
       cancelled: 'Hai annullato questa generazione.',

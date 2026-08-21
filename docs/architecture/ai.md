@@ -3,14 +3,14 @@
 What an AI action is, who runs it, what it costs, and what the app does
 when nothing is configured — which is the default.
 
-Phase 21. This document is opened by
-[21.1](https://github.com/FraOri03/Lattice/issues/100), the hosted RunPod
-backend, and covers the seam it had to be written against, the job
-lifecycle, the failure taxonomy, and the deployment numbers. The catalogue
-and the local backend belong to
-[21.0](https://github.com/FraOri03/Lattice/issues/261) and
-[21.6](https://github.com/FraOri03/Lattice/issues/264) and will extend what
-is here rather than replace it.
+Phase 21.
+[21.0](https://github.com/FraOri03/Lattice/issues/261) settles the
+vocabulary — the action catalogue, the provider seam, the job model, the
+failure taxonomy and the honest default;
+[21.1](https://github.com/FraOri03/Lattice/issues/100) is the hosted RunPod
+backend written against it, and brought the job lifecycle and the deployment
+numbers. The local ComfyUI backend and the switch between them are
+[21.6](https://github.com/FraOri03/Lattice/issues/264).
 
 ## The default is off, and that is a feature
 
@@ -29,9 +29,12 @@ src/lib/ai/
   jobModel.ts           states, transitions, failure taxonomy   (shared with api/)
   protocol.ts           the /api/ai/* wire contract             (shared with api/)
   AiBackendProvider.ts  the interface + DisabledAiProvider
+  index.ts              the registry: which provider runs which action
   backoff.ts            the polling schedule
+  immediateJob.ts       a job handle for a backend that answers in one trip
   jobStore.ts           the vault record that survives a reload
-  RunPodAiProvider.ts   the hosted implementation
+  RunPodAiProvider.ts   the hosted GPU implementation
+  providers/            GeminiSetDesignProvider, OfflineSetDesignProvider
   strings.ts            EN/IT sentences for every state and failure
 ```
 
@@ -48,6 +51,115 @@ Three files are **shared verbatim** with `api/`, the same way
 are dependency-free and imported with `.js` extensions, so a parameter range
 the browser enforces is literally the same function the endpoint enforces.
 The browser can only ever *predict* what the server decides.
+
+## The action catalogue
+
+A closed, typed list of what the product can ask a backend to do, with **no
+vendor field anywhere in it**. A ComfyUI node name or a RunPod endpoint id in
+[`actions.ts`](../../src/lib/ai/actions.ts) would couple every consumer to
+today's backend; the mapping from an action to the artefact that runs it is
+the server's (21.2) and is never shipped to the browser.
+
+Each action declares a stable id, its input and output kinds, its parameters
+with ranges and defaults, whether it is reproducible from a seed, its input
+cap, its deadline, and — *optionally* — the GPU class a GPU backend should
+run it on.
+
+| Action | In | Out | GPU class | Deterministic |
+|---|---|---|---|---|
+| `text-to-image` | — | image | standard | with a seed |
+| `image-to-image` | image | image | standard | with a seed |
+| `upscale` | image | image | light | no |
+| `background-removal` | image | image | light | no |
+| `inpaint` | image + mask | image | heavy | with a seed |
+| `design-set` | — | scene | *none* | no |
+
+`invalidParams()` is the pure function that checks a parameter bag against
+those ranges, and it is shared verbatim with `/api/ai/submit` — one
+definition of a range, checked on both sides, with nothing to drift.
+
+## Capability negotiation, and the disclosure
+
+**The UI asks the provider; it never hard-codes a vendor's abilities.**
+
+`canRun(action)` is the cheap prediction. `capabilities()` is the answer, and
+it is asked at *runtime* because every other backend predicate in
+`src/lib/env.ts` is a build-time constant and AI must not be one: a key can
+be revoked, an endpoint deleted, credit exhausted — and a user can paste or
+clear their own key without anything being rebuilt.
+
+Before a job runs, the surface owes the user three facts. They come from two
+halves of the seam, because neither half can answer for the other:
+
+- **What leaves** — `dataCarriedBy(action)`: nothing, a prompt, inputs, or
+  both. Derived from what the action declares, so it cannot drift from it.
+- **Where it goes, and who pays** — `provider.disclosure`: a `destination` of
+  `device`, `deployment` or `third-party`, and a `cost` of `free`,
+  `deployment` or `your-key`.
+
+The same `upscale` sends the same image whether it lands on a rented GPU, on
+the user's own machine, or nowhere at all — which is exactly why the two are
+separate.
+
+### The registry
+
+`resolveAiProvider(action, { localOnly })` returns the first provider that
+can run the action, in a deliberate order: the hosted GPU backend, then a
+third-party model the user holds a key for, then the offline templates, then
+`DisabledAiProvider`. `localOnly` skips anything that sends bytes — which is
+what "use the offline layout instead" means, expressed as a constraint
+rather than as a named provider. 21.6 turns this order into a preference the
+user sets.
+
+## The migration that tested the contract
+
+Photo mode's set designer was a hard-coded call to Gemini with its own key
+storage, its own error handling and its own offline fallback. It worked, and
+it was exactly what must not be repeated once per feature — so 21.0 moved it
+onto this seam, and that migration is the only real evidence the seam is a
+contract rather than a description of RunPod.
+
+It is a genuinely awkward fit, which is the point: no GPU, no queue, a
+third-party vendor, the user's own credential, and an answer that is a layout
+rather than an image. Four things had to change, and all four were the seam
+being wrong rather than the feature being special:
+
+1. **`gpuClass` became optional.** `design-set` has no GPU class, and
+   inventing one would have been a field that lies. A GPU provider now reads
+   exactly that field to decide what it can take.
+2. **An output can be a value, not only a URL.** A worker writes bytes
+   somewhere and returns a link; a model answering with structure *is* the
+   result. `AiJobOutput.value` is deliberately `unknown` — the alternative is
+   the catalogue importing the model types of every possible consumer, which
+   is the coupling it exists to prevent, pointing the other way. The action's
+   declared output kind is what tells a caller how to narrow it.
+3. **`immediateJob` was added.** A backend that answers in one round trip
+   reports `running` and then a terminal state, with the same abort, the same
+   deadline and the same taxonomy as a job that queues for a minute. 21.6's
+   local ComfyUI and 21.9's fake provider get it for free.
+4. **`disclosure` was added, and one failure was renamed.** `id` was carrying
+   two questions: `local | hosted | disabled` answers "does it leave the
+   device" cleanly and says nothing about who is billed — and a third-party
+   model on the user's own key is `hosted` while costing the deployment
+   nothing. Separately, `no-worker` became `no-capacity`: a rate-limited
+   vendor API and a serverless endpoint with no free worker are the same fact
+   to a user, and the old name was a RunPod word in a file meant to outlive
+   RunPod.
+
+What did **not** change is the feature. `PhotoAI.tsx` asks the same question
+and gets the same answer; [`src/lib/photo/ai.ts`](../../src/lib/photo/ai.ts)
+is now a short translation between Photo mode's vocabulary and the
+catalogue's. The templates still run with no key, no account and no network,
+which is why Photo mode never has to show "AI is unavailable".
+
+### The key stays the user's
+
+The Gemini key is stored per account via `vaultKey`, sent only to Google, and
+never to any Lattice endpoint. Storing it *is* the consent: there are no
+binary inputs on this action, and a dialog per prompt would be asking again
+for something whose entire configuration was the act of agreeing to it. What
+the surface still owes is the disclosure above — third-party, your key —
+shown before the first run rather than after.
 
 ## The trust boundary
 
@@ -175,10 +287,10 @@ retrying. A raw upstream error or a bare status code is never shown.
 | `consent-required` | after a change | no | A binary input would have been uploaded without explicit consent |
 | `input-too-large` | after a change | no | Over the 3 MB transport cap |
 | `invalid-parameters` | after a change | no | Outside the ranges the catalogue declares |
-| `no-credit` | no | no | The RunPod account is out of credit |
-| `no-worker` | later | no | Capacity, not a fault |
-| `model-missing` | no | no | The container does not have what the action needs (21.2) |
-| `upstream-error` | later | **yes** | RunPod had the job when it broke |
+| `no-credit` | no | no | The account behind the backend is out of credit |
+| `no-capacity` | later | no | Nothing free to run it on — a busy queue, a rate limit. Capacity, not a fault |
+| `model-missing` | no | no | The backend does not have what the action needs (21.2) |
+| `upstream-error` | later | **yes** | The backend had the job when it broke |
 | `cancelled` | yes | **yes** | The user, the deadline, or an abort |
 | `timed-out` | later | **yes** | Ran past its ceiling and was stopped |
 | `network-lost` | yes | **yes** | The browser stopped hearing about it; reattachment is the cure |
@@ -356,7 +468,16 @@ Server-side, never `VITE_`-prefixed:
 
 Client-side, and not a credential:
 
-- `VITE_AI_BACKEND` — `hosted`, `local`, or empty (the default).
+- `VITE_AI_BACKEND` — `hosted`, `local`, or empty (the default). It selects
+  which implementation of the seam is constructed and nothing more;
+  `hasAiBackend` in `src/lib/env.ts` reads it, and the connections panel
+  shows the row as *not in this build* when it is empty.
+
+Neither list covers Photo mode's set designer. It runs on templates with
+nothing configured at all, and on a third-party model as soon as the user
+pastes their own key — neither of which is a *deployment* backend, so
+neither turns `hasAiBackend` on. The connections panel is about what this
+build talks to, not about what a user has connected for themselves.
 
 ## What is deliberately not here yet
 
@@ -368,5 +489,12 @@ Client-side, and not a credential:
 - **Where results are stored** (21.5). A completed job hands back URLs.
 - **Who pays in a shared project** (21.7). Today the check is the project
   role: a viewer cannot spend the owner's GPU credit.
-- **The local ComfyUI backend and the switch between them** (21.6).
-- **The in-app surface, and what the user is told about cost** (21.3).
+- **The local ComfyUI backend and the switch between them** (21.6). The
+  registry order in `index.ts` is a list this file decides; 21.6 makes it a
+  preference the user sets.
+- **The in-app surface, and what the user is told about cost** (21.3). The
+  seam can already answer what leaves, where it goes and who pays; nothing
+  yet shows it, apart from Photo mode's error messages.
+- **A translated Photo mode panel.** The failure sentences it shows now come
+  from the catalogue and are EN/IT; the rest of `PhotoAI.tsx` is still
+  English, and translating it is not this issue's to do.
