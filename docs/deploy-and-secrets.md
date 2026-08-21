@@ -30,13 +30,20 @@ hope.
 | `VITE_GOOGLE_CLIENT_ID` | An OAuth client id is an identifier; the secret half never leaves Google. |
 | `VITE_GITHUB_CLIENT_ID` | Same. `GITHUB_CLIENT_SECRET` is server-only. |
 | `VITE_LIVEKIT_URL` | An endpoint, not a credential. Access comes from a token signed server-side. |
+| `VITE_AI_BACKEND` | A switch (`hosted` / `local` / empty), not an address. It selects which provider is built; whether the server has a key is asked at runtime ([ai.md](architecture/ai.md)). |
 | `VITE_GOOGLE_API_KEY` | A *browser* key. Restricted by HTTP referrer in the Google console — the restriction is the control, not secrecy. |
 | `SUPABASE_ANON_KEY` / `SUPABASE_PUBLISHABLE_KEY` | Public by definition. RLS is enabled with no policies, so it grants nothing ([16.3](authorisation-phase-16-3.md)). |
 
 Everything else — `SUPABASE_SECRET_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
 `SUPABASE_JWT_SECRET`, `POSTGRES_PASSWORD`, `LIVEBLOCKS_SECRET_KEY`,
-`LIVEKIT_API_SECRET`, `GITHUB_CLIENT_SECRET`, `RESEND_API_KEY` — is
-server-only and must never acquire a `VITE_` prefix.
+`LIVEKIT_API_SECRET`, `GITHUB_CLIENT_SECRET`, `RESEND_API_KEY`,
+`RUNPOD_API_KEY`, `AI_JOB_SECRET` — is server-only and must never acquire a
+`VITE_` prefix.
+
+The `RUNPOD_ENDPOINT_*` ids belong to that list too, for a reason worth
+stating: an endpoint id is not a credential on its own, but there is no
+version of this app in which the browser needs one, and a variable the
+client cannot see is a variable that cannot leak with the next refactor.
 
 ## The environments
 
@@ -56,6 +63,7 @@ errors.
 | `LIVEKIT_API_KEY` / `_SECRET` | optional | ✓ | ✓ |
 | `SUPABASE_URL` + secret key | optional | **✗ today** | ✓ |
 | `RESEND_API_KEY` + `MAIL_FROM` | optional | ✓ | ✓ |
+| `RUNPOD_API_KEY` + `RUNPOD_ENDPOINT_STANDARD` | optional | optional | optional |
 
 **Local** reads `.env.local`, which is gitignored. Copy `.env.example` and
 fill in only what you need; everything left empty simply stays off.
@@ -125,6 +133,15 @@ holds a long-lived reference, so this one is quick.
 **`GITHUB_CLIENT_SECRET`.** GitHub allows two client secrets on one OAuth
 app for exactly this reason. Add, deploy, remove.
 
+**`RUNPOD_API_KEY`.** Create a second key, set it, redeploy, revoke the old
+one. One thing to know before you do: unless `AI_JOB_SECRET` is set, the
+job tickets and callback tokens are *derived from this key*, so rotating it
+invalidates every outstanding ticket. In practice that means a generation
+running at the moment of the rotation loses its ability to be polled or
+cancelled from the browser — it still runs, and still ends, and RunPod's
+own execution timeout still stops it. Set `AI_JOB_SECRET` explicitly if
+that matters for your deployment; then the two rotate independently.
+
 **Postgres password.** The hardest one, because the integration wrote the
 `POSTGRES_*` set. Rotating the database password in Supabase invalidates
 them all at once and there is no overlap window — do it only if the
@@ -175,6 +192,11 @@ having no check by a slower route.
   partition.
 - **It scans `dist/` only.** Serverless functions under `api/` are supposed
   to hold secrets; scanning them would flag the correct arrangement.
+- **A missing AI backend is not an error.** `RUNPOD_API_KEY` unset means
+  `/api/ai/capabilities` answers `configured: false` and the UI says AI is
+  unavailable. That is the honest default for every environment, including
+  production, and nothing in the table above should be read as a
+  requirement.
 - **The shape list is finite.** It covers the providers this project uses
   plus the common ones; a credential from a provider nobody has added yet
   will be caught by the value check or not at all.

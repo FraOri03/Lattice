@@ -5,6 +5,7 @@ import { resolveClaim } from '../../../src/lib/auth/identity.js'
 import type { IdentityClaim } from '../../../src/types/identity.js'
 import type { ProjectInvite } from '../../../src/types/collab.js'
 import type { MailSend } from '../../../src/types/mail.js'
+import type { AiJobRecord } from '../../../src/types/aiJob.js'
 import type { RoomAcl } from '../../../src/lib/collab/acl.js'
 import { roleOf } from '../../../src/lib/collab/acl.js'
 
@@ -401,6 +402,79 @@ describe('EntitlementRepository', () => {
   it('leaves other accounts alone', async () => {
     await db.entitlements.put('usr_ada', { plan: 'team' })
     expect((await db.entitlements.of('usr_grace')).plan).toBe('free')
+  })
+})
+
+/* ---------------- ai jobs ---------------- */
+
+const aiJob = (over: Partial<AiJobRecord> = {}): AiJobRecord => ({
+  jobId: 'job-1',
+  subject: 'g-1',
+  actionId: 'text-to-image',
+  gpuClass: 'standard',
+  projectId: 'p1',
+  state: 'queued',
+  callbackTokenHash: 'hash-1',
+  submittedAt: 1_700_000_000_000,
+  deadlineAt: 1_700_000_180_000,
+  closedAt: null,
+  failureReason: null,
+  executionMs: null,
+  ...over,
+})
+
+describe('AiJobRepository — the line a webhook closes', () => {
+  it('stores a job and reads it back through the row mappers', async () => {
+    await db.aiJobs.record(aiJob())
+    expect(await db.aiJobs.get('job-1')).toEqual(aiJob())
+  })
+
+  it('has nothing to say about a job it never recorded', async () => {
+    expect(await db.aiJobs.get('nope')).toBeNull()
+    expect(await db.aiJobs.close('nope', { state: 'succeeded', closedAt: 1 })).toBeNull()
+  })
+
+  it('closes an open job with its reason and worker time', async () => {
+    await db.aiJobs.record(aiJob())
+    const closed = await db.aiJobs.close('job-1', {
+      state: 'failed',
+      closedAt: 1_700_000_100_000,
+      failureReason: 'model-missing',
+      executionMs: 2_500,
+    })
+    expect(closed).toMatchObject({
+      state: 'failed',
+      failureReason: 'model-missing',
+      executionMs: 2_500,
+    })
+  })
+
+  /**
+   * The invariant that matters: a webhook and a poll race routinely, and the
+   * one that arrives second must not overwrite the first with a staler view
+   * of the same job.
+   */
+  it('refuses to reopen or rewrite a job that is already closed', async () => {
+    await db.aiJobs.record(aiJob())
+    await db.aiJobs.close('job-1', { state: 'cancelled', closedAt: 1, failureReason: 'cancelled' })
+    const second = await db.aiJobs.close('job-1', { state: 'succeeded', closedAt: 2 })
+    expect(second).toMatchObject({ state: 'cancelled', closedAt: 1 })
+  })
+
+  it('lists only what an account still has running', async () => {
+    await db.aiJobs.record(aiJob())
+    await db.aiJobs.record(aiJob({ jobId: 'job-2' }))
+    await db.aiJobs.record(aiJob({ jobId: 'job-3', subject: 'g-2' }))
+    await db.aiJobs.close('job-2', { state: 'succeeded', closedAt: 5 })
+
+    const open = await db.aiJobs.openFor('g-1')
+    expect(open.map((j) => j.jobId)).toEqual(['job-1'])
+  })
+
+  it('treats a repeated record of the same id as the same job', async () => {
+    await db.aiJobs.record(aiJob())
+    await db.aiJobs.record(aiJob({ state: 'running' }))
+    expect(await db.aiJobs.openFor('g-1')).toHaveLength(1)
   })
 })
 

@@ -10,6 +10,9 @@ import type { UsageType } from '../../../src/types/model.js'
 import type { Session } from '../../../src/types/session.js'
 import type { OtpCode } from '../../../src/types/otpRecord.js'
 import type { MailKind, MailSend } from '../../../src/types/mail.js'
+import type { AiJobRecord } from '../../../src/types/aiJob.js'
+import type { AiActionId, GpuClass } from '../../../src/lib/ai/actions.js'
+import type { AiFailureReason, AiJobState } from '../../../src/lib/ai/jobModel.js'
 
 /**
  * The shape the database actually stores, and the translation to and from
@@ -429,5 +432,56 @@ export function entitlementToRow(entitlement: Entitlement): EntitlementRow {
     current_period_end: toIsoOrNull(entitlement.currentPeriodEnd),
     created_at: toIso(entitlement.createdAt),
     updated_at: toIso(entitlement.updatedAt),
+  }
+}
+
+/* ---------------- ai jobs ---------------- */
+
+export interface AiJobRow {
+  id: string
+  subject: string
+  action_id: string
+  gpu_class: string
+  project_id: string
+  state: string
+  callback_token_hash: string
+  submitted_at: string
+  deadline_at: string
+  closed_at: string | null
+  failure_reason: string | null
+  execution_ms: number | null
+}
+
+export function aiJobFromRow(row: AiJobRow): AiJobRecord {
+  return {
+    jobId: row.id,
+    subject: row.subject,
+    actionId: row.action_id as AiActionId,
+    gpuClass: row.gpu_class as GpuClass,
+    projectId: row.project_id,
+    state: row.state as AiJobState,
+    callbackTokenHash: row.callback_token_hash,
+    submittedAt: fromIso(row.submitted_at),
+    deadlineAt: fromIso(row.deadline_at),
+    closedAt: fromIsoOrNull(row.closed_at),
+    failureReason: (row.failure_reason as AiFailureReason | null) ?? null,
+    executionMs: row.execution_ms,
+  }
+}
+
+export function aiJobToRow(job: AiJobRecord): AiJobRow {
+  return {
+    id: job.jobId,
+    subject: job.subject,
+    action_id: job.actionId,
+    gpu_class: job.gpuClass,
+    project_id: job.projectId,
+    state: job.state,
+    callback_token_hash: job.callbackTokenHash,
+    submitted_at: toIso(job.submittedAt),
+    deadline_at: toIso(job.deadlineAt),
+    closed_at: toIsoOrNull(job.closedAt),
+    failure_reason: job.failureReason,
+    execution_ms: job.executionMs,
   }
 }

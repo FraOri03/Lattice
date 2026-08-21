@@ -12,8 +12,10 @@ import { freeEntitlement } from '../../../src/types/entitlement.js'
 import type { Session } from '../../../src/types/session.js'
 import type { OtpCode } from '../../../src/types/otpRecord.js'
 import type { MailSend } from '../../../src/types/mail.js'
+import type { AiJobClosure, AiJobRecord } from '../../../src/types/aiJob.js'
 import type { RoomAcl } from '../../../src/lib/collab/acl.js'
 import type {
+  AiJobRepository,
   EntitlementRepository,
   IdentityRepository,
   InvitationRepository,
@@ -26,6 +28,8 @@ import type {
 } from './repositories.js'
 import {
   aclFromRows,
+  aiJobFromRow,
+  aiJobToRow,
   entitlementFromRow,
   entitlementToRow,
   identityFromRow,
@@ -41,6 +45,7 @@ import {
   toIso,
   userFromRow,
   userToRow,
+  type AiJobRow,
   type EntitlementRow,
   type IdentityRow,
   type InvitationRow,
@@ -74,6 +79,7 @@ const ENTITLEMENTS = 'entitlements'
 const SESSIONS = 'sessions'
 const OTP = 'email_otp_codes'
 const MAIL_SENDS = 'mail_sends'
+const AI_JOBS = 'ai_jobs'
 
 /** Postgres unique-violation; the only conflict this layer expects to lose. */
 const UNIQUE_VIOLATION = '23505'
@@ -98,6 +104,7 @@ export class SupabaseRepositories implements Repositories {
   readonly sessions: SessionRepository
   readonly otp: OtpRepository
   readonly mailSends: MailSendRepository
+  readonly aiJobs: AiJobRepository
 
   constructor(client: SupabaseClient) {
     this.identities = new SupabaseIdentityRepository(client)
@@ -107,6 +114,75 @@ export class SupabaseRepositories implements Repositories {
     this.sessions = new SupabaseSessionRepository(client)
     this.otp = new SupabaseOtpRepository(client)
     this.mailSends = new SupabaseMailSendRepository(client)
+    this.aiJobs = new SupabaseAiJobRepository(client)
+  }
+}
+
+/* ---------------- ai jobs ---------------- */
+
+class SupabaseAiJobRepository implements AiJobRepository {
+  constructor(private db: SupabaseClient) {}
+
+  async record(job: AiJobRecord): Promise<void> {
+    // Upsert rather than insert: RunPod's id is the primary key, and a
+    // retried submission that reached RunPod twice would otherwise turn a
+    // duplicate into a 500 on a job that is running perfectly well.
+    unwrap(
+      await this.db.from(AI_JOBS).upsert(aiJobToRow(job), { onConflict: 'id' }),
+      'record ai job',
+    )
+  }
+
+  async get(jobId: string): Promise<AiJobRecord | null> {
+    const rows = unwrap(
+      await this.db.from(AI_JOBS).select('*').eq('id', jobId).limit(1),
+      'load ai job',
+    ) as AiJobRow[] | null
+    const row = rows?.[0]
+    return row ? aiJobFromRow(row) : null
+  }
+
+  /**
+   * `.is('closed_at', null)` is the whole of the race handling.
+   *
+   * The webhook and a poll routinely arrive within milliseconds of each
+   * other, and the loser must not be able to overwrite the winner. Making
+   * the condition part of the UPDATE means the database decides, rather
+   * than a read-then-write in a serverless function that has no transaction
+   * around it.
+   */
+  async close(jobId: string, closure: AiJobClosure): Promise<AiJobRecord | null> {
+    const updated = unwrap(
+      await this.db
+        .from(AI_JOBS)
+        .update({
+          state: closure.state,
+          closed_at: toIso(closure.closedAt),
+          failure_reason: closure.failureReason ?? null,
+          ...(closure.executionMs === undefined ? {} : { execution_ms: closure.executionMs }),
+        })
+        .eq('id', jobId)
+        .is('closed_at', null)
+        .select('*'),
+      'close ai job',
+    ) as AiJobRow[] | null
+    const row = updated?.[0]
+    // No row updated means either "no such job" or "already closed"; the
+    // current record answers both, and neither is an error.
+    return row ? aiJobFromRow(row) : this.get(jobId)
+  }
+
+  async openFor(subject: string): Promise<AiJobRecord[]> {
+    const rows = unwrap(
+      await this.db
+        .from(AI_JOBS)
+        .select('*')
+        .eq('subject', subject)
+        .is('closed_at', null)
+        .order('submitted_at', { ascending: false }),
+      'list open ai jobs',
+    ) as AiJobRow[] | null
+    return (rows ?? []).map(aiJobFromRow)
   }
 }
 

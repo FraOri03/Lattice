@@ -1300,6 +1300,60 @@ export const en = {
   },
 
   /**
+   * AI (phase 21). Every string a generation can put on screen, including
+   * every branch of the failure taxonomy — `docs/architecture/ai.md` lists
+   * them — because a job that fails with a status code is a job the user
+   * cannot act on.
+   */
+  ai: {
+    unavailable: 'AI is not available on this deployment',
+    unavailableBody:
+      'Nothing is sent anywhere. An administrator has to configure a hosted GPU backend, or you can point Lattice at a ComfyUI running on this machine.',
+    state: {
+      queued: 'Queued',
+      coldStart: 'Waiting for a GPU',
+      running: 'Generating',
+      succeeded: 'Done',
+      failed: 'Failed',
+      cancelled: 'Cancelled',
+      timedOut: 'Timed out',
+    },
+    coldStartHint: 'A worker is starting up. This usually takes under a minute.',
+    queuePosition: (n: number) => `${n} ahead of you in the queue`,
+    cancel: 'Cancel',
+    cancelling: 'Cancelling…',
+    retry: 'Try again',
+    resumed: 'Reconnected to a generation that was already running.',
+    uploadConsentTitle: 'Send this image to a hosted GPU?',
+    uploadConsentBody:
+      'The image leaves this device and is processed on a rented GPU worker. It is used to run this action and nothing else.',
+    uploadConsentConfirm: 'Send and generate',
+    /** One sentence per failure reason. Shown verbatim; never a status code. */
+    failure: {
+      'not-configured': 'No AI backend is configured on this deployment.',
+      unauthorized: 'You are not signed in, or this project does not let you run AI actions.',
+      'consent-required': 'This action uploads an image, which needs your explicit consent first.',
+      'input-too-large': 'That image is too large to send. Try one under 3 MB.',
+      'invalid-parameters': 'Some settings are outside the range this action accepts.',
+      'no-credit': 'The GPU account behind this deployment is out of credit.',
+      'no-worker': 'No GPU is free right now.',
+      'model-missing': 'The worker does not have the model this action needs.',
+      'upstream-error': 'The GPU backend failed while running this job.',
+      cancelled: 'You cancelled this generation.',
+      'timed-out': 'The job ran past its time limit and was stopped.',
+      'network-lost': 'Lost contact with the server. The job may still be running.',
+    },
+    /** What to do about it, keyed by the retry stance the taxonomy assigns. */
+    retryStance: {
+      yes: 'You can try again.',
+      'after-change': 'Change something and try again.',
+      later: 'Worth trying again in a few minutes.',
+      no: 'Trying again will not help.',
+    },
+    billedWarning: 'This job may already have used GPU time, so it is not retried automatically.',
+  },
+
+  /**
    * Notes and documents are both text, so the product has to say out loud
    * which one is for what — otherwise the user picks by coin toss and the
    * two drift into the same thing.
@@ -2493,6 +2547,56 @@ export const it: Catalog = {
     notSignedIn: 'Accesso non effettuato',
     notSignedInBody:
       'Lattice funziona senza account — tutto resta in questo browser. L’accesso con Google aggiunge la sincronizzazione con Drive e permette di recapitare gli inviti.',
+  },
+
+  ai: {
+    unavailable: 'L’AI non è disponibile su questo deploy',
+    unavailableBody:
+      'Non viene inviato nulla da nessuna parte. Serve che un amministratore configuri un backend GPU ospitato, oppure puoi collegare Lattice a un ComfyUI in esecuzione su questa macchina.',
+    state: {
+      queued: 'In coda',
+      coldStart: 'In attesa di una GPU',
+      running: 'Generazione in corso',
+      succeeded: 'Completato',
+      failed: 'Non riuscito',
+      cancelled: 'Annullato',
+      timedOut: 'Tempo scaduto',
+    },
+    coldStartHint: 'Un worker si sta avviando. Di solito ci vuole meno di un minuto.',
+    queuePosition: (n) => `${n} in coda prima di te`,
+    cancel: 'Annulla',
+    cancelling: 'Annullamento…',
+    retry: 'Riprova',
+    resumed: 'Ripreso il collegamento a una generazione già in corso.',
+    uploadConsentTitle: 'Inviare questa immagine a una GPU remota?',
+    uploadConsentBody:
+      'L’immagine esce da questo dispositivo e viene elaborata su un worker GPU a noleggio. Serve solo a eseguire questa azione, nient’altro.',
+    uploadConsentConfirm: 'Invia e genera',
+    failure: {
+      'not-configured': 'Nessun backend AI configurato su questo deploy.',
+      unauthorized:
+        'Non hai effettuato l’accesso, oppure questo progetto non ti permette di eseguire azioni AI.',
+      'consent-required':
+        'Questa azione carica un’immagine: serve il tuo consenso esplicito prima di procedere.',
+      'input-too-large': 'Immagine troppo grande per l’invio. Provane una sotto i 3 MB.',
+      'invalid-parameters': 'Alcuni valori sono fuori dall’intervallo accettato da questa azione.',
+      'no-credit': 'L’account GPU dietro questo deploy ha esaurito il credito.',
+      'no-worker': 'Nessuna GPU libera in questo momento.',
+      'model-missing': 'Il worker non ha il modello richiesto da questa azione.',
+      'upstream-error': 'Il backend GPU si è interrotto durante il lavoro.',
+      cancelled: 'Hai annullato questa generazione.',
+      'timed-out': 'Il lavoro ha superato il limite di tempo ed è stato interrotto.',
+      'network-lost':
+        'Contatto con il server perso. Il lavoro potrebbe essere ancora in esecuzione.',
+    },
+    retryStance: {
+      yes: 'Puoi riprovare.',
+      'after-change': 'Cambia qualcosa e riprova.',
+      later: 'Vale la pena riprovare tra qualche minuto.',
+      no: 'Riprovare non serve.',
+    },
+    billedWarning:
+      'Questo lavoro potrebbe aver già consumato tempo GPU, quindi non viene ritentato in automatico.',
   },
 
   textEntities: {

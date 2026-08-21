@@ -11,8 +11,10 @@ import { freeEntitlement } from '../../../src/types/entitlement.js'
 import type { Session } from '../../../src/types/session.js'
 import type { OtpCode } from '../../../src/types/otpRecord.js'
 import type { MailSend } from '../../../src/types/mail.js'
+import type { AiJobClosure, AiJobRecord } from '../../../src/types/aiJob.js'
 import type { RoomAcl } from '../../../src/lib/collab/acl.js'
 import type {
+  AiJobRepository,
   EntitlementRepository,
   IdentityRepository,
   InvitationRepository,
@@ -25,6 +27,8 @@ import type {
 } from './repositories.js'
 import {
   aclFromRows,
+  aiJobFromRow,
+  aiJobToRow,
   entitlementFromRow,
   entitlementToRow,
   fromIso,
@@ -41,6 +45,7 @@ import {
   toIso,
   userFromRow,
   userToRow,
+  type AiJobRow,
   type EntitlementRow,
   type IdentityRow,
   type InvitationRow,
@@ -80,6 +85,7 @@ export class MemoryDatabase {
   sessions: SessionRow[] = []
   otp: OtpRow[] = []
   mailSends: MailSendRow[] = []
+  aiJobs: AiJobRow[] = []
 
   clear(): void {
     this.users = []
@@ -90,6 +96,7 @@ export class MemoryDatabase {
     this.sessions = []
     this.otp = []
     this.mailSends = []
+    this.aiJobs = []
   }
 }
 
@@ -102,9 +109,52 @@ export class MemoryRepositories implements Repositories {
   readonly sessions: SessionRepository = new MemorySessionRepository(this.data)
   readonly otp: OtpRepository = new MemoryOtpRepository(this.data)
   readonly mailSends: MailSendRepository = new MemoryMailSendRepository(this.data)
+  readonly aiJobs: AiJobRepository = new MemoryAiJobRepository(this.data)
 
   clear(): void {
     this.data.clear()
+  }
+}
+
+/* ---------------- ai jobs ---------------- */
+
+class MemoryAiJobRepository implements AiJobRepository {
+  constructor(private db: MemoryDatabase) {}
+
+  async record(job: AiJobRecord): Promise<void> {
+    // The id is RunPod's, so a duplicate means a retry rather than a second
+    // job. Replacing keeps the invariant the primary key states in SQL.
+    this.db.aiJobs = this.db.aiJobs.filter((r) => r.id !== job.jobId)
+    this.db.aiJobs.push(aiJobToRow(job))
+  }
+
+  async get(jobId: string): Promise<AiJobRecord | null> {
+    const row = this.db.aiJobs.find((r) => r.id === jobId)
+    return row ? aiJobFromRow(row) : null
+  }
+
+  async close(jobId: string, closure: AiJobClosure): Promise<AiJobRecord | null> {
+    const at = this.db.aiJobs.findIndex((r) => r.id === jobId)
+    if (at < 0) return null
+    const current = aiJobFromRow(this.db.aiJobs[at])
+    // One-way, and it is the invariant the SQL enforces too: a webhook and a
+    // poll race routinely, and the loser must not overwrite the winner.
+    if (current.closedAt !== null) return current
+    const closed: AiJobRecord = {
+      ...current,
+      state: closure.state,
+      closedAt: closure.closedAt,
+      failureReason: closure.failureReason ?? null,
+      executionMs: closure.executionMs ?? current.executionMs,
+    }
+    this.db.aiJobs[at] = aiJobToRow(closed)
+    return closed
+  }
+
+  async openFor(subject: string): Promise<AiJobRecord[]> {
+    return this.db.aiJobs
+      .filter((r) => r.subject === subject && r.closed_at === null)
+      .map(aiJobFromRow)
   }
 }
 
