@@ -41,7 +41,12 @@ function PeerAvatar({ peer, scope }: { peer: PresencePeer; scope: string }) {
   )
 }
 
-export function PresenceAvatars() {
+/**
+ * `labelled` comes from the bar (see lib/layout/topBarFit) — the scope badge is
+ * the widest, least urgent thing here, so it is the first to go when the bar
+ * is tight and it comes back inside the roomy "···" panel.
+ */
+export function PresenceAvatars({ labelled = true }: { labelled?: boolean }) {
   const peers = usePeers()
   const mode = useCollabMode()
   if (!peers.length) return null
@@ -55,7 +60,7 @@ export function PresenceAvatars() {
         : 'same browser'
   return (
     <div
-      className="flex items-center gap-1.5"
+      className="flex flex-none items-center gap-1.5"
       aria-label={`${peers.length} other ${peers.length === 1 ? 'person' : 'people'} active — ${mode.scopeLabel}`}
     >
       <div className="flex items-center">
@@ -68,9 +73,9 @@ export function PresenceAvatars() {
           </span>
         )}
       </div>
-      {!mode.isRealtime && (
+      {!mode.isRealtime && labelled && (
         <span
-          className="hidden items-center gap-1 rounded-full border border-bord bg-panel2 px-1.5 py-0.5 text-[9.5px] font-medium text-muted xl:flex"
+          className="flex items-center gap-1 rounded-full border border-bord bg-panel2 px-1.5 py-0.5 text-[9.5px] font-medium whitespace-nowrap text-muted"
           title={mode.description}
         >
           {mode.tier === 'drive' ? <IcCloud size={11} /> : <IcInfo size={11} />}

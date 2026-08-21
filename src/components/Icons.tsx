@@ -790,3 +790,68 @@ export const IcRotate = (p: P) => (
     <path d="M21 3v5h-5" />
   </S>
 )
+
+/* ---------- planned environments (phases 21 + 23–26) ----------
+   Placeholders for the AI and Creative suites, drawn here rather than borrowed
+   from the insert menu: `IcImage` means "insert an image" everywhere else in
+   the app, and a switcher tab that reuses it would be saying the wrong thing
+   for years. They move into the phase-22 tool/icon registry when it exists —
+   see docs/architecture/creative-suite.md on why reuse has to be mechanical. */
+
+/**
+ * ComfyUI — the product's own mark, not an interpretation of it.
+ *
+ * The other two brand marks here (`IcGithub`, `IcDrive`) are redrawn as
+ * strokes, and that works because both are outlines already. This one is a
+ * solid zigzag ribbon: stroking its contour would draw the mark twice, and
+ * stroking its centreline at 1.8 would leave a thin zigzag nobody recognises.
+ * So it is the real path, filled — which is what `SFill` is for.
+ *
+ * The artwork was authored in a 512 box; the transform maps it to 1.25…22.75
+ * of the 24 box (the same edge-to-edge square the alignment family is drawn
+ * in), and `inkScale` then does the optical correction those icons rely on, so
+ * a caller still asks for the same `size` as every stroked icon beside it.
+ */
+export const IcComfyUI = (p: P) => (
+  <SFill inkScale={ALIGN_INK_SCALE} {...p}>
+    <g transform="translate(1.4876 1.03) scale(.042849)">
+      <path d="M117.013 506.88c-12.117 0-21.888-4.416-28.266-12.757-6.55-8.576-8.256-20.565-4.694-32.853l14.336-49.387c1.152-3.925.342-8.17-2.133-11.435a13.33 13.33 0 00-10.539-5.184H44.48c-12.117 0-21.888-4.416-28.267-12.757-6.549-8.597-8.256-20.565-4.693-32.853L60.8 180.757l5.44-18.56c7.317-25.173 33.963-45.653 59.435-45.653h49.344c5.888 0 11.072-3.84 12.693-9.43l16.299-56.17c7.317-25.173 33.962-45.632 59.456-45.632l105.493-.17h77.227c12.117 0 21.91 4.394 28.267 12.735 6.549 8.576 8.256 20.566 4.693 32.854l-22.08 76.074c-7.317 25.131-33.984 45.59-59.456 45.59l-105.728.213H242.56c-5.824-.021-11.008 3.819-12.672 9.408l-41.13 140.885a12.892 12.892 0 002.133 11.457 13.31 13.31 0 0010.56 5.184l69.866-.128h77.014c12.117 0 21.888 4.394 28.267 12.757 6.549 8.576 8.256 20.565 4.693 32.853l-22.101 76.054c-7.296 25.152-33.963 45.61-59.435 45.61l-105.75.214h-77.013l.021-.022z" />
+    </g>
+  </SFill>
+)
+
+/** Trace — a Bézier curve between two anchor points. */
+export const IcBezier = (p: P) => (
+  <S {...p}>
+    <path d="M4.5 18c8 0 7-12 15-12" />
+    <rect x="1.5" y="16" width="4" height="4" rx="1" />
+    <rect x="18.5" y="4" width="4" height="4" rx="1" />
+  </S>
+)
+
+/** Forge — a painter's palette. */
+export const IcPalette = (p: P) => (
+  <S {...p}>
+    <path d="M12 3a9 9 0 1 0 0 18 1.9 1.9 0 0 0 1.9-1.9c0-.5-.2-.9-.5-1.3-.3-.3-.5-.8-.5-1.2a1.9 1.9 0 0 1 1.9-1.9H17a4.9 4.9 0 0 0 4.9-4.9C21.9 5.9 17.5 3 12 3z" />
+    <circle cx="7.5" cy="10.5" r="1" />
+    <circle cx="12" cy="7.5" r="1" />
+    <circle cx="16.5" cy="10.5" r="1" />
+  </S>
+)
+
+/** Folio — an open two-page spread. */
+export const IcPages = (p: P) => (
+  <S {...p}>
+    <path d="M12 6C10.6 4.7 8.5 4 6 4H3v14h3c2.5 0 4.6.7 6 2 1.4-1.3 3.5-2 6-2h3V4h-3c-2.5 0-4.6.7-6 2z" />
+    <path d="M12 6v14" />
+  </S>
+)
+
+/** Flux — a film strip. */
+export const IcFilm = (p: P) => (
+  <S {...p}>
+    <rect x="2.5" y="4.5" width="19" height="15" rx="2" />
+    <path d="M7.5 4.5v15M16.5 4.5v15" />
+    <path d="M2.5 12h5M16.5 12h5" />
+  </S>
+)
