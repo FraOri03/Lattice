@@ -88,6 +88,58 @@ export type TokenSupplier = () => Promise<string | null>
  */
 export type ProjectNameSupplier = (projectId: string) => string | undefined
 
+/**
+ * Byte-level progress for one transfer, called repeatedly while it runs.
+ *
+ * `total` is `null` when the size is genuinely unknown — a response with no
+ * `Content-Length`, an upload the browser refuses to measure — and callers
+ * are expected to render that as indeterminate rather than as a number.
+ *
+ * Passing one of these is what selects the measurable code path: without it
+ * uploads take the plain `fetch` route (which cannot report upload progress
+ * at all) and downloads read the body in one go.
+ */
+export type TransferProgress = (loaded: number, total: number | null) => void
+
+/**
+ * Read a response body chunk by chunk so the caller can watch it arrive.
+ *
+ * `Content-Length` is the only size Drive offers, and it counts bytes ON THE
+ * WIRE: if the response is compressed it is smaller than what the reader
+ * accumulates, so `loaded` can overshoot it. That is why `jobPercent` clamps
+ * rather than trusting the ratio — the alternative, dropping the header
+ * entirely, would leave every download unmeasurable to avoid an error of a
+ * few percent on the compressible ones.
+ */
+async function readWithProgress(res: Response, onProgress: TransferProgress): Promise<Blob> {
+  const header = res.headers.get('Content-Length')
+  const declared = header ? Number(header) : NaN
+  const total = Number.isFinite(declared) && declared > 0 ? declared : null
+  const type = res.headers.get('Content-Type') ?? ''
+
+  // no streaming body (old browsers, and jsdom in the test run): still report
+  // one honest measurement rather than none
+  if (!res.body) {
+    const blob = await res.blob()
+    onProgress(blob.size, blob.size)
+    return blob
+  }
+
+  const reader = res.body.getReader()
+  const chunks: BlobPart[] = []
+  let loaded = 0
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    chunks.push(value as BlobPart)
+    loaded += value.byteLength
+    onProgress(loaded, total)
+  }
+  // the true size is known now, whatever the header claimed
+  onProgress(loaded, loaded)
+  return new Blob(chunks, { type })
+}
+
 function q(value: string): string {
   return value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")
 }
@@ -483,6 +535,7 @@ export class GoogleDriveStorageProvider implements StorageProvider {
     metadata: Record<string, unknown>,
     content: Blob | string,
     contentType: string,
+    onProgress?: TransferProgress,
   ): Promise<{ id: string }> {
     const boundary = `lattice-${Math.random().toString(36).slice(2)}`
     const blob = typeof content === 'string' ? new Blob([content], { type: contentType }) : content
@@ -496,12 +549,64 @@ export class GoogleDriveStorageProvider implements StorageProvider {
       ],
       { type: `multipart/related; boundary=${boundary}` },
     )
+    const type = `multipart/related; boundary=${boundary}`
+    if (onProgress) return this.uploadWithProgress(url, method, body, type, onProgress)
     const res = await this.request(url, {
       method,
-      headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
+      headers: { 'Content-Type': type },
       body,
     })
     return (await res.json()) as { id: string }
+  }
+
+  /**
+   * The same request as above, sent over XMLHttpRequest instead of `fetch`.
+   *
+   * `fetch` has no way to report how much of a request body has gone out —
+   * request streaming exists but needs HTTP/2, `duplex: 'half'` and a browser
+   * that supports both, and it would still hand us a stream to meter by hand.
+   * `xhr.upload.onprogress` reports the real thing today, in every browser
+   * Lattice targets, which is what the sync queue's percentages are made of.
+   *
+   * `fetch` therefore stays the default for the other ~dozen calls that have
+   * no progress to report, and errors are funnelled through the SAME
+   * `parseDriveError` / `TypeError` shapes so `describeDriveError` keeps
+   * classifying them (401 expired, 403 scope, 429 rate limit, network).
+   */
+  private async uploadWithProgress(
+    url: string,
+    method: 'POST' | 'PATCH',
+    body: Blob,
+    contentType: string,
+    onProgress: TransferProgress,
+  ): Promise<{ id: string }> {
+    const headers = await this.authHeaders()
+    return new Promise<{ id: string }>((resolve, reject) => {
+      const xhr = new XMLHttpRequest()
+      xhr.open(method, url, true)
+      for (const [key, value] of Object.entries(headers)) xhr.setRequestHeader(key, value)
+      xhr.setRequestHeader('Content-Type', contentType)
+      xhr.upload.onprogress = (e) => onProgress(e.loaded, e.lengthComputable ? e.total : null)
+      xhr.onload = () => {
+        if (xhr.status < 200 || xhr.status >= 300) {
+          reject(parseDriveError(xhr.status, xhr.responseText ?? ''))
+          return
+        }
+        // the bytes are gone even if the id below turns out to be unreadable
+        onProgress(body.size, body.size)
+        try {
+          resolve(JSON.parse(xhr.responseText) as { id: string })
+        } catch {
+          reject(new DriveApiError(xhr.status, 'Drive API returned a malformed upload response'))
+        }
+      }
+      // TypeError is what a failed fetch() throws, and describeDriveError
+      // already turns that into the "could not reach Drive" message
+      xhr.onerror = () => reject(new TypeError('Could not reach Google Drive'))
+      xhr.ontimeout = () => reject(new TypeError('Google Drive upload timed out'))
+      xhr.onabort = () => reject(new TypeError('Google Drive upload was interrupted'))
+      xhr.send(body)
+    })
   }
 
   /**
@@ -520,6 +625,7 @@ export class GoogleDriveStorageProvider implements StorageProvider {
     content: Blob | string,
     contentType: string,
     appProperties?: Record<string, string>,
+    onProgress?: TransferProgress,
   ): Promise<string> {
     const cacheKey = `${path.join('/')}|${name}`
     let fileId = this.fileIdCache.get(cacheKey)
@@ -540,6 +646,7 @@ export class GoogleDriveStorageProvider implements StorageProvider {
       metadata,
       content,
       contentType,
+      onProgress,
     )
     this.fileIdCache.set(cacheKey, id)
     return id
@@ -555,6 +662,7 @@ export class GoogleDriveStorageProvider implements StorageProvider {
     content: Blob | string,
     contentType: string,
     appProperties?: Record<string, string>,
+    onProgress?: TransferProgress,
   ): Promise<string> {
     const folderId = await this.ensurePath(path)
     const { id } = await this.multipartUpload(
@@ -563,6 +671,7 @@ export class GoogleDriveStorageProvider implements StorageProvider {
       { name, parents: [folderId], appProperties },
       content,
       contentType,
+      onProgress,
     )
     return id
   }
@@ -579,6 +688,7 @@ export class GoogleDriveStorageProvider implements StorageProvider {
     content: Blob | string,
     contentType: string,
     appProperties?: Record<string, string>,
+    onProgress?: TransferProgress,
   ): Promise<void> {
     await this.multipartUpload(
       `${UPLOAD}/files/${fileId}?uploadType=multipart&fields=id`,
@@ -586,6 +696,7 @@ export class GoogleDriveStorageProvider implements StorageProvider {
       { name, appProperties },
       content,
       contentType,
+      onProgress,
     )
   }
 
@@ -610,19 +721,22 @@ export class GoogleDriveStorageProvider implements StorageProvider {
     return data.files[0] ?? null
   }
 
-  async downloadJson<T = unknown>(fileId: string): Promise<T> {
+  async downloadJson<T = unknown>(fileId: string, onProgress?: TransferProgress): Promise<T> {
     const res = await this.request(`${API}/files/${fileId}?alt=media`)
-    return (await res.json()) as T
+    if (!onProgress) return (await res.json()) as T
+    return JSON.parse(await (await readWithProgress(res, onProgress)).text()) as T
   }
 
-  async downloadText(fileId: string): Promise<string> {
+  async downloadText(fileId: string, onProgress?: TransferProgress): Promise<string> {
     const res = await this.request(`${API}/files/${fileId}?alt=media`)
-    return res.text()
+    if (!onProgress) return res.text()
+    return (await readWithProgress(res, onProgress)).text()
   }
 
-  async downloadBlob(fileId: string): Promise<Blob> {
+  async downloadBlob(fileId: string, onProgress?: TransferProgress): Promise<Blob> {
     const res = await this.request(`${API}/files/${fileId}?alt=media`)
-    return res.blob()
+    if (!onProgress) return res.blob()
+    return readWithProgress(res, onProgress)
   }
 
   /** Move a file to Drive's trash (recoverable) — never permanent delete. */

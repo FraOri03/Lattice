@@ -6,7 +6,6 @@ import { useOpenId } from '@/lib/tabs/openEntity'
 import { useUiStore } from '@/store/useUiStore'
 import { useWorkspaceLayoutStore } from '@/store/workspaceLayoutStore'
 import { useSyncStore } from '@/lib/sync/syncStore'
-import { syncEngine } from '@/lib/sync/SyncEngine'
 import { useCollabStore } from '@/lib/collab/collabStore'
 import { useReadOnly } from '@/lib/collab/useCollab'
 import { SectionTabs } from '@/components/shell/SectionTabs'
@@ -15,6 +14,7 @@ import { ProfileMenu } from '@/components/account/ProfileMenu'
 import { PresenceAvatars } from '@/components/collab/PresenceAvatars'
 import { RealtimeStatusChip } from '@/components/collab/RealtimeStatusChip'
 import { NotificationCenter } from '@/components/collab/NotificationCenter'
+import { SyncQueuePanel } from '@/components/sync/SyncQueuePanel'
 import { useCollabMode } from '@/lib/collab/collabPresentation'
 import { AnchoredPopover } from '@/components/ui/AnchoredPopover'
 import { useI18n } from '@/lib/i18n'
@@ -50,12 +50,25 @@ function useOnline(): boolean {
   return online
 }
 
-/** Cloud sync status dot for the top bar. */
+/**
+ * Cloud sync status dot for the top bar, and the handle on the file queue
+ * behind it.
+ *
+ * Clicking the chip used to fire `syncNow()` — an action with no feedback
+ * beyond the spinner it replaced itself with. It now opens the queue, where
+ * every file in flight is listed with its measured progress and "Sync now"
+ * is the first button. The states that are ABOUT the connection rather than
+ * about a transfer (no Drive, Drive erroring) still go straight to the Drive
+ * dialog: there is no queue to show when there is nothing to sync with.
+ */
 function SyncIndicator() {
   const sync = useSyncStore()
   const online = useOnline()
   const t = useI18n()
   const setDriveDialogOpen = useUiStore((s) => s.setDriveDialogOpen)
+  const chip = useRef<HTMLButtonElement>(null)
+  const [queueOpen, setQueueOpen] = useState(false)
+  const closeQueue = useCallback(() => setQueueOpen(false), [])
 
   if (!online) {
     return (
@@ -116,23 +129,29 @@ function SyncIndicator() {
             ? t.syncChip.pending(sync.pendingChanges)
             : t.syncChip.drive
   return (
-    <button
-      className={`flex cursor-pointer items-center gap-1.5 rounded-full border border-bord bg-panel2 px-2 py-1 text-[10px] font-medium ${color}`}
-      title={sync.error ?? t.syncChip.driveTitle}
-      aria-label={t.syncChip.driveAria(label, sync.status === 'error')}
-      onClick={() =>
-        sync.status === 'error' ? setDriveDialogOpen(true) : void syncEngine.syncNow()
-      }
-    >
-      {sync.status === 'syncing' ? (
-        <IcRefresh size={12} className="animate-spin" />
-      ) : sync.status === 'error' ? (
-        <IcAlert size={12} />
-      ) : (
-        <IcCloud size={12} />
-      )}
-      {label}
-    </button>
+    <div className="relative flex-none">
+      <button
+        ref={chip}
+        className={`flex cursor-pointer items-center gap-1.5 rounded-full border border-bord bg-panel2 px-2 py-1 text-[10px] font-medium ${color}`}
+        title={sync.error ?? t.syncChip.driveTitle}
+        aria-label={t.syncChip.driveAria(label, sync.status === 'error')}
+        aria-expanded={queueOpen}
+        onClick={() =>
+          sync.status === 'error' ? setDriveDialogOpen(true) : setQueueOpen((o) => !o)
+        }
+      >
+        {sync.status === 'syncing' ? (
+          <IcRefresh size={12} className="animate-spin" />
+        ) : sync.status === 'error' ? (
+          <IcAlert size={12} />
+        ) : (
+          <IcCloud size={12} />
+        )}
+        {label}
+      </button>
+
+      <SyncQueuePanel anchorRef={chip} open={queueOpen} onClose={closeQueue} />
+    </div>
   )
 }
 

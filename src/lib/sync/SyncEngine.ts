@@ -7,11 +7,13 @@ import {
   DriveApiError,
   describeDriveError,
   FOLDER_MIME,
+  type TransferProgress,
 } from '@/lib/storage/GoogleDriveStorageProvider'
 import { PROJECT_ID_PROPERTY } from '@/lib/storage/driveProjectFolder'
 import { authService } from '@/lib/auth/AuthService'
 import { buildStandaloneHtml, companionFileName } from '@/lib/export/ExportService'
 import { useSyncStore } from './syncStore'
+import { syncQueue, type SyncJobKind } from './syncQueue'
 import {
   describeConflict,
   hasUnpushedBody,
@@ -339,6 +341,7 @@ class SyncEngine {
     }
     this.busy = true
     useSyncStore.getState().setStatus('syncing')
+    syncQueue.beginRun()
     try {
       await this.pull()
       await this.pushInner()
@@ -358,6 +361,7 @@ class SyncEngine {
       this.reportError(err)
     } finally {
       this.busy = false
+      syncQueue.endRun()
     }
   }
 
@@ -369,6 +373,7 @@ class SyncEngine {
     }
     this.busy = true
     useSyncStore.getState().setStatus('syncing')
+    syncQueue.beginRun()
     try {
       await this.pushInner()
       this.meta.lastSyncAt = Date.now()
@@ -378,6 +383,31 @@ class SyncEngine {
       this.reportError(err)
     } finally {
       this.busy = false
+      syncQueue.endRun()
+    }
+  }
+
+  /**
+   * Run one transfer as a queue row: the row goes active, the callback handed
+   * to the provider meters the actual bytes, and the outcome is recorded
+   * whichever way it goes.
+   *
+   * Failures are re-thrown. The queue is a view of the sync, never a place
+   * errors go to be swallowed — the status chip, the error banner and the
+   * "could not pull N projects" report all still happen exactly as before.
+   */
+  private async tracked<T>(
+    key: string,
+    run: (onProgress: TransferProgress) => Promise<T>,
+  ): Promise<T> {
+    syncQueue.start(key)
+    try {
+      const result = await run(syncQueue.track(key))
+      syncQueue.done(key)
+      return result
+    } catch (err) {
+      syncQueue.fail(key, describeDriveError(err))
+      throw err
     }
   }
 
@@ -424,73 +454,150 @@ class SyncEngine {
     const drive = this.drive!
     const s = useStore.getState()
 
-    for (const project of Object.values(s.projects)) {
+    /**
+     * What to push is decided in full BEFORE the first byte leaves, so the
+     * overlay can show the whole queue from the start instead of growing a
+     * row at a time. The dirty checks are the same ones that used to sit
+     * inside the loops as `continue` guards — only their position moved.
+     */
+    const projects = Object.values(s.projects).filter(
+      (p) => this.projectDirtyAt(p.id) > (this.meta.projectPush[p.id] ?? 0),
+    )
+    // bodies — only entities that changed since their last upload
+    const bodyJobs: {
+      id: string
+      kind: Extract<SyncJobKind, 'doc' | 'sheet' | 'code'>
+      title: string
+      updatedAt: number
+      projectId?: string
+      folder: string
+      name: string
+      json: boolean
+    }[] = [
+      ...Object.values(s.docs).map((d) => ({
+        id: d.id, kind: 'doc' as const, title: d.title, updatedAt: d.updatedAt, projectId: d.projectId,
+        folder: 'documents', name: `${d.id}.json`, json: true,
+      })),
+      ...Object.values(s.sheetDocs).map((sh) => ({
+        id: sh.id, kind: 'sheet' as const, title: sh.title, updatedAt: sh.updatedAt, projectId: sh.projectId,
+        folder: 'spreadsheets', name: `${sh.id}.json`, json: true,
+      })),
+      ...Object.values(s.codeDocs).map((c) => ({
+        id: c.id, kind: 'code' as const, title: c.title, updatedAt: c.updatedAt, projectId: c.projectId,
+        folder: 'code', name: `${c.id}.${c.extension || 'txt'}`, json: false,
+      })),
+    ].filter((job) => job.updatedAt > (this.meta.bodyPush[job.id] ?? 0))
+    // asset binaries — immutable after import, so one upload each
+    const assets = Object.values(s.assets).filter(
+      (a) => !this.meta.uploadedAssets.includes(a.id),
+    )
+
+    for (const project of projects) {
+      syncQueue.add({
+        key: `upload:project:${project.id}`,
+        kind: 'project',
+        direction: 'upload',
+        label: project.name,
+        file: 'project.json',
+      })
+    }
+    for (const job of bodyJobs) {
+      syncQueue.add({
+        key: `upload:${job.kind}:${job.id}`,
+        kind: job.kind,
+        direction: 'upload',
+        label: job.title,
+        file: job.name,
+      })
+      // the companion is its own file on Drive and its own row here: it can
+      // fail on its own, and on a slow link it is the second half of the wait
+      if (job.kind === 'doc') {
+        syncQueue.add({
+          key: `upload:companion:${job.id}`,
+          kind: 'companion',
+          direction: 'upload',
+          label: job.title,
+          file: companionFileName(job.title),
+        })
+      }
+    }
+    for (const asset of assets) {
+      syncQueue.add({
+        key: `upload:asset:${asset.id}`,
+        kind: 'asset',
+        direction: 'upload',
+        label: asset.name,
+        file: `${asset.id}${asset.ext ? `.${asset.ext}` : ''}`,
+        total: asset.size,
+      })
+    }
+
+    for (const project of projects) {
       const dirtyAt = this.projectDirtyAt(project.id)
-      if (dirtyAt <= (this.meta.projectPush[project.id] ?? 0)) continue
       // a rename touches nothing but the project's own metadata, so this
       // is the one place that also pushes the folder name to Drive
       await drive.syncProjectFolder(project.id)
       const snapshot = this.snapshotOf(project.id)
-      await drive.putFile(
-        ['projects', project.id],
-        'project.json',
-        JSON.stringify(snapshot),
-        'application/json',
-        { latticeUpdatedAt: String(dirtyAt) },
+      await this.tracked(`upload:project:${project.id}`, (onProgress) =>
+        drive.putFile(
+          ['projects', project.id],
+          'project.json',
+          JSON.stringify(snapshot),
+          'application/json',
+          { latticeUpdatedAt: String(dirtyAt) },
+          onProgress,
+        ),
       )
       this.meta.projectPush[project.id] = dirtyAt
       this.saveMeta()
     }
 
-    // bodies — only entities that changed since their last upload
-    const bodyJobs: { id: string; updatedAt: number; projectId?: string; folder: string; name: string; json: boolean }[] = [
-      ...Object.values(s.docs).map((d) => ({
-        id: d.id, updatedAt: d.updatedAt, projectId: d.projectId,
-        folder: 'documents', name: `${d.id}.json`, json: true,
-      })),
-      ...Object.values(s.sheetDocs).map((sh) => ({
-        id: sh.id, updatedAt: sh.updatedAt, projectId: sh.projectId,
-        folder: 'spreadsheets', name: `${sh.id}.json`, json: true,
-      })),
-      ...Object.values(s.codeDocs).map((c) => ({
-        id: c.id, updatedAt: c.updatedAt, projectId: c.projectId,
-        folder: 'code', name: `${c.id}.${c.extension || 'txt'}`, json: false,
-      })),
-    ]
     for (const job of bodyJobs) {
-      if (job.updatedAt <= (this.meta.bodyPush[job.id] ?? 0)) continue
       const body = await storage.getDocument(job.id)
-      if (body === undefined) continue
+      if (body === undefined) {
+        syncQueue.skip(`upload:${job.kind}:${job.id}`, 'no-local-copy')
+        if (job.kind === 'doc') syncQueue.skip(`upload:companion:${job.id}`, 'no-local-copy')
+        continue
+      }
       const projectId = job.projectId ?? 'unassigned'
-      await drive.putFile(
-        ['projects', projectId, job.folder],
-        job.name,
-        job.json ? JSON.stringify(body) : String(body),
-        job.json ? 'application/json' : 'text/plain',
-        { latticeUpdatedAt: String(job.updatedAt) },
+      await this.tracked(`upload:${job.kind}:${job.id}`, (onProgress) =>
+        drive.putFile(
+          ['projects', projectId, job.folder],
+          job.name,
+          job.json ? JSON.stringify(body) : String(body),
+          job.json ? 'application/json' : 'text/plain',
+          { latticeUpdatedAt: String(job.updatedAt) },
+          onProgress,
+        ),
       )
       this.meta.bodyPush[job.id] = job.updatedAt
       this.saveMeta()
 
       // readable companion — rich documents only; rides this same dirty
       // check, so it re-syncs exactly when (and only when) the doc did
-      if (job.folder === 'documents') {
+      if (job.kind === 'doc') {
         const docMeta = s.docs[job.id]
         if (docMeta) await this.syncCompanion(projectId, docMeta, body as JSONContent)
+        else syncQueue.skip(`upload:companion:${job.id}`, 'no-local-copy')
       }
     }
 
-    // asset binaries — immutable after import, so one upload each
-    for (const asset of Object.values(s.assets)) {
-      if (this.meta.uploadedAssets.includes(asset.id)) continue
+    for (const asset of assets) {
       const blob = await storage.getBlob(asset.id)
-      if (!blob) continue
+      if (!blob) {
+        syncQueue.skip(`upload:asset:${asset.id}`, 'no-local-copy')
+        continue
+      }
       const projectId = asset.projectId ?? 'unassigned'
-      await drive.putFile(
-        ['projects', projectId, 'assets'],
-        `${asset.id}${asset.ext ? `.${asset.ext}` : ''}`,
-        blob,
-        asset.mime || 'application/octet-stream',
+      await this.tracked(`upload:asset:${asset.id}`, (onProgress) =>
+        drive.putFile(
+          ['projects', projectId, 'assets'],
+          `${asset.id}${asset.ext ? `.${asset.ext}` : ''}`,
+          blob,
+          asset.mime || 'application/octet-stream',
+          undefined,
+          onProgress,
+        ),
       )
       this.meta.uploadedAssets.push(asset.id)
       this.saveMeta()
@@ -525,11 +632,14 @@ class SyncEngine {
       const found = await drive.findFileByAppProperty(path, 'latticeDocId', meta.id)
       fileId = found?.id
     }
-    if (fileId) {
-      await drive.updateFileById(fileId, name, html, 'text/html', appProperties)
-    } else {
-      fileId = await drive.createFile(path, name, html, 'text/html', appProperties)
-    }
+    const key = `upload:companion:${meta.id}`
+    fileId = await this.tracked(key, async (onProgress) => {
+      if (fileId) {
+        await drive.updateFileById(fileId, name, html, 'text/html', appProperties, onProgress)
+        return fileId
+      }
+      return drive.createFile(path, name, html, 'text/html', appProperties, onProgress)
+    })
 
     this.meta.docCompanions[meta.id] = fileId
     this.saveMeta()
@@ -567,7 +677,19 @@ class SyncEngine {
       try {
         const snapMeta = await drive.findFile(['projects', projectId], 'project.json')
         if (!snapMeta) continue
-        const snapshot = await drive.downloadJson<ProjectSnapshot>(snapMeta.id)
+        const key = `download:project:${projectId}`
+        syncQueue.add({
+          key,
+          kind: 'project',
+          direction: 'download',
+          // the folder is named after the project, so it is the best label
+          // available for a project this device has never seen
+          label: useStore.getState().projects[projectId]?.name ?? folder.name,
+          file: 'project.json',
+        })
+        const snapshot = await this.tracked(key, (onProgress) =>
+          drive.downloadJson<ProjectSnapshot>(snapMeta.id, onProgress),
+        )
         if (snapshot?.app !== 'lattice-project' || !snapshot.project) continue
         await this.mergeSnapshot(snapshot, conflicts)
       } catch (err) {
@@ -677,12 +799,16 @@ class SyncEngine {
     // the local copy had unpushed edits (conflict case)
     const pullBody = async (
       id: string,
+      kind: Extract<SyncJobKind, 'doc' | 'sheet' | 'code'>,
+      title: string,
       folder: string,
       name: string,
       json: boolean,
       remoteUpdatedAt: number,
       localUpdatedAt: number,
     ) => {
+      const key = `download:${kind}:${id}`
+      syncQueue.add({ key, kind, direction: 'download', label: title, file: name })
       /**
        * The backup fires when this device holds body edits Drive has never
        * seen — `hasUnpushedBody` says what that means and why it is measured
@@ -698,36 +824,54 @@ class SyncEngine {
         ? await storage.getDocument(id)
         : undefined
       if (localBody !== undefined) {
-        await drive.putFile(
-          ['projects', projectId, folder],
-          `${id}.conflict-${Date.now()}.json`,
-          JSON.stringify(localBody),
-          'application/json',
+        // the rescue copy is a real file landing on Drive, so it gets a row
+        // of its own rather than hiding inside the download that displaced it
+        const backupName = `${id}.conflict-${Date.now()}.json`
+        const backupKey = `upload:backup:${id}`
+        syncQueue.add({
+          key: backupKey,
+          kind: 'backup',
+          direction: 'upload',
+          label: title,
+          file: backupName,
+        })
+        await this.tracked(backupKey, (onProgress) =>
+          drive.putFile(
+            ['projects', projectId, folder],
+            backupName,
+            JSON.stringify(localBody),
+            'application/json',
+            undefined,
+            onProgress,
+          ),
         )
       }
       const meta = await drive.findFile(['projects', projectId, folder], name)
-      if (!meta) return
-      const body = json
-        ? await drive.downloadJson(meta.id)
-        : await drive.downloadText(meta.id)
+      if (!meta) {
+        syncQueue.skip(key, 'missing-on-drive')
+        return
+      }
+      const body = await this.tracked(key, (onProgress) =>
+        json ? drive.downloadJson(meta.id, onProgress) : drive.downloadText(meta.id, onProgress),
+      )
       await storage.putDocument(id, body)
       this.meta.bodyPush[id] = remoteUpdatedAt
       this.saveMeta()
     }
 
     for (const { id, localUpdatedAt } of docs.pulled) {
-      const name = `${id}.json`
-      await pullBody(id, 'documents', name, true, snapshot.docs[id].updatedAt, localUpdatedAt)
+      const d = snapshot.docs[id]
+      await pullBody(id, 'doc', d.title, 'documents', `${id}.json`, true, d.updatedAt, localUpdatedAt)
     }
     for (const { id, localUpdatedAt } of sheetDocs.pulled) {
+      const sh = snapshot.sheetDocs[id]
       const name = `${id}.json`
-      const at = snapshot.sheetDocs[id].updatedAt
-      await pullBody(id, 'spreadsheets', name, true, at, localUpdatedAt)
+      await pullBody(id, 'sheet', sh.title, 'spreadsheets', name, true, sh.updatedAt, localUpdatedAt)
     }
     for (const { id, localUpdatedAt } of codeDocs.pulled) {
       const c = snapshot.codeDocs[id]
       const name = `${id}.${c.extension || 'txt'}`
-      await pullBody(id, 'code', name, false, c.updatedAt, localUpdatedAt)
+      await pullBody(id, 'code', c.title, 'code', name, false, c.updatedAt, localUpdatedAt)
     }
 
     // asset binaries we reference but don't have locally
@@ -736,12 +880,24 @@ class SyncEngine {
         if (!this.meta.uploadedAssets.includes(id)) this.meta.uploadedAssets.push(id)
         continue
       }
-      const meta = await drive.findFile(
-        ['projects', projectId, 'assets'],
-        `${id}${asset.ext ? `.${asset.ext}` : ''}`,
+      const file = `${id}${asset.ext ? `.${asset.ext}` : ''}`
+      const key = `download:asset:${id}`
+      syncQueue.add({
+        key,
+        kind: 'asset',
+        direction: 'download',
+        label: asset.name,
+        file,
+        total: asset.size,
+      })
+      const meta = await drive.findFile(['projects', projectId, 'assets'], file)
+      if (!meta) {
+        syncQueue.skip(key, 'missing-on-drive')
+        continue
+      }
+      const blob = await this.tracked(key, (onProgress) =>
+        drive.downloadBlob(meta.id, onProgress),
       )
-      if (!meta) continue
-      const blob = await drive.downloadBlob(meta.id)
       await storage.putBlob(id, blob)
       if (!this.meta.uploadedAssets.includes(id)) this.meta.uploadedAssets.push(id)
       this.saveMeta()

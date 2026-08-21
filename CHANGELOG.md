@@ -12,6 +12,27 @@ All notable changes to Lattice are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **The sync chip opens the queue of files it is actually moving, each with its own
+  measured progress.** The chip could say "Syncing…" and nothing else, so a sync stuck on
+  one 400 MB video and a sync quietly re-uploading forty documents looked identical, and
+  the only thing a slow sync could tell you was that it was slow. Clicking it now opens an
+  overlay listing every file in the run — project snapshots, document bodies, their
+  readable HTML mirrors, sheets, code, asset binaries, and the conflict backups a pull
+  writes before it overwrites anything — each with its direction, its name on Drive, and
+  the bytes moved out of the bytes expected. The percentages are measured rather than
+  staged: uploads now go out over `XMLHttpRequest` so `upload.onprogress` can report them
+  (`fetch` cannot report request-body progress at all), and downloads are read chunk by
+  chunk against `Content-Length`. Where neither side can be measured the row shows a
+  moving stripe and no number, because a panel that exists to say where the sync is has no
+  business inventing one; a file that moved no bytes says why (not stored on this device,
+  not on Drive) instead of vanishing from the list. "Sync now" moved into the panel, so
+  the click that used to fire a sync blind still fires one — it just no longer costs you
+  the ability to watch it. The states that are about the connection rather than about a
+  transfer (Drive not connected, Drive erroring) still open the Drive dialog, since there
+  is no queue to show when there is nothing to sync with.
+
 ### Fixed
 
 - **Signing out, or continuing without an account, no longer shows the last user's
