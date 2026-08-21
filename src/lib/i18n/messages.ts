@@ -100,9 +100,51 @@ export const en = {
     syncError: 'Sync error',
     pending: (n: number) => `${n} pending`,
     drive: 'Drive',
-    driveTitle: 'Google Drive sync — click to sync now',
+    driveTitle: 'Google Drive sync — click to see the file queue',
     driveAria: (label: string, isError: boolean) =>
-      `Google Drive: ${label}${isError ? ' — click for diagnostics' : ' — click to sync now'}`,
+      `Google Drive: ${label}${isError ? ' — click for diagnostics' : ' — click to see the file queue'}`,
+  },
+
+  /** the overlay behind the chip: one row per file being transferred */
+  syncQueue: {
+    title: 'Sync queue',
+    close: 'Close the sync queue',
+    syncNow: 'Sync now',
+    syncNowTitle: 'Pull from Drive, then push what changed here',
+    clear: 'Clear finished',
+    lastSync: (ago: string) => `Last sync ${ago}`,
+    files: (settled: number, total: number) => `${settled} of ${total} files`,
+    waiting: (n: number) => `${n} change${n === 1 ? '' : 's'} waiting to be sent`,
+    empty: 'Nothing is being transferred.',
+    emptyHint: 'Every file a sync moves shows up here, with the bytes it has moved.',
+    failed: (n: number) => `${n} failed`,
+    upload: 'Upload',
+    download: 'Download',
+    /** the file families, as the queue labels them */
+    kind: {
+      project: 'Project',
+      doc: 'Document',
+      companion: 'Readable copy',
+      sheet: 'Sheet',
+      code: 'Code',
+      asset: 'Asset',
+      backup: 'Conflict backup',
+    } as Record<string, string>,
+    state: {
+      queued: 'Queued',
+      active: 'Transferring',
+      done: 'Done',
+      error: 'Failed',
+      skipped: 'Skipped',
+    } as Record<string, string>,
+    /** why a queued file moved no bytes */
+    reason: {
+      'no-local-copy': 'not stored on this device',
+      'missing-on-drive': 'not on Drive',
+    } as Record<string, string>,
+    /** shown while a transfer is running but its size is not yet known */
+    unmeasured: 'size unknown',
+    bytesOf: (loaded: string, total: string) => `${loaded} of ${total}`,
   },
 
   profile: {
@@ -1268,11 +1310,49 @@ export const it: Catalog = {
     syncError: 'Errore di sync',
     pending: (n) => `${n} in sospeso`,
     drive: 'Drive',
-    driveTitle: 'Sync Google Drive — clic per sincronizzare ora',
+    driveTitle: 'Sync Google Drive — clic per la coda dei file',
     driveAria: (label, isError) =>
       `Google Drive: ${label}${
-        isError ? ' — clic per la diagnostica' : ' — clic per sincronizzare ora'
+        isError ? ' — clic per la diagnostica' : ' — clic per la coda dei file'
       }`,
+  },
+
+  syncQueue: {
+    title: 'Coda di sincronizzazione',
+    close: 'Chiudi la coda di sincronizzazione',
+    syncNow: 'Sincronizza ora',
+    syncNowTitle: 'Scarica da Drive, poi carica ciò che è cambiato qui',
+    clear: 'Pulisci i completati',
+    lastSync: (ago) => `Ultimo sync ${ago}`,
+    files: (settled, total) => `${settled} di ${total} file`,
+    waiting: (n) => `${n} modific${n === 1 ? 'a' : 'he'} da inviare`,
+    empty: 'Nessun trasferimento in corso.',
+    emptyHint: 'Ogni file mosso da un sync compare qui, con i byte trasferiti.',
+    failed: (n) => `${n} non riuscit${n === 1 ? 'o' : 'i'}`,
+    upload: 'Caricamento',
+    download: 'Scaricamento',
+    kind: {
+      project: 'Progetto',
+      doc: 'Documento',
+      companion: 'Copia leggibile',
+      sheet: 'Foglio',
+      code: 'Codice',
+      asset: 'Risorsa',
+      backup: 'Backup conflitto',
+    },
+    state: {
+      queued: 'In coda',
+      active: 'In trasferimento',
+      done: 'Completato',
+      error: 'Non riuscito',
+      skipped: 'Saltato',
+    },
+    reason: {
+      'no-local-copy': 'non presente su questo dispositivo',
+      'missing-on-drive': 'non presente su Drive',
+    },
+    unmeasured: 'dimensione ignota',
+    bytesOf: (loaded, total) => `${loaded} di ${total}`,
   },
 
   profile: {
