@@ -35,6 +35,31 @@ All notable changes to Lattice are recorded here. The format follows
 
 ### Fixed
 
+- **The top bar no longer breaks the row it lives in.** `.btn` could shrink below its own
+  content inside the bar's flex row, so a label wrapped rather than a button holding its
+  width: "Join call" and the `Ctrl K` hint each became two lines and 45px and 40px tall
+  inside a 44px bar, and drew outside it. Underneath that was a second fault the wrapping
+  was hiding — the bar never fitted at any width. With nothing wrapping it asked for 1772px
+  inside the 1671px it gets on a 1920 window, because the rule that decided what to fold
+  read the *viewport* tier while the bar is the viewport minus the sidebar, minus more again
+  when a pane is split: a number roughly 250px larger than the box it was deciding for. The
+  bar now measures itself and folds against widths taken from what its contents actually
+  cost ([src/lib/layout/topBarFit.ts](src/lib/layout/topBarFit.ts)), and nothing overflows
+  from 2160px down to the phone floor, where the bar scrolls and the document does not.
+- **Controls in the top bar's "···" panel have their words back.** Share, the realtime chip
+  and Join call hid their labels behind container queries, but the panel is portalled out of
+  the header, so the query measured the popover or nothing at all — the overflow menu was a
+  column of anonymous icons. Whether a control shows its word is now decided by the bar and
+  passed down, and a folded control is always labelled.
+- **Two top-bar controls folded on the window instead of on the bar.** Join call and the
+  realtime chip used viewport breakpoints, which is exactly the fault the rest of the bar had
+  already moved away from: they showed their labels into a bar with no room for them.
+- **The Italian top bar no longer answers in English.** The call button and the realtime
+  chip's nine status words were hard-coded English beside "Sincronizzato" and "Condividi".
+  The prose inside the realtime popover and the collaboration-scope wording are still English
+  and remain a later translation slice.
+- **The command-palette hint names a key that is on the keyboard reading it** — `Ctrl` on
+  Windows and Linux, `⌘` on Apple hardware, instead of a ⌘ glyph next to the word "Ctrl".
 - **Signing out, or continuing without an account, no longer shows the last user's
   projects** ([#257](https://github.com/FraOri03/Lattice/issues/257)). Namespacing the
   storage keys (below) gave every account its own vault and then handed two of them the
@@ -108,6 +133,19 @@ All notable changes to Lattice are recorded here. The format follows
 
 ### Added
 
+- **The AI and Creative suites have their place in the switcher before they exist.** The top
+  bar's section switcher is five clusters now — `[Split] · [Board · Graph] · [Document ·
+  Sheet · Presentation · Code] · [ComfyUI · AI dashboard] · [Trace · Forge · Photo · Folio ·
+  Flux]` — with the six unbuilt environments present and disabled. Spending their width now
+  is the point: adding each one on the day it ships would re-lay-out the bar six times and
+  make its width budget a surprise six times. Each placeholder's tooltip names the phase that
+  builds it rather than promising "coming soon", they stay icon-only at every width, and they
+  are the first thing to leave a narrow bar, because a control you cannot click is the
+  cheapest thing to drop. Photo moves into the creative cluster: it is a set-and-lighting
+  planner, and grouping it with Sheet and Code only ever described where it was built. The
+  composition is a single list in [src/types/workspace.ts](src/types/workspace.ts), so
+  enabling an environment is one line. ComfyUI carries its own mark, filled, rather than an
+  invented node-graph glyph.
 - **A build can no longer publish a secret by accident.** Lattice compiles every
   `VITE_`-prefixed setting straight into the JavaScript it serves — that is how the browser
   gets its configuration, and it means one wrong prefix on a database key would hand that key

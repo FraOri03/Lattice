@@ -110,8 +110,13 @@ body {
   .field:focus {
     border-color: var(--accent);
   }
+  /* `whitespace-nowrap` is load-bearing, not cosmetic: a .btn in a flex row
+     (the top bar is one) may shrink below its content, and a wrapping label
+     turns a 29px control into a 45px one that spills out of the 44px bar.
+     Nowrap also pins the flex item's automatic minimum size to the text
+     width, so the button stops shrinking instead of breaking its line. */
   .btn {
-    @apply inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-md border border-bord bg-panel2 px-2.5 py-1.5 text-xs font-medium text-ink select-none;
+    @apply inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-md border border-bord bg-panel2 px-2.5 py-1.5 text-xs font-medium whitespace-nowrap text-ink select-none;
   }
   .btn:hover {
     border-color: var(--accent);

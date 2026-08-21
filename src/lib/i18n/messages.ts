@@ -35,6 +35,13 @@ export const en = {
     presentation: 'Presentation',
     code: 'Code',
     photo: 'Photo',
+    /** planned environments — proper nouns, so most of these do not translate */
+    comfyui: 'ComfyUI',
+    aiDashboard: 'AI dashboard',
+    trace: 'Trace',
+    forge: 'Forge',
+    folio: 'Folio',
+    flux: 'Flux',
   },
 
   topbar: {
@@ -80,8 +87,53 @@ export const en = {
     shareAria: (scope: string) => `Share project — collaboration reaches ${scope}`,
     themeToLight: 'Switch to light theme',
     themeToDark: 'Switch to dark theme',
+    /** what each planned environment will be, for its disabled tab */
+    plannedDomain: {
+      comfyui: 'generative workflows',
+      aiDashboard: 'models, usage & keys',
+      trace: 'vector & illustration',
+      forge: 'image & painting',
+      folio: 'layout & publishing',
+      flux: 'video & motion',
+    },
+    plannedTitle: (label: string, domain: string, phase: number) =>
+      `${label} — ${domain} · phase ${phase}, not built yet`,
+    plannedAria: (label: string) => `${label} — planned, not available yet`,
     /** whatever did not fit in the bar (12.3) */
     more: 'More controls',
+  },
+
+  /** the project call, in the top bar's status cluster */
+  call: {
+    join: 'Join call',
+    joining: 'Joining…',
+    inCall: 'In call',
+    inCallTitle: 'You are in the project call — controls are in the call island, bottom right',
+    joinTitle:
+      'Join the project call — your microphone and camera stay off until you turn them on',
+    retryTitle: (err: string) => `${err} — click to try again`,
+    joinAria: 'Join the project call',
+    unavailableAria: (why: string) => `Join call unavailable: ${why}`,
+  },
+
+  /**
+   * Realtime chip labels. The popover's prose — setup instructions, the
+   * offline and unconfigured explanations — is a later slice and is still
+   * English, like the collabPresentation blurb noted at the top of this file.
+   */
+  realtime: {
+    unconfigured: 'Realtime off',
+    'no-account': 'Realtime: sign in',
+    inactive: 'Realtime idle',
+    connecting: 'Connecting…',
+    connected: 'Live',
+    reconnecting: 'Reconnecting…',
+    offline: 'Offline',
+    unauthorized: 'No access',
+    error: 'Realtime error',
+    aria: (label: string) => `Realtime collaboration: ${label}`,
+    close: 'Close realtime status',
+    dialog: 'Realtime collaboration status',
   },
 
   /** cloud-sync status chip in the top bar */
@@ -1246,6 +1298,12 @@ export const it: Catalog = {
     presentation: 'Presentazione',
     code: 'Codice',
     photo: 'Foto',
+    comfyui: 'ComfyUI',
+    aiDashboard: 'Dashboard AI',
+    trace: 'Trace',
+    forge: 'Forge',
+    folio: 'Folio',
+    flux: 'Flux',
   },
 
   topbar: {
@@ -1291,7 +1349,46 @@ export const it: Catalog = {
     shareAria: (scope) => `Condividi progetto — la collaborazione raggiunge ${scope}`,
     themeToLight: 'Passa al tema chiaro',
     themeToDark: 'Passa al tema scuro',
+    plannedDomain: {
+      comfyui: 'workflow generativi',
+      aiDashboard: 'modelli, consumi e chiavi',
+      trace: 'vettoriale e illustrazione',
+      forge: 'immagine e pittura',
+      folio: 'impaginazione ed editoria',
+      flux: 'video e motion',
+    },
+    plannedTitle: (label, domain, phase) =>
+      `${label} — ${domain} · fase ${phase}, non ancora realizzato`,
+    plannedAria: (label) => `${label} — previsto, non ancora disponibile`,
     more: 'Altri controlli',
+  },
+
+  call: {
+    join: 'Entra',
+    joining: 'Connessione…',
+    inCall: 'In chiamata',
+    inCallTitle:
+      'Sei nella chiamata del progetto — i controlli sono nell’isola in basso a destra',
+    joinTitle:
+      'Entra nella chiamata del progetto — microfono e videocamera restano spenti finché non li attivi',
+    retryTitle: (err) => `${err} — clic per riprovare`,
+    joinAria: 'Entra nella chiamata del progetto',
+    unavailableAria: (why) => `Chiamata non disponibile: ${why}`,
+  },
+
+  realtime: {
+    unconfigured: 'Realtime off',
+    'no-account': 'Realtime: accedi',
+    inactive: 'Realtime inattivo',
+    connecting: 'Connessione…',
+    connected: 'Live',
+    reconnecting: 'Riconnessione…',
+    offline: 'Offline',
+    unauthorized: 'Nessun accesso',
+    error: 'Errore realtime',
+    aria: (label) => `Collaborazione realtime: ${label}`,
+    close: 'Chiudi lo stato realtime',
+    dialog: 'Stato della collaborazione realtime',
   },
 
   syncChip: {

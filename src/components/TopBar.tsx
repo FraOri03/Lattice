@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useStore } from '@/store/useStore'
-import { atLeast } from '@/lib/layout/tiers'
-import { useViewportTier } from '@/lib/layout/useViewportTier'
+import { barFit } from '@/lib/layout/topBarFit'
+import { useElementWidth } from '@/lib/layout/useElementWidth'
 import { useOpenId } from '@/lib/tabs/openEntity'
 import { useUiStore } from '@/store/useUiStore'
 import { useWorkspaceLayoutStore } from '@/store/workspaceLayoutStore'
@@ -34,6 +34,18 @@ import {
   IcUserPlus,
   IcWifiOff,
 } from '@/components/Icons'
+
+/**
+ * The modifier the palette's hint should name. `CommandPalette` accepts Ctrl
+ * *or* Meta, so this is purely about which one the user's keyboard has — a bar
+ * that reads "Ctrl K" beside a ⌘ glyph on a Windows machine names a key that
+ * is not on the keyboard it is being read on.
+ */
+const MOD_KEY = /mac|iphone|ipad/i.test(
+  typeof navigator === 'undefined' ? '' : navigator.userAgent,
+)
+  ? '⌘'
+  : 'Ctrl'
 
 function useOnline(): boolean {
   const [online, setOnline] = useState(navigator.onLine)
@@ -356,20 +368,33 @@ export function TopBar({
   const setPaletteOpen = useUiStore((s) => s.setPaletteOpen)
   const setShareDialogOpen = useUiStore((s) => s.setShareDialogOpen)
   const collabMode = useCollabMode()
-  const tier = useViewportTier()
+  const bar = useRef<HTMLElement>(null)
   const t = useI18n()
 
   /**
-   * What folds, and when. 12.0 measured the bar asking for 1400 px inside a
-   * 1200 px box at a 1440 viewport — so "fits at Full" was never true and the
-   * fix cannot be a single breakpoint. Two groups leave at two different
-   * widths, each rendered ONCE and moved rather than duplicated: mounting
+   * What folds, and when. Two groups leave at two different widths, each
+   * rendered ONCE and moved rather than duplicated: mounting
    * `NotificationCenter` twice and hiding one with CSS would give the project
    * two of the same state, which is the failure phase 11.3 spent itself
    * removing.
+   *
+   * The widths come from measuring THIS element, not the window — the bar is
+   * the viewport minus the sidebar, minus more when a pane is split, and the
+   * old viewport-tier rule was reading a number ~250px larger than the box it
+   * was deciding for. See lib/layout/topBarFit for the measured thresholds.
    */
-  const foldActions = !atLeast(tier, 'full')
-  const foldStatus = !atLeast(tier, 'compact')
+  const fit = barFit(useElementWidth(bar))
+  const foldActions = !fit.showActions
+  const foldStatus = !fit.showStatus
+
+  /**
+   * A control shows its word when the bar is wide — or whenever it has been
+   * folded into the "···" panel, which is roomy and where a column of
+   * unlabelled icons would be a menu of guesses. This is why the rule is a
+   * prop and not a `@min-[64rem]:` class: the panel is portalled out of the
+   * bar, so a container query there measures the popover, or nothing.
+   */
+  const labelled = (folded: boolean) => folded || fit.showControlLabels
 
   // presence (who is in the project) and the call (who is talking) are
   // deliberately adjacent but distinct states
@@ -381,9 +406,9 @@ export function TopBar({
           project room; on the dashboard none is attached */}
       {!onDashboard && (
         <>
-          <PresenceAvatars />
-          <RealtimeStatusChip />
-          <JoinCallButton />
+          <PresenceAvatars labelled={labelled(foldStatus)} />
+          <RealtimeStatusChip labelled={labelled(foldStatus)} />
+          <JoinCallButton labelled={labelled(foldStatus)} />
         </>
       )}
       <NotificationCenter />
@@ -405,9 +430,9 @@ export function TopBar({
         aria-label={t.topbar.shareAria(collabMode.scopeLabel)}
       >
         <IcUserPlus size={13} />
-        <span className="hidden @min-[64rem]:inline">{t.topbar.share}</span>
-        {!collabMode.isRealtime && (
-          <span className="hidden rounded bg-panel px-1 text-[9px] font-semibold text-muted @min-[80rem]:inline">
+        {labelled(foldActions) && <span>{t.topbar.share}</span>}
+        {!collabMode.isRealtime && (foldActions || fit.showScopeBadge) && (
+          <span className="rounded bg-panel px-1 text-[9px] font-semibold text-muted">
             {collabMode.shortLabel}
           </span>
         )}
@@ -421,7 +446,7 @@ export function TopBar({
         aria-label={t.topbar.openCommandPalette}
       >
         <IcCommand size={12} />
-        <kbd className="text-[10px] text-muted">Ctrl K</kbd>
+        <kbd className="text-[10px] text-muted">{MOD_KEY} K</kbd>
       </button>
       {/* the reveal starts from this button, so the new theme visibly comes
           out of the control the user pressed */}
@@ -459,7 +484,10 @@ export function TopBar({
      * should keep the bar inside its box, but if some locale or some future
      * control overflows anyway, the bar scrolls and the document does not.
      */
-    <header className="@container flex h-11 max-w-full min-w-0 flex-none items-center gap-2 overflow-x-auto border-b border-bord bg-panel px-3">
+    <header
+      ref={bar}
+      className="@container flex h-11 max-w-full min-w-0 flex-none items-center gap-2 overflow-x-auto border-b border-bord bg-panel px-3"
+    >
       {onDashboard ? (
         <span className="min-w-0 truncate text-[13px] font-bold">{title}</span>
       ) : (
@@ -469,8 +497,9 @@ export function TopBar({
       <div className="flex-1" />
 
       {/* Centre: [Split] · [Board · Graph] · [Document · Sheet · Presentation ·
-          Code · Photo]. Split stays a layout and Graph a view underneath — see
-          SectionTabs. */}
+          Code] · [ComfyUI · AI dashboard] · [Trace · Forge · Photo · Folio ·
+          Flux]. Split stays a layout and Graph a view underneath, and the last
+          two clusters are disabled placeholders — see SectionTabs. */}
       {!onDashboard && <SectionTabs />}
 
       <div className="flex-1" />

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useCrdtStore, REALTIME_SETUP_INSTRUCTIONS } from '@/lib/crdt/crdtStore'
 import { ROLE_LABEL, type RealtimeStatus } from '@/types/collab'
+import { useI18n } from '@/lib/i18n'
 import {
   IcAlert,
   IcCheck,
@@ -27,28 +28,34 @@ import {
 
 type IconCmp = (p: { size?: number; className?: string }) => React.ReactNode
 
-const STATUS_META: Record<
-  RealtimeStatus,
-  { label: string; dot: string; Icon: IconCmp; pulse?: boolean }
-> = {
-  unconfigured: { label: 'Realtime off', dot: 'var(--muted)', Icon: IcCloudOff },
-  'no-account': { label: 'Realtime: sign in', dot: '#ffa629', Icon: IcInfo },
-  inactive: { label: 'Realtime idle', dot: 'var(--muted)', Icon: IcCloudOff },
-  connecting: { label: 'Connecting…', dot: '#ffa629', Icon: IcRefresh, pulse: true },
-  connected: { label: 'Live', dot: '#14ae5c', Icon: IcCheck },
-  reconnecting: { label: 'Reconnecting…', dot: '#ffa629', Icon: IcRefresh, pulse: true },
-  offline: { label: 'Offline', dot: 'var(--muted)', Icon: IcWifiOff },
-  unauthorized: { label: 'No access', dot: '#f24822', Icon: IcLock },
-  error: { label: 'Realtime error', dot: '#f24822', Icon: IcAlert },
+/** Shape and colour per status; the WORD comes from the catalog (t.realtime). */
+const STATUS_META: Record<RealtimeStatus, { dot: string; Icon: IconCmp; pulse?: boolean }> = {
+  unconfigured: { dot: 'var(--muted)', Icon: IcCloudOff },
+  'no-account': { dot: '#ffa629', Icon: IcInfo },
+  inactive: { dot: 'var(--muted)', Icon: IcCloudOff },
+  connecting: { dot: '#ffa629', Icon: IcRefresh, pulse: true },
+  connected: { dot: '#14ae5c', Icon: IcCheck },
+  reconnecting: { dot: '#ffa629', Icon: IcRefresh, pulse: true },
+  offline: { dot: 'var(--muted)', Icon: IcWifiOff },
+  unauthorized: { dot: '#f24822', Icon: IcLock },
+  error: { dot: '#f24822', Icon: IcAlert },
 }
 
-export function RealtimeStatusChip() {
+/**
+ * `labelled` is decided by the bar (see lib/layout/topBarFit) rather than by a
+ * container query, because the chip is also rendered inside the top bar's
+ * "···" panel, which is portalled out of the header — a container query there
+ * measures the popover, or nothing at all.
+ */
+export function RealtimeStatusChip({ labelled = true }: { labelled?: boolean }) {
   const status = useCrdtStore((s) => s.status)
   const detail = useCrdtStore((s) => s.detail)
   const pendingUpdates = useCrdtStore((s) => s.pendingUpdates)
   const serverRole = useCrdtStore((s) => s.serverRole)
   const [open, setOpen] = useState(false)
+  const t = useI18n()
   const meta = STATUS_META[status]
+  const label = t.realtime[status]
   const Icon = meta.Icon
 
   return (
@@ -57,8 +64,8 @@ export function RealtimeStatusChip() {
         className="btn"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        aria-label={`Realtime collaboration: ${meta.label}`}
-        title={detail ?? `Realtime collaboration: ${meta.label}`}
+        aria-label={t.realtime.aria(label)}
+        title={detail ?? t.realtime.aria(label)}
       >
         <span
           className={meta.pulse ? 'flex animate-pulse' : 'flex'}
@@ -67,7 +74,7 @@ export function RealtimeStatusChip() {
         >
           <Icon size={13} />
         </span>
-        <span className="hidden lg:inline">{meta.label}</span>
+        {labelled && <span>{label}</span>}
         {pendingUpdates > 0 && status !== 'connected' && (
           <span className="rounded-full bg-panel2 px-1.5 text-[9.5px] font-bold text-muted">
             {pendingUpdates > 99 ? '99+' : pendingUpdates}
@@ -79,19 +86,19 @@ export function RealtimeStatusChip() {
         <>
           <button
             className="fixed inset-0 z-40 cursor-default"
-            aria-label="Close realtime status"
+            aria-label={t.realtime.close}
             onClick={() => setOpen(false)}
           />
           <div
             role="dialog"
-            aria-label="Realtime collaboration status"
+            aria-label={t.realtime.dialog}
             className="absolute right-0 z-50 mt-1.5 w-72 rounded-xl border border-bord bg-panel p-3 text-xs shadow-xl"
           >
             <div className="mb-1 flex items-center gap-2">
               <span style={{ color: meta.dot }} aria-hidden>
                 <Icon size={14} />
               </span>
-              <span className="font-semibold">{meta.label}</span>
+              <span className="font-semibold">{label}</span>
               {serverRole && status === 'connected' && (
                 <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[10px] font-semibold text-accent">
                   {ROLE_LABEL[serverRole]} (server-verified)
