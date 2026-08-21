@@ -10,6 +10,7 @@ import type { Entitlement } from '../../../src/types/entitlement.js'
 import type { Session } from '../../../src/types/session.js'
 import type { OtpCode } from '../../../src/types/otpRecord.js'
 import type { MailSend } from '../../../src/types/mail.js'
+import type { AiJobClosure, AiJobRecord } from '../../../src/types/aiJob.js'
 import type { RoomAcl } from '../../../src/lib/collab/acl.js'
 
 /**
@@ -321,6 +322,36 @@ export interface MailSendRepository {
   countForScope(scope: string, since: number): Promise<number>
 }
 
+/* ---------------- ai jobs ---------------- */
+
+/**
+ * The server's ledger of AI jobs (Phase 21.1, #100).
+ *
+ * Narrow on purpose. It is not how a poll is authorised — the signed ticket
+ * does that, so AI keeps working on a deployment with no database. What
+ * needs storage is the one thing a stateless design cannot do: record that
+ * a job ended when the browser that started it was gone.
+ */
+export interface AiJobRepository {
+  /** Called once, immediately after RunPod accepted the job. */
+  record(job: AiJobRecord): Promise<void>
+
+  get(jobId: string): Promise<AiJobRecord | null>
+
+  /**
+   * Close a job, once.
+   *
+   * Idempotent and one-way: a job that is already closed is returned
+   * unchanged rather than reopened. The webhook and a poll routinely race,
+   * and whichever loses must not be able to overwrite the winner with a
+   * staler view of the same job.
+   */
+  close(jobId: string, closure: AiJobClosure): Promise<AiJobRecord | null>
+
+  /** Jobs this account still has open — what 21.10 reconciles against. */
+  openFor(subject: string): Promise<AiJobRecord[]>
+}
+
 /* ---------------- the set of them ---------------- */
 
 export interface Repositories {
@@ -331,4 +362,5 @@ export interface Repositories {
   sessions: SessionRepository
   otp: OtpRepository
   mailSends: MailSendRepository
+  aiJobs: AiJobRepository
 }

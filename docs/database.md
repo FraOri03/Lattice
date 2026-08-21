@@ -10,7 +10,7 @@ shaped it is [16.3](authorisation-phase-16-3.md); the model it stores is
 
 ## What lives here
 
-Eight tables, and they have one thing in common: they are small, rarely
+Nine tables, and they have one thing in common: they are small, rarely
 written, and security-critical.
 
 | Table | Holds |
@@ -23,6 +23,13 @@ written, and security-critical.
 | `sessions` | a Lattice-issued session; the cookie token is hashed, never stored ([17.2](sessions.md)) |
 | `email_otp_codes` | one-time sign-in codes, scrypt-hashed and rate-limited ([17.3](email-otp.md)) |
 | `mail_sends` | one row per message attempted — the evidence rate limits are counted from ([18.2](mail.md)) |
+| `ai_jobs` | one GPU job: who ran what, on which class of hardware, and how it ended ([21.1](architecture/ai.md)) |
+
+`ai_jobs` is the one table nothing *depends* on. A poll is authorised by a
+signed ticket, not by a row, so AI keeps working on a deployment with no
+database at all. What the table adds is the thing a stateless design cannot
+do: close a job whose browser was shut before it finished, so a paid
+generation is not simply forgotten.
 
 **Document content is not here and will not be.** Docs, boards, sheets,
 code and presentations live in Yjs, Liveblocks and Google Drive. Postgres

@@ -75,6 +75,22 @@ export const env = {
   mediaTokenUrl:
     (import.meta.env.VITE_MEDIA_TOKEN_URL as string | undefined) ||
     '/api/realtime/media-token',
+  /**
+   * Which AI backend this build offers (Phase 21). 'hosted' selects the
+   * RunPod provider, which talks only to `/api/ai/*`; 'local' is 21.6's
+   * ComfyUI on the user's own machine; anything else — the default — leaves
+   * `DisabledAiProvider` in place and the UI says so honestly.
+   *
+   * Deliberately NOT the credential. `RUNPOD_API_KEY` and the endpoint ids
+   * are server-only variables read by `/api/ai/*` and never prefixed
+   * `VITE_`; this flag only says which seam implementation to instantiate,
+   * and the browser learns nothing from it that it could misuse.
+   *
+   * It is also only half the answer: the server can withdraw AI without a
+   * redeploy, so the provider asks `/api/ai/capabilities` at runtime and
+   * that answer wins over this constant.
+   */
+  aiBackend: (import.meta.env.VITE_AI_BACKEND as string | undefined) ?? '',
 } as const
 
 /** True when real Google OAuth is configured (otherwise the mock auth provider is used). */
@@ -100,3 +116,15 @@ export const hasConversionBackend = env.conversionApiUrl.length > 0
  * that honestly rather than pretending a call is available.
  */
 export const hasMediaCalls = env.livekitUrl.length > 0 && hasRealtimeBackend
+
+/**
+ * True when this build was compiled with the hosted AI backend selected.
+ *
+ * A *build-time* answer, and only the first half of the question: whether
+ * the server actually has a RunPod key, credit and an endpoint is something
+ * only the server knows, and it must be able to change its mind without a
+ * redeploy. The provider asks `/api/ai/capabilities` for that. This
+ * constant decides which implementation of the seam is constructed; the
+ * runtime probe decides what it will admit to being able to run.
+ */
+export const hasHostedAiBackend = env.aiBackend === 'hosted'
