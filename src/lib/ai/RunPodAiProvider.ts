@@ -334,8 +334,12 @@ export const RunPodAiProvider: AiBackendProvider = {
   id: 'hosted',
   label: 'Hosted GPU workers',
   requiresUpload: true,
+  disclosure: { destination: 'deployment', cost: 'deployment' },
 
-  canRun: (action) => hasHostedAiBackend && Object.hasOwn(AI_ACTIONS, action),
+  // An action with no GPU class is one no GPU backend can run — the
+  // catalogue holds more than GPU work, and saying "yes" here would mean
+  // submitting a set-design prompt to a diffusion endpoint.
+  canRun: (action) => hasHostedAiBackend && Boolean(AI_ACTIONS[action]?.gpuClass),
 
   async capabilities() {
     if (!hasHostedAiBackend) {

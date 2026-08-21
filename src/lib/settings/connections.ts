@@ -12,7 +12,7 @@
  * other way to see what they look like unconfigured.
  */
 
-export type ServiceId = 'drive' | 'github' | 'realtime' | 'livekit' | 'conversion'
+export type ServiceId = 'drive' | 'github' | 'realtime' | 'livekit' | 'conversion' | 'ai'
 
 /**
  * - `connected` — talking to it now.
@@ -41,6 +41,7 @@ export interface ConnectionInputs {
   hasRealtimeBackend: boolean
   hasMediaCalls: boolean
   hasConversionBackend: boolean
+  hasAiBackend: boolean
 }
 
 export function deriveConnections(i: ConnectionInputs): ServiceStatus[] {
@@ -86,6 +87,19 @@ export function deriveConnections(i: ConnectionInputs): ServiceStatus[] {
       state: i.hasConversionBackend ? 'connected' : 'unconfigured',
       action: 'none',
       configuredBy: 'VITE_CONVERSION_API_URL',
+    },
+    {
+      /*
+       * The row is about the DEPLOYMENT's backend, which is why it can be
+       * `unconfigured` while Photo mode's set designer is happily producing
+       * layouts: templates run here and a key the user pasted is theirs, not
+       * this build's. Saying "connected" for either would be claiming credit
+       * for something this deployment neither runs nor pays for.
+       */
+      id: 'ai',
+      state: i.hasAiBackend ? 'connected' : 'unconfigured',
+      action: 'none',
+      configuredBy: 'VITE_AI_BACKEND',
     },
   ]
 }

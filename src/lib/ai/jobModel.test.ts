@@ -9,7 +9,13 @@ import {
   type AiFailureReason,
   type AiJobState,
 } from './jobModel'
-import { AI_ACTIONS, AI_ACTION_IDS, defaultParams, invalidParams } from './actions'
+import {
+  AI_ACTIONS,
+  AI_ACTION_IDS,
+  dataCarriedBy,
+  defaultParams,
+  invalidParams,
+} from './actions'
 
 const ALL_STATES: AiJobState[] = [
   'queued',
@@ -92,26 +98,46 @@ describe('the failure taxonomy', () => {
   })
 
   it('does allow an automatic retry for something that never reached a worker', () => {
-    expect(AI_FAILURES['no-worker'].billed).toBe(false)
+    expect(AI_FAILURES['no-capacity'].billed).toBe(false)
     expect(AI_FAILURES['not-configured'].billed).toBe(false)
   })
 
   it('tells the user to change something rather than to wait, where that is true', () => {
     expect(AI_FAILURES['input-too-large'].retry).toBe('after-change')
     expect(AI_FAILURES['invalid-parameters'].retry).toBe('after-change')
-    expect(AI_FAILURES['no-worker'].retry).toBe('later')
+    expect(AI_FAILURES['no-capacity'].retry).toBe('later')
     expect(AI_FAILURES['no-credit'].retry).toBe('no')
   })
 })
 
 describe('the action catalogue', () => {
-  it('declares a GPU class, a deadline and an input cap for every action', () => {
+  it('declares a deadline and an input cap for every action', () => {
     for (const id of AI_ACTION_IDS) {
       const action = AI_ACTIONS[id]
-      expect(['light', 'standard', 'heavy']).toContain(action.gpuClass)
       expect(action.deadlineMs).toBeGreaterThan(0)
       expect(action.maxInputBytes).toBeGreaterThanOrEqual(0)
     }
+  })
+
+  /**
+   * Optional, and only for work a GPU backend could actually take. An
+   * invented class on `design-set` would be a field that lies, and the
+   * hosted provider reads exactly this to decide what it can run.
+   */
+  it('declares a GPU class only where a GPU backend could run the action', () => {
+    for (const id of AI_ACTION_IDS) {
+      const gpuClass = AI_ACTIONS[id].gpuClass
+      if (gpuClass !== undefined) expect(['light', 'standard', 'heavy']).toContain(gpuClass)
+    }
+    expect(AI_ACTIONS['design-set'].gpuClass).toBeUndefined()
+  })
+
+  it('says what each action carries, derived from what it declares', () => {
+    expect(dataCarriedBy('text-to-image')).toBe('prompt')
+    expect(dataCarriedBy('upscale')).toBe('inputs')
+    expect(dataCarriedBy('inpaint')).toBe('prompt-and-inputs')
+    expect(dataCarriedBy('background-removal')).toBe('inputs')
+    expect(dataCarriedBy('design-set')).toBe('prompt')
   })
 
   it('puts the cheap actions on the cheap hardware', () => {

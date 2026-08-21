@@ -123,7 +123,7 @@ export function httpStatusFor(reason: AiFailureReason): number {
       return 413
     case 'no-credit':
       return 402
-    case 'no-worker':
+    case 'no-capacity':
       return 503
     case 'model-missing':
       return 500

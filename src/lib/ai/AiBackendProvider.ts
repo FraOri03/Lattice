@@ -79,6 +79,37 @@ export interface AiJobHandle {
   cancel(): Promise<void>
 }
 
+/**
+ * What the surface must be able to tell the user *before* anything runs.
+ *
+ * The action says what a job carries ({@link dataCarriedBy}); this says
+ * where that goes and who pays for it. The two are separate because they
+ * are answered by different halves of the seam, and neither half can
+ * answer for the other: the same `upscale` sends the same image whether it
+ * lands on a rented GPU, on the user's own machine, or nowhere at all.
+ *
+ * This field is what the Photo mode migration bought. Before it, `id` was
+ * carrying both questions — and `local | hosted | disabled` answers "does
+ * it leave the device" cleanly while saying nothing at all about who is
+ * billed. A third-party model reached with the user's own key is `hosted`
+ * and costs the deployment nothing, which is a sentence the id alone
+ * cannot express.
+ */
+export interface AiDisclosure {
+  /**
+   * - `device` — nothing leaves.
+   * - `deployment` — a backend this deployment runs and pays for.
+   * - `third-party` — a vendor the user chose, under their own account.
+   */
+  readonly destination: 'device' | 'deployment' | 'third-party'
+  /**
+   * - `free` — nothing is billed to anyone.
+   * - `deployment` — the deployment's account is charged.
+   * - `your-key` — the user's own credential, and their own bill.
+   */
+  readonly cost: 'free' | 'deployment' | 'your-key'
+}
+
 /** What a backend says it can do, asked at runtime rather than assumed. */
 export interface AiCapabilities {
   readonly configured: boolean
@@ -96,6 +127,8 @@ export interface AiBackendProvider {
   readonly label: string
   /** True when running an action sends bytes off the device. */
   readonly requiresUpload: boolean
+  /** Where the data goes and who pays — see {@link AiDisclosure}. */
+  readonly disclosure: AiDisclosure
   /**
    * The build-time answer, from the closed catalogue.
    *
@@ -156,6 +189,7 @@ export const DisabledAiProvider: AiBackendProvider = {
   id: 'disabled',
   label: 'AI backend not configured',
   requiresUpload: false,
+  disclosure: { destination: 'device', cost: 'free' },
   canRun: () => false,
   capabilities: async () => ({
     configured: false,

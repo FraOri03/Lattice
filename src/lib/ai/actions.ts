@@ -36,9 +36,19 @@ export type AiActionId =
   | 'upscale'
   | 'background-removal'
   | 'inpaint'
+  | 'design-set'
 
-/** What an action consumes and produces. Vendor-neutral by construction. */
-export type AiAssetKind = 'text' | 'image' | 'mask'
+/**
+ * What an action consumes and produces. Vendor-neutral by construction.
+ *
+ * `scene` is the kind that proved the catalogue was not secretly a
+ * pixel-only catalogue: Photo mode's set designer returns a described
+ * arrangement of cameras, lights and props, not an image. An output kind
+ * that could only ever be bytes would have forced that feature to keep its
+ * own private path, which is exactly the outcome this seam exists to
+ * prevent.
+ */
+export type AiAssetKind = 'text' | 'image' | 'mask' | 'scene'
 
 /**
  * The hardware tier an action is submitted to.
@@ -80,7 +90,17 @@ export interface AiAction {
   /** Binary inputs the action needs, in the order the caller supplies them. */
   readonly inputs: readonly AiAssetKind[]
   readonly output: AiAssetKind
-  readonly gpuClass: GpuClass
+  /**
+   * The tier a GPU backend should run this on, or absent when no GPU
+   * backend can run it at all.
+   *
+   * Optional because the catalogue turned out to hold more than GPU work.
+   * `design-set` is a language model answering a prompt with a structured
+   * layout: it has no GPU class, and inventing one for it would have been a
+   * field that lies. A provider that only runs GPU work reports `canRun`
+   * false for an action with no class, which is the honest answer.
+   */
+  readonly gpuClass?: GpuClass
   readonly deterministicWithSeed: boolean
   /** Ceiling on each binary input. Enforced client-side and again on the server. */
   readonly maxInputBytes: number
@@ -181,6 +201,28 @@ export const AI_ACTIONS: Readonly<Record<AiActionId, AiAction>> = {
     params: {},
   },
 
+  /**
+   * Photo mode's set designer: a prompt in, an arrangement of cameras,
+   * lights, people and props out.
+   *
+   * The action that keeps the catalogue honest. It is not image generation,
+   * it needs no GPU, its output is structure rather than pixels, and the
+   * backend that runs it today is a third-party language model reached with
+   * the user's own key. A catalogue that could not describe it would be a
+   * catalogue tuned to one backend.
+   */
+  'design-set': {
+    id: 'design-set',
+    inputs: [],
+    output: 'scene',
+    deterministicWithSeed: false,
+    maxInputBytes: 0,
+    deadlineMs: 60_000,
+    params: {
+      prompt: PROMPT,
+    },
+  },
+
   inpaint: {
     id: 'inpaint',
     inputs: ['image', 'mask'],
@@ -234,6 +276,26 @@ export function invalidParams(
     }
   }
   return bad
+}
+
+/**
+ * What an action has to hand a backend in order to run.
+ *
+ * Half of the sentence the surface owes the user before anything runs; the
+ * other half is the provider's {@link AiBackendProvider.disclosure}, which
+ * says where it goes and who pays. Derived rather than declared, so it
+ * cannot drift from the parameters and inputs it describes.
+ */
+export type AiDataCarried = 'nothing' | 'prompt' | 'inputs' | 'prompt-and-inputs'
+
+export function dataCarriedBy(actionId: AiActionId): AiDataCarried {
+  const action = AI_ACTIONS[actionId]
+  const hasText = Object.values(action.params).some((spec) => spec.kind === 'text')
+  const hasInputs = action.inputs.length > 0
+  if (hasText && hasInputs) return 'prompt-and-inputs'
+  if (hasText) return 'prompt'
+  if (hasInputs) return 'inputs'
+  return 'nothing'
 }
 
 /** The declared defaults for an action, as a bag ready to be submitted. */

@@ -88,11 +88,22 @@ export default async function handler(req: ApiRequest, res: ApiRes): Promise<voi
     return
   }
   const action = AI_ACTIONS[body.actionId]
-  if (!availableActions().includes(action.id)) {
+  const gpuClass = action.gpuClass
+  if (gpuClass === undefined || !availableActions().includes(action.id)) {
+    /*
+     * Two refusals that read the same to a caller and are not the same
+     * thing. An action with no GPU class is one no hosted backend will ever
+     * run — `design-set` is answered by a language model in the browser —
+     * while a class with no endpoint is a deployment that has not
+     * provisioned one. Both mean "not here", which is what the caller acts
+     * on; the sentence says which.
+     */
     sendAiError(
       res,
       'not-configured',
-      `No RunPod endpoint is configured for the ${action.gpuClass} GPU class this action needs.`,
+      gpuClass === undefined
+        ? `${action.id} is not run by a hosted GPU backend.`
+        : `No RunPod endpoint is configured for the ${gpuClass} GPU class this action needs.`,
     )
     return
   }
@@ -165,7 +176,7 @@ export default async function handler(req: ApiRequest, res: ApiRes): Promise<voi
 
   try {
     const accepted = await submitJob({
-      gpuClass: action.gpuClass,
+      gpuClass,
       deadlineMs,
       // The container's contract, and the only place an action becomes a
       // payload. 21.2 owns the other side of it.
@@ -187,7 +198,7 @@ export default async function handler(req: ApiRequest, res: ApiRes): Promise<voi
     const submittedAt = Date.now()
     const deadlineAt = submittedAt + deadlineMs
     const ticket = mintTicket(
-      { jobId: accepted.jobId, subject: identity.sub, gpuClass: action.gpuClass },
+      { jobId: accepted.jobId, subject: identity.sub, gpuClass },
       submittedAt,
     )
 
@@ -198,7 +209,7 @@ export default async function handler(req: ApiRequest, res: ApiRes): Promise<voi
           jobId: accepted.jobId,
           subject: identity.sub,
           actionId: action.id,
-          gpuClass: action.gpuClass,
+          gpuClass,
           projectId,
           state: accepted.state,
           callbackTokenHash: callbackTokenHash(callback.token),
