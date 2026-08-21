@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useCrdtStore, REALTIME_SETUP_INSTRUCTIONS } from '@/lib/crdt/crdtStore'
+import { maskAddresses } from '@/lib/auth/addressAlias'
 import { ROLE_LABEL, type RealtimeStatus } from '@/types/collab'
 import { useI18n } from '@/lib/i18n'
 import {
@@ -49,7 +50,9 @@ const STATUS_META: Record<RealtimeStatus, { dot: string; Icon: IconCmp; pulse?: 
  */
 export function RealtimeStatusChip({ labelled = true }: { labelled?: boolean }) {
   const status = useCrdtStore((s) => s.status)
-  const detail = useCrdtStore((s) => s.detail)
+  // the endpoints name the caller in prose ("<address> is not a member of
+  // this project"), so the rename has to happen on the sentence
+  const detail = maskAddresses(useCrdtStore((s) => s.detail)) || null
   const pendingUpdates = useCrdtStore((s) => s.pendingUpdates)
   const serverRole = useCrdtStore((s) => s.serverRole)
   const [open, setOpen] = useState(false)

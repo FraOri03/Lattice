@@ -367,3 +367,35 @@ describe('transfer-ownership', () => {
     expect(updateRoom).not.toHaveBeenCalled()
   })
 })
+
+describe('members — reading the ACL the endpoints enforce', () => {
+  it('hands the ACL to a member, which is what makes the drift visible', async () => {
+    mockGoogle('ada@example.com')
+    const sent = await call({ action: 'members', projectId: 'proj_1', googleToken: 'ya29' })
+
+    expect(sent.code).toBe(200)
+    expect((sent.body as { acl: { ownerEmail: string } }).acl.ownerEmail).toBe(
+      'owner@example.com',
+    )
+  })
+
+  /**
+   * The two refusals used to be one 403, so the client could not tell "nobody
+   * has opened this project with realtime yet" (which its owner fixes alone)
+   * from "the server does not know you here" (which needs somebody else).
+   */
+  it('says 404 when the project has no rooms at all', async () => {
+    getRoom.mockRejectedValue(new Error('room not found'))
+    mockGoogle('ada@example.com')
+    const sent = await call({ action: 'members', projectId: 'proj_1', googleToken: 'ya29' })
+
+    expect(sent.code).toBe(404)
+  })
+
+  it('says 403 when the rooms exist and the caller is not in them', async () => {
+    mockGoogle('stranger@example.com', 'g-sub-9')
+    const sent = await call({ action: 'members', projectId: 'proj_1', googleToken: 'ya29' })
+
+    expect(sent.code).toBe(403)
+  })
+})

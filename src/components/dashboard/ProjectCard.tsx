@@ -1,5 +1,6 @@
 import { useStore } from '@/store/useStore'
 import { useCollabStore } from '@/lib/collab/collabStore'
+import { displayAddress } from '@/lib/auth/addressAlias'
 import { useSyncStore } from '@/lib/sync/syncStore'
 import { useI18n, useTimeAgo } from '@/lib/i18n'
 import { announce } from '@/lib/a11y/announcer'
@@ -208,7 +209,7 @@ export function ProjectCard({
                 key={m.userId}
                 className="flex h-4 w-4 items-center justify-center rounded-full border border-panel bg-panel2 text-[8px] font-semibold"
               >
-                {(m.name || m.email).slice(0, 1).toUpperCase()}
+                {(m.name || displayAddress(m.email)).slice(0, 1).toUpperCase()}
               </span>
             ))}
           </span>

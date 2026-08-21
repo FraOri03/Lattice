@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  aclSlots,
   addEmail,
   bindUserId,
   decodeBindings,
@@ -177,5 +178,26 @@ describe('the wire format', () => {
 
   it('refuses to encode a value that would not survive the round trip', () => {
     expect(encodeBindings({ 'a b@x.com': 'usr_a' })).toEqual([])
+  })
+})
+
+describe('aclSlots', () => {
+  it('flattens the whole grant, highest rank first', () => {
+    expect(aclSlots(acl()).map((s) => `${s.role}:${s.email}`)).toEqual([
+      'owner:owner@example.com',
+      'admin:ada@example.com',
+      'editor:bob@example.com',
+      'viewer:viv@example.com',
+    ])
+  })
+
+  it('says which slots have been claimed — the difference a reader needs', () => {
+    const claimed = aclSlots(acl({ bindings: { 'ada@example.com': 'usr_ada' } }))
+    expect(claimed.find((s) => s.email === 'ada@example.com')?.claimed).toBe(true)
+    expect(claimed.find((s) => s.email === 'bob@example.com')?.claimed).toBe(false)
+  })
+
+  it('reads an ownerless ACL as holding no owner slot, rather than an empty one', () => {
+    expect(aclSlots(acl({ ownerEmail: '' })).some((s) => s.role === 'owner')).toBe(false)
   })
 })

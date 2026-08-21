@@ -3,9 +3,11 @@ import { useStore } from '@/store/useStore'
 import { useCollabStore } from './collabStore'
 import { currentIdentity } from './localIdentity'
 import { canManageRole } from './permissions'
+import { roleInProject } from './memberRole'
 import { activityLog } from './ActivityLogService'
 import { collabHub } from './hub'
 import { serverAcl } from './ServerAclService'
+import { mirrorToServer } from './serverMirror'
 
 /**
  * MembersService — project membership. Every project has exactly one
@@ -64,14 +66,16 @@ class MembersService {
     )
   }
 
-  /** The current user's real role in a project (no view-as applied). */
+  /**
+   * The current user's real role in a project (no view-as applied).
+   *
+   * Resolved by `memberRole.roleInProject`, which is also what the hooks
+   * read: the rank checks below decide who may demote whom, and an answer
+   * that disagreed with the one the UI is showing would let a control appear
+   * that its own handler then refuses.
+   */
   actualRole(projectId: string): CollabRole {
-    const identity = currentIdentity()
-    const member = this.membersOf(projectId).find(
-      (m) => m.userId === identity.userId && m.status === 'active',
-    )
-    // projects without membership data belong to the local user
-    return member?.role ?? 'owner'
+    return roleInProject(this.membersOf(projectId), currentIdentity())
   }
 
   /** Role used for permission checks — honors the "view as" preview. */
@@ -101,7 +105,11 @@ class MembersService {
       userId,
     )
     collabHub.broadcastState(projectId)
-    void serverAcl.setRole(projectId, target.email, role)
+    void mirrorToServer(
+      projectId,
+      `${target.name || target.email} still has their old access on the server.`,
+      () => serverAcl.setRole(projectId, target.email, role),
+    )
     return true
   }
 
@@ -126,7 +134,13 @@ class MembersService {
       userId,
     )
     collabHub.broadcastState(projectId)
-    void serverAcl.setRole(projectId, target.email, null)
+    // the direction that matters: they are gone from this screen and, until
+    // this lands, still able to write over the realtime backend
+    void mirrorToServer(
+      projectId,
+      `${target.name || target.email} still has access on the server.`,
+      () => serverAcl.setRole(projectId, target.email, null),
+    )
     return true
   }
 
@@ -165,7 +179,11 @@ class MembersService {
       toUserId,
     )
     collabHub.broadcastState(projectId)
-    void serverAcl.transferOwnership(projectId, target.email)
+    void mirrorToServer(
+      projectId,
+      `The server still records you as the owner, not ${target.name || target.email}.`,
+      () => serverAcl.transferOwnership(projectId, target.email),
+    )
     return true
   }
 
@@ -201,7 +219,11 @@ class MembersService {
       member.userId,
     )
     collabHub.broadcastState(projectId)
-    void serverAcl.setRole(projectId, member.email, member.role)
+    void mirrorToServer(
+      projectId,
+      `${member.name || member.email} does not have access on the server yet.`,
+      () => serverAcl.setRole(projectId, member.email, member.role),
+    )
   }
 
   /** Refresh the current user's lastActiveAt (cheap presence-over-Drive). */

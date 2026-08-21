@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react'
 import { useAccount } from '@/lib/auth/AccountProvider'
+import { displayAddress } from '@/lib/auth/addressAlias'
 import { useSyncStore } from '@/lib/sync/syncStore'
 import { useStore } from '@/store/useStore'
 import { useI18n, useTimeAgo } from '@/lib/i18n'
@@ -88,7 +89,7 @@ export function ProfileMenu() {
             </span>
             <div className="min-w-0">
               <div className="truncate text-[13px] font-semibold">{account.name}</div>
-              <div className="truncate text-[11px] text-muted">{account.email}</div>
+              <div className="truncate text-[11px] text-muted">{displayAddress(account.email)}</div>
               {authKind === 'mock' && (
                 <div className="mt-0.5 inline-block rounded bg-panel2 px-1.5 py-0.5 text-[9px] font-semibold tracking-wider text-[#ffa629] uppercase">
                   {t.profile.localOnlyAccount}

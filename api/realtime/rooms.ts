@@ -155,7 +155,20 @@ export default async function handler(req: ApiRequest, res: ApiRes): Promise<voi
     }
 
     case 'members': {
-      if (!acl || !roleOf(acl, principal)) {
+      /**
+       * The two refusals are different facts and the UI acts on each
+       * differently: a project with no rooms has never been opened with
+       * realtime by anyone and its owner can fix that by opening it, while
+       * a project that does not know the caller needs somebody else to
+       * grant them. Answering both with one 403 (as this did) left the
+       * client unable to tell them apart, which is precisely the drift the
+       * members view exists to expose.
+       */
+      if (!acl) {
+        sendError(res, 404, 'This project has no realtime rooms yet.')
+        return
+      }
+      if (!roleOf(acl, principal)) {
         sendError(res, 403, 'Not a member of this project.')
         return
       }

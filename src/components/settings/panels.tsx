@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useAccount } from '@/lib/auth/AccountProvider'
 import { authService } from '@/lib/auth/AuthService'
 import {
@@ -7,6 +7,7 @@ import {
   type ServiceId,
 } from '@/lib/settings/connections'
 import { initialsOf, MAX_DISPLAY_NAME } from '@/lib/auth/profile'
+import { displayAddress } from '@/lib/auth/addressAlias'
 import { AvatarError, avatarDataUrlFrom } from '@/lib/auth/avatar'
 import { announce } from '@/lib/a11y/announcer'
 import { useSyncStore } from '@/lib/sync/syncStore'
@@ -14,6 +15,11 @@ import { syncEngine } from '@/lib/sync/SyncEngine'
 import { githubProvider } from '@/lib/github/GithubCodeProvider'
 import { useCollabStore } from '@/lib/collab/collabStore'
 import { NOTIFICATION_EVENTS } from '@/lib/collab/notificationPrefs'
+import {
+  foreignGrants,
+  grantAddresses,
+  revokeForeignAccess,
+} from '@/lib/collab/revokeSharing'
 import { useStore } from '@/store/useStore'
 import { useUiStore } from '@/store/useUiStore'
 import { useI18n, useLocale, useTimeAgo } from '@/lib/i18n'
@@ -201,7 +207,7 @@ function AccountPanel() {
           <Avatar account={account} size={44} />
           <div className="min-w-0 flex-1">
             <div className="truncate text-[13.5px] font-semibold">{account.name}</div>
-            <div className="truncate text-[11.5px] text-muted">{account.email}</div>
+            <div className="truncate text-[11.5px] text-muted">{displayAddress(account.email)}</div>
             {authKind === 'mock' && (
               <div className="mt-1 inline-block rounded bg-panel2 px-1.5 py-0.5 text-[9px] font-semibold tracking-wider text-[#ffa629] uppercase">
                 {t.profile.localOnlyAccount}
@@ -217,7 +223,7 @@ function AccountPanel() {
       <Card>
         <Field
           label={t.settings.account.emailLabel}
-          value={account.email || '—'}
+          value={displayAddress(account.email) || '—'}
           hint={
             authKind === 'google'
               ? t.settings.account.emailFromGoogle
@@ -487,7 +493,7 @@ function IdentityFacts() {
       value: !account
         ? c.identityNone
         : authKind === 'google'
-          ? c.identityGoogle(account.email)
+          ? c.identityGoogle(displayAddress(account.email))
           : c.identityLocal,
       ok: !!account,
     },
@@ -620,6 +626,104 @@ function ConnectionsPanel() {
 
 /* ---------------- security ---------------- */
 
+/**
+ * Everyone who holds access to something in this vault, and the one control
+ * that takes it back in bulk.
+ *
+ * It lists before it revokes, because "who can reach my projects" is a
+ * question the Share dialog can only answer one project at a time — and the
+ * vaults that need this are precisely the ones with grants in projects the
+ * user has not opened in months. The addresses are shown; the button is the
+ * second half of the same card, not a separate leap of faith.
+ */
+function SharingCard({ account }: { account: Account | null }) {
+  const t = useI18n()
+  const sec = t.settings.security
+  // named as dependencies rather than passed: `foreignGrants` reads the store
+  // itself (it also walks records for projects the vault no longer holds), so
+  // these two are what makes the count re-derive when membership changes
+  const members = useCollabStore((s) => s.members)
+  const invites = useCollabStore((s) => s.invites)
+  const [running, setRunning] = useState(false)
+  const keepEmail = account?.email.trim().toLowerCase() ?? ''
+
+  const grants = useMemo(
+    () => (keepEmail ? foreignGrants(keepEmail) : []),
+    [keepEmail, members, invites],
+  )
+  const addresses = grantAddresses(grants)
+  const projects = new Set(grants.map((g) => g.projectId)).size
+
+  const run = async () => {
+    const ok = await confirmDialog({
+      title: sec.sharingConfirmTitle,
+      body: sec.sharingConfirmBody(addresses.map(displayAddress).join(', ')),
+      confirmLabel: sec.sharingConfirm,
+      danger: true,
+    })
+    if (!ok) return
+    setRunning(true)
+    try {
+      const report = await revokeForeignAccess(keepEmail)
+      const headline = sec.sharingDone(report.members, report.invites, report.projects)
+      const detail = [
+        report.reclaimed.length ? sec.sharingReclaimed(report.reclaimed.length) : '',
+        report.refused.length ? sec.sharingRefused(report.refused.length) : '',
+      ]
+        .filter(Boolean)
+        .join(' ')
+      // a server that refused is not a success, however much went through
+      if (report.refused.length) toast.warning(headline, detail)
+      else toast.success(headline, detail || undefined)
+      announce(headline)
+    } catch (err) {
+      toast.error(sec.sharingTitle, err instanceof Error ? err.message : String(err))
+    } finally {
+      setRunning(false)
+    }
+  }
+
+  return (
+    <Card title={sec.sharingTitle} body={sec.sharingBody}>
+      <div className="flex flex-col gap-3">
+        <span className="text-[12px]">
+          {keepEmail ? sec.sharingKept(displayAddress(keepEmail)) : sec.sharingUnavailable}
+        </span>
+        {keepEmail &&
+          (addresses.length ? (
+            <>
+              <span className="text-[11.5px] text-muted">
+                {sec.sharingFound(addresses.length, projects)}
+              </span>
+              <ul className="flex flex-wrap gap-1.5">
+                {addresses.map((address) => (
+                  <li
+                    key={address}
+                    className="rounded-full border border-bord bg-panel2 px-2 py-0.5 text-[11px]"
+                  >
+                    {displayAddress(address)}
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : (
+            <span className="text-[11.5px] text-muted">{sec.sharingNone}</span>
+          ))}
+        <div>
+          <button
+            className="btn"
+            disabled={!keepEmail || !grants.length || running}
+            title={keepEmail ? undefined : sec.sharingUnavailable}
+            onClick={() => void run()}
+          >
+            <IcUsers size={12} /> {sec.sharingRevoke}
+          </button>
+        </div>
+      </div>
+    </Card>
+  )
+}
+
 function SecurityPanel() {
   const t = useI18n()
   const sec = t.settings.security
@@ -682,7 +786,7 @@ function SecurityPanel() {
           <span className="min-w-0 flex-1 text-[12px]">
             {account
               ? authKind === 'google'
-                ? sec.signedInGoogle(account.email)
+                ? sec.signedInGoogle(displayAddress(account.email))
                 : sec.signedInLocal
               : sec.signedOut}
           </span>
@@ -715,6 +819,8 @@ function SecurityPanel() {
           <IcLock size={12} /> {sec.revoke}
         </button>
       </Card>
+
+      <SharingCard account={account} />
 
       <Card title={sec.forgetTitle} body={sec.forgetBody}>
         <button className="btn" disabled={forgetting} onClick={() => void forget()}>

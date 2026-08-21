@@ -3,6 +3,7 @@ import type { CollabRole, ProjectInvite } from '@/types/collab'
 import type { MailDelivery } from '@/types/mail'
 import { useStore } from '@/store/useStore'
 import { authService } from '@/lib/auth/AuthService'
+import { realAddress } from '@/lib/auth/addressAlias'
 import { NotAuthenticatedError, sessionClient } from '@/lib/auth/sessionClient'
 import { useCollabStore } from './collabStore'
 import { currentIdentity } from './CollaborationProvider'
@@ -76,6 +77,21 @@ export interface InviteResult {
    * afternoon of guessing otherwise.
    */
   deliveryError?: string
+  /**
+   * Why the realtime ACL did not reserve the slot, in the server's words.
+   *
+   * An invitation is two grants, and only one of them is this record: the
+   * other is a reservation in the project's room metadata, which is what
+   * the endpoints actually enforce. That call used to be fired and
+   * forgotten, so its commonest refusal — 404, because the project has no
+   * rooms until somebody opens it with realtime connected — reached a
+   * `console.warn` and nobody else. The recipient found out instead, as a
+   * red "No access" lock, days later.
+   *
+   * Absent when the reservation succeeded or when this build has no
+   * realtime backend to reserve anything in.
+   */
+  reservationError?: string
 }
 
 /**
@@ -264,7 +280,14 @@ class InviteService {
     email: string,
     role: CollabRole,
   ): Promise<InviteResult> {
-    const clean = email.trim().toLowerCase()
+    /**
+     * A display alias is a label, not a mailbox (`lib/auth/addressAlias`).
+     * Somebody who copies one out of the members list and pastes it here
+     * means the person it stands for, and inviting the label itself would
+     * open a slot no address can ever claim — so it is resolved back before
+     * anything is minted. A build with no aliases changes nothing.
+     */
+    const clean = realAddress(email).toLowerCase()
     if (!EMAIL.test(clean)) return { ok: false }
 
     /**
@@ -309,16 +332,23 @@ class InviteService {
 
     this.store(projectId, [invite, ...this.invitesOf(projectId)])
     activityLog.log(projectId, 'member.invited', `${clean} was invited as ${role}`, invite.id)
-    // reserve the role server-side so the invitee is recognised by the
-    // realtime backend the moment they sign in (16.2's unbound slot)
-    void import('./ServerAclService').then(({ serverAcl }) =>
-      serverAcl.setRole(projectId, clean, role),
-    )
+    /**
+     * Reserve the role server-side so the invitee is recognised by the
+     * realtime backend the moment they sign in (16.2's unbound slot).
+     *
+     * Awaited, and its refusal returned: the sender is standing here, and
+     * they are the only person who can act on "this project has no realtime
+     * rooms yet". A no-op that answers `ok` on a build without a realtime
+     * backend, so nothing is reported where nothing was attempted.
+     */
+    const { serverAcl } = await import('./ServerAclService')
+    const reservation = await serverAcl.setRole(projectId, clean, role)
     return {
       ok: true,
       invite,
       delivery: reply?.ok ? reply.data.delivery : undefined,
       deliveryError: reply?.ok ? reply.data.deliveryError : undefined,
+      reservationError: reservation.ok ? undefined : reservation.error,
     }
   }
 
@@ -368,6 +398,16 @@ class InviteService {
     })
   }
 
+  /**
+   * Withdraw an offer, here and in the ACL that enforces it.
+   *
+   * A revoked invitation whose server-side reservation survives is not a
+   * withdrawn offer: it is an address that still holds a role, off the screen
+   * that was supposed to have removed it. So the second half is awaited, and
+   * a refusal is raised rather than logged (see `serverMirror`) — raised
+   * rather than returned because the callers that matter are a row's × and a
+   * sweep across a whole vault, neither of which is a person reading a reply.
+   */
   async revoke(projectId: string, inviteId: string): Promise<void> {
     const invite = this.invitesOf(projectId).find((i) => i.id === inviteId)
     const reply = await this.ask<{ invite: ProjectInvite }>({
@@ -381,8 +421,14 @@ class InviteService {
 
     // drop the server-side reservation unless they already joined
     if (invite && invite.status === 'pending') {
-      void import('./ServerAclService').then(({ serverAcl }) =>
-        serverAcl.setRole(projectId, invite.email, null),
+      const [{ serverAcl }, { mirrorToServer }] = await Promise.all([
+        import('./ServerAclService'),
+        import('./serverMirror'),
+      ])
+      await mirrorToServer(
+        projectId,
+        `${invite.email} still holds a reserved role on the server.`,
+        () => serverAcl.setRole(projectId, invite.email, null),
       )
     }
   }

@@ -8,6 +8,7 @@ import { focusAreaOnBoard } from './CommentAreas'
 import { membersService } from '@/lib/collab/MembersService'
 import { useCan, useMyRole } from '@/lib/collab/useCollab'
 import { currentIdentity, colorForUser } from '@/lib/collab/CollaborationProvider'
+import { displayAddress } from '@/lib/auth/addressAlias'
 import { can } from '@/lib/collab/permissions'
 import type { CommentTargetType, CommentThread } from '@/types/collab'
 import { toast } from '@/components/ui/Toaster'
@@ -247,7 +248,7 @@ function ThreadCard({
             <option value="">Unassigned</option>
             {membersService.membersOf(projectId).map((m) => (
               <option key={m.userId} value={m.userId}>
-                {m.name || m.email}
+                {m.name || displayAddress(m.email)}
               </option>
             ))}
           </select>
@@ -491,7 +492,7 @@ export function CommentsPanel() {
               {membersService
                 .membersOf(projectId)
                 .slice(0, 4)
-                .map((m) => `@${(m.name || m.email.split('@')[0]).toLowerCase().replace(/\s+/g, '')}`)
+                .map((m) => `@${(m.name || displayAddress(m.email).split('@')[0]).toLowerCase().replace(/\s+/g, '')}`)
                 .join(' ')}
             </div>
           )}
