@@ -514,7 +514,8 @@ export function TopBar({
           {foldActions && actions}
         </TopBarOverflow>
       )}
-      <ProfileMenu />
+      {/* the admin mark is about a project, so it is off on the dashboard */}
+      <ProfileMenu inProject={!onDashboard} />
     </header>
   )
 }

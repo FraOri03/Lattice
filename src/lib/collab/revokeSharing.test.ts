@@ -193,7 +193,7 @@ describe('revokeForeignAccess', () => {
   })
 
   it('withdraws open invitations to anybody else, and leaves mine alone', async () => {
-    const revoke = vi.spyOn(inviteService, 'revoke').mockResolvedValue(undefined)
+    const revoke = vi.spyOn(inviteService, 'revoke').mockResolvedValue({ ok: true })
     useCollabStore
       .getState()
       .setInvites('proj_a', [

@@ -114,6 +114,33 @@ export interface InviteLookup {
  * somebody act on the refusal. It is safe to show: whoever holds the link
  * was mailed at that address.
  */
+/**
+ * What came of withdrawing an offer.
+ *
+ * It used to come of nothing: `revoke` returned `void`, and the one branch
+ * that mattered — the server said no — fell off the end of the function
+ * without a word. The row stayed on screen, the invitation stayed live, and
+ * the only trace of the refusal was a reply nobody read. A × that answers
+ * silence is indistinguishable from a × that is not wired up, which is
+ * exactly what it was reported as.
+ *
+ * So the refusal is carried back to the person who clicked, in the server's
+ * own words — "a viewer cannot manage invitations" and "not a member of this
+ * project" are two different afternoons.
+ */
+export interface RevokeResult {
+  ok: boolean
+  /** The server's own words when it refused. */
+  error?: string
+  /**
+   * The record is withdrawn but the ACL still reserves the role — the half
+   * of a revocation that leaves an address holding access off-screen.
+   * `mirrorToServer` has already raised it as an event; this lets a caller
+   * standing in front of the row say so inline too.
+   */
+  reservationError?: string
+}
+
 export interface AcceptOutcome {
   ok: boolean
   invite?: ProjectInvite
@@ -404,11 +431,15 @@ class InviteService {
    * A revoked invitation whose server-side reservation survives is not a
    * withdrawn offer: it is an address that still holds a role, off the screen
    * that was supposed to have removed it. So the second half is awaited, and
-   * a refusal is raised rather than logged (see `serverMirror`) — raised
-   * rather than returned because the callers that matter are a row's × and a
-   * sweep across a whole vault, neither of which is a person reading a reply.
+   * a refusal is raised as an event too (see `serverMirror`), because the
+   * callers include a sweep across a whole vault with nobody watching it.
+   *
+   * The REFUSAL of the first half is returned rather than swallowed. The
+   * server refusing to withdraw an invitation is the one outcome where
+   * nothing changes anywhere, and it used to be the one outcome that said
+   * nothing at all.
    */
-  async revoke(projectId: string, inviteId: string): Promise<void> {
+  async revoke(projectId: string, inviteId: string): Promise<RevokeResult> {
     const invite = this.invitesOf(projectId).find((i) => i.id === inviteId)
     const reply = await this.ask<{ invite: ProjectInvite }>({
       action: 'revoke',
@@ -417,7 +448,7 @@ class InviteService {
     })
     if (reply?.ok) this.replace(projectId, reply.data.invite)
     else if (!reply) this.patch(projectId, inviteId, { status: 'revoked' })
-    else return
+    else return { ok: false, error: reply.error }
 
     // drop the server-side reservation unless they already joined
     if (invite && invite.status === 'pending') {
@@ -425,12 +456,14 @@ class InviteService {
         import('./ServerAclService'),
         import('./serverMirror'),
       ])
-      await mirrorToServer(
+      const mirrored = await mirrorToServer(
         projectId,
         `${invite.email} still holds a reserved role on the server.`,
         () => serverAcl.setRole(projectId, invite.email, null),
       )
+      if (!mirrored.ok) return { ok: true, reservationError: mirrored.error }
     }
+    return { ok: true }
   }
 
   /** Change what is being offered, which is only possible before acceptance. */

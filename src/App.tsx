@@ -109,14 +109,58 @@ function useCollaboration() {
   useEffect(() => {
     membersService.ensureOwner(activeProjectId)
   }, [activeProjectId])
+}
 
-  // invite links: …/#invite=<token>
+/**
+ * The button in an invitation e-mail: `…/#invite=<token>`.
+ *
+ * ## Why the token is not thrown away on sight
+ *
+ * It used to be. The hash was cleared in the first line of the effect,
+ * before the invitation had even been looked up — so every outcome short of
+ * "accepted" left the recipient on a clean URL with nothing to retry, and
+ * the only way back was the e-mail. Two of those outcomes are ordinary:
+ *
+ *  - **opened as a guest.** This runs inside the shell, and the shell is
+ *    reachable without an account ("continue without signing in"). Accepting
+ *    needs a session, so it refuses — and the token that would have worked a
+ *    minute later, after signing in, was already gone.
+ *  - **opened as the wrong address.** The refusal names the mailbox that was
+ *    invited, which is advice you can only act on by signing in as it. The
+ *    link has to survive that round trip.
+ *
+ * So the token is cleared when the invitation is SETTLED — accepted,
+ * declined, or dead — and kept when the answer was about who is holding it.
+ * Because it is kept, this re-runs when the account changes: signing in is
+ * what the recipient was told to do, and it should be enough.
+ */
+function useInviteLink() {
+  const { account } = useAccount()
+  /** The `${who}:${token}` pair already offered, so one sign-in prompts once. */
+  const offered = useRef('')
+
   useEffect(() => {
     const token = new URLSearchParams(location.hash.slice(1)).get('invite')
     if (!token) return
-    history.replaceState(null, '', location.pathname + location.search)
+    const attempt = `${account?.email ?? ''}:${token}`
+    if (offered.current === attempt) return
+    offered.current = attempt
+
+    /** Take the token out of the URL — only ever on a settled outcome. */
+    const settle = () => {
+      const hash = new URLSearchParams(location.hash.slice(1))
+      hash.delete('invite')
+      const rest = hash.toString()
+      history.replaceState(
+        null,
+        '',
+        location.pathname + location.search + (rest ? `#${rest}` : ''),
+      )
+    }
+
     void inviteService.findByToken(token).then((found) => {
       if (!found) {
+        settle()
         toast.warning(
           'Invite not found',
           'This invite was revoked, has expired, was already used, or its project data has not reached this browser yet.',
@@ -129,7 +173,12 @@ function useCollaboration() {
         body: `${invite.invitedByName} invited ${invite.email} as ${invite.role}.`,
         confirmLabel: 'Accept invite',
       }).then(async (confirmed) => {
-        if (!confirmed) return
+        // declining the prompt is an answer, and it settles the link: the
+        // alternative is being asked again on every sign-in
+        if (!confirmed) {
+          settle()
+          return
+        }
         /**
          * 18.3 — the address is proved before anything is granted, and by
          * the server whenever there is one. A refusal names the mailbox that
@@ -139,6 +188,7 @@ function useCollaboration() {
          */
         const outcome = await inviteService.accept(invite, token)
         if (outcome.ok) {
+          settle()
           useStore.getState().setActiveProject(invite.projectId)
           toast.success('Invite accepted', `You joined as ${invite.role}.`)
           return
@@ -152,7 +202,7 @@ function useCollaboration() {
         )
       })
     })
-  }, [])
+  }, [account?.email])
 }
 
 /** Global shortcuts that aren't tied to a specific pane. */
@@ -360,6 +410,7 @@ function AppShell() {
   const surface = useStore((s) => s.navSurface)
 
   useCollaboration()
+  useInviteLink()
   useGlobalShortcuts()
   useUrlHistory()
   // the viewport tier, published on :root for CSS and read by the shell. It

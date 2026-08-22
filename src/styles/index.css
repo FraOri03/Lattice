@@ -128,6 +128,25 @@ body {
     background: var(--panel2);
     color: var(--ink);
   }
+  /* The destructive one: revoking an invitation, dropping a grant. It reads
+     as an ordinary icon button until the pointer is on it, and then says
+     what it is — the same red the danger confirm uses, white glyph on top,
+     so "withdraw" and "copy the link" never look alike at the moment of the
+     click. Keyboard focus gets the same treatment: the cue cannot be one
+     that only a mouse can reach. */
+  .icon-btn-danger:hover,
+  .icon-btn-danger:focus-visible {
+    background: #f24822;
+    color: #ffffff;
+  }
+  .icon-btn:disabled {
+    cursor: default;
+    opacity: 0.45;
+  }
+  .icon-btn-danger:disabled:hover {
+    background: var(--panel2);
+    color: var(--muted);
+  }
   .insp-h {
     @apply mt-4 mb-1.5 text-[10px] font-semibold tracking-widest text-muted uppercase;
   }

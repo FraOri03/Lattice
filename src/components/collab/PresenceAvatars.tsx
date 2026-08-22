@@ -1,7 +1,10 @@
-import { usePeers } from '@/lib/collab/useCollab'
+import { useStore } from '@/store/useStore'
+import { useI18n } from '@/lib/i18n'
+import { usePeers, useRoleLookup } from '@/lib/collab/useCollab'
 import { useCollabMode } from '@/lib/collab/collabPresentation'
+import { AdminMark } from '@/components/collab/AdminMark'
 import { IcCloud, IcInfo } from '@/components/Icons'
-import type { PresencePeer } from '@/types/collab'
+import type { CollabRole, PresencePeer } from '@/types/collab'
 
 /**
  * PresenceAvatars — stacked avatars of everyone active in this project,
@@ -19,24 +22,45 @@ function locationLabel(peer: PresencePeer): string {
   return `in ${peer.location.mode} view`
 }
 
-function PeerAvatar({ peer, scope }: { peer: PresencePeer; scope: string }) {
+function PeerAvatar({
+  peer,
+  scope,
+  role,
+  adminLabel,
+}: {
+  peer: PresencePeer
+  scope: string
+  role: CollabRole | undefined
+  /** The mark's tooltip, built by the parent that holds the i18n table. */
+  adminLabel: string
+}) {
+  /**
+   * The editing dot and the admin badge want the same corner, so the dot
+   * moves to the top when both are on. Two marks stacked on 24px is already
+   * the limit; overlapping them would make neither readable.
+   */
+  const marked = role === 'owner' || role === 'admin'
   return (
-    <span
-      className="relative -ml-1.5 flex h-6 w-6 items-center justify-center overflow-hidden rounded-full border-2 bg-panel2 text-[10px] font-bold first:ml-0"
-      style={{ borderColor: peer.color }}
-      title={`${peer.name} — ${locationLabel(peer)} · ${scope}`}
-    >
-      {peer.avatarUrl ? (
-        <img src={peer.avatarUrl} alt={peer.name} className="h-full w-full object-cover" />
-      ) : (
-        <span style={{ color: peer.color }}>{peer.name.slice(0, 1).toUpperCase()}</span>
-      )}
-      {peer.editing && (
+    <span className="-ml-1.5 flex first:ml-0">
+      <AdminMark role={role} size={24} label={adminLabel}>
         <span
-          className="absolute right-0 bottom-0 h-1.5 w-1.5 rounded-full"
-          style={{ background: peer.color }}
-        />
-      )}
+          className="relative flex h-6 w-6 items-center justify-center overflow-hidden rounded-full border-2 bg-panel2 text-[10px] font-bold"
+          style={{ borderColor: peer.color }}
+          title={`${peer.name} — ${locationLabel(peer)} · ${scope}`}
+        >
+          {peer.avatarUrl ? (
+            <img src={peer.avatarUrl} alt={peer.name} className="h-full w-full object-cover" />
+          ) : (
+            <span style={{ color: peer.color }}>{peer.name.slice(0, 1).toUpperCase()}</span>
+          )}
+          {peer.editing && (
+            <span
+              className={`absolute right-0 h-1.5 w-1.5 rounded-full ${marked ? 'top-0' : 'bottom-0'}`}
+              style={{ background: peer.color }}
+            />
+          )}
+        </span>
+      </AdminMark>
     </span>
   )
 }
@@ -49,6 +73,9 @@ function PeerAvatar({ peer, scope }: { peer: PresencePeer; scope: string }) {
 export function PresenceAvatars({ labelled = true }: { labelled?: boolean }) {
   const peers = usePeers()
   const mode = useCollabMode()
+  const roleOf = useRoleLookup()
+  const t = useI18n()
+  const projectName = useStore((s) => s.projects[s.activeProjectId]?.name ?? '')
   if (!peers.length) return null
   const shown = peers.slice(0, 4)
   const extra = peers.length - shown.length
@@ -64,9 +91,18 @@ export function PresenceAvatars({ labelled = true }: { labelled?: boolean }) {
       aria-label={`${peers.length} other ${peers.length === 1 ? 'person' : 'people'} active — ${mode.scopeLabel}`}
     >
       <div className="flex items-center">
-        {shown.map((p) => (
-          <PeerAvatar key={p.sessionId} peer={p} scope={scopeWord} />
-        ))}
+        {shown.map((p) => {
+          const role = roleOf(p.userId)
+          return (
+            <PeerAvatar
+              key={p.sessionId}
+              peer={p}
+              scope={scopeWord}
+              role={role}
+              adminLabel={`${p.name} · ${role ? t.share.adminMark(t.roles[role], projectName) : ''}`}
+            />
+          )
+        })}
         {extra > 0 && (
           <span className="-ml-1.5 flex h-6 w-6 items-center justify-center rounded-full border-2 border-bord bg-panel2 text-[9px] font-bold text-muted">
             +{extra}
