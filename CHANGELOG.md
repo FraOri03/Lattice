@@ -14,6 +14,20 @@ All notable changes to Lattice are recorded here. The format follows
 
 ### Added
 
+- **Whoever administers the project you are looking at wears it on their avatar.** An
+  accent ring and a corner shield now mark owners and admins wherever a face appears
+  inside a project — the profile picture in the top bar, the member rows in Share, the
+  presence stack, and comment authors — so "who can take my access away" is answerable at
+  a glance instead of by opening a dialog. The mark is scoped the way the grant is:
+  `admin` is a row in `project_memberships` and a slot in the room ACL, not an account
+  flag, and the same person is an admin here and a viewer next door. So the tooltip names
+  the project it is a mark for, and the badge is off on the dashboard, where
+  `activeProjectId` still points at whatever was open last and a badge would be a claim
+  about a project nobody is looking at. Owners carry it too — from the outside that is one
+  question, not two, and a mark that skipped them would leave the most privileged avatar
+  in the room the only unmarked one. Neither the ring nor the shield carries the meaning
+  alone: the accessible name says it in words, for anyone who cannot see either.
+
 - **The sync chip opens the queue of files it is actually moving, each with its own
   measured progress.** The chip could say "Syncing…" and nothing else, so a sync stuck on
   one 400 MB video and a sync quietly re-uploading forty documents looked identical, and
@@ -34,6 +48,38 @@ All notable changes to Lattice are recorded here. The format follows
   is no queue to show when there is nothing to sync with.
 
 ### Fixed
+
+- **Revoking an invitation says what happened, including when the server said no.**
+  `InviteService.revoke()` returned `void`, and the one branch that mattered — the server
+  refusing — fell off the end of the function without touching the store or telling
+  anyone. A 403 (`not a member of this project`, `a viewer cannot manage invitations`)
+  reached a reply nobody read: the row stayed on screen, the invitation stayed live, and
+  the × was indistinguishable from a button that had never been wired up, which is exactly
+  how it was reported. The refusal now comes back to whoever clicked, in the server's own
+  words, since which role it thinks you are and whether it has heard of you at all are two
+  different afternoons. The button also disables itself for the round trip, confirms when
+  it lands, and says so separately when the record is withdrawn but the ACL reservation
+  survives — an address still holding a role off the screen that was supposed to have
+  removed it. `revokeForeignAccess` had the same silence one level up: it counted
+  `invites += 1` on the *call* rather than the outcome, so a sweep the server refused
+  outright still reported three invitations revoked. It now counts what happened and lists
+  the rest under `refused`.
+
+- **The revoke button looks like what it does.** It was a plain `.icon-btn`, identical on
+  hover to "copy link" and "resend" sitting beside it. `.icon-btn-danger` gives it the red
+  the danger confirm already uses with a white glyph on top — on `:focus-visible` as well
+  as `:hover`, because a cue only a mouse can reach is not a cue.
+
+- **An invitation link survives being opened by the wrong person.** The `#invite=` handler
+  cleared the hash in its first line, before the invitation had even been looked up, so
+  every outcome short of "accepted" left the recipient on a clean URL with nothing to
+  retry and no way back but the e-mail. Two of those outcomes are ordinary: the shell is
+  reachable without an account, so opening the link as a guest refuses for want of a
+  session; and opening it signed in as another address refuses with advice — "sign in as
+  grace@example.com" — that you can only act on by signing in, which is the round trip
+  that used to eat the token. The link is now cleared when the invitation is *settled*
+  (accepted, declined at the prompt, or dead) and kept when the answer was about who is
+  holding it, and the handler re-runs when the account changes, so signing in is enough.
 
 - **The top bar no longer breaks the row it lives in.** `.btn` could shrink below its own
   content inside the bar's flex row, so a label wrapped rather than a button holding its

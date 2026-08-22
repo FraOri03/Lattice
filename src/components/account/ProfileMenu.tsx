@@ -6,7 +6,9 @@ import { useStore } from '@/store/useStore'
 import { useI18n, useTimeAgo } from '@/lib/i18n'
 import { env } from '@/lib/env'
 import { AnchoredPopover } from '@/components/ui/AnchoredPopover'
-import { IcCloud, IcLogOut, IcSettings, IcUser } from '@/components/Icons'
+import { AdminMark, marksAsAdmin } from '@/components/collab/AdminMark'
+import { useMyRole } from '@/lib/collab/useCollab'
+import { IcCloud, IcLogOut, IcSettings, IcShield, IcUser } from '@/components/Icons'
 
 /**
  * Avatar button + account dropdown.
@@ -15,13 +17,27 @@ import { IcCloud, IcLogOut, IcSettings, IcUser } from '@/components/Icons'
  * sync line and the route to Settings. The connected services, the sync
  * controls and the language switch live in the Settings sections that own
  * them, so there is exactly one place to change each of them.
+ *
+ * ## The admin mark, and why it is not always on
+ *
+ * `admin` is a project role, not an account flag — the same person
+ * administers one project and reads another. The mark therefore appears only
+ * where there is a project for it to be about: `inProject` is false on the
+ * dashboard, where `activeProjectId` still points at whatever was open last
+ * and a badge would be a claim about a project nobody is looking at.
  */
-export function ProfileMenu() {
+export function ProfileMenu({ inProject = true }: { inProject?: boolean }) {
   const { account, authKind, loginSkipped, signIn, signOut, exitGuest } = useAccount()
   const sync = useSyncStore()
   const t = useI18n()
   const timeAgo = useTimeAgo()
   const openSettings = useStore((s) => s.openSettings)
+  const myRole = useMyRole()
+  const projectName = useStore((s) => s.projects[s.activeProjectId]?.name ?? '')
+  const markedRole = inProject ? myRole : undefined
+  const markLabel = markedRole
+    ? t.share.adminMarkMine(t.roles[markedRole], projectName)
+    : ''
   const [open, setOpen] = useState(false)
   const avatar = useRef<HTMLButtonElement>(null)
   const close = useCallback(() => setOpen(false), [])
@@ -52,21 +68,23 @@ export function ProfileMenu() {
 
   return (
     <div className="relative flex-none">
-      <button
-        ref={avatar}
-        className="flex h-7 w-7 cursor-pointer items-center justify-center overflow-hidden rounded-full border border-bord bg-panel2 hover:border-accent"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        title={t.profile.accountTitle(account.name)}
-      >
-        {account.avatarUrl ? (
-          <img src={account.avatarUrl} alt={account.name} className="h-full w-full object-cover" />
-        ) : (
-          <span className="text-[11px] font-bold text-muted">
-            {account.name.slice(0, 1).toUpperCase()}
-          </span>
-        )}
-      </button>
+      <AdminMark role={markedRole} size={28} label={markLabel}>
+        <button
+          ref={avatar}
+          className="flex h-7 w-7 cursor-pointer items-center justify-center overflow-hidden rounded-full border border-bord bg-panel2 hover:border-accent"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          title={t.profile.accountTitle(account.name)}
+        >
+          {account.avatarUrl ? (
+            <img src={account.avatarUrl} alt={account.name} className="h-full w-full object-cover" />
+          ) : (
+            <span className="text-[11px] font-bold text-muted">
+              {account.name.slice(0, 1).toUpperCase()}
+            </span>
+          )}
+        </button>
+      </AdminMark>
 
       {/* portalled out of the top bar, which clips vertically at 43 px —
           see AnchoredPopover */}
@@ -80,16 +98,25 @@ export function ProfileMenu() {
       >
           {/* identity */}
           <div className="flex items-center gap-3 border-b border-bord pb-3">
-            <span className="flex h-10 w-10 flex-none items-center justify-center overflow-hidden rounded-full border border-bord bg-panel2">
-              {account.avatarUrl ? (
-                <img src={account.avatarUrl} alt="" className="h-full w-full object-cover" />
-              ) : (
-                <IcUser size={18} className="text-muted" />
-              )}
-            </span>
+            <AdminMark role={markedRole} size={40} label={markLabel}>
+              <span className="flex h-10 w-10 flex-none items-center justify-center overflow-hidden rounded-full border border-bord bg-panel2">
+                {account.avatarUrl ? (
+                  <img src={account.avatarUrl} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <IcUser size={18} className="text-muted" />
+                )}
+              </span>
+            </AdminMark>
             <div className="min-w-0">
               <div className="truncate text-[13px] font-semibold">{account.name}</div>
               <div className="truncate text-[11px] text-muted">{displayAddress(account.email)}</div>
+              {/* the mark's meaning in words: which role, in which project */}
+              {markedRole && marksAsAdmin(markedRole) && (
+                <div className="mt-0.5 inline-flex items-center gap-1 rounded bg-accent/15 px-1.5 py-0.5 text-[9px] font-semibold tracking-wider text-accent uppercase">
+                  <IcShield size={9} /> {t.roles[markedRole]}
+                  {projectName ? ` · ${projectName}` : ''}
+                </div>
+              )}
               {authKind === 'mock' && (
                 <div className="mt-0.5 inline-block rounded bg-panel2 px-1.5 py-0.5 text-[9px] font-semibold tracking-wider text-[#ffa629] uppercase">
                   {t.profile.localOnlyAccount}

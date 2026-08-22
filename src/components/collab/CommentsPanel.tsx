@@ -6,7 +6,9 @@ import { useCollabStore } from '@/lib/collab/collabStore'
 import { commentService } from '@/lib/collab/CommentService'
 import { focusAreaOnBoard } from './CommentAreas'
 import { membersService } from '@/lib/collab/MembersService'
-import { useCan, useMyRole } from '@/lib/collab/useCollab'
+import { useCan, useMyRole, useRoleLookup } from '@/lib/collab/useCollab'
+import { AdminMark } from '@/components/collab/AdminMark'
+import { useI18n } from '@/lib/i18n'
 import { currentIdentity, colorForUser } from '@/lib/collab/CollaborationProvider'
 import { displayAddress } from '@/lib/auth/addressAlias'
 import { can } from '@/lib/collab/permissions'
@@ -79,17 +81,27 @@ function useTargetLabel() {
 }
 
 function Avatar({ userId, name, avatarUrl }: { userId: string; name: string; avatarUrl?: string }) {
+  const roleOf = useRoleLookup()
+  const t = useI18n()
+  const projectName = useStore((s) => s.projects[s.activeProjectId]?.name ?? '')
+  const role = roleOf(userId)
   return (
-    <span
-      className="flex h-6 w-6 flex-none items-center justify-center overflow-hidden rounded-full border border-bord bg-panel2 text-[10px] font-bold"
-      style={{ color: colorForUser(userId) }}
+    <AdminMark
+      role={role}
+      size={24}
+      label={role ? `${name} · ${t.share.adminMark(t.roles[role], projectName)}` : ''}
     >
-      {avatarUrl ? (
-        <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
-      ) : (
-        name.slice(0, 1).toUpperCase()
-      )}
-    </span>
+      <span
+        className="flex h-6 w-6 flex-none items-center justify-center overflow-hidden rounded-full border border-bord bg-panel2 text-[10px] font-bold"
+        style={{ color: colorForUser(userId) }}
+      >
+        {avatarUrl ? (
+          <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+        ) : (
+          name.slice(0, 1).toUpperCase()
+        )}
+      </span>
+    </AdminMark>
   )
 }
 

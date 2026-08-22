@@ -17,6 +17,7 @@ import { useI18n, useTimeAgo } from '@/lib/i18n'
 import { type CollabRole, type ProjectInvite, type ProjectMember } from '@/types/collab'
 import { toast } from '@/components/ui/Toaster'
 import { confirmDialog } from '@/components/ui/ConfirmDialog'
+import { AdminMark } from '@/components/collab/AdminMark'
 import {
   IcCopy,
   IcEye,
@@ -35,18 +36,25 @@ import {
  * active project. Opened from the top bar "Share" button.
  */
 
-function MemberAvatar({ member }: { member: ProjectMember }) {
+function MemberAvatar({ member, projectName }: { member: ProjectMember; projectName: string }) {
+  const t = useI18n()
   return (
-    <span
-      className="flex h-8 w-8 flex-none items-center justify-center overflow-hidden rounded-full border border-bord bg-panel2 text-[12px] font-bold"
-      style={{ color: colorForUser(member.userId) }}
+    <AdminMark
+      role={member.role}
+      size={32}
+      label={t.share.adminMark(t.roles[member.role], projectName)}
     >
-      {member.avatarUrl ? (
-        <img src={member.avatarUrl} alt="" className="h-full w-full object-cover" />
-      ) : (
-        (member.name || displayAddress(member.email)).slice(0, 1).toUpperCase()
-      )}
-    </span>
+      <span
+        className="flex h-8 w-8 flex-none items-center justify-center overflow-hidden rounded-full border border-bord bg-panel2 text-[12px] font-bold"
+        style={{ color: colorForUser(member.userId) }}
+      >
+        {member.avatarUrl ? (
+          <img src={member.avatarUrl} alt="" className="h-full w-full object-cover" />
+        ) : (
+          (member.name || displayAddress(member.email)).slice(0, 1).toUpperCase()
+        )}
+      </span>
+    </AdminMark>
   )
 }
 
@@ -58,10 +66,13 @@ function MemberRow({ member, projectId }: { member: ProjectMember; projectId: st
   const isSelf = member.userId === identity.userId
   const manageable = !isSelf && canManageRole(myRole, member.role)
   const displayName = member.name || displayAddress(member.email)
+  // the avatar mark names the project it is a mark for — the same person is
+  // an admin here and a viewer next door
+  const projectName = useStore((s) => s.projects[projectId]?.name ?? '')
 
   return (
     <div className="flex items-center gap-2.5 rounded-lg px-2 py-2 hover:bg-panel2/50">
-      <MemberAvatar member={member} />
+      <MemberAvatar member={member} projectName={projectName} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5 text-[12.5px] font-medium">
           <span className="truncate">{displayName}</span>
@@ -140,6 +151,16 @@ function InviteRow({ invite, projectId }: { invite: ProjectInvite; projectId: st
   const t = useI18n()
   const timeAgo = useTimeAgo()
   /**
+   * One flight at a time, and visibly so.
+   *
+   * Revoking is a round-trip, and the row it removes is the only feedback
+   * there was — so between the click and the reply the button looked exactly
+   * as it does when nothing is happening, and a refusal left it looking that
+   * way for good. Now it is disabled while in flight and the answer is
+   * always said out loud.
+   */
+  const [busy, setBusy] = useState(false)
+  /**
    * The link exists only where its token does — the device that created the
    * invitation, or the one that last resent it. Anywhere else the record
    * carries a digest, and 18.1's answer to "copy the link" is to say so and
@@ -184,6 +205,7 @@ function InviteRow({ invite, projectId }: { invite: ProjectInvite; projectId: st
         className="icon-btn h-6 w-6"
         title={t.share.resendTitle}
         aria-label={t.share.resendAria}
+        disabled={busy}
         onClick={() => {
           // the fresh token only exists in the reply, so the copy waits for it
           void inviteService.resend(projectId, invite.id).then((updated) => {
@@ -195,10 +217,30 @@ function InviteRow({ invite, projectId }: { invite: ProjectInvite; projectId: st
         <IcRefresh size={12} />
       </button>
       <button
-        className="icon-btn h-6 w-6"
+        className="icon-btn icon-btn-danger h-6 w-6"
         title={t.share.revoke}
-        aria-label={t.share.revoke}
-        onClick={() => void inviteService.revoke(projectId, invite.id)}
+        aria-label={t.share.revokeAria(displayAddress(invite.email))}
+        disabled={busy}
+        onClick={() => {
+          setBusy(true)
+          void inviteService.revoke(projectId, invite.id).then((result) => {
+            setBusy(false)
+            if (!result.ok) {
+              // the server's own sentence: which role it thinks you are, or
+              // that it has never heard of you in this project
+              toast.error(t.share.revokeFailed, result.error)
+              return
+            }
+            if (result.reservationError) {
+              toast.warning(
+                t.share.revokeHalfDone,
+                t.share.revokeHalfDoneBody(displayAddress(invite.email), result.reservationError),
+              )
+              return
+            }
+            toast.success(t.share.revokedTitle, t.share.revokedBody(displayAddress(invite.email)))
+          })
+        }}
       >
         <IcX size={12} />
       </button>

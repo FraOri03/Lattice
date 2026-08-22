@@ -314,6 +314,19 @@ export const en = {
     resendTitle: 'Resend (mints a new link; the previous one stops working)',
     resendAria: 'Resend invite',
     revoke: 'Revoke invite',
+    revokeAria: (email: string) => `Revoke the invitation sent to ${email}`,
+    revokedTitle: 'Invitation revoked',
+    revokedBody: (email: string) =>
+      `The link sent to ${email} no longer opens anything.`,
+    revokeFailed: 'The invitation was not revoked',
+    revokeHalfDone: 'Revoked here, not on the server',
+    revokeHalfDoneBody: (email: string, reason: string) =>
+      `The invitation is withdrawn, but ${email} still holds a reserved role on the server. ${reason}`,
+    // the mark on an avatar — scoped to the project, because the role is
+    adminMark: (role: string, project: string) =>
+      `${role} of “${project}” — can manage members and invitations`,
+    adminMarkMine: (role: string, project: string) =>
+      `You are ${role} of “${project}” — you can manage members and invitations`,
     // what the server enforces, as opposed to what this device believes
     serverTitle: 'What the server enforces',
     serverBody:
@@ -1610,6 +1623,17 @@ export const it: Catalog = {
     resendTitle: 'Reinvia (genera un link nuovo; il precedente smette di funzionare)',
     resendAria: 'Reinvia invito',
     revoke: 'Revoca invito',
+    revokeAria: (email) => `Revoca l’invito mandato a ${email}`,
+    revokedTitle: 'Invito revocato',
+    revokedBody: (email) => `Il link mandato a ${email} non apre più niente.`,
+    revokeFailed: 'L’invito non è stato revocato',
+    revokeHalfDone: 'Revocato qui, non sul server',
+    revokeHalfDoneBody: (email, reason) =>
+      `L’invito è ritirato, ma ${email} ha ancora un ruolo prenotato sul server. ${reason}`,
+    adminMark: (role, project) =>
+      `${role} di “${project}” — può gestire membri e inviti`,
+    adminMarkMine: (role, project) =>
+      `Sei ${role} di “${project}” — puoi gestire membri e inviti`,
     serverTitle: 'Cosa fa valere il server',
     serverBody:
       'La lista qui sopra è di questo dispositivo. Il token realtime nasce da questa, quindi dove le due non concordano è questa a decidere davvero.',

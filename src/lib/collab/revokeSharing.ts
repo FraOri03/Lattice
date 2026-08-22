@@ -192,8 +192,22 @@ export async function revokeForeignAccess(keepEmail: string): Promise<RevokeRepo
         .invitesOf(projectId)
         .find((i) => sameAddress(i.email, grant.email))
       if (!invite) continue
-      await inviteService.revoke(projectId, invite.id)
-      report.invites += 1
+      /**
+       * Counted only if it happened. The tally used to increment on the call
+       * rather than on the outcome, so a sweep that the server refused
+       * outright still reported "3 invitations revoked" — the one number
+       * somebody reads this report for, and the one it could not deliver.
+       */
+      const result = await inviteService.revoke(projectId, invite.id)
+      if (result.ok) report.invites += 1
+      else {
+        report.refused.push(
+          `${projectName} — ${grant.label}: ${result.error ?? 'refused'}`,
+        )
+      }
+      if (result.reservationError) {
+        report.refused.push(`${projectName} — ${grant.label}: ${result.reservationError}`)
+      }
     }
   }
 

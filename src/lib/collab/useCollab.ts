@@ -24,6 +24,43 @@ export function useMyRole(): CollabRole {
   }, [members, viewAsRole])
 }
 
+/**
+ * Somebody else's role in the active project, by id or by address.
+ *
+ * A presence peer and a comment author carry a name and a face and no role —
+ * the role lives in the member list, which is the one record that has it. So
+ * the marks that follow a face around the app (`AdminMark`) look it up here
+ * rather than each growing their own copy of the join.
+ *
+ * Both keys, for the same reason `memberRole` matches on both: one Google
+ * account can hold a membership under an id a given device does not present
+ * (`auth/identity.googleUserIds`), and the address is the fallback the
+ * server ACL already uses for a slot nobody has claimed.
+ *
+ * `undefined` means the list does not know them — a peer in a project this
+ * device has no membership record for, which is not the same as a viewer and
+ * must not be drawn as one.
+ */
+export function useRoleLookup(): (
+  userId: string,
+  email?: string,
+) => CollabRole | undefined {
+  const projectId = useStore((s) => s.activeProjectId)
+  const members = useCollabStore((s) => s.members[projectId])
+  return useMemo(() => {
+    const byId = new Map<string, CollabRole>()
+    const byEmail = new Map<string, CollabRole>()
+    for (const member of members ?? []) {
+      if (member.status !== 'active') continue
+      if (member.userId) byId.set(member.userId, member.role)
+      if (member.email) byEmail.set(member.email.trim().toLowerCase(), member.role)
+    }
+    return (userId, email) =>
+      byId.get(userId) ??
+      (email ? byEmail.get(email.trim().toLowerCase()) : undefined)
+  }, [members])
+}
+
 export function useCan(cap: Capability): boolean {
   return can(useMyRole(), cap)
 }
