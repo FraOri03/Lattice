@@ -42,6 +42,16 @@ export interface ConnectionInputs {
   hasMediaCalls: boolean
   hasConversionBackend: boolean
   hasAiBackend: boolean
+  /**
+   * The user holds a key of their own for some AI vendor (21.3).
+   *
+   * A separate input from `hasAiBackend` because it answers a separate
+   * question: one is what this BUILD was given, the other is what this
+   * PERSON added. Collapsing them would make the row unable to tell the
+   * difference between "AI does not work here" and "AI works here, on your
+   * account, and this deployment pays nothing".
+   */
+  hasAiKey: boolean
 }
 
 export function deriveConnections(i: ConnectionInputs): ServiceStatus[] {
@@ -90,14 +100,32 @@ export function deriveConnections(i: ConnectionInputs): ServiceStatus[] {
     },
     {
       /*
-       * The row is about the DEPLOYMENT's backend, which is why it can be
-       * `unconfigured` while Photo mode's set designer is happily producing
-       * layouts: templates run here and a key the user pasted is theirs, not
-       * this build's. Saying "connected" for either would be claiming credit
-       * for something this deployment neither runs nor pays for.
+       * Four answers, because AI genuinely has four states and the row was
+       * previously giving two.
+       *
+       * `connected` stays what it always was: a backend this DEPLOYMENT runs
+       * and pays for. `blocked` is that same backend with nobody signed in —
+       * it authorises every job against a Google account, so a build with
+       * RunPod configured and no identity cannot run anything, and saying
+       * "connected" for it is the kind of green tick that produces a support
+       * ticket. `available` is the case a local-first product is in most
+       * often: nothing hosted here, and AI working anyway on a key the user
+       * added — which this deployment neither runs nor pays for, so claiming
+       * credit for it would be the same lie in the other direction.
+       *
+       * Templates are deliberately absent from all four. Photo mode's
+       * offline set designer needs no connection at all, and a connections
+       * panel that listed it would be describing the app rather than what it
+       * talks to.
        */
       id: 'ai',
-      state: i.hasAiBackend ? 'connected' : 'unconfigured',
+      state: i.hasAiBackend
+        ? i.googleSignedIn
+          ? 'connected'
+          : 'blocked'
+        : i.hasAiKey
+          ? 'available'
+          : 'unconfigured',
       action: 'none',
       configuredBy: 'VITE_AI_BACKEND',
     },

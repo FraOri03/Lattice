@@ -9,7 +9,12 @@ vocabulary — the action catalogue, the provider seam, the job model, the
 failure taxonomy and the honest default;
 [21.1](https://github.com/FraOri03/Lattice/issues/100) is the hosted RunPod
 backend written against it, and brought the job lifecycle and the deployment
-numbers. The local ComfyUI backend and the switch between them are
+numbers;
+[21.2](https://github.com/FraOri03/Lattice/issues/101) owns the graphs, the
+model pins and the licences;
+[21.3](https://github.com/FraOri03/Lattice/issues/102) is the in-app surface
+- the toolbar entry, cost, privacy, consent and bring-your-own-key. The local
+ComfyUI backend and the switch between them are
 [21.6](https://github.com/FraOri03/Lattice/issues/264).
 
 ## The default is off, and that is a feature
@@ -29,7 +34,8 @@ src/lib/ai/
   jobModel.ts           states, transitions, failure taxonomy   (shared with api/)
   protocol.ts           the /api/ai/* wire contract             (shared with api/)
   AiBackendProvider.ts  the interface + DisabledAiProvider
-  index.ts              the registry: which provider runs which action
+  registry.ts           which provider runs which action
+  index.ts              the barrel
   backoff.ts            the polling schedule
   immediateJob.ts       a job handle for a backend that answers in one trip
   jobStore.ts           the vault record that survives a reload
@@ -545,6 +551,153 @@ Every graph is validated at build time — links, bindings, pinned models —
 so a broken image fails where nobody is waiting rather than on a user's
 first job after a cold start they paid for.
 
+## The surface
+
+[21.3](https://github.com/FraOri03/Lattice/issues/102). The seam could
+already answer what leaves, where it goes and who pays; nothing showed it.
+
+```
+src/lib/ai/
+  cost.ts            the estimate, the actual, and the money formatting
+  byok.ts            keys the user holds, per vendor
+  consent.ts         who the user has agreed to send data to
+  availability.ts    what would happen if the button were pressed now
+  jobsStore.ts       running jobs, their cost, and the completion notification
+  activity.ts        one number, so the toolbar tab can be eager
+  persistedJobs.ts   "is there a job to reattach?", answerable without the seam
+  restoreOnBoot.ts   the app-shell hook that answers it
+src/components/ai/
+  AiTab.tsx          the toolbar entry (eager) + the lazy panel
+  AiPanel.tsx        the surface itself
+  parts.tsx          disclosure, cost, consent, key field, job row — shared
+```
+
+### A panel, not a section
+
+Generating is something you do *for* what is already on screen. A section
+switch would take the board, document or shot away to show a form about it,
+then hand back a result with no context to drop it into. So the AI entry
+opens an anchored panel over the workspace — the arrangement the notification
+centre and the sync queue already use — and the rest of the app keeps working
+behind it, which is also what "a running job must not block the app"
+requires.
+
+The entry replaced the `aiDashboard` placeholder in the switcher's AI
+cluster, in the space the bar had already been measured with. That is the
+placeholder model (`src/types/workspace.ts`) working as designed: nothing
+else in the bar moved, and `topBarFit`'s budget is unchanged — which is also
+why the tab is icon-only, since a ninth label in the switcher takes it past
+the box it was measured into. The command palette is where it can be reached
+by name.
+
+### Two gates, and they answer different questions
+
+The provider already refuses a submission carrying binary inputs without
+`uploadConsent` — a per-REQUEST assertion, enforced inside the provider so a
+surface that forgot cannot upload anything at all.
+
+`consent.ts` is the other half: a per-DESTINATION grant, remembered per
+account through `vaultKey`, revocable, and keyed by `destination` plus a
+stable `vendor` id rather than by a provider id. A grant recorded against
+`third-party:google-gemini` survives the provider being rewritten and stops
+applying the moment the same action starts going somewhere else — which is
+what "re-asked when the destination changes" has to mean. The surface reads
+the grant and passes `uploadConsent` on its strength; remove either gate and
+one of the two failures comes back.
+
+`device` is not a destination anybody consents to. Nothing leaves, so there
+is nothing to agree to, and a dialog in front of a local computation would
+make the offline fallback unreachable exactly when the user has refused the
+vendor.
+
+### The cost is an estimate, and says so
+
+A GPU job's duration is not knowable in advance: queue time depends on other
+people, cold start on whether a worker is up (min workers is 0 everywhere),
+and sampling time on hardware that is a *class* rather than a model. So
+`cost.ts` produces a **range**, its high end carries a cold start, and the
+surface renders the word "estimate" next to it. `AiCostEstimate` and
+`AiCostActual` are separate types with a discriminant, because a surface
+confusing them asks the user to decide on a number that was invented.
+
+The rates are the deployment's list prices for the hardware each class
+targets, and the seconds-per-unit-of-work constants are reasoned from the
+same deployment table. **They are decisions, not measurements** — the
+admission that table already makes about idle timeouts. They are also
+deliberately not an environment variable: anything `VITE_`-prefixed is
+compiled into the public bundle anyway, and a rate only the server knows
+cannot be shown before the button is pressed.
+
+What it *actually* cost is arithmetic on the worker milliseconds the backend
+reported, and it is the only spend figure this phase states as a fact. There
+is no ceiling to compare it against until
+[21.4](https://github.com/FraOri03/Lattice/issues/262) builds the ledger, and
+the panel says there is none rather than implying a limit.
+
+### Bring your own key
+
+Photo mode already did this correctly for one vendor — stored per account via
+`vaultKey`, sent only to Google, with an offline fallback. What was wrong was
+that it was welded to one provider file, so the second vendor would have
+copied it. `byok.ts` is the registry: key storage, the vendor a key goes to,
+the actions it unlocks, and where to get one.
+
+It does **not** clear on sign-out, and neither does the GitHub token: the key
+belongs to the account rather than to the session, and destroying it would
+charge a re-paste every time somebody signed out on their own machine.
+Sign-out makes it unreachable — the slot is namespaced — which is the
+property that matters; deleting it is a button, and settings has one.
+
+### Offline: refused, never queued
+
+A job carries a wall-clock deadline and an expiring authorisation ticket, so
+an outbox would hold work that is guaranteed to time out the moment it is
+released — while holding someone's photograph in the meantime. So an action
+whose provider needs the network is blocked with a sentence, and where a
+provider that sends nothing exists (`localFallback`) the surface offers it
+instead. That is what Photo mode's offline templates already were; now it is
+a decision the whole catalogue answers the same way.
+
+### Four states, not a boolean
+
+`aiSurfaceState` is `ready` | `your-key` | `on-device` | `unavailable`, and
+`AiBlockedReason` is `not-configured` | `no-key` | `offline` | `sign-in`.
+Both are lists rather than booleans because the middle states are the ones a
+local-first product is in most of the time, and each blocked reason owes the
+user a different next step. One "AI is unavailable" covering four problems is
+the dead end this issue existed to remove.
+
+The connections panel says the same thing in its own vocabulary: the AI row
+is `connected` (a backend this deployment runs, with somebody signed in),
+`blocked` (that backend, nobody signed in — every hosted job authorises
+against an account), `available` (nothing hosted here, and AI working anyway
+on a key of the user's own) or `unconfigured`.
+
+### A job outlives the panel
+
+The panel is a popover; it is unmounted the moment the user clicks elsewhere.
+A job is not. `jobsStore` holds the snapshots, the estimate it was quoted and
+what it actually cost, so a completion raises a notification while the panel
+is shut, a running job keeps polling while the user works in another section,
+and cancel is reachable from anywhere the panel can be reopened. Completion
+goes through `NotificationService.notify` as `ai-job`, in the `jobs` row
+beside GitHub sync and conversion — one gate, so a muted event is muted
+whichever path raised it.
+
+### The bundle
+
+The surface is a lazy chunk: `AiTab` is eager (a button, a popover and one
+number from `activity.ts`), and `AiPanel` — with the whole seam behind it —
+arrives through `React.lazy`. The settings panel's AI details are lazy for
+the same reason.
+
+Reattaching a job that outlived a refresh is the one thing that cannot wait
+for the panel to open, because it is already being paid for. So the app shell
+imports two leaves — `hasHostedAiBackend` (a build-time constant) and
+`hasPersistedAiJobs` (one `localStorage` read) — and only a yes from both
+pulls the seam in with a dynamic import. On a build with no AI backend the
+constant folds to `false` and the whole path is shaken out.
+
 ## Environment
 
 Server-side, never `VITE_`-prefixed:
@@ -587,9 +740,13 @@ build talks to, not about what a user has connected for themselves.
 - **The local ComfyUI backend and the switch between them** (21.6). The
   registry order in `index.ts` is a list this file decides; 21.6 makes it a
   preference the user sets.
-- **The in-app surface, and what the user is told about cost** (21.3). The
-  seam can already answer what leaves, where it goes and who pays; nothing
-  yet shows it, apart from Photo mode's error messages.
-- **A translated Photo mode panel.** The failure sentences it shows now come
-  from the catalogue and are EN/IT; the rest of `PhotoAI.tsx` is still
-  English, and translating it is not this issue's to do.
+- **A spend ceiling, and a metered rate** (21.4). The surface shows an
+  estimate before a run and the reported worker cost after it, both from a
+  price table that is a decision rather than a measurement. Nothing enforces
+  a budget, and the panel says so.
+- **Running an image action from the app.** The catalogue's GPU actions have
+  no host surface yet: a generated image needs somewhere to be stored (21.5)
+  and something to be dropped into (phases 22-26). The panel lists them with
+  their disclosure and estimate, and says what is missing rather than
+  offering a button with nowhere to put the result. `design-set` is the one
+  action with a home today, and the panel opens it in Photo mode.

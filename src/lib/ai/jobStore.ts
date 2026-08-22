@@ -1,5 +1,5 @@
-import { vaultKey } from '@/lib/storage/vaultScope'
 import { isAiActionId, type AiActionId } from './actions.js'
+import { aiJobsStorageKey } from './persistedJobs.js'
 import { isTerminal, type AiJobState } from './jobModel.js'
 
 /**
@@ -28,8 +28,13 @@ import { isTerminal, type AiJobState } from './jobModel.js'
  * live is 21.5's question.
  */
 
-/** The vault name these records live under. Exported so tests can corrupt it. */
-export const AI_JOBS_KEY = vaultKey('lattice-ai-jobs')
+/**
+ * The vault name these records live under. Exported so tests can corrupt it.
+ *
+ * The name itself is declared in `persistedJobs.ts`, which the app shell
+ * imports eagerly to decide whether this module is worth loading at all.
+ */
+export const AI_JOBS_KEY = aiJobsStorageKey()
 
 const KEY = AI_JOBS_KEY
 

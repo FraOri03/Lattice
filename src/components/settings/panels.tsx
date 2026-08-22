@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useAccount } from '@/lib/auth/AccountProvider'
 import { authService } from '@/lib/auth/AuthService'
 import {
@@ -24,6 +24,7 @@ import { useStore } from '@/store/useStore'
 import { useUiStore } from '@/store/useUiStore'
 import { useI18n, useLocale, useTimeAgo } from '@/lib/i18n'
 import { forgetThisDevice } from '@/lib/storage/forgetDevice'
+import { hasAnyByokKey } from '@/lib/ai/byok'
 import { confirmDialog } from '@/components/ui/ConfirmDialog'
 import { toast } from '@/components/ui/Toaster'
 import { setThemeAnimated } from '@/lib/theme/animateTheme'
@@ -466,6 +467,15 @@ function AppearancePanel() {
 
 /* ---------------- connected apps ---------------- */
 
+/**
+ * The AI row's keys and consent records.
+ *
+ * Lazy for the same reason the AI panel is: the settings screen is mounted
+ * on every page load, and five other connection rows do not need the AI
+ * seam's strings, cost tables and job model in order to render.
+ */
+const AiConnectionDetails = lazy(() => import('@/components/ai/AiConnectionDetails'))
+
 const SERVICE_ICON: Record<ServiceId, typeof IcDrive> = {
   drive: IcDrive,
   github: IcGithub,
@@ -558,6 +568,9 @@ function ConnectionsPanel() {
     hasMediaCalls,
     hasConversionBackend,
     hasAiBackend,
+    // the user's own key is a different answer from the build's backend, and
+    // the row shows a different state for it
+    hasAiKey: hasAnyByokKey(),
   })
 
   const act = (id: ServiceId, action: ServiceAction) => {
@@ -619,6 +632,11 @@ function ConnectionsPanel() {
               )}
               {s.state === 'blocked' && (
                 <p className="mt-1 text-[10.5px] text-muted">{c.blocked}</p>
+              )}
+              {s.id === 'ai' && (
+                <Suspense fallback={null}>
+                  <AiConnectionDetails />
+                </Suspense>
               )}
             </div>
           )

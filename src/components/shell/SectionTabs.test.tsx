@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { useStore } from '@/store/useStore'
 import { useWorkspaceLayoutStore } from '@/store/workspaceLayoutStore'
+import { useUiStore } from '@/store/useUiStore'
 import { SectionTabs } from './SectionTabs'
 
 const tab = (name: RegExp) => screen.getByRole('button', { name })
@@ -11,6 +12,7 @@ const graphTab = () => tab(/graph view/i)
 describe('SectionTabs', () => {
   beforeEach(() => {
     useStore.setState({ viewMode: 'board' })
+    useUiStore.setState({ aiPanelOpen: false })
     useWorkspaceLayoutStore.setState({
       split: false,
       secondaryContent: 'board',
@@ -41,6 +43,11 @@ describe('SectionTabs', () => {
    * asserted rather than left to whoever next edits the JSX: five clusters,
    * with Photo inside the creative one — between Forge and Folio — and not
    * beside the editors it was built next to.
+   *
+   * The AI cluster now leads with a live tab (21.3) where it used to hold two
+   * placeholders. That is the placeholder model working as designed: the
+   * surface that shipped moved into space the bar had already been measured
+   * with, so nothing else in this list moved.
    */
   it('lays the five clusters out in order, with Photo inside the creative one', () => {
     render(<SectionTabs />)
@@ -56,8 +63,8 @@ describe('SectionTabs', () => {
       'Sheet section',
       'Presentation section',
       'Code section',
+      'AI panel',
       'ComfyUI — planned, not available yet',
-      'AI dashboard — planned, not available yet',
       'Trace — planned, not available yet',
       'Forge — planned, not available yet',
       'Photo section',
@@ -66,11 +73,25 @@ describe('SectionTabs', () => {
     ])
   })
 
+  /** The one tab in the AI cluster that does something. */
+  it('opens the AI panel from the toolbar, and closes it again', () => {
+    render(<SectionTabs />)
+    const ai = tab(/^ai panel$/i)
+    expect(ai).not.toBeDisabled()
+    expect(ai).toHaveAttribute('aria-pressed', 'false')
+
+    fireEvent.click(ai)
+    expect(useUiStore.getState().aiPanelOpen).toBe(true)
+    expect(tab(/^ai panel$/i)).toHaveAttribute('aria-pressed', 'true')
+
+    fireEvent.click(tab(/^ai panel$/i))
+    expect(useUiStore.getState().aiPanelOpen).toBe(false)
+  })
+
   it('leaves the planned environments disabled, and says which phase builds each', () => {
     render(<SectionTabs />)
     for (const [name, phase] of [
       [/comfyui/i, 21],
-      [/ai dashboard/i, 21],
       [/trace/i, 23],
       [/forge/i, 24],
       [/folio/i, 25],
@@ -85,10 +106,20 @@ describe('SectionTabs', () => {
 
   it('does not pin a planned tab to a word it cannot afford', () => {
     render(<SectionTabs />)
-    // the six placeholders are icon-only at every width, so the switcher can
+    // the five placeholders are icon-only at every width, so the switcher can
     // still show the eight live labels when the bar is wide enough for them
     expect(tab(/trace/i)).toHaveTextContent('')
     expect(tab(/document section/i)).toHaveTextContent('Document')
+  })
+
+  /**
+   * The AI tab is live and still icon-only: `topBarFit`'s budget was measured
+   * with this cluster contributing two icons and no words, and a ninth label
+   * in the switcher takes the bar past the box it was measured into.
+   */
+  it('keeps the AI tab icon-only, so the bar keeps the width it was measured with', () => {
+    render(<SectionTabs />)
+    expect(tab(/^ai panel$/i)).toHaveTextContent('')
   })
 
   it('marks the active section with aria-pressed', () => {

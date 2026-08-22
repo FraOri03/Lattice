@@ -334,7 +334,7 @@ export const RunPodAiProvider: AiBackendProvider = {
   id: 'hosted',
   label: 'Hosted GPU workers',
   requiresUpload: true,
-  disclosure: { destination: 'deployment', cost: 'deployment' },
+  disclosure: { destination: 'deployment', cost: 'deployment', vendor: 'lattice-hosted-gpu' },
 
   // An action with no GPU class is one no GPU backend can run — the
   // catalogue holds more than GPU work, and saying "yes" here would mean

@@ -200,6 +200,9 @@ describe('what the surface can tell the user before anything runs', () => {
     expect(GeminiSetDesignProvider.disclosure).toEqual({
       destination: 'third-party',
       cost: 'your-key',
+      // the stable id a consent record is filed against, so the grant
+      // detaches the moment the recipient changes rather than surviving it
+      vendor: 'google-gemini',
     })
   })
 

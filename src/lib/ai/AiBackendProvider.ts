@@ -108,6 +108,15 @@ export interface AiDisclosure {
    * - `your-key` — the user's own credential, and their own bill.
    */
   readonly cost: 'free' | 'deployment' | 'your-key'
+  /**
+   * A STABLE id for who receives the data — what a consent record is filed
+   * against (`src/lib/ai/consent.ts`).
+   *
+   * Not the label: a label is prose that gets reworded, and a consent
+   * record keyed to prose silently detaches from the thing it was about.
+   * Absent only for `device`, where there is no recipient to name.
+   */
+  readonly vendor?: string
 }
 
 /** What a backend says it can do, asked at runtime rather than assumed. */

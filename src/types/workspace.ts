@@ -110,19 +110,23 @@ export const SECTION_METAS: SectionMeta[] = [
 ]
 
 /**
- * Environments that are on the roadmap and have no engine yet: the AI suite
- * (phase 21 — RunPod serverless + in-house ComfyUI) and the Creative suite
- * (phases 23–26, on the phase-22 Creative Core).
+ * Environments that are on the roadmap and have no engine yet: the ComfyUI
+ * workflow surface (phase 21) and the Creative suite (phases 23–26, on the
+ * phase-22 Creative Core).
  *
  * They are in the switcher, disabled, on purpose. The alternative — adding
  * them the day each one ships — is how a toolbar gets re-laid-out six times
  * and how the bar's width budget becomes a surprise six times. Here the space
  * they will occupy is spent now, and every tooltip says which phase builds it
  * rather than pretending the tab is one click from working.
+ *
+ * `aiDashboard` used to be on this list and is not any more: 21.3 built it,
+ * and it is the `ai` switcher item below. That is the list working as
+ * intended — a placeholder leaves by being replaced, in the space it was
+ * already occupying, so the bar is not re-laid out to make room.
  */
 export type PlannedSurface =
   | 'comfyui'
-  | 'aiDashboard'
   | 'trace'
   | 'forge'
   | 'folio'
@@ -142,6 +146,13 @@ export interface PlannedMeta {
 export type SwitcherItem =
   | { kind: 'section'; section: WorkspaceSection }
   | { kind: 'planned'; planned: PlannedMeta }
+  /**
+   * The AI surface (21.3). Not a section: it does not replace what is on
+   * screen, it opens a panel over it — a generation is something you start
+   * while working on something else, and a section switch would take away
+   * the thing you were generating for.
+   */
+  | { kind: 'ai' }
 
 const asSection = (section: WorkspaceSection): SwitcherItem => ({ kind: 'section', section })
 const asPlanned = (id: PlannedSurface, phase: number): SwitcherItem => ({
@@ -168,8 +179,8 @@ export const SWITCHER_CLUSTERS: SwitcherItem[][] = [
     asSection('presentation'),
     asSection('code'),
   ],
-  // AI — phase 21
-  [asPlanned('comfyui', 21), asPlanned('aiDashboard', 21)],
+  // AI — the live surface (21.3) beside the workflow editor that is not built
+  [{ kind: 'ai' }, asPlanned('comfyui', 21)],
   // creative — phases 23–26, with Photo already live in the middle of them
   [
     asPlanned('trace', 23),

@@ -38,7 +38,9 @@ export const EVENT_TYPES: Record<NotificationEvent, NotificationType[]> = {
   resolved: ['comment-resolved'],
   invites: ['invite'],
   sync: ['drive-failure', 'realtime-failure'],
-  jobs: ['github-sync', 'conversion'],
+  // an AI generation is the same kind of event as a conversion or a GitHub
+  // push: work you started that finishes when you are looking elsewhere
+  jobs: ['github-sync', 'conversion', 'ai-job'],
   versions: ['version-restored'],
 }
 

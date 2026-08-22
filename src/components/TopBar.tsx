@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { useStore } from '@/store/useStore'
 import { barFit } from '@/lib/layout/topBarFit'
 import { useElementWidth } from '@/lib/layout/useElementWidth'
@@ -18,6 +18,7 @@ import { SyncQueuePanel } from '@/components/sync/SyncQueuePanel'
 import { useCollabMode } from '@/lib/collab/collabPresentation'
 import { AnchoredPopover } from '@/components/ui/AnchoredPopover'
 import { useI18n } from '@/lib/i18n'
+import { useOnline } from '@/lib/net/useOnline'
 import { nextTheme, setThemeAnimated } from '@/lib/theme/animateTheme'
 import {
   IcAlert,
@@ -46,21 +47,6 @@ const MOD_KEY = /mac|iphone|ipad/i.test(
 )
   ? '⌘'
   : 'Ctrl'
-
-function useOnline(): boolean {
-  const [online, setOnline] = useState(navigator.onLine)
-  useEffect(() => {
-    const up = () => setOnline(true)
-    const down = () => setOnline(false)
-    window.addEventListener('online', up)
-    window.addEventListener('offline', down)
-    return () => {
-      window.removeEventListener('online', up)
-      window.removeEventListener('offline', down)
-    }
-  }, [])
-  return online
-}
 
 /**
  * Cloud sync status dot for the top bar, and the handle on the file queue

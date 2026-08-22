@@ -13,6 +13,8 @@ import {
   type WorkspaceSection,
 } from '@/types/workspace'
 import { useI18n } from '@/lib/i18n'
+import { SwitcherTab } from './SwitcherTab'
+import { AiTab } from '@/components/ai/AiTab'
 import {
   IcBezier,
   IcBoard,
@@ -25,7 +27,6 @@ import {
   IcPages,
   IcPalette,
   IcPresentation,
-  IcSparkles,
   IcSplit,
   IcTable,
 } from '@/components/Icons'
@@ -41,7 +42,6 @@ const SECTION_ICONS: Record<WorkspaceSection, React.ReactNode> = {
 
 const PLANNED_ICONS: Record<PlannedSurface, React.ReactNode> = {
   comfyui: <IcComfyUI size={13} />,
-  aiDashboard: <IcSparkles size={13} />,
   trace: <IcBezier size={13} />,
   forge: <IcPalette size={13} />,
   folio: <IcPages size={13} />,
@@ -51,7 +51,7 @@ const PLANNED_ICONS: Record<PlannedSurface, React.ReactNode> = {
 /**
  * The top navigation: five segmented clusters —
  * [Split] · [Board · Graph] · [Document · Sheet · Presentation · Code] ·
- * [ComfyUI · AI dashboard] · [Trace · Forge · Photo · Folio · Flux].
+ * [AI · ComfyUI] · [Trace · Forge · Photo · Folio · Flux].
  *
  * Split leads on its own because it is the odd one out: a LAYOUT that applies
  * on top of whatever else is selected, rather than a thing you select.
@@ -62,11 +62,16 @@ const PLANNED_ICONS: Record<PlannedSurface, React.ReactNode> = {
  * be active at the same time, and why Graph can occupy the second pane while an
  * editor holds the first.
  *
- * The last two clusters are the AI and Creative suites, disabled: the space
- * they will take is spent now rather than six times over as each ships. They
- * are also the first thing to leave a narrow bar — a placeholder you cannot
- * click is the cheapest thing to drop — which is why they hide on a container
- * query rather than being unconditionally mounted.
+ * The last two clusters are the AI and Creative suites. Their placeholders are
+ * disabled: the space they will take is spent now rather than six times over
+ * as each ships, and they are the first thing to leave a narrow bar — a tab
+ * you cannot click is the cheapest thing to drop — which is why a cluster with
+ * nothing live in it hides on a container query.
+ *
+ * The AI cluster stopped being one of those in 21.3. Its first member is the
+ * real surface now, so the cluster stays at every width and only the ComfyUI
+ * placeholder beside it folds away. That is the placeholder model working: the
+ * live tab moved into space the bar had already been measured with.
  */
 export function SectionTabs() {
   const viewMode = useStore((s) => s.viewMode)
@@ -124,7 +129,7 @@ export function SectionTabs() {
       aria-label={t.topbar.viewModeGroup}
     >
       <Cluster>
-        <Tab
+        <SwitcherTab
           icon={<IcSplit size={13} />}
           label={t.modes.split}
           active={split}
@@ -145,7 +150,7 @@ export function SectionTabs() {
 
       <Cluster>
         <SectionTab section="board" active={viewMode === 'board'} onSelect={setViewMode} />
-        <Tab
+        <SwitcherTab
           icon={<IcGraph size={13} />}
           label={t.modes.graph}
           active={graphActive}
@@ -167,18 +172,20 @@ export function SectionTabs() {
         // a cluster with nothing clickable in it goes away whole at the same
         // width its members would have gone one by one
         <Cluster key={i} planned={items.every(isPlanned)}>
-          {items.map((item) =>
-            item.kind === 'section' ? (
+          {items.map((item) => {
+            if (item.kind === 'ai') return <AiTab key="ai" />
+            if (item.kind === 'planned') {
+              return <PlannedTab key={item.planned.id} meta={item.planned} />
+            }
+            return (
               <SectionTab
                 key={item.section}
                 section={item.section}
                 active={viewMode === sectionMeta(item.section).mode}
                 onSelect={setViewMode}
               />
-            ) : (
-              <PlannedTab key={item.planned.id} meta={item.planned} />
-            ),
-          )}
+            )
+          })}
         </Cluster>
       ))}
     </div>
@@ -214,7 +221,7 @@ function SectionTab({
   // list testable without a DOM); the visible label is localised here.
   const label = t.modes[meta.mode]
   return (
-    <Tab
+    <SwitcherTab
       icon={SECTION_ICONS[section]}
       label={label}
       active={active}
@@ -237,7 +244,7 @@ function PlannedTab({ meta }: { meta: PlannedMeta }) {
   const t = useI18n()
   const label = t.modes[meta.id]
   return (
-    <Tab
+    <SwitcherTab
       icon={PLANNED_ICONS[meta.id]}
       label={label}
       labelled={false}
@@ -248,53 +255,5 @@ function PlannedTab({ meta }: { meta: PlannedMeta }) {
       ariaLabel={t.topbar.plannedAria(label)}
       title={t.topbar.plannedTitle(label, t.topbar.plannedDomain[meta.id], meta.phase)}
     />
-  )
-}
-
-function Tab({
-  icon,
-  label,
-  labelled = true,
-  hideWhenTight,
-  active,
-  disabled,
-  onClick,
-  ariaLabel,
-  title,
-}: {
-  icon: React.ReactNode
-  label: string
-  /** false pins the tab to its icon — see PlannedTab */
-  labelled?: boolean
-  /** leaves the bar below 64rem, where every pixel belongs to a live surface */
-  hideWhenTight?: boolean
-  active: boolean
-  disabled?: boolean
-  onClick: () => void
-  ariaLabel: string
-  title: string
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      aria-pressed={active}
-      aria-label={ariaLabel}
-      title={title}
-      className={`flex-none cursor-pointer items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium whitespace-nowrap focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40 ${
-        hideWhenTight ? 'hidden @min-[64rem]:flex' : 'flex'
-      } ${active ? 'bg-panel text-ink shadow-sm' : 'text-muted hover:text-ink'}`}
-    >
-      {icon}
-      {/* The eight words take the switcher from 520px to 899px, and that is
-          the difference between a bar that fits and one that does not: with
-          them the bar asks for 1996px. 127rem is measured from that, unlike
-          the 87.5rem it replaces — which was set when the switcher had eight
-          tabs, and was already producing a bar that overflowed at 1920. The
-          query asks the BAR how wide it is, not the window (audit F4). See
-          lib/layout/topBarFit for the rest of the budget. */}
-      {labelled && <span className="hidden @min-[127rem]:inline">{label}</span>}
-    </button>
   )
 }
