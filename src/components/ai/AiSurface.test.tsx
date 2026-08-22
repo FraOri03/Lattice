@@ -71,6 +71,21 @@ describe('the panel says what a run costs and where it goes, before anything run
     await waitFor(() => expect(panel).toHaveTextContent(/phase 21\.5/i))
   })
 
+  /**
+   * The disabled provider's disclosure is `device` / `free`. Rendering it for
+   * an action nothing can run says "it stays here, nothing is billed", which
+   * a reader takes to mean the action runs locally — the opposite of true.
+   */
+  it('does not borrow the disabled provider’s reassurance for a blocked action', async () => {
+    render(<AiTab />)
+    fireEvent.click(screen.getByRole('button', { name: /ai panel/i }))
+    const panel = await screen.findByRole('dialog')
+    await waitFor(() => expect(panel).toHaveTextContent(/nothing here runs this action/i))
+    // the device sentence survives for exactly one row: the set designer,
+    // where the on-device templates really do answer and it is simply true
+    expect(within(panel).getAllByText(/^it stays here/i)).toHaveLength(1)
+  })
+
   it('offers the key field and the consent log in the same place', async () => {
     render(<AiTab />)
     fireEvent.click(screen.getByRole('button', { name: /ai panel/i }))

@@ -1413,6 +1413,8 @@ export const en = {
     },
     retention:
       'It is used to run this action and nothing else, and is not kept once the job ends.',
+    nothingRunsIt:
+      'Nothing here runs this action, so nothing is sent anywhere. What it would carry, and to whom, depends on the backend an administrator configures.',
     /** Who pays. */
     billing: {
       free: 'Nothing is billed to anyone.',
@@ -2826,6 +2828,8 @@ export const it: Catalog = {
     },
     retention:
       'Serve a eseguire questa azione e nient’altro, e non viene conservato dopo la fine del lavoro.',
+    nothingRunsIt:
+      'Qui non c’è niente che esegua questa azione, quindi non viene inviato niente. Cosa porterebbe con sé, e a chi, dipende dal backend che configura un amministratore.',
     billing: {
       free: 'Non viene addebitato niente a nessuno.',
       deployment: 'Addebitato a questo deployment.',

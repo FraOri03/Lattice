@@ -51,7 +51,18 @@ export function recipientLabel(t: Catalog, subject: AiConsentSubject): string {
  */
 export function AiDisclosureNote({ availability }: { availability: AiActionAvailability }) {
   const t = useI18n()
-  const { disclosure, carries, consent } = availability
+  const { disclosure, carries, consent, provider } = availability
+
+  /*
+   * The disabled provider's disclosure is `device` / `free`, and rendering it
+   * would be a reassurance about an action that cannot run: "it stays here,
+   * nothing is billed" reads as *this one runs locally*, which is the
+   * opposite of true. What leaves and who pays are answers only a configured
+   * backend has, so this says that instead of borrowing the placeholder's.
+   */
+  if (provider.id === 'disabled') {
+    return <p className="text-[10.5px] leading-relaxed text-muted">{t.ai.nothingRunsIt}</p>
+  }
 
   /*
    * When the destination is this device, the "what leaves" half is skipped
