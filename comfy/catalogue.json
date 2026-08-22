@@ -1,0 +1,170 @@
+{
+  "$comment": "Generated from src/lib/ai/actions.ts by scripts/build-ai-catalogue.mjs — do not edit. Run: npm run comfy:catalogue",
+  "maxInputBytes": 3145728,
+  "actions": {
+    "text-to-image": {
+      "inputs": [],
+      "output": "image",
+      "gpuClass": "standard",
+      "deterministicWithSeed": true,
+      "maxInputBytes": 0,
+      "params": {
+        "prompt": {
+          "kind": "text",
+          "maxLength": 2000,
+          "default": ""
+        },
+        "negativePrompt": {
+          "kind": "text",
+          "maxLength": 2000,
+          "default": ""
+        },
+        "width": {
+          "kind": "number",
+          "min": 256,
+          "max": 2048,
+          "step": 64,
+          "default": 1024
+        },
+        "height": {
+          "kind": "number",
+          "min": 256,
+          "max": 2048,
+          "step": 64,
+          "default": 1024
+        },
+        "steps": {
+          "kind": "number",
+          "min": 1,
+          "max": 60,
+          "step": 1,
+          "default": 25
+        },
+        "guidance": {
+          "kind": "number",
+          "min": 0,
+          "max": 20,
+          "step": 0.5,
+          "default": 5
+        },
+        "seed": {
+          "kind": "number",
+          "min": 0,
+          "max": 2147483647,
+          "step": 1,
+          "default": 0
+        }
+      }
+    },
+    "image-to-image": {
+      "inputs": [
+        "image"
+      ],
+      "output": "image",
+      "gpuClass": "standard",
+      "deterministicWithSeed": true,
+      "maxInputBytes": 3145728,
+      "params": {
+        "prompt": {
+          "kind": "text",
+          "maxLength": 2000,
+          "default": ""
+        },
+        "strength": {
+          "kind": "number",
+          "min": 0,
+          "max": 1,
+          "step": 0.05,
+          "default": 0.6
+        },
+        "steps": {
+          "kind": "number",
+          "min": 1,
+          "max": 60,
+          "step": 1,
+          "default": 25
+        },
+        "seed": {
+          "kind": "number",
+          "min": 0,
+          "max": 2147483647,
+          "step": 1,
+          "default": 0
+        }
+      }
+    },
+    "upscale": {
+      "inputs": [
+        "image"
+      ],
+      "output": "image",
+      "gpuClass": "light",
+      "deterministicWithSeed": false,
+      "maxInputBytes": 3145728,
+      "params": {
+        "scale": {
+          "kind": "choice",
+          "choices": [
+            "2",
+            "4"
+          ],
+          "default": "2"
+        }
+      }
+    },
+    "background-removal": {
+      "inputs": [
+        "image"
+      ],
+      "output": "image",
+      "gpuClass": "light",
+      "deterministicWithSeed": false,
+      "maxInputBytes": 3145728,
+      "params": {}
+    },
+    "design-set": {
+      "inputs": [],
+      "output": "scene",
+      "deterministicWithSeed": false,
+      "maxInputBytes": 0,
+      "params": {
+        "prompt": {
+          "kind": "text",
+          "maxLength": 2000,
+          "default": ""
+        }
+      }
+    },
+    "inpaint": {
+      "inputs": [
+        "image",
+        "mask"
+      ],
+      "output": "image",
+      "gpuClass": "heavy",
+      "deterministicWithSeed": true,
+      "maxInputBytes": 3145728,
+      "params": {
+        "prompt": {
+          "kind": "text",
+          "maxLength": 2000,
+          "default": ""
+        },
+        "steps": {
+          "kind": "number",
+          "min": 1,
+          "max": 60,
+          "step": 1,
+          "default": 30
+        },
+        "seed": {
+          "kind": "number",
+          "min": 0,
+          "max": 2147483647,
+          "step": 1,
+          "default": 0
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "1": {
+    "class_type": "CheckpointLoaderSimple",
+    "inputs": { "ckpt_name": "sd_xl_base_1.0.safetensors" },
+    "_meta": { "title": "SDXL base" }
+  },
+  "2": {
+    "class_type": "VAELoader",
+    "inputs": { "vae_name": "sdxl_vae.safetensors" },
+    "_meta": { "title": "VAE (fp16 fix)" }
+  },
+  "3": {
+    "class_type": "LoadImage",
+    "inputs": { "image": "input.png", "upload": "image" },
+    "_meta": { "title": "Source image" }
+  },
+  "4": {
+    "class_type": "LoadImageMask",
+    "inputs": { "image": "mask.png", "channel": "red", "upload": "image" },
+    "_meta": { "title": "Mask — white is what gets repainted" }
+  },
+  "5": {
+    "class_type": "VAEEncodeForInpaint",
+    "inputs": { "pixels": ["3", 0], "vae": ["2", 0], "mask": ["4", 0], "grow_mask_by": 6 },
+    "_meta": { "title": "Encode for inpaint" }
+  },
+  "6": {
+    "class_type": "CLIPTextEncode",
+    "inputs": { "text": "", "clip": ["1", 1] },
+    "_meta": { "title": "Prompt" }
+  },
+  "7": {
+    "class_type": "CLIPTextEncode",
+    "inputs": { "text": "", "clip": ["1", 1] },
+    "_meta": { "title": "Negative prompt" }
+  },
+  "8": {
+    "class_type": "KSampler",
+    "inputs": {
+      "seed": 0,
+      "steps": 30,
+      "cfg": 5,
+      "sampler_name": "dpmpp_2m",
+      "scheduler": "karras",
+      "denoise": 1,
+      "model": ["1", 0],
+      "positive": ["6", 0],
+      "negative": ["7", 0],
+      "latent_image": ["5", 0]
+    },
+    "_meta": { "title": "Sampler" }
+  },
+  "9": {
+    "class_type": "VAEDecode",
+    "inputs": { "samples": ["8", 0], "vae": ["2", 0] },
+    "_meta": { "title": "Decode" }
+  },
+  "10": {
+    "class_type": "SaveImage",
+    "inputs": { "filename_prefix": "lattice", "images": ["9", 0] },
+    "_meta": { "title": "Output" }
+  }
+}

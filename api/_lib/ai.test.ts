@@ -230,6 +230,30 @@ describe('a job payload', () => {
     expect(mapJobError('CUDA out of memory').reason).toBe('upstream-error')
   })
 
+  /**
+   * Our own container names its reason (21.2), so this does not have to
+   * guess from free text — and an error that arrives as `upstream-error`
+   * would advise a retry that cannot possibly help.
+   */
+  it('takes the reason the container named, and drops the prefix', () => {
+    const mapped = mapJobError('[invalid-parameters] steps was 5000')
+    expect(mapped.reason).toBe('invalid-parameters')
+    expect(mapped.detail).toBe('steps was 5000')
+  })
+
+  it.each(['no-credit', 'no-capacity', 'model-missing', 'timed-out'] as const)(
+    'accepts %s from the container',
+    (reason) => {
+      expect(mapJobError(`[${reason}] detail`).reason).toBe(reason)
+    },
+  )
+
+  /** An upstream free to write any string must not choose how the UI reacts. */
+  it('ignores a prefix that names no reason the taxonomy has', () => {
+    expect(mapJobError('[free-money] hello').reason).toBe('upstream-error')
+    expect(mapJobError('[free-money] hello').detail).toContain('[free-money]')
+  })
+
   it('gives a timed-out and a cancelled job their own reasons', () => {
     expect(viewOf({ status: 'TIMED_OUT' }).failure?.reason).toBe('timed-out')
     expect(viewOf({ status: 'CANCELLED' }).failure?.reason).toBe('cancelled')

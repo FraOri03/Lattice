@@ -448,10 +448,102 @@ most of the cold start and the job is short enough for that to dominate the
 experience. Off on heavy, where the weights are large and the job takes
 minutes anyway, so the storage cost buys proportionally little.
 
-These are decisions, not measurements: the container they run is
-[21.2](https://github.com/FraOri03/Lattice/issues/101)'s, and the real
-cold-start and per-job costs should be measured against it and this table
-corrected once they exist.
+These are decisions, not measurements. The real cold-start and per-job costs
+should be measured against the container below and this table corrected once
+they exist.
+
+## The container, and the graphs it runs
+
+[`comfy/`](../../comfy/README.md) is the generation side, owned rather than
+borrowed: versioned workflows, pinned models, and one table from a catalogue
+action to a graph.
+[21.2](https://github.com/FraOri03/Lattice/issues/101).
+
+### The blast radius is one directory
+
+**Every ComfyUI concept lives under `comfy/`** — node class names, node ids,
+input keys, in `action-map.json` and `workflows/*.json` and nowhere else. Above
+it, code names an *action*. If ComfyUI is ever replaced, that directory is
+what gets rewritten and nothing above it moves; `comfy/pipeline.test.ts`
+fails the build if a node class name appears in `src/` or `api/`.
+
+The graphs are committed in ComfyUI **API** format, which is a different
+thing from what the editor's plain *Save* produces. A test asserts it,
+because it is the mistake every consumer makes exactly once.
+
+### The worker takes an action, never a graph
+
+`/api/ai/submit` sends `{action, params, inputs}` and the container builds
+the prompt. The other direction would have been easier and is much worse: a
+worker that ran whatever graph it was handed would turn a leaked RunPod key
+into arbitrary code execution on our GPUs, instead of into the four things
+this container knows how to do.
+
+### Versioning, and why a superseded workflow stays
+
+A workflow is `<id>@<version>.json`, and **a change that alters output is a
+new version**, never an edit in place. The resolver loads by id *and*
+version, so a version the map has moved on from keeps working for as long as
+its file is in the tree — which is what makes "generated with upscale v1"
+mean something a year later. 21.5 stores exactly that pair with every result.
+
+### Pins are hashes, and licences sit next to them
+
+`comfy/pins.json` records every model and custom node by sha256, with its
+source, its licence and whether commercial use is allowed. An unpinned model
+means the same prompt silently produces something else next month; an
+unreviewed licence means nobody can tell a user whether the image is theirs
+to sell. Both are the same question about the same file, so they are written
+in the same place.
+
+`scripts/fetch_models.py` verifies every download against its digest and
+stops the build on a mismatch. Custom nodes: **none**, deliberately — a
+ComfyUI custom node is arbitrary third-party code running with the worker's
+privileges (21.11), and the four shipped graphs need only core nodes.
+
+A licence review that changes nothing is not a review, and this one changed
+something: **background removal is not shipped**. The obvious model forbids
+commercial use, and the MIT alternative downloads its weights at first use
+and therefore cannot be pinned. The action stays in the catalogue because
+the product still intends it, and a job for it fails with `model-missing` —
+named, not silently dropped. Both refusals are recorded in `pins.json` under
+`rejected`.
+
+### Determinism is made true here
+
+Where the catalogue claims an action is deterministic given a seed, this is
+where the claim is kept: the seed is exposed, the sampler and scheduler are
+**not**, and an action that supplies no seed gets one drawn for it and
+reported back — a result nobody can name is a result nobody can reproduce.
+`comfy/scripts/smoke.py` asserts the end of that chain on a real GPU: same
+seed, same bytes; different seed, different bytes.
+
+### What ships, and where it runs
+
+| Action | Workflow | GPU class | Models |
+|---|---|---|---|
+| `text-to-image` | `text-to-image@1` | standard | SDXL base + fp16-fix VAE |
+| `image-to-image` | `image-to-image@1` | standard | the same |
+| `inpaint` | `inpaint@1` | heavy | the same, via `VAEEncodeForInpaint` |
+| `upscale` | `upscale@1` | light | Real-ESRGAN x4plus |
+
+The GPU class is a property of the **workflow**, not of the request, which
+is what lets 21.1 route an upscale to cheap hardware instead of paying the
+top rate for it.
+
+### The build
+
+ComfyUI at a commit, every model at a sha256, every Python dependency
+exact — nothing resolves "latest", so the same Dockerfile produces the same
+worker next month. The weights are baked into their own layer rather than
+mounted from a RunPod network volume: a volume is region-pinned, which
+shrinks the pool of GPUs the endpoint can schedule on and makes *waiting for
+a GPU* more likely. A slow first pull happens once per worker; a smaller GPU
+pool happens to every user. The cost is an image of about 8 GB.
+
+Every graph is validated at build time — links, bindings, pinned models —
+so a broken image fails where nobody is waiting rather than on a user's
+first job after a cold start they paid for.
 
 ## Environment
 
@@ -484,8 +576,11 @@ build talks to, not about what a user has connected for themselves.
 - **The spend ceiling** (21.4). This phase enforces the catalogue's limits —
   parameter ranges, input size, deadline — and no budget. The gap is
   recorded rather than assumed away.
-- **The graphs the endpoint runs** (21.2). `input.action` and `input.params`
-  are the container's contract; the other side of it does not exist yet.
+- **Background removal.** In the catalogue, not in the container: no model
+  that is both licence-clear and pinnable. See the licence note above.
+- **A measured cold start.** The deployment table is decisions, not
+  measurements, and the container that would let anyone measure them only
+  just arrived.
 - **Where results are stored** (21.5). A completed job hands back URLs.
 - **Who pays in a shared project** (21.7). Today the check is the project
   role: a viewer cannot spend the owner's GPU credit.

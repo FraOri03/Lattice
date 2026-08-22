@@ -1,0 +1,114 @@
+{
+  "$comment": [
+    "Every third-party artefact this container runs, pinned by hash, with its",
+    "source and its licence (Phase 21.2, #101).",
+    "",
+    "An unpinned model means the same prompt silently produces something else",
+    "next month, and an unreviewed licence means nobody can answer whether a",
+    "user may sell what they generated. Both are recorded here, next to each",
+    "other, because they are the same question asked of the same file.",
+    "",
+    "`scripts/fetch_models.py` reads this file, downloads each artefact and",
+    "refuses to continue on a hash mismatch. A wrong hash is therefore a loud",
+    "build failure rather than a silent substitution.",
+    "",
+    "`digestFrom` records where the digest was obtained when it did not come",
+    "from the source itself — GitHub release assets publish no checksum, so",
+    "for those the digest comes from a mirror whose bytes match. The build is",
+    "what confirms it."
+  ],
+
+  "runtime": {
+    "comfyui": {
+      "repo": "https://github.com/comfyanonymous/ComfyUI",
+      "tag": "v0.33.1",
+      "commit": "72865f4f27eaf5396f8f36370e0a2be3a9a090ee",
+      "licence": "GPL-3.0-only",
+      "commercialUse": "allowed",
+      "notes": "Pinned to a tag AND its commit: a tag can be moved, a commit cannot."
+    },
+    "python": "3.11",
+    "cuda": "12.4"
+  },
+
+  "customNodes": [],
+  "$customNodesComment": [
+    "Deliberately empty, and it is the single largest security decision in",
+    "this container. A ComfyUI custom node is arbitrary third-party code that",
+    "runs with the worker's privileges; every one added is a supply chain to",
+    "review and re-review (21.11). The four workflows here are built from core",
+    "ComfyUI nodes only, so the supply chain is ComfyUI itself plus three",
+    "weight files.",
+    "",
+    "The moment that stops being true, an entry here needs a repo, a COMMIT",
+    "(never a branch), a licence and a note saying what it does and why no",
+    "core node could."
+  ],
+
+  "models": [
+    {
+      "id": "sd_xl_base_1.0.safetensors",
+      "kind": "checkpoint",
+      "installTo": "models/checkpoints",
+      "sizeBytes": 6938078334,
+      "sha256": "31e35c80fc4829d14f90153f4c74cd59c90b779f6afe05a74cd6120b893f7e5b",
+      "source": "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/sd_xl_base_1.0.safetensors",
+      "digestFrom": "source",
+      "licence": "CreativeML Open RAIL++-M",
+      "licenceUrl": "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/blob/main/LICENSE.md",
+      "commercialUse": "allowed-with-restrictions",
+      "notes": "Commercial use is permitted. The use-based restrictions in Attachment A travel with the output and are a product obligation, not a footnote: 21.8 is where they are surfaced to whoever generated the image."
+    },
+    {
+      "id": "sdxl_vae.safetensors",
+      "kind": "vae",
+      "installTo": "models/vae",
+      "sizeBytes": 334641162,
+      "sha256": "235745af8d86bf4a4c1b5b4f529868b37019a10f7c0b2e79ad0abca3a22bc6e1",
+      "source": "https://huggingface.co/madebyollin/sdxl-vae-fp16-fix/resolve/main/sdxl_vae.safetensors",
+      "digestFrom": "source",
+      "licence": "MIT",
+      "licenceUrl": "https://huggingface.co/madebyollin/sdxl-vae-fp16-fix",
+      "commercialUse": "allowed",
+      "notes": "Loaded explicitly rather than using the checkpoint's baked VAE, which produces NaNs in fp16. A decode that silently differs by precision is a determinism claim that cannot hold."
+    },
+    {
+      "id": "RealESRGAN_x4plus.pth",
+      "kind": "upscale_model",
+      "installTo": "models/upscale_models",
+      "sizeBytes": 67040989,
+      "sha256": "aa00f09ad753d88576b21ed977e97d634976377031b178acc3b5b238df463400",
+      "source": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth",
+      "mirror": "https://huggingface.co/ai-forever/Real-ESRGAN/resolve/main/RealESRGAN_x4.pth",
+      "digestFrom": "mirror",
+      "licence": "BSD-3-Clause",
+      "licenceUrl": "https://github.com/xinntao/Real-ESRGAN/blob/master/LICENSE",
+      "commercialUse": "allowed",
+      "notes": "Source is the upstream release, which is where the licence lives. GitHub publishes no checksum for release assets, so the digest comes from a mirror whose file is byte-identical in size (67,040,989). If the upstream bytes ever differ from this digest the build stops, which is the behaviour wanted."
+    }
+  ],
+
+  "rejected": [
+    {
+      "id": "RMBG-1.4",
+      "consideredFor": "background-removal",
+      "source": "https://huggingface.co/briaai/RMBG-1.4",
+      "licence": "bria-rmbg-1.4 (non-commercial)",
+      "why": "The obvious choice for background removal, and not shippable: the licence forbids commercial use, and Lattice cannot tell a user their generated cut-out is theirs to sell while the model that made it says otherwise. A non-commercial licence is a product constraint, not a footnote."
+    },
+    {
+      "id": "InSPyReNet / transparent-background",
+      "consideredFor": "background-removal",
+      "source": "https://github.com/john-rocky/ComfyUI-Inspyrenet-Rembg",
+      "licence": "MIT (node), MIT (weights)",
+      "why": "Licence-clear, but the node downloads its weights at first use from a third-party host. A model fetched at runtime cannot be pinned, cannot be hashed at build time, and turns a cold start into a network dependency — every property this file exists to prevent. Shippable only once the weights are pinned here and baked in like the others."
+    },
+    {
+      "id": "sd_xl_refiner_1.0.safetensors",
+      "consideredFor": "text-to-image",
+      "source": "https://huggingface.co/stabilityai/stable-diffusion-xl-refiner-1.0",
+      "licence": "CreativeML Open RAIL++-M",
+      "why": "Another 6 GB in the image and a second sampling pass per job, for a quality difference most prompts do not show. Cost, not licence — revisit if the base output proves not good enough."
+    }
+  ]
+}

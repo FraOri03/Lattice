@@ -46,7 +46,15 @@ export function immediateJob(args: {
   const controller = new AbortController()
   const onCallerAbort = () => controller.abort()
   opts.signal?.addEventListener('abort', onCallerAbort)
-  const timer = setTimeout(() => controller.abort(), deadlineMs)
+  // Which of the two fired, recorded rather than inferred. Comparing clocks
+  // afterwards looks equivalent and is not: a timer that fires within the
+  // same millisecond as its deadline reads as a caller abort, and the user
+  // is told they cancelled something that actually timed out.
+  let timedOut = false
+  const timer = setTimeout(() => {
+    timedOut = true
+    controller.abort()
+  }, deadlineMs)
 
   const emit = (next: AiJobSnapshot) => {
     current = next
@@ -70,7 +78,7 @@ export function immediateJob(args: {
     (err: unknown) => {
       if (settled) throw err
       finish()
-      const failure = asJobError(err, controller.signal.aborted, Date.now() > deadlineAt)
+      const failure = asJobError(err, controller.signal.aborted, timedOut)
       emit({ ...current, state: failure.state, failure: failure.failure })
       throw failure
     },
@@ -96,11 +104,13 @@ export function immediateJob(args: {
  * an abort caused by the user are the same `AbortError`, and telling the
  * two apart is the difference between "you cancelled this" and "this took
  * too long" — which is the whole reason `timed-out` is a separate state.
+ * `timedOut` is set by the timer itself, so a deadline of one millisecond
+ * is still reported as a deadline.
  */
-function asJobError(err: unknown, aborted: boolean, pastDeadline: boolean): AiJobError {
+function asJobError(err: unknown, aborted: boolean, timedOut: boolean): AiJobError {
   if (err instanceof AiJobError) return err
   if (aborted) {
-    return pastDeadline
+    return timedOut
       ? new AiJobError('timed-out', 'The request outran the action deadline.')
       : new AiJobError('cancelled', 'The caller aborted the request.')
   }

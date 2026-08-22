@@ -1,0 +1,58 @@
+{
+  "1": {
+    "class_type": "CheckpointLoaderSimple",
+    "inputs": { "ckpt_name": "sd_xl_base_1.0.safetensors" },
+    "_meta": { "title": "SDXL base" }
+  },
+  "2": {
+    "class_type": "VAELoader",
+    "inputs": { "vae_name": "sdxl_vae.safetensors" },
+    "_meta": { "title": "VAE (fp16 fix)" }
+  },
+  "3": {
+    "class_type": "LoadImage",
+    "inputs": { "image": "input.png", "upload": "image" },
+    "_meta": { "title": "Source image" }
+  },
+  "4": {
+    "class_type": "VAEEncode",
+    "inputs": { "pixels": ["3", 0], "vae": ["2", 0] },
+    "_meta": { "title": "Encode" }
+  },
+  "5": {
+    "class_type": "CLIPTextEncode",
+    "inputs": { "text": "", "clip": ["1", 1] },
+    "_meta": { "title": "Prompt" }
+  },
+  "6": {
+    "class_type": "CLIPTextEncode",
+    "inputs": { "text": "", "clip": ["1", 1] },
+    "_meta": { "title": "Negative prompt" }
+  },
+  "7": {
+    "class_type": "KSampler",
+    "inputs": {
+      "seed": 0,
+      "steps": 25,
+      "cfg": 5,
+      "sampler_name": "dpmpp_2m",
+      "scheduler": "karras",
+      "denoise": 0.6,
+      "model": ["1", 0],
+      "positive": ["5", 0],
+      "negative": ["6", 0],
+      "latent_image": ["4", 0]
+    },
+    "_meta": { "title": "Sampler" }
+  },
+  "8": {
+    "class_type": "VAEDecode",
+    "inputs": { "samples": ["7", 0], "vae": ["2", 0] },
+    "_meta": { "title": "Decode" }
+  },
+  "9": {
+    "class_type": "SaveImage",
+    "inputs": { "filename_prefix": "lattice", "images": ["8", 0] },
+    "_meta": { "title": "Output" }
+  }
+}
