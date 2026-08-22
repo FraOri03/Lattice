@@ -25,6 +25,14 @@ and Photo mode's vocabulary. The key is still the user's, still stored per accou
 and still sent only to Google. What the move bought — and what it cost the seam — is
 in [architecture/ai.md](architecture/ai.md).
 
+Phase 21.3 finished the job in the other direction. The panel now shows the
+disclosure **before** the button — what leaves, where it goes, whose bill it is —
+asks for consent once per recipient and remembers it, and renders the same key field
+the top-bar AI panel does rather than a second copy of it. The run goes through the
+shared jobs store, so a generation started here stays visible, cancellable and costed
+from the AI panel after you have left Photo mode, and its completion raises a
+notification. The panel is also EN/IT throughout, which it was not before.
+
 ## Board integration
 
 A `photo` **card type** puts a live preview of one shot on the board;
@@ -52,4 +60,6 @@ model (the canvas toolbar is hidden when read-only).
   the photo card but render their own local scene. Use scene JSON export/import to
   hand a set over.
 - Lighting is a **2D approximation** for planning, not a physically accurate render.
-- The AI designer requires a user-supplied key for its non-heuristic path.
+- The AI designer requires a user-supplied key for its non-heuristic path, and an
+  explicit consent grant for the vendor before anything is sent. Declining leaves the
+  offline templates working.

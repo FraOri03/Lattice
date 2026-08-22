@@ -29,6 +29,7 @@ import {
   IcPlus,
   IcSearch,
   IcSettings,
+  IcSparkles,
   IcSplit,
   IcSun,
   IcUserPlus,
@@ -289,6 +290,7 @@ function usePaletteSections(
   const setGithubDialogOpen = useUiStore((st) => st.setGithubDialogOpen)
   const setDriveDialogOpen = useUiStore((st) => st.setDriveDialogOpen)
   const setShareDialogOpen = useUiStore((st) => st.setShareDialogOpen)
+  const setAiPanelOpen = useUiStore((st) => st.setAiPanelOpen)
   const setShortcutsOpen = useUiStore((st) => st.setShortcutsOpen)
   const setPanel = useCollabStore((st) => st.setPanel)
 
@@ -593,6 +595,9 @@ function usePaletteSections(
       [cmd.github, <IcGithub size={14} />, () => setGithubDialogOpen(true)],
       [cmd.drive, <IcCloud size={14} />, () => setDriveDialogOpen(true)],
       [cmd.share, <IcUserPlus size={14} />, () => setShareDialogOpen(true)],
+      // the AI tab is icon-only in the bar (the switcher has no width for a
+      // ninth label), so the palette is where it can be reached by name
+      [cmd.ai, <IcSparkles size={14} />, () => setAiPanelOpen(true)],
       [cmd.comments, <IcMessage size={14} />, () => setPanel('comments')],
       [cmd.activity, <IcActivity size={14} />, () => setPanel('activity')],
       [cmd.versions, <IcHistory size={14} />, () => setPanel('versions')],
@@ -678,5 +683,5 @@ function usePaletteSections(
 
     return found
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, pending, s, t, syncProvider, setGithubDialogOpen, setDriveDialogOpen, setShareDialogOpen, setShortcutsOpen, setPanel])
+  }, [query, pending, s, t, syncProvider, setGithubDialogOpen, setDriveDialogOpen, setShareDialogOpen, setAiPanelOpen, setShortcutsOpen, setPanel])
 }

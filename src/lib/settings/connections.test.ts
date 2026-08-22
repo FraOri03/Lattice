@@ -10,6 +10,7 @@ const inputs = (patch: Partial<ConnectionInputs> = {}): ConnectionInputs => ({
   hasMediaCalls: false,
   hasConversionBackend: false,
   hasAiBackend: false,
+  hasAiKey: false,
   ...patch,
 })
 
@@ -98,11 +99,36 @@ describe('AI', () => {
     })
   })
 
-  it('reports connected once a backend was selected at build time', () => {
-    expect(of('ai', { hasAiBackend: true }).state).toBe('connected')
+  it('reports connected once a backend was selected AND somebody is signed in', () => {
+    expect(of('ai', { hasAiBackend: true, googleSignedIn: true }).state).toBe('connected')
   })
 
-  it('offers nothing to click either way', () => {
-    expect(of('ai', { hasAiBackend: true }).action).toBe('none')
+  /**
+   * The green tick this row used to show on a build that could not run a
+   * single job. Every hosted job is authorised against a Google account, so
+   * a configured backend with nobody signed in is blocked, and it says so.
+   */
+  it('is blocked, not connected, while nobody is signed in', () => {
+    expect(of('ai', { hasAiBackend: true }).state).toBe('blocked')
+  })
+
+  /**
+   * The state a local-first product is in most often: nothing hosted here,
+   * and AI working anyway on a key the user added. Neither "connected" (this
+   * deployment runs nothing) nor "not in this build" (it works) is true.
+   */
+  it('reports available when the only AI is a key of the user’s own', () => {
+    expect(of('ai', { hasAiKey: true })).toMatchObject({ state: 'available', action: 'none' })
+  })
+
+  it('offers nothing to click in any state', () => {
+    for (const patch of [
+      { hasAiBackend: true, googleSignedIn: true },
+      { hasAiBackend: true },
+      { hasAiKey: true },
+      {},
+    ]) {
+      expect(of('ai', patch).action).toBe('none')
+    }
   })
 })

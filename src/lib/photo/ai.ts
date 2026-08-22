@@ -1,6 +1,7 @@
 import type { PhotoElement } from '@/types/photo'
 import { AiJobError } from '@/lib/ai/AiBackendProvider'
-import { resolveAiProvider } from '@/lib/ai'
+import { resolveAiProvider } from '@/lib/ai/registry'
+import { useAiJobs } from '@/lib/ai/jobsStore'
 import {
   getSetDesignKey,
   setSetDesignKey,
@@ -46,21 +47,33 @@ export interface PhotoAiResult {
  * stored Gemini key means Gemini, `forceOffline` means the templates, and
  * no key means the templates too. The panel offers the offline layout as a
  * retry after a failure, which is `localOnly` and nothing more.
+ *
+ * It goes through the jobs store rather than straight at the provider
+ * (21.3): that is what puts the run in the AI panel while the user is in
+ * another section, what raises the completion notification, and what records
+ * what it cost. A second path to a provider would have had none of the
+ * three, and the panel would have been describing generations it could not
+ * see.
  */
 export async function generateSetLayout(
   prompt: string,
-  opts: { forceOffline?: boolean; projectId?: string; signal?: AbortSignal } = {},
+  opts: {
+    forceOffline?: boolean
+    projectId?: string
+    signal?: AbortSignal
+    /** The caller has a consent grant for the recipient. See `lib/ai/consent`. */
+    uploadConsent?: boolean
+  } = {},
 ): Promise<PhotoAiResult> {
   const provider = resolveAiProvider('design-set', { localOnly: opts.forceOffline })
-  const job = await provider.submit(
-    {
-      actionId: 'design-set',
-      projectId: opts.projectId ?? '',
-      params: { prompt },
-    },
-    { signal: opts.signal },
-  )
-  const result = await job.result()
+  const result = await useAiJobs.getState().submit({
+    actionId: 'design-set',
+    projectId: opts.projectId ?? '',
+    params: { prompt },
+    localOnly: opts.forceOffline,
+    uploadConsent: opts.uploadConsent,
+    signal: opts.signal,
+  })
   const elements = sceneElements(result.outputs)
   if (elements.length === 0) {
     throw new AiJobError('upstream-error', 'The answer did not contain any set elements.')

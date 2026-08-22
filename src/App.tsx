@@ -33,6 +33,7 @@ import { SettingsScreen } from '@/components/settings/SettingsScreen'
 import { Toaster, toast } from '@/components/ui/Toaster'
 import { LiveRegion } from '@/components/a11y/LiveRegion'
 import { useUrlHistory } from '@/lib/nav/useUrlHistory'
+import { useAiJobRestore } from '@/lib/ai/restoreOnBoot'
 import { useTierAttribute } from '@/lib/layout/useTierAttribute'
 import { useAppearance } from '@/lib/theme/useAppearance'
 import { splitAvailable } from '@/lib/layout/tiers'
@@ -362,6 +363,9 @@ function AppShell() {
   useCollaboration()
   useGlobalShortcuts()
   useUrlHistory()
+  // a generation that outlived a refresh is reattached here rather than in
+  // the AI panel: it is already being paid for, and the panel may never open
+  useAiJobRestore()
   // the viewport tier, published on :root for CSS and read by the shell. It
   // is mounted here for the same reason as the history binding: one writer,
   // above the surface switch, so it survives the trip to the dashboard.

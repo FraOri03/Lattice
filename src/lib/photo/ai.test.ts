@@ -17,6 +17,11 @@ vi.mock('@/lib/env', async (importOriginal) => ({
 
 const { generateSetLayout, getPhotoAiKey, setPhotoAiKey } = await import('./ai')
 const { AiJobError } = await import('@/lib/ai/AiBackendProvider')
+const { clearConsentHistory, grantConsent } = await import('@/lib/ai/consent')
+const { useAiJobs } = await import('@/lib/ai/jobsStore')
+
+/** The recipient Gemini's disclosure names, and therefore what consent is filed against. */
+const GEMINI = { destination: 'third-party', vendor: 'google-gemini' } as const
 
 function geminiReplies(elements: unknown): void {
   vi.stubGlobal(
@@ -44,6 +49,8 @@ function geminiRefuses(status: number, message = 'nope'): void {
 
 beforeEach(() => {
   setPhotoAiKey('')
+  clearConsentHistory()
+  useAiJobs.getState().clear()
 })
 
 afterEach(() => {
@@ -95,6 +102,10 @@ describe('with no key', () => {
 /* ---------------- gemini ---------------- */
 
 describe('with a key', () => {
+  // the grant that says bytes may go to this recipient — asked once by the
+  // panel, remembered per account, and separate from storing the key itself
+  beforeEach(() => grantConsent(GEMINI))
+
   it('asks the model and reports which engine answered', async () => {
     setPhotoAiKey('a-key')
     geminiReplies([{ type: 'camera', name: 'Camera A', x: 0, y: 0, rotation: 0 }])
@@ -145,7 +156,10 @@ describe('with a key', () => {
 /* ---------------- failures ---------------- */
 
 describe('when the model refuses', () => {
-  beforeEach(() => setPhotoAiKey('a-key'))
+  beforeEach(() => {
+    setPhotoAiKey('a-key')
+    grantConsent(GEMINI)
+  })
 
   it.each([
     [400, 'unauthorized'],
@@ -192,5 +206,53 @@ describe('when the model refuses', () => {
     await expect(generateSetLayout('a set')).rejects.toMatchObject({
       failure: { reason: 'upstream-error' },
     })
+  })
+})
+
+/* ---------------- consent ---------------- */
+
+/**
+ * Storing a key says the user HAS an account with the vendor. It does not
+ * say bytes may go there, and treating those as one answer is how a feature
+ * uploads something nobody agreed to. 21.3 separated them; this is the test
+ * that keeps them separate.
+ */
+describe('consent, which is not the same thing as a key', () => {
+  it('sends nothing to the vendor before the recipient has been agreed to', async () => {
+    setPhotoAiKey('a-key')
+    const spy = vi.fn()
+    vi.stubGlobal('fetch', spy)
+
+    await expect(generateSetLayout('a night exterior')).rejects.toMatchObject({
+      failure: { reason: 'consent-required' },
+    })
+    expect(spy).not.toHaveBeenCalled()
+  })
+
+  it('runs once the grant is on record, without asking again', async () => {
+    setPhotoAiKey('a-key')
+    grantConsent(GEMINI)
+    geminiReplies([{ type: 'camera', name: 'Camera A', x: 0, y: 0, rotation: 0 }])
+
+    await expect(generateSetLayout('a night exterior')).resolves.toMatchObject({
+      source: 'gemini',
+    })
+  })
+
+  /**
+   * The offline templates run here, so there is no recipient and nothing to
+   * agree to. A consent dialog in front of a local computation would be a
+   * question with no meaning, and it would make the fallback unreachable
+   * exactly when the user has refused the vendor.
+   */
+  it('never asks for the on-device templates', async () => {
+    setPhotoAiKey('a-key')
+    const spy = vi.fn()
+    vi.stubGlobal('fetch', spy)
+
+    const result = await generateSetLayout('a beauty photoshoot', { forceOffline: true })
+
+    expect(result.source).toBe('offline')
+    expect(spy).not.toHaveBeenCalled()
   })
 })

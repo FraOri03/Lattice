@@ -1,5 +1,5 @@
 import type { PhotoElement } from '@/types/photo'
-import { vaultKey } from '@/lib/storage/vaultScope'
+import { byokKey, setByokKey } from '../byok.js'
 import { AiJobError, type AiBackendProvider } from '../AiBackendProvider.js'
 import { immediateJob } from '../immediateJob.js'
 import { AI_ACTIONS, invalidParams } from '../actions.js'
@@ -19,33 +19,33 @@ import type { AiFailureReason } from '../jobModel.js'
  *
  * ## The key
  *
- * Stored per account via `vaultKey`, sent only to Google, and never to any
- * Lattice endpoint. Storing it *is* the consent: there are no binary inputs
- * here, and asking again per prompt would be a dialog in front of a feature
- * whose entire configuration was the act of agreeing to it. What the
- * surface still owes the user is the disclosure above, shown before the
- * first run rather than after.
+ * Stored per account, sent only to Google, and never to any Lattice
+ * endpoint. The storage itself moved to [`byok`](../byok.ts) in 21.3: the
+ * behaviour was already right, but it was welded to this one file, and the
+ * second vendor would have copied it rather than reused it.
+ *
+ * Storing a key is not the same as consenting to the upload. It says the
+ * user *has* an account with the vendor; the grant that says bytes may go
+ * there is `consent.ts`, keyed by destination and vendor, and the surface
+ * asks for it before the first run rather than after.
  */
 
-const KEY_STORAGE = vaultKey('lattice-photo-gemini-key')
 const GEMINI_MODEL = 'gemini-3.5-flash'
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`
 
+/**
+ * The stored key, and the way to change it.
+ *
+ * Kept as named exports rather than pointing every caller at `byok` because
+ * they are this provider's vocabulary: `getSetDesignKey` says what the key
+ * is FOR, which `byokKey('gemini')` does not.
+ */
 export function getSetDesignKey(): string {
-  try {
-    return localStorage.getItem(KEY_STORAGE) ?? ''
-  } catch {
-    return ''
-  }
+  return byokKey('gemini')
 }
 
 export function setSetDesignKey(key: string): void {
-  try {
-    if (key) localStorage.setItem(KEY_STORAGE, key)
-    else localStorage.removeItem(KEY_STORAGE)
-  } catch {
-    /* storage unavailable — the key just will not persist */
-  }
+  setByokKey('gemini', key)
 }
 
 const SYSTEM_INSTRUCTION = `You are an expert Filmmaking & Photography Set Designer AI.
@@ -123,7 +123,7 @@ export const GeminiSetDesignProvider: AiBackendProvider = {
   id: 'hosted',
   label: 'Gemini (your own key)',
   requiresUpload: true,
-  disclosure: { destination: 'third-party', cost: 'your-key' },
+  disclosure: { destination: 'third-party', cost: 'your-key', vendor: 'google-gemini' },
 
   // Runtime, not build-time: the answer changes the moment the user pastes
   // a key or clears one, and no redeploy is involved in either.

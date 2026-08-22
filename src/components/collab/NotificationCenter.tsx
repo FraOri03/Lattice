@@ -14,6 +14,7 @@ import {
   IcHistory,
   IcMail,
   IcMessage,
+  IcSparkles,
   IcUser,
   IcUsers,
   IcX,
@@ -37,6 +38,7 @@ const TYPE_ICON: Record<NotificationType, React.ReactNode> = {
   'realtime-failure': <IcAlert size={12} />,
   'github-sync': <IcGithub size={12} />,
   conversion: <IcActivity size={12} />,
+  'ai-job': <IcSparkles size={12} />,
 }
 
 function timeAgo(ts: number): string {

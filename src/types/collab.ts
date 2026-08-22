@@ -246,6 +246,8 @@ export type NotificationType =
   | 'realtime-failure'
   | 'github-sync'
   | 'conversion'
+  /** An AI generation reached a terminal state (21.3). */
+  | 'ai-job'
 
 /**
  * A local, per-user notification. Derived from synced state (comments,

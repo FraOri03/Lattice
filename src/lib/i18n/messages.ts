@@ -35,9 +35,10 @@ export const en = {
     presentation: 'Presentation',
     code: 'Code',
     photo: 'Photo',
+    /** the AI surface — a real entry since 21.3, not a placeholder */
+    ai: 'AI',
     /** planned environments — proper nouns, so most of these do not translate */
     comfyui: 'ComfyUI',
-    aiDashboard: 'AI dashboard',
     trace: 'Trace',
     forge: 'Forge',
     folio: 'Folio',
@@ -90,7 +91,6 @@ export const en = {
     /** what each planned environment will be, for its disabled tab */
     plannedDomain: {
       comfyui: 'generative workflows',
-      aiDashboard: 'models, usage & keys',
       trace: 'vector & illustration',
       forge: 'image & painting',
       folio: 'layout & publishing',
@@ -99,6 +99,16 @@ export const en = {
     plannedTitle: (label: string, domain: string, phase: number) =>
       `${label} — ${domain} · phase ${phase}, not built yet`,
     plannedAria: (label: string) => `${label} — planned, not available yet`,
+    /**
+     * The AI tab. It stays icon-only at every width on purpose: the bar's
+     * width budget was measured with this cluster contributing two icons and
+     * no words (see lib/layout/topBarFit), and a ninth label would push the
+     * switcher past the box it was measured into.
+     */
+    aiOpen: 'AI — actions, cost and privacy',
+    aiClose: 'Close the AI panel',
+    aiAria: (running: number) =>
+      running > 0 ? `AI panel — ${running} running` : 'AI panel',
     /** whatever did not fit in the bar (12.3) */
     more: 'More controls',
   },
@@ -1012,6 +1022,7 @@ export const en = {
       github: 'GitHub — sync code',
       drive: 'Google Drive — connect and diagnostics',
       share: 'Share — members and invites',
+      ai: 'AI — actions, cost and privacy',
       comments: 'Comments',
       activity: 'Activity log',
       versions: 'Version history',
@@ -1354,6 +1365,175 @@ export const en = {
       no: 'Trying again will not help.',
     },
     billedWarning: 'This job may already have used GPU time, so it is not retried automatically.',
+
+    /* ---- the in-app surface (21.3) ---- */
+
+    panelTitle: 'AI',
+    panelAria: 'AI actions, cost and privacy',
+    open: 'Open AI',
+    close: 'Close AI',
+    /** One per catalogue action. The name the user reads, everywhere. */
+    actions: {
+      'text-to-image': 'Text to image',
+      'image-to-image': 'Image to image',
+      upscale: 'Upscale',
+      'background-removal': 'Background removal',
+      inpaint: 'Inpaint',
+      'design-set': 'Set designer',
+    },
+    /** The one-line state of the whole surface — four, because three of them work. */
+    surface: {
+      ready: 'Running on the GPU backend this deployment pays for.',
+      'your-key': 'No hosted backend here — running on a key of your own.',
+      'on-device': 'Running on this device. Nothing is sent anywhere.',
+      unavailable: 'Nothing here can run an AI action yet.',
+    },
+    /** Why a button is not a button, with the step that would change it. */
+    blocked: {
+      'not-configured': 'No backend on this deployment runs this action.',
+      'no-key': 'Add your own key below and this runs on your account.',
+      offline: 'This device is offline and this action needs the network.',
+      'sign-in': 'Sign in with Google — hosted jobs are run against an account.',
+    },
+    offlinePolicy:
+      'Offline, an AI action is refused rather than queued: a job carries a wall-clock deadline, so one held until the network came back would only run out of time when it was let go.',
+    useOnDevice: 'Use the on-device version instead',
+    /** What the job carries off the device, derived from the action itself. */
+    carries: {
+      nothing: 'Nothing leaves this device.',
+      prompt: 'Your prompt leaves this device.',
+      inputs: 'The image you pick leaves this device.',
+      'prompt-and-inputs': 'Your prompt and the image you pick leave this device.',
+    },
+    /** Where it goes. The other half of the sentence, from the provider. */
+    destination: {
+      device: 'It stays here — nothing is sent anywhere.',
+      deployment: 'It goes to a GPU this deployment rents.',
+      'third-party': (vendor: string) => `It goes to ${vendor}, under your own account.`,
+    },
+    retention:
+      'It is used to run this action and nothing else, and is not kept once the job ends.',
+    nothingRunsIt:
+      'Nothing here runs this action, so nothing is sent anywhere. What it would carry, and to whom, depends on the backend an administrator configures.',
+    /** Who pays. */
+    billing: {
+      free: 'Nothing is billed to anyone.',
+      deployment: 'Billed to this deployment.',
+      'your-key': 'Billed to you, by the vendor whose key you added.',
+    },
+    billedYourKey: 'Billed to you by the vendor whose key you added.',
+    estimate: 'Estimate',
+    estimateOf: (range: string) => `${range} — an estimate`,
+    estimateWhy:
+      'A range, because queue time, cold start and the settings you pick all move it. What it actually cost is shown once the job ends.',
+    actualCost: (amount: string, seconds: number) => `${amount} — ${seconds} GPU-seconds`,
+    noGpuCost: 'No GPU time is billed for this action.',
+    noBudgetYet:
+      'No spend ceiling is enforced yet — the ledger that would enforce one is phase 21.4. Until then this is what has been spent, not what is left.',
+    spentThisSession: (amount: string) => `Spent since this tab opened: ${amount}`,
+    /* consent */
+    consentTitle: (recipient: string) => `Send data to ${recipient}?`,
+    consentBodyDeployment:
+      'The prompt, and any image you pick, leave this device and are processed on a GPU this deployment rents. They are used to run the action and nothing else.',
+    consentBodyThirdParty: (vendor: string) =>
+      `The prompt, and any image you pick, leave this device and go to ${vendor} on the key you added. Their terms govern what happens next, and the bill is yours.`,
+    consentGrant: 'Agree and continue',
+    consentDecline: 'Not now',
+    consentGranted: (when: string) => `Agreed ${when}`,
+    consentRevoke: 'Revoke',
+    consentTitleList: 'What you have agreed to',
+    consentEmpty: 'Nothing has been agreed on this account.',
+    consentRecipient: {
+      deployment: 'This deployment’s GPU backend',
+      'third-party': 'A vendor you added a key for',
+    },
+    /* bring your own key */
+    keysTitle: 'Your own keys',
+    keysBody:
+      'A key you add is stored in this account’s vault in this browser. It is never synced to Drive, never sent to a Lattice server, and goes only to the vendor it belongs to.',
+    keyLabel: (vendor: string) => `${vendor} API key`,
+    keyPlaceholder: 'Paste a key to run on your own account',
+    keyBilled: 'Anything you run on this key is billed to you by the vendor, not to Lattice.',
+    keyRemove: 'Remove key',
+    keyGet: 'Where to get one',
+    keyStored: 'A key is stored for this account',
+    keyNone: 'No key stored',
+    actionsTitle: 'Actions',
+    hostPhoto: 'Offered in Photo mode, on the shot you are planning.',
+    noHostYet:
+      'Nothing in the app runs this yet: a generated image needs somewhere to be stored and something to be dropped into, and both are phase 21.5.',
+    openInPhoto: 'Open in Photo',
+    /* jobs */
+    jobsTitle: 'Generations',
+    jobsEmpty: 'Nothing has run yet.',
+    jobsRunning: (n: number) => (n === 1 ? '1 running' : `${n} running`),
+    dismiss: 'Dismiss',
+    progressAria: (action: string, percent: number) => `${action}: ${percent}% complete`,
+    notifyDone: (action: string) => `${action} finished`,
+    notifyFailed: (action: string) => `${action} failed`,
+    notifyCost: (amount: string, seconds: number) =>
+      `${seconds} GPU-seconds, about ${amount}.`,
+    notifyNoWorkerTime: 'The backend reported no worker time for this job.',
+
+    /**
+     * Photo mode's set designer — the one place in the app an AI action is
+     * actually launched today.
+     *
+     * Its strings were the last English-only panel in the feature, recorded
+     * as a debt when 21.0 migrated it onto the seam. They are here rather
+     * than under `toolbar.photo` because they belong to the AI surface: the
+     * consent card, the key field and the disclosure beside them are shared
+     * with the top-bar panel, and splitting the sentences across two
+     * catalogues is how two surfaces start describing the same upload
+     * differently.
+     */
+    photo: {
+      title: 'AI set designer',
+      close: 'Close the AI panel',
+      intro:
+        'Describe the scene you want to plan: the assistant lays out cameras, lights and subjects on the set, replacing the active shot’s elements.',
+      examplesTitle: 'Quick examples',
+      examples: {
+        beauty: {
+          title: 'Beauty photo set',
+          prompt: 'Create a beauty photoshoot set with two softboxes and a rim light.',
+        },
+        ski: {
+          title: 'Ski slope with drone',
+          prompt:
+            'Create a scene on a summer ski slope with a photographer at the edge of the track and two cameras, one on a drone.',
+        },
+        interview: {
+          title: 'Cinematic interview',
+          prompt:
+            'Set up a video interview with a 45-degree key light, an LED fill panel and a camera with an 85mm lens for cinematic bokeh.',
+        },
+        night: {
+          title: 'Night exterior',
+          prompt:
+            'Create a night exterior set with two actors close together, a warm yellow spot simulating a street lamp and a cold blue rim light.',
+        },
+      },
+      promptPlaceholder: 'Describe the set (e.g. interview with 3 lights…)',
+      generate: 'Generate layout',
+      generating: 'Generating…',
+      steps: [
+        'Contacting the virtual director…',
+        'Setting up the coordinate plane…',
+        'Computing camera FOV cones…',
+        'Balancing light temperatures…',
+        'Placing subjects and backdrop…',
+        'Drawing the blueprint on canvas…',
+      ],
+      successTitle: 'Set generated',
+      success: (engine: string, cameras: number, lights: number, others: number) =>
+        `${engine} placed ${cameras} camera${cameras === 1 ? '' : 's'}, ${lights} light${lights === 1 ? '' : 's'} and ${others} scene element${others === 1 ? '' : 's'} in the active shot.`,
+      failureTitle: 'Generation failed',
+      useOffline: 'Use the offline generator instead',
+      engineModel: 'The model',
+      engineOffline: 'An offline template',
+      unknownError: 'Unknown error — check the API key.',
+    },
   },
 
   /**
@@ -1399,8 +1579,8 @@ export const it: Catalog = {
     presentation: 'Presentazione',
     code: 'Codice',
     photo: 'Foto',
+    ai: 'AI',
     comfyui: 'ComfyUI',
-    aiDashboard: 'Dashboard AI',
     trace: 'Trace',
     forge: 'Forge',
     folio: 'Folio',
@@ -1452,7 +1632,6 @@ export const it: Catalog = {
     themeToDark: 'Passa al tema scuro',
     plannedDomain: {
       comfyui: 'workflow generativi',
-      aiDashboard: 'modelli, consumi e chiavi',
       trace: 'vettoriale e illustrazione',
       forge: 'immagine e pittura',
       folio: 'impaginazione ed editoria',
@@ -1461,6 +1640,9 @@ export const it: Catalog = {
     plannedTitle: (label, domain, phase) =>
       `${label} — ${domain} · fase ${phase}, non ancora realizzato`,
     plannedAria: (label) => `${label} — previsto, non ancora disponibile`,
+    aiOpen: 'AI — azioni, costo e privacy',
+    aiClose: 'Chiudi il pannello AI',
+    aiAria: (running) => (running > 0 ? `Pannello AI — ${running} in corso` : 'Pannello AI'),
     more: 'Altri controlli',
   },
 
@@ -2270,6 +2452,7 @@ export const it: Catalog = {
       github: 'GitHub — sincronizza il codice',
       drive: 'Google Drive — connessione e diagnostica',
       share: 'Condivisione — membri e inviti',
+      ai: 'AI — azioni, costo e privacy',
       comments: 'Commenti',
       activity: 'Registro attività',
       versions: 'Cronologia versioni',
@@ -2603,6 +2786,153 @@ export const it: Catalog = {
     },
     billedWarning:
       'Questo lavoro potrebbe aver già consumato tempo GPU, quindi non viene ritentato in automatico.',
+
+    panelTitle: 'AI',
+    panelAria: 'Azioni AI, costo e privacy',
+    open: 'Apri AI',
+    close: 'Chiudi AI',
+    actions: {
+      'text-to-image': 'Da testo a immagine',
+      'image-to-image': 'Da immagine a immagine',
+      upscale: 'Ingrandimento',
+      'background-removal': 'Rimozione sfondo',
+      inpaint: 'Ritocco',
+      'design-set': 'Progettazione set',
+    },
+    surface: {
+      ready: 'Gira sul backend GPU che paga questo deployment.',
+      'your-key': 'Nessun backend ospitato qui — gira su una chiave tua.',
+      'on-device': 'Gira su questo dispositivo. Non esce niente.',
+      unavailable: 'Qui non c’è ancora niente che possa eseguire un’azione AI.',
+    },
+    blocked: {
+      'not-configured': 'Nessun backend di questo deployment esegue questa azione.',
+      'no-key': 'Aggiungi una chiave tua qui sotto e l’azione gira sul tuo account.',
+      offline: 'Questo dispositivo è offline e l’azione ha bisogno della rete.',
+      'sign-in': 'Accedi con Google — i lavori ospitati girano su un account.',
+    },
+    offlinePolicy:
+      'Offline un’azione AI viene rifiutata, non messa in coda: un lavoro porta con sé una scadenza a orologio, quindi uno trattenuto fino al ritorno della rete scadrebbe proprio nel momento in cui parte.',
+    useOnDevice: 'Usa invece la versione su dispositivo',
+    carries: {
+      nothing: 'Non esce niente da questo dispositivo.',
+      prompt: 'Il tuo prompt esce da questo dispositivo.',
+      inputs: 'L’immagine che scegli esce da questo dispositivo.',
+      'prompt-and-inputs':
+        'Il tuo prompt e l’immagine che scegli escono da questo dispositivo.',
+    },
+    destination: {
+      device: 'Resta qui — non viene inviato da nessuna parte.',
+      deployment: 'Va su una GPU che questo deployment noleggia.',
+      'third-party': (vendor) => `Va a ${vendor}, sul tuo account.`,
+    },
+    retention:
+      'Serve a eseguire questa azione e nient’altro, e non viene conservato dopo la fine del lavoro.',
+    nothingRunsIt:
+      'Qui non c’è niente che esegua questa azione, quindi non viene inviato niente. Cosa porterebbe con sé, e a chi, dipende dal backend che configura un amministratore.',
+    billing: {
+      free: 'Non viene addebitato niente a nessuno.',
+      deployment: 'Addebitato a questo deployment.',
+      'your-key': 'Addebitato a te, dal fornitore della chiave che hai aggiunto.',
+    },
+    billedYourKey: 'Addebitato a te dal fornitore della chiave che hai aggiunto.',
+    estimate: 'Stima',
+    estimateOf: (range) => `${range} — una stima`,
+    estimateWhy:
+      'Un intervallo, perché coda, avvio a freddo e le impostazioni che scegli lo spostano. Quanto è costato davvero compare a lavoro finito.',
+    actualCost: (amount, seconds) => `${amount} — ${seconds} secondi GPU`,
+    noGpuCost: 'Per questa azione non viene addebitato tempo GPU.',
+    noBudgetYet:
+      'Non c’è ancora un tetto di spesa: il registro che lo imporrebbe è la fase 21.4. Fino ad allora questo è quanto è stato speso, non quanto resta.',
+    spentThisSession: (amount) => `Speso da quando hai aperto questa scheda: ${amount}`,
+    consentTitle: (recipient) => `Inviare dati a ${recipient}?`,
+    consentBodyDeployment:
+      'Il prompt, e qualsiasi immagine tu scelga, escono da questo dispositivo e vengono elaborati su una GPU noleggiata da questo deployment. Servono a eseguire l’azione e nient’altro.',
+    consentBodyThirdParty: (vendor) =>
+      `Il prompt, e qualsiasi immagine tu scelga, escono da questo dispositivo e vanno a ${vendor} con la chiave che hai aggiunto. Da lì valgono le loro condizioni, e il conto è tuo.`,
+    consentGrant: 'Accetto, procedi',
+    consentDecline: 'Non ora',
+    consentGranted: (when) => `Accettato ${when}`,
+    consentRevoke: 'Revoca',
+    consentTitleList: 'Cosa hai accettato',
+    consentEmpty: 'Su questo account non è stato accettato niente.',
+    consentRecipient: {
+      deployment: 'Il backend GPU di questo deployment',
+      'third-party': 'Un fornitore per cui hai aggiunto una chiave',
+    },
+    keysTitle: 'Le tue chiavi',
+    keysBody:
+      'Una chiave che aggiungi resta nel vault di questo account, in questo browser. Non viene mai sincronizzata su Drive, non arriva mai a un server Lattice e va solo al fornitore a cui appartiene.',
+    keyLabel: (vendor) => `Chiave API ${vendor}`,
+    keyPlaceholder: 'Incolla una chiave per usare il tuo account',
+    keyBilled:
+      'Tutto quello che esegui con questa chiave lo addebita a te il fornitore, non Lattice.',
+    keyRemove: 'Rimuovi chiave',
+    keyGet: 'Dove ottenerne una',
+    keyStored: 'Per questo account è salvata una chiave',
+    keyNone: 'Nessuna chiave salvata',
+    actionsTitle: 'Azioni',
+    hostPhoto: 'Disponibile in modalità Foto, sullo scatto che stai progettando.',
+    noHostYet:
+      'Nell’app non c’è ancora niente che la esegua: un’immagine generata ha bisogno di un posto dove finire e di qualcosa in cui essere inserita, e sono entrambi la fase 21.5.',
+    openInPhoto: 'Apri in Foto',
+    jobsTitle: 'Generazioni',
+    jobsEmpty: 'Non è ancora stato eseguito niente.',
+    jobsRunning: (n) => (n === 1 ? '1 in corso' : `${n} in corso`),
+    dismiss: 'Rimuovi',
+    progressAria: (action, percent) => `${action}: ${percent}% completato`,
+    notifyDone: (action) => `${action}: finito`,
+    notifyFailed: (action) => `${action}: non riuscito`,
+    notifyCost: (amount, seconds) => `${seconds} secondi GPU, circa ${amount}.`,
+    notifyNoWorkerTime: 'Il backend non ha riportato tempo di lavoro per questo job.',
+
+    photo: {
+      title: 'Progettista AI del set',
+      close: 'Chiudi il pannello AI',
+      intro:
+        'Descrivi la scena che vuoi progettare: l’assistente dispone camere, luci e soggetti sul set, sostituendo gli elementi dello scatto attivo.',
+      examplesTitle: 'Esempi rapidi',
+      examples: {
+        beauty: {
+          title: 'Set beauty',
+          prompt: 'Crea un set per uno shooting beauty con due softbox e una luce di contorno.',
+        },
+        ski: {
+          title: 'Pista da sci con drone',
+          prompt:
+            'Crea una scena su una pista da sci estiva con un fotografo a bordo pista e due camere, una su un drone.',
+        },
+        interview: {
+          title: 'Intervista cinematografica',
+          prompt:
+            'Prepara un’intervista video con una key light a 45 gradi, un pannello LED di riempimento e una camera con un 85mm per un bokeh cinematografico.',
+        },
+        night: {
+          title: 'Esterno notte',
+          prompt:
+            'Crea un set in esterno notte con due attori vicini, uno spot giallo caldo che simula un lampione e una luce di contorno blu fredda.',
+        },
+      },
+      promptPlaceholder: 'Descrivi il set (es. intervista con 3 luci…)',
+      generate: 'Genera disposizione',
+      generating: 'Generazione…',
+      steps: [
+        'Contatto il regista virtuale…',
+        'Preparo il piano cartesiano…',
+        'Calcolo i coni di campo delle camere…',
+        'Bilancio le temperature delle luci…',
+        'Posiziono soggetti e fondale…',
+        'Disegno la planimetria sul canvas…',
+      ],
+      successTitle: 'Set generato',
+      success: (engine, cameras, lights, others) =>
+        `${engine} ha posizionato ${cameras} camer${cameras === 1 ? 'a' : 'e'}, ${lights} luc${lights === 1 ? 'e' : 'i'} e ${others} element${others === 1 ? 'o' : 'i'} di scena nello scatto attivo.`,
+      failureTitle: 'Generazione non riuscita',
+      useOffline: 'Usa invece il generatore offline',
+      engineModel: 'Il modello',
+      engineOffline: 'Un modello offline',
+      unknownError: 'Errore sconosciuto — controlla la chiave API.',
+    },
   },
 
   textEntities: {
