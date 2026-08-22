@@ -1,0 +1,8 @@
+# The handler's own dependencies, pinned exactly (Phase 21.2, #101).
+#
+# ComfyUI brings its own requirements.txt and this does not duplicate it.
+# Three packages, because everything else the handler needs is the standard
+# library — a small dependency list is a small supply chain to review (21.11).
+runpod==1.7.7
+requests==2.32.3
+websocket-client==1.8.0

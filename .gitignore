@@ -10,3 +10,7 @@ dist
 
 # Graphify generated knowledge graph (dev-only, rebuild with `npm run graph:build`)
 graphify-out/
+
+# Python bytecode from the ComfyUI pipeline (comfy/, Phase 21.2)
+__pycache__/
+*.py[cod]

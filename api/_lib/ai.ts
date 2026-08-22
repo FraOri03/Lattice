@@ -1,5 +1,6 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 import { AI_ACTIONS, type AiActionId, type GpuClass } from '../../src/lib/ai/actions.js'
+import { AI_FAILURES } from '../../src/lib/ai/jobModel.js'
 import type { AiFailureReason, AiJobOutput, AiJobState } from '../../src/lib/ai/jobModel.js'
 import { httpStatusFor } from '../../src/lib/ai/protocol.js'
 import type { ApiRes } from './realtime.js'
@@ -392,12 +393,23 @@ export function mapStatus(status: unknown): AiJobState {
 /**
  * A failed job's `error` string, mapped onto the taxonomy.
  *
- * Only two shapes are worth recognising: a container that does not have the
- * model the action asked for (a deployment mistake, and retrying will not
- * help), and everything else. Guessing more finely from free text would
- * produce confident wrong answers.
+ * Our own container names its reason: 21.2's handler answers
+ * `"[invalid-parameters] ..."`, because a worker that knows exactly what went
+ * wrong should not make this function guess. The prefix is only trusted when
+ * it names a reason the taxonomy actually has — an upstream free to write
+ * anything into a string must not be free to choose how the UI reacts.
+ *
+ * Without a prefix, only two shapes are worth recognising: a container that
+ * does not have the model the action asked for (a deployment mistake, and
+ * retrying will not help), and everything else. Guessing more finely from
+ * free text would produce confident wrong answers.
  */
 export function mapJobError(error: string): { reason: AiFailureReason; detail: string } {
+  const named = /^\s*\[([a-z-]{3,20})\]\s*(.*)$/s.exec(error)
+  if (named && Object.hasOwn(AI_FAILURES, named[1])) {
+    return { reason: named[1] as AiFailureReason, detail: named[2].slice(0, 300) }
+  }
+
   const lower = error.toLowerCase()
   if (
     lower.includes('checkpoint') ||

@@ -1,0 +1,127 @@
+{
+  "$comment": [
+    "From a catalogue action (src/lib/ai/actions.ts) to a workflow, a version",
+    "and the node inputs it overrides (Phase 21.2, #101).",
+    "",
+    "THIS FILE AND THE WORKFLOWS ARE THE BLAST RADIUS. Node class names, node",
+    "ids and input keys are ComfyUI concepts and they are allowed to exist",
+    "here and in workflows/*.json and nowhere else in the repository — not in",
+    "src/, not in api/. If ComfyUI is ever replaced, this directory is what",
+    "gets rewritten and nothing above it moves. `comfy/pipeline.test.ts`",
+    "enforces that.",
+    "",
+    "A parameter that is NOT listed under `params` is fixed by the workflow.",
+    "That is a product decision every time, and `fixed` says which decision",
+    "and why — an exposed knob nobody explained is how a catalogue stops",
+    "matching what the graph actually accepts."
+  ],
+
+  "mapVersion": 1,
+
+  "actions": {
+    "text-to-image": {
+      "workflow": "text-to-image",
+      "version": 1,
+      "gpuClass": "standard",
+      "outputNode": "8",
+      "seed": { "node": "6", "input": "seed" },
+      "params": {
+        "prompt": { "node": "3", "input": "text" },
+        "negativePrompt": { "node": "4", "input": "text" },
+        "width": { "node": "5", "input": "width" },
+        "height": { "node": "5", "input": "height" },
+        "steps": { "node": "6", "input": "steps" },
+        "guidance": { "node": "6", "input": "cfg" },
+        "seed": { "node": "6", "input": "seed" }
+      },
+      "inputs": [],
+      "fixed": {
+        "sampler_name / scheduler": "dpmpp_2m + karras. Exposing the sampler would make the catalogue's determinism claim untestable — the same seed on a different sampler is a different image, and the claim is per action, not per request.",
+        "batch_size": "One image per job. 21.4 prices a job; a batch would make a job's cost depend on a parameter the ceiling never sees.",
+        "denoise": "1.0 — anything less is image-to-image, which is its own action."
+      }
+    },
+
+    "image-to-image": {
+      "workflow": "image-to-image",
+      "version": 1,
+      "gpuClass": "standard",
+      "outputNode": "9",
+      "seed": { "node": "7", "input": "seed" },
+      "params": {
+        "prompt": { "node": "5", "input": "text" },
+        "strength": { "node": "7", "input": "denoise" },
+        "steps": { "node": "7", "input": "steps" },
+        "seed": { "node": "7", "input": "seed" }
+      },
+      "inputs": [{ "kind": "image", "node": "3", "input": "image" }],
+      "fixed": {
+        "negativePrompt": "Empty. The catalogue does not offer one for this action, and a graph input the product cannot reach is a graph input that drifts.",
+        "cfg": "5 — tuned with the fixed sampler; the two are one setting in practice.",
+        "sampler_name / scheduler": "As text-to-image, and for the same reason."
+      }
+    },
+
+    "inpaint": {
+      "workflow": "inpaint",
+      "version": 1,
+      "gpuClass": "heavy",
+      "outputNode": "10",
+      "seed": { "node": "8", "input": "seed" },
+      "params": {
+        "prompt": { "node": "6", "input": "text" },
+        "steps": { "node": "8", "input": "steps" },
+        "seed": { "node": "8", "input": "seed" }
+      },
+      "inputs": [
+        { "kind": "image", "node": "3", "input": "image" },
+        { "kind": "mask", "node": "4", "input": "image" }
+      ],
+      "fixed": {
+        "grow_mask_by": "6 px. A mask that stops exactly at the edge leaves a seam; this is the smallest value that reliably hides one.",
+        "channel": "The mask's red channel, so a plain black-and-white PNG works and white is what gets repainted.",
+        "denoise": "1.0 — VAEEncodeForInpaint already restricts the change to the masked region."
+      }
+    },
+
+    "upscale": {
+      "workflow": "upscale",
+      "version": 1,
+      "gpuClass": "light",
+      "outputNode": "5",
+      "seed": null,
+      "params": {
+        "scale": {
+          "node": "4",
+          "input": "scale_by",
+          "values": { "2": 0.5, "4": 1 }
+        }
+      },
+      "inputs": [{ "kind": "image", "node": "2", "input": "image" }],
+      "fixed": {
+        "upscale_method": "lanczos, for the resample back down from 4x. Real-ESRGAN only produces 4x, so a request for 2x is 4x followed by a halving — which looks better than any 2x model this size would.",
+        "model": "RealESRGAN_x4plus, and the reason it is the whole workflow: an upscaler is a small model and a short job, which is why this action runs on the light GPU class."
+      }
+    }
+  },
+
+  "notShipped": {
+    "background-removal": {
+      "why": "No licence-clear model that can be pinned. The obvious choice, BRIA RMBG-1.4, forbids commercial use; the MIT alternative downloads its weights at first use, which cannot be hashed at build time. Both refusals are recorded in pins.json under `rejected`.",
+      "consequence": "The action stays in the catalogue because the product still intends it, and a job submitted for it fails with `model-missing` — the reason that exists for exactly this, with a retry stance of `no`. It is not silently dropped and it is not silently attempted."
+    }
+  },
+
+  "superseded": [],
+  "$supersededComment": [
+    "Workflow versions no longer mapped by any action, kept so a past result",
+    "stays explainable — 'generated with upscale v2' has to mean something a",
+    "year later, and 21.5 stores exactly that pair.",
+    "",
+    "Empty today because every workflow here is at version 1. The mechanism is",
+    "not: `resolve()` loads by id AND version from the workflow directory, so",
+    "an entry listed here keeps resolving after the map has moved on. Adding a",
+    "version means writing `<id>@<n+1>.json`, pointing the action at it, and",
+    "listing the old pair here with what changed."
+  ]
+}

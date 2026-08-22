@@ -25,6 +25,17 @@ jobs:
         run: npm run typecheck
       - name: Test
         run: npm test
+      # 21.2 (#101) — the ComfyUI resolver runs in the container and is
+      # Python, so `npm test` cannot reach it. It has no dependencies beyond
+      # the standard library, which is why this is two lines rather than a
+      # second toolchain.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Test the ComfyUI pipeline resolver
+        run: npm run comfy:test
+      - name: Validate every ComfyUI graph
+        run: npm run comfy:validate
       - name: Build
         run: npm run build
       # 17.4 (#87) — every VITE_-prefixed variable is compiled into the
